@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
   # Wireframes para Aplicación Educativa
 
@@ -9,3 +10,6 @@
 
   Run `npm run dev` to start the development server.
   
+=======
+# EduPath-Frontend
+>>>>>>> 9bd6d883d3bcf214facaac0ff73c4498fb7098cf
