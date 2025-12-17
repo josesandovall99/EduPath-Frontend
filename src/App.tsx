@@ -1,0 +1,272 @@
+import { useState } from 'react';
+import { LoginScreen } from './components/LoginScreen';
+import { AdminRegisterScreen } from './components/AdminRegisterScreen';
+import { DashboardScreen } from './components/DashboardScreen';
+import { AdminDashboard } from './components/AdminDashboard';
+import { ThemeManagementScreen } from './components/ThemeManagementScreen';
+import { ContentManagementScreen } from './components/ContentManagementScreen';
+import { ReportsScreen } from './components/ReportsScreen';
+import { StudentTrackingScreen } from './components/StudentTrackingScreen';
+import { SubjectContentScreen } from './components/SubjectContentScreen';
+import { ProgrammingContentView } from './components/ProgrammingContentView';
+import { TheoryContentView } from './components/TheoryContentView';
+import { QuizActivityView } from './components/QuizActivityView';
+import { UMLDiagramView } from './components/UMLDiagramView';
+import { AIWorkshopView } from './components/AIWorkshopView';
+import { ChatbotButton } from './components/ChatbotButton';
+
+type Screen = 
+  | 'login' 
+  | 'admin-register'
+  | 'dashboard' 
+  | 'admin-dashboard'
+  | 'admin-themes'
+  | 'admin-contents'
+  | 'admin-reports'
+  | 'admin-students'
+  | 'subject-content' 
+  | 'programming-content'
+  | 'theory-content'
+  | 'quiz-activity'
+  | 'uml-diagram'
+  | 'ai-workshop';
+
+interface Subject {
+  id: string;
+  name: string;
+}
+
+interface Content {
+  id: string;
+  title: string;
+  type: 'video' | 'document' | 'activity' | 'quiz' | 'uml' | 'workshop';
+  duration?: string;
+  status?: 'completed' | 'in-progress' | 'not-started';
+}
+
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [selectedContent, setSelectedContent] = useState<Content | null>(null);
+
+  // Student login (Google)
+  const handleLogin = () => {
+    setCurrentScreen('dashboard');
+  };
+
+  // Admin login (Ingresar button)
+  const handleAdminLogin = () => {
+    setCurrentScreen('admin-dashboard');
+  };
+
+  // Show admin register
+  const handleShowRegister = () => {
+    setCurrentScreen('admin-register');
+  };
+
+  // Complete registration
+  const handleRegister = () => {
+    // In real app, this would submit the form
+    // For now, just go to admin dashboard
+    setCurrentScreen('admin-dashboard');
+  };
+
+  // Back to login
+  const handleBackToLogin = () => {
+    setCurrentScreen('login');
+    setSelectedSubject(null);
+    setSelectedContent(null);
+  };
+
+  const handleLogout = () => {
+    setCurrentScreen('login');
+    setSelectedSubject(null);
+    setSelectedContent(null);
+  };
+
+  const handleSubjectSelect = (subject: Subject) => {
+    setSelectedSubject(subject);
+    setCurrentScreen('subject-content');
+  };
+
+  const handleBackToDashboard = () => {
+    setCurrentScreen('dashboard');
+    setSelectedSubject(null);
+    setSelectedContent(null);
+  };
+
+  const handleBackToAdminDashboard = () => {
+    setCurrentScreen('admin-dashboard');
+  };
+
+  const handleAdminNavigate = (section: 'themes' | 'contents' | 'reports' | 'students') => {
+    switch (section) {
+      case 'themes':
+        setCurrentScreen('admin-themes');
+        break;
+      case 'contents':
+        setCurrentScreen('admin-contents');
+        break;
+      case 'reports':
+        setCurrentScreen('admin-reports');
+        break;
+      case 'students':
+        setCurrentScreen('admin-students');
+        break;
+    }
+  };
+
+  const handleContentSelect = (content: Content) => {
+    setSelectedContent(content);
+    
+    // Determine which view to show based on subject and content type
+    if (selectedSubject?.name === 'Fundamentos de Programación') {
+      // Programming subject uses the programming view for all content
+      setCurrentScreen('programming-content');
+    } else if (selectedSubject?.name === 'Análisis de Sistemas') {
+      // Analysis Systems subject
+      if (content.type === 'workshop') {
+        setCurrentScreen('ai-workshop');
+      } else if (content.type === 'uml') {
+        setCurrentScreen('uml-diagram');
+      } else if (content.type === 'quiz' || content.type === 'activity') {
+        setCurrentScreen('quiz-activity');
+      } else {
+        setCurrentScreen('theory-content');
+      }
+    } else if (selectedSubject?.name === 'Alcance, Tiempo y Costo') {
+      // Project Management subject
+      if (content.type === 'workshop') {
+        setCurrentScreen('ai-workshop');
+      } else if (content.type === 'quiz' || content.type === 'activity') {
+        setCurrentScreen('quiz-activity');
+      } else {
+        setCurrentScreen('theory-content');
+      }
+    } else {
+      // Default to theory content
+      setCurrentScreen('theory-content');
+    }
+  };
+
+  const handleBackToSubject = () => {
+    setCurrentScreen('subject-content');
+    setSelectedContent(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      {currentScreen === 'login' && (
+        <LoginScreen 
+          onLogin={handleLogin}
+          onAdminLogin={handleAdminLogin}
+          onShowRegister={handleShowRegister}
+        />
+      )}
+
+      {currentScreen === 'admin-register' && (
+        <AdminRegisterScreen
+          onBack={handleBackToLogin}
+          onRegister={handleRegister}
+        />
+      )}
+      
+      {currentScreen === 'dashboard' && (
+        <>
+          <DashboardScreen 
+            onSubjectSelect={handleSubjectSelect}
+            onLogout={handleLogout}
+          />
+          <ChatbotButton />
+        </>
+      )}
+
+      {currentScreen === 'admin-dashboard' && (
+        <AdminDashboard
+          onLogout={handleLogout}
+          onNavigate={handleAdminNavigate}
+        />
+      )}
+
+      {currentScreen === 'admin-themes' && (
+        <ThemeManagementScreen onBack={handleBackToAdminDashboard} />
+      )}
+
+      {currentScreen === 'admin-contents' && (
+        <ContentManagementScreen onBack={handleBackToAdminDashboard} />
+      )}
+
+      {currentScreen === 'admin-reports' && (
+        <ReportsScreen onBack={handleBackToAdminDashboard} />
+      )}
+
+      {currentScreen === 'admin-students' && (
+        <StudentTrackingScreen onBack={handleBackToAdminDashboard} />
+      )}
+      
+      {currentScreen === 'subject-content' && selectedSubject && (
+        <>
+          <SubjectContentScreen 
+            subject={selectedSubject}
+            onBack={handleBackToDashboard}
+            onContentSelect={handleContentSelect}
+          />
+          <ChatbotButton />
+        </>
+      )}
+
+      {currentScreen === 'programming-content' && selectedContent && (
+        <>
+          <ProgrammingContentView
+            content={selectedContent}
+            onBack={handleBackToSubject}
+          />
+          <ChatbotButton />
+        </>
+      )}
+
+      {currentScreen === 'theory-content' && selectedContent && selectedSubject && (
+        <>
+          <TheoryContentView
+            subjectName={selectedSubject.name}
+            content={selectedContent}
+            onBack={handleBackToSubject}
+          />
+          <ChatbotButton />
+        </>
+      )}
+
+      {currentScreen === 'quiz-activity' && selectedContent && selectedSubject && (
+        <>
+          <QuizActivityView
+            subjectName={selectedSubject.name}
+            activity={selectedContent}
+            onBack={handleBackToSubject}
+          />
+          <ChatbotButton />
+        </>
+      )}
+
+      {currentScreen === 'uml-diagram' && selectedContent && (
+        <>
+          <UMLDiagramView
+            activity={selectedContent}
+            onBack={handleBackToSubject}
+          />
+          <ChatbotButton />
+        </>
+      )}
+
+      {currentScreen === 'ai-workshop' && selectedContent && selectedSubject && (
+        <>
+          <AIWorkshopView
+            subjectName={selectedSubject.name}
+            workshop={selectedContent}
+            onBack={handleBackToSubject}
+          />
+          {/* Note: ChatbotButton is integrated into AIWorkshopView */}
+        </>
+      )}
+    </div>
+  );
+}
