@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Square, GitMerge, Share2, Boxes, Diamond, RotateCcw, Redo2, Trash2, BookOpen, Save, Send } from 'lucide-react';
+import * as joint from 'jointjs';
+import 'jointjs/dist/joint.css';
 
 
 interface UMLDiagramViewProps {
@@ -10,16 +12,464 @@ interface UMLDiagramViewProps {
   onBack: () => void;
 }
 
+type RelationType = 'association' | 'inheritance' | 'aggregation' | 'composition' | null;
+
+interface MultiplicityDialog {
+  isOpen: boolean;
+  sourceId: string | null;
+  targetId: string | null;
+  type: RelationType;
+  sourceMultiplicity: string;
+  targetMultiplicity: string;
+}
+
 export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
-  const [diagramElements] = useState([
-    { id: 'class1', name: 'Usuario', x: 100, y: 100 },
-    { id: 'class2', name: 'Producto', x: 350, y: 100 }
-  ]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const graphRef = useRef<joint.dia.Graph | null>(null);
+  const paperRef = useRef<joint.dia.Paper | null>(null);
+  const [selectedElement, setSelectedElement] = useState<joint.dia.Element | null>(null);
+  const [classText, setClassText] = useState('');
+  const [isEditingClass, setIsEditingClass] = useState(false);
+  const [undoStack, setUndoStack] = useState<string[]>([]);
+  const [redoStack, setRedoStack] = useState<string[]>([]);
+  
+  // Estados para modo de dibujo de relaciones
+  const [drawingMode, setDrawingMode] = useState<RelationType>(null);
+  const [selectedForRelation, setSelectedForRelation] = useState<string | null>(null);
+  
+  // Refs para mantener los valores actuales en los listeners
+  const drawingModeRef = useRef<RelationType>(null);
+  const selectedForRelationRef = useRef<string | null>(null);
+  
+  const [multiplicityDialog, setMultiplicityDialog] = useState<MultiplicityDialog>({
+    isOpen: false,
+    sourceId: null,
+    targetId: null,
+    type: null,
+    sourceMultiplicity: '1',
+    targetMultiplicity: '1',
+  });
+
+  // Actualizar los refs cuando cambien los estados
+  useEffect(() => {
+    drawingModeRef.current = drawingMode;
+    selectedForRelationRef.current = selectedForRelation;
+  }, [drawingMode, selectedForRelation]);
+
+  // Inicializar el lienzo de jointjs
+  useEffect(() => {
+    const graph = new joint.dia.Graph();
+    graphRef.current = graph;
+
+    const paper = new joint.dia.Paper({
+      el: containerRef.current!,
+      model: graph,
+      width: '100%',
+      height: '100%',
+      gridSize: 10,
+      drawGrid: true,
+      background: { color: '#ffffff' },
+      interactive: true
+    });
+    paperRef.current = paper;
+
+    paper.on('element:pointerclick', (elementView: joint.dia.ElementView) => {
+      const element = ((elementView as any).model) as joint.dia.Element;
+      
+      console.log('Click en elemento:', element.id, 'DrawingMode:', drawingModeRef.current);
+      
+      // Si estamos en modo de dibujo de relaciones
+      if (drawingModeRef.current) {
+        console.log('En modo dibujo, selected:', selectedForRelationRef.current);
+        
+        if (!selectedForRelationRef.current) {
+          // Seleccionar el primer elemento
+          console.log('Primera clase seleccionada:', element.id);
+          selectedForRelationRef.current = element.id as string;
+          setSelectedForRelation(element.id as string);
+          
+          // Resaltar visualmente
+          element.attr('body/stroke', '#FF6B6B');
+          element.attr('body/strokeWidth', 4);
+        } else if (element.id !== selectedForRelationRef.current) {
+          // Seleccionar el segundo elemento y abrir diálogo
+          console.log('Segunda clase seleccionada:', element.id, 'Abriendo modal...');
+          
+          // Restaurar el color de la primera clase
+          const firstElement = graphRef.current?.getCell(selectedForRelationRef.current);
+          if (firstElement) {
+            firstElement.attr('body/stroke', '#7ED6A7');
+            firstElement.attr('body/strokeWidth', 2);
+          }
+          
+          // Abrir modal
+          const sourceId = selectedForRelationRef.current;
+          const targetId = element.id as string;
+          const type = drawingModeRef.current;
+          
+          console.log('Abriendo modal con:', { sourceId, targetId, type });
+          
+          setMultiplicityDialog({
+            isOpen: true,
+            sourceId,
+            targetId,
+            type,
+            sourceMultiplicity: '1',
+            targetMultiplicity: '1',
+          });
+          
+          selectedForRelationRef.current = null;
+          setSelectedForRelation(null);
+          setDrawingMode(null);
+        } else {
+          // Deseleccionar si hace clic en el mismo elemento
+          console.log('Deseleccionando...');
+          const currentElement = graphRef.current?.getCell(element.id as string);
+          if (currentElement) {
+            currentElement.attr('body/stroke', '#7ED6A7');
+            currentElement.attr('body/strokeWidth', 2);
+          }
+          selectedForRelationRef.current = null;
+          setSelectedForRelation(null);
+        }
+      } else {
+        // Modo normal: solo seleccionar la clase (no editar automáticamente)
+        console.log('Modo normal - seleccionando clase');
+        setSelectedElement(element);
+        setClassText(element.attr('label/text') || '');
+        setIsEditingClass(false);
+      }
+    });
+
+    return () => {
+      graphRef.current = null;
+      paperRef.current = null;
+    };
+  }, []);
+
+  const saveToUndoStack = () => {
+    const json = graphRef.current?.toJSON();
+    if (json) {
+      setUndoStack([...undoStack, JSON.stringify(json)]);
+    }
+  };
+
+  const addClass = () => {
+    setDrawingMode(null);
+    setSelectedForRelation(null);
+    saveToUndoStack();
+    const newClass = new joint.shapes.standard.Rectangle();
+    newClass.position(100 + Math.random() * 600, 100 + Math.random() * 300);
+    newClass.resize(200, 100);
+    newClass.attr({
+      body: { fill: '#ffffff', stroke: '#7ED6A7', strokeWidth: 2 },
+      label: { text: 'NuevaClase\n- atributo: tipo\n+ metodo(): retorno', fill: '#3A4A5B' }
+    });
+    graphRef.current?.addCell(newClass);
+  };
+
+  const startDrawingRelation = (type: RelationType) => {
+    setDrawingMode(type);
+    setSelectedForRelation(null);
+    setSelectedElement(null);
+  };
+
+  const createRelation = () => {
+    if (!multiplicityDialog.sourceId || !multiplicityDialog.targetId || !multiplicityDialog.type) {
+      console.log('Faltan datos para crear relación');
+      return;
+    }
+
+    console.log('Creando relación de:', multiplicityDialog.sourceId, 'a:', multiplicityDialog.targetId);
+    
+    saveToUndoStack();
+    const source = graphRef.current?.getCell(multiplicityDialog.sourceId);
+    const target = graphRef.current?.getCell(multiplicityDialog.targetId);
+
+    console.log('Source:', source?.id, 'Target:', target?.id);
+
+    if (!source || !target) {
+      console.log('No se encontraron las celdas');
+      return;
+    }
+
+    const link = new joint.shapes.standard.Link();
+    link.source(source);
+    link.target(target);
+
+    let lineStyle: any = { stroke: '#7ED6A7', strokeWidth: 2 };
+    let targetMarker: any = { type: 'classic' };
+
+    // Configurar según el tipo de relación
+    if (multiplicityDialog.type === 'inheritance') {
+      lineStyle.strokeDasharray = '5,5';
+      targetMarker = { type: 'path', d: 'M 10 -10 L 0 0 L 10 10 Z', fill: '#7ED6A7', stroke: '#7ED6A7' };
+    } else if (multiplicityDialog.type === 'aggregation') {
+      targetMarker = { type: 'path', d: 'M 10 -10 L 0 0 L 10 10 Z', fill: 'white', stroke: '#7ED6A7', strokeWidth: 2 };
+    } else if (multiplicityDialog.type === 'composition') {
+      targetMarker = { type: 'path', d: 'M 10 -10 L 0 0 L 10 10 Z', fill: '#7ED6A7', stroke: '#7ED6A7' };
+    }
+
+    link.attr('line', { stroke: lineStyle.stroke, strokeWidth: lineStyle.strokeWidth, targetMarker });
+    
+    if (lineStyle.strokeDasharray) {
+      link.attr('line/strokeDasharray', lineStyle.strokeDasharray);
+    }
+
+    link.labels([
+      {
+        position: 0.25,
+        attrs: {
+          text: { text: multiplicityDialog.sourceMultiplicity, fontSize: 12, fill: '#3A4A5B' }
+        }
+      },
+      {
+        position: 0.75,
+        attrs: {
+          text: { text: multiplicityDialog.targetMultiplicity, fontSize: 12, fill: '#3A4A5B' }
+        }
+      }
+    ]);
+
+    graphRef.current?.addCell(link);
+    console.log('Relación creada exitosamente');
+
+    // Resetear diálogo
+    setMultiplicityDialog({
+      isOpen: false,
+      sourceId: null,
+      targetId: null,
+      type: null,
+      sourceMultiplicity: '1',
+      targetMultiplicity: '1',
+    });
+  };
+
+  const updateClassText = () => {
+    if (selectedElement) {
+      selectedElement.attr('label/text', classText);
+    }
+  };
+
+  const clearDiagram = () => {
+    saveToUndoStack();
+    graphRef.current?.clear();
+    setSelectedElement(null);
+    setClassText('');
+    setDrawingMode(null);
+    setSelectedForRelation(null);
+  };
+
+  const undo = () => {
+    const json = graphRef.current?.toJSON();
+    if (json) {
+      setRedoStack([...redoStack, JSON.stringify(json)]);
+    }
+    if (undoStack.length > 0) {
+      const lastState = undoStack[undoStack.length - 1];
+      graphRef.current?.fromJSON(JSON.parse(lastState));
+      setUndoStack(undoStack.slice(0, -1));
+    }
+  };
+
+  const redo = () => {
+    const json = graphRef.current?.toJSON();
+    if (json) {
+      setUndoStack([...undoStack, JSON.stringify(json)]);
+    }
+    if (redoStack.length > 0) {
+      const lastState = redoStack[redoStack.length - 1];
+      graphRef.current?.fromJSON(JSON.parse(lastState));
+      setRedoStack(redoStack.slice(0, -1));
+    }
+  };
+
+  const exportDiagram = async () => {
+    const json = graphRef.current?.toJSON();
+    try {
+      const res = await fetch('http://localhost:4000/diagrams/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ diagram: json })
+      });
+      const data = await res.json();
+      alert('Validación: ' + data.message);
+    } catch (error) {
+      alert('Diagrama capturado. (Backend no disponible en este momento)');
+    }
+  };
   
   const subjectColor = '#7ED6A7'; // Análisis de Sistemas
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] flex">
+      {/* Modal de Multiplicidad */}
+      {multiplicityDialog.isOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+          }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#3A4A5B',
+              marginBottom: '16px',
+            }}>Configurar Multiplicidad</h3>
+            
+            <p style={{
+              color: '#666',
+              fontSize: '14px',
+              marginBottom: '16px',
+            }}>Define la multiplicidad en ambos lados de la relación</p>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#3A4A5B',
+                marginBottom: '6px',
+              }}>Multiplicidad izquierda (origen):</label>
+              <select
+                value={multiplicityDialog.sourceMultiplicity}
+                onChange={(e) => setMultiplicityDialog({
+                  ...multiplicityDialog,
+                  sourceMultiplicity: e.target.value
+                })}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="1">1</option>
+                <option value="0..1">0..1</option>
+                <option value="*">* (Muchos)</option>
+                <option value="0..*">0..* (Cero o más)</option>
+                <option value="1..*">1..* (Uno o más)</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#3A4A5B',
+                marginBottom: '6px',
+              }}>Multiplicidad derecha (destino):</label>
+              <select
+                value={multiplicityDialog.targetMultiplicity}
+                onChange={(e) => setMultiplicityDialog({
+                  ...multiplicityDialog,
+                  targetMultiplicity: e.target.value
+                })}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="1">1</option>
+                <option value="0..1">0..1</option>
+                <option value="*">* (Muchos)</option>
+                <option value="0..*">0..* (Cero o más)</option>
+                <option value="1..*">1..* (Uno o más)</option>
+              </select>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'flex-end',
+            }}>
+              <button
+                onClick={() => setMultiplicityDialog({
+                  isOpen: false,
+                  sourceId: null,
+                  targetId: null,
+                  type: null,
+                  sourceMultiplicity: '1',
+                  targetMultiplicity: '1',
+                })}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  backgroundColor: '#f5f5f5',
+                  color: '#3A4A5B',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={createRelation}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  backgroundColor: subjectColor,
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                Crear Relación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Indicador de modo de dibujo */}
+      {drawingMode && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: 'rgba(126, 214, 167, 0.95)',
+          color: 'white',
+          padding: '12px 24px',
+          borderRadius: '8px',
+          zIndex: 9998,
+          fontSize: '14px',
+          fontWeight: '500',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          maxWidth: '90%',
+          textAlign: 'center',
+        }}>
+          {selectedForRelation 
+            ? `✓ Primera clase seleccionada (${drawingMode}) - Toca la segunda clase`
+            : `Modo ${drawingMode}: Selecciona la PRIMERA clase`}
+        </div>
+      )}
       {/* Left Sidebar */}
       <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto shadow-sm">
         <div 
@@ -38,7 +488,8 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
             <h3 className="text-sm text-gray-500 mb-3">Elementos</h3>
             <div className="space-y-2">
               <button 
-                className="w-full p-3 border-2 border-gray-200 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 group"
+                onClick={addClass}
+                className="w-full p-3 border-2 border-gray-200 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 group hover:border-green-400"
                
               >
                 <div 
@@ -49,7 +500,11 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                 </div>
                 <span className="text-[#3A4A5B]">Clase</span>
               </button>
-              <button className="w-full p-3 border-2 border-gray-200 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3">
+              <button 
+                onClick={() => startDrawingRelation('association')}
+                className={`w-full p-3 border-2 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 ${
+                  drawingMode === 'association' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-400'
+                }`}>
                 <div 
                   className="w-8 h-8 rounded-lg flex items-center justify-center"
                   style={{ backgroundColor: `${subjectColor}15` }}
@@ -58,7 +513,11 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                 </div>
                 <span className="text-[#3A4A5B]">Asociación</span>
               </button>
-              <button className="w-full p-3 border-2 border-gray-200 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3">
+              <button 
+                onClick={() => startDrawingRelation('inheritance')}
+                className={`w-full p-3 border-2 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 ${
+                  drawingMode === 'inheritance' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-purple-400'
+                }`}>
                 <div 
                   className="w-8 h-8 rounded-lg flex items-center justify-center"
                   style={{ backgroundColor: `${subjectColor}15` }}
@@ -67,7 +526,11 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                 </div>
                 <span className="text-[#3A4A5B]">Herencia</span>
               </button>
-              <button className="w-full p-3 border-2 border-gray-200 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3">
+              <button 
+                onClick={() => startDrawingRelation('aggregation')}
+                className={`w-full p-3 border-2 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 ${
+                  drawingMode === 'aggregation' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-400'
+                }`}>
                 <div 
                   className="w-8 h-8 rounded-lg flex items-center justify-center"
                   style={{ backgroundColor: `${subjectColor}15` }}
@@ -76,7 +539,11 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                 </div>
                 <span className="text-[#3A4A5B]">Agregación</span>
               </button>
-              <button className="w-full p-3 border-2 border-gray-200 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3">
+              <button 
+                onClick={() => startDrawingRelation('composition')}
+                className={`w-full p-3 border-2 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 ${
+                  drawingMode === 'composition' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-indigo-400'
+                }`}>
                 <div 
                   className="w-8 h-8 rounded-lg flex items-center justify-center"
                   style={{ backgroundColor: `${subjectColor}15` }}
@@ -91,15 +558,21 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
           <div className="mb-6">
             <h3 className="text-sm text-gray-500 mb-3">Acciones</h3>
             <div className="space-y-2">
-              <button className="w-full p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-[#3A4A5B] flex items-center gap-2 transition-all">
+              <button 
+                onClick={clearDiagram}
+                className="w-full p-3 border-2 border-gray-200 rounded-lg hover:bg-red-50 text-sm text-[#3A4A5B] flex items-center gap-2 transition-all hover:border-red-300">
                 <Trash2 className="w-4 h-4 text-gray-500" />
                 Limpiar diagrama
               </button>
-              <button className="w-full p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-[#3A4A5B] flex items-center gap-2 transition-all">
+              <button 
+                onClick={undo}
+                className="w-full p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-[#3A4A5B] flex items-center gap-2 transition-all hover:border-gray-400">
                 <RotateCcw className="w-4 h-4 text-gray-500" />
                 Deshacer
               </button>
-              <button className="w-full p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-[#3A4A5B] flex items-center gap-2 transition-all">
+              <button 
+                onClick={redo}
+                className="w-full p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-[#3A4A5B] flex items-center gap-2 transition-all hover:border-gray-400">
                 <Redo2 className="w-4 h-4 text-gray-500" />
                 Rehacer
               </button>
@@ -128,13 +601,14 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                   <Save className="w-4 h-4" />
                   Guardar borrador
                 </button>
-                <button 
-                  className="px-6 py-2 rounded-lg text-white shadow-md hover:shadow-lg transition-all flex items-center gap-2"
-                  style={{ backgroundColor: subjectColor }}
-                >
-                  <Send className="w-4 h-4" />
-                  Enviar diagrama
-                </button>
+              <button 
+                onClick={exportDiagram}
+                className="px-6 py-2 rounded-lg text-white shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                style={{ backgroundColor: subjectColor }}
+              >
+                <Send className="w-4 h-4" />
+                Enviar diagrama
+              </button>
               </div>
             </div>
           </div>
@@ -207,65 +681,58 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
           </div>
 
           {/* Diagram Canvas */}
-          <div className="flex-1 bg-[#F2F2F2] p-6 overflow-auto">
-            <div className="w-full h-full rounded-2xl bg-white border-2 border-gray-200 shadow-md relative">
-              {/* Canvas Grid */}
-              <div className="absolute inset-0 opacity-10 rounded-2xl" style={{
-                backgroundImage: 'linear-gradient(#ccc 1px, transparent 1px), linear-gradient(90deg, #ccc 1px, transparent 1px)',
-                backgroundSize: '20px 20px'
-              }}></div>
-
-              {/* Placeholder for UML Elements */}
-              <div className="absolute top-12 left-12 text-center p-4">
-                <div className="rounded-xl border-2 shadow-md bg-white p-6 w-52" style={{ borderColor: subjectColor }}>
-                  <div 
-                    className="border-b-2 pb-2 mb-3 text-white py-2 rounded-t-lg"
-                    style={{ backgroundColor: subjectColor }}
+          <div className="flex-1 bg-[#F2F2F2] p-6 overflow-hidden flex flex-col">
+            {selectedElement && !drawingMode && (
+              <div className="mb-4 bg-white p-4 rounded-lg shadow-md">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-[#3A4A5B]">Clase Seleccionada</label>
+                  <button 
+                    onClick={() => setIsEditingClass(!isEditingClass)}
+                    className="px-3 py-1 rounded text-sm transition-all"
+                    style={{ 
+                      backgroundColor: isEditingClass ? '#ff6b6b' : subjectColor,
+                      color: 'white'
+                    }}
                   >
-                    <span>Usuario</span>
-                  </div>
-                  <div className="text-left text-sm text-gray-600 border-b border-gray-200 pb-3 mb-3 space-y-1">
-                    <div>- id: int</div>
-                    <div>- nombre: string</div>
-                    <div>- email: string</div>
-                  </div>
-                  <div className="text-left text-sm text-gray-600 space-y-1">
-                    <div>+ prestar()</div>
-                    <div>+ devolver()</div>
-                  </div>
+                    {isEditingClass ? '❌ Cancelar' : '✏️ Editar'}
+                  </button>
                 </div>
+                
+                {isEditingClass && (
+                  <>
+                    <textarea
+                      value={classText}
+                      onChange={(e) => setClassText(e.target.value)}
+                      rows={4}
+                      className="w-full border border-gray-300 p-2 font-mono rounded text-sm mb-2"
+                      placeholder="Nombre\n- atributo: tipo\n+ metodo(): retorno"
+                    />
+                    <button 
+                      onClick={updateClassText} 
+                      className="w-full px-4 py-2 rounded text-white transition-all"
+                      style={{ backgroundColor: subjectColor }}
+                    >
+                      💾 Guardar Cambios
+                    </button>
+                  </>
+                )}
+                
+                {!isEditingClass && (
+                  <div className="text-sm text-gray-600 font-mono whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">
+                    {classText || 'Sin contenido'}
+                  </div>
+                )}
               </div>
-
-              <div className="absolute top-12 right-12 text-center p-4">
-                <div className="rounded-xl border-2 shadow-md bg-white p-6 w-52" style={{ borderColor: subjectColor }}>
-                  <div 
-                    className="border-b-2 pb-2 mb-3 text-white py-2 rounded-t-lg"
-                    style={{ backgroundColor: subjectColor }}
-                  >
-                    <span>Libro</span>
-                  </div>
-                  <div className="text-left text-sm text-gray-600 border-b border-gray-200 pb-3 mb-3 space-y-1">
-                    <div>- isbn: string</div>
-                    <div>- titulo: string</div>
-                    <div>- autor: string</div>
-                  </div>
-                  <div className="text-left text-sm text-gray-600 space-y-1">
-                    <div>+ getInfo()</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Center Helper Text */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="text-gray-400 text-center bg-white/80 backdrop-blur-sm p-6 rounded-xl">
-                  <div className="w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: `${subjectColor}20` }}>
-                    <Boxes className="w-8 h-8" style={{ color: subjectColor }} />
-                  </div>
-                  <div className="text-sm text-gray-600">Área de trabajo del diagrama UML</div>
-                  <div className="text-xs mt-2 text-gray-500">[API externa de diagramación se integraría aquí]</div>
-                </div>
-              </div>
-            </div>
+            )}
+            <div 
+              ref={containerRef} 
+              style={{ 
+                flex: 1,
+                border: '2px solid #ddd',
+                borderRadius: '0.5rem',
+                backgroundColor: '#ffffff'
+              }} 
+            />
           </div>
         </div>
       </div>
