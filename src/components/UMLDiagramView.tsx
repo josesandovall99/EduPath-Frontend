@@ -14,6 +14,24 @@ interface UMLDiagramViewProps {
 
 type RelationType = 'association' | 'inheritance' | 'aggregation' | 'composition' | null;
 
+interface ValidationError {
+  type: string;
+  severity: 'error' | 'warning';
+  message: string;
+  elementId?: string;
+  lineNumber?: number;
+  location: string;
+  details?: string;
+  suggestion?: string;
+}
+
+interface ValidationResponse {
+  success: boolean;
+  message: string;
+  errors?: ValidationError[];
+  warnings?: ValidationError[];
+}
+
 interface MultiplicityDialog {
   isOpen: boolean;
   sourceId: string | null;
@@ -49,6 +67,12 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     sourceMultiplicity: '1',
     targetMultiplicity: '1',
   });
+
+  // Estados para validación de diagrama
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<ValidationError[]>([]);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
 
   // Actualizar los refs cuando cambien los estados
   useEffect(() => {
@@ -284,18 +308,49 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     }
   };
 
-  const exportDiagram = async () => {
+  const validateDiagram = async () => {
+    setIsValidating(true);
     const json = graphRef.current?.toJSON();
+    
     try {
-      const res = await fetch('http://localhost:4000/diagrams/validate', {
+      const response = await fetch('http://localhost:4000/diagrams/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ diagram: json })
       });
-      const data = await res.json();
-      alert('Validación: ' + data.message);
+
+      const data: ValidationResponse = await response.json();
+
+      if (!data.success && data.errors) {
+        // Resaltar elementos con error en rojo
+        data.errors.forEach(err => {
+          if (err.elementId) {
+            const element = graphRef.current?.getCell(err.elementId);
+            if (element) {
+              element.attr({
+                body: {
+                  stroke: '#f44336',
+                  strokeWidth: 3
+                }
+              });
+            }
+          }
+        });
+
+        setValidationErrors(data.errors);
+        setValidationWarnings(data.warnings || []);
+        setShowErrorModal(true);
+      } else {
+        // Diagrama válido
+        setValidationErrors([]);
+        setValidationWarnings(data.warnings || []);
+        setShowErrorModal(false);
+        alert('✓ Diagrama válido');
+      }
     } catch (error) {
-      alert('Diagrama capturado. (Backend no disponible en este momento)');
+      alert('❌ Error al validar. Backend no disponible en este momento.');
+    } finally {
+      setIsValidating(false);
     }
   };
   
@@ -303,6 +358,203 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] flex">
+      {/* Modal de Errores de Validación */}
+      {showErrorModal && validationErrors.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10001,
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '0',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            {/* Header del modal */}
+            <div style={{
+              padding: '24px',
+              borderBottom: '1px solid #e0e0e0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: '#d32f2f',
+                margin: 0,
+              }}>❌ Errores en el diagrama</h3>
+              <button
+                onClick={() => setShowErrorModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#999',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Contenido con scroll */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '24px',
+            }}>
+              <p style={{
+                color: '#666',
+                fontSize: '14px',
+                marginBottom: '20px',
+              }}>
+                Se encontraron {validationErrors.length} error{validationErrors.length !== 1 ? 'es' : ''}
+              </p>
+
+              {/* Lista de errores */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {validationErrors.map((err, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      borderLeft: '4px solid #f44336',
+                      backgroundColor: '#ffebee',
+                      padding: '12px',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    <div style={{
+                      color: '#d32f2f',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      marginBottom: '5px',
+                    }}>
+                      📍 {err.location}
+                    </div>
+                    <div style={{
+                      color: '#c62828',
+                      fontSize: '14px',
+                      marginBottom: '5px',
+                    }}>
+                      {err.message}
+                    </div>
+                    {err.details && (
+                      <div style={{
+                        color: '#666',
+                        fontSize: '12px',
+                        fontStyle: 'italic',
+                      }}>
+                        💡 {err.details}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Warnings */}
+              {validationWarnings && validationWarnings.length > 0 && (
+                <>
+                  <h4 style={{
+                    marginTop: '24px',
+                    marginBottom: '12px',
+                    color: '#f57c00',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                  }}>
+                    ⚠️ Advertencias
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {validationWarnings.map((warn, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          borderLeft: '4px solid #ff9800',
+                          backgroundColor: '#fff3e0',
+                          padding: '12px',
+                          borderRadius: '4px',
+                        }}
+                      >
+                        <div style={{
+                          color: '#e65100',
+                          fontWeight: 'bold',
+                          fontSize: '14px',
+                          marginBottom: '5px',
+                        }}>
+                          {warn.message}
+                        </div>
+                        {warn.suggestion && (
+                          <div style={{
+                            color: '#666',
+                            fontSize: '12px',
+                            marginTop: '5px',
+                          }}>
+                            💡 {warn.suggestion}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer del modal */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #e0e0e0',
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end',
+              backgroundColor: '#f5f5f5',
+            }}>
+              <button
+                onClick={() => {
+                  setShowErrorModal(false);
+                  // Restaurar colores de elementos
+                  graphRef.current?.getCells().forEach(cell => {
+                    if (cell.isElement()) {
+                      cell.attr({
+                        body: {
+                          stroke: '#333333',
+                          strokeWidth: 2,
+                        }
+                      });
+                    }
+                  });
+                }}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  backgroundColor: '#f5f5f5',
+                  color: '#3A4A5B',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s',
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Multiplicidad */}
       {multiplicityDialog.isOpen && (
         <div style={{
@@ -602,12 +854,13 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                   Guardar borrador
                 </button>
               <button 
-                onClick={exportDiagram}
-                className="px-6 py-2 rounded-lg text-white shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                onClick={validateDiagram}
+                disabled={isValidating}
+                className="px-6 py-2 rounded-lg text-white shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: subjectColor }}
               >
                 <Send className="w-4 h-4" />
-                Enviar diagrama
+                {isValidating ? 'Validando...' : 'Enviar diagrama'}
               </button>
               </div>
             </div>
