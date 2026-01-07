@@ -13,6 +13,21 @@ interface Area {
   descripcion: string;
 }
 
+interface Tema {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  estado: boolean;
+  area_id: string;
+}
+
+interface Subtema {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  tema_id: string;
+}
+
 interface Theme {
   id: string;
   name: string;
@@ -35,13 +50,15 @@ const subjectColors: Record<string, { primary: string; light: string; icon: any 
 
 export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
+  const [temas, setTemas] = useState<Tema[]>([]);
+  const [subtemas, setSubtemas] = useState<Record<string, Subtema[]>>({});
   const [loading, setLoading] = useState(true);
+  const [temasLoading, setTemasLoading] = useState(false);
+  const [subtemasLoading, setSubtemasLoading] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [temasError, setTemasError] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState('');
-  const [expandedThemes, setExpandedThemes] = useState<Record<string, boolean>>({
-    't1': true,
-    't2': true
-  });
+  const [expandedThemes, setExpandedThemes] = useState<Record<string, boolean>>({});
 
   // Cargar áreas del backend
   useEffect(() => {
@@ -95,6 +112,89 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
 
     fetchAreas();
   }, []);
+
+  // Cargar temas cuando cambia el área seleccionada
+  useEffect(() => {
+    if (!selectedSubject) return;
+
+    const fetchTemas = async () => {
+      try {
+        setTemasLoading(true);
+        setTemasError(null);
+        
+        const response = await axios.get(`http://localhost:4000/temas/por-area/${selectedSubject}`, {
+          timeout: 5000,
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
+        
+        const data = response.data;
+        
+        if (!Array.isArray(data)) {
+          throw new Error('La respuesta no es un array de temas');
+        }
+        
+        setTemas(data);
+      } catch (err) {
+        let errorMessage = 'Error desconocido al cargar los temas';
+        
+        if (axios.isAxiosError(err)) {
+          if (err.code === 'ECONNREFUSED') {
+            errorMessage = 'No se pudo conectar al servidor en http://localhost:4000.';
+          } else if (err.response?.status === 404) {
+            errorMessage = 'No hay temas para esta área.';
+          } else if (err.response?.status) {
+            errorMessage = `Error ${err.response.status}: ${err.response.statusText}`;
+          } else if (err.message) {
+            errorMessage = err.message;
+          }
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        
+        setTemasError(errorMessage);
+        setTemas([]);
+        console.error('Error fetching temas:', err);
+      } finally {
+        setTemasLoading(false);
+      }
+    };
+
+    fetchTemas();
+  }, [selectedSubject]);
+
+  // Cargar subtemas cuando se expande un tema
+  const loadSubtemas = async (temaId: string) => {
+    // Si ya están cargados, no hace nada
+    if (subtemas[temaId]) {
+      return;
+    }
+
+    try {
+      setSubtemasLoading(prev => ({ ...prev, [temaId]: true }));
+      
+      const response = await axios.get(`http://localhost:4000/subtemas/por-tema/${temaId}`, {
+        timeout: 5000,
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      const data = response.data;
+      
+      if (!Array.isArray(data)) {
+        throw new Error('La respuesta no es un array de subtemas');
+      }
+      
+      setSubtemas(prev => ({ ...prev, [temaId]: data }));
+    } catch (err) {
+      console.error('Error fetching subtemas:', err);
+      setSubtemas(prev => ({ ...prev, [temaId]: [] }));
+    } finally {
+      setSubtemasLoading(prev => ({ ...prev, [temaId]: false }));
+    }
+  };
   
   const [subjects] = useState([
     { id: 'fundamentos', name: 'Fundamentos de Programación' },
@@ -102,107 +202,23 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
     { id: 'alcance', name: 'Alcance, Tiempo y Costo' }
   ]);
 
-  const [themes, setThemes] = useState<Record<string, Theme[]>>({
-    fundamentos: [
-      {
-        id: 't1',
-        name: 'Introducción a la Programación',
-        enabled: true,
-        subthemes: [
-          { id: 'st1', name: 'Variables y tipos de datos', enabled: true },
-          { id: 'st2', name: 'Operadores básicos', enabled: true },
-          { id: 'st3', name: 'Entrada y salida de datos', enabled: false }
-        ]
-      },
-      {
-        id: 't2',
-        name: 'Estructuras de Control',
-        enabled: true,
-        subthemes: [
-          { id: 'st4', name: 'Condicionales', enabled: true },
-          { id: 'st5', name: 'Ciclos', enabled: true }
-        ]
-      },
-      {
-        id: 't3',
-        name: 'Funciones y Procedimientos',
-        enabled: false,
-        subthemes: [
-          { id: 'st6', name: 'Definición de funciones', enabled: false },
-          { id: 'st7', name: 'Parámetros y retorno', enabled: false }
-        ]
-      }
-    ],
-    analisis: [
-      {
-        id: 't4',
-        name: 'Fundamentos de Análisis',
-        enabled: true,
-        subthemes: [
-          { id: 'st8', name: 'Requisitos funcionales', enabled: true },
-          { id: 'st9', name: 'Requisitos no funcionales', enabled: true }
-        ]
-      },
-      {
-        id: 't5',
-        name: 'Diagramas UML',
-        enabled: true,
-        subthemes: [
-          { id: 'st10', name: 'Diagramas de casos de uso', enabled: true },
-          { id: 'st11', name: 'Diagramas de clases', enabled: true },
-          { id: 'st12', name: 'Diagramas de secuencia', enabled: false }
-        ]
-      }
-    ],
-    alcance: [
-      {
-        id: 't6',
-        name: 'Gestión del Alcance',
-        enabled: true,
-        subthemes: [
-          { id: 'st13', name: 'Definición del alcance', enabled: true },
-          { id: 'st14', name: 'WBS', enabled: true }
-        ]
-      },
-      {
-        id: 't7',
-        name: 'Gestión del Tiempo',
-        enabled: true,
-        subthemes: [
-          { id: 'st15', name: 'Cronograma del proyecto', enabled: true },
-          { id: 'st16', name: 'Ruta crítica', enabled: false }
-        ]
-      }
-    ]
-  });
-
-  const toggleTheme = (themeId: string) => {
-    setThemes(prev => ({
-      ...prev,
-      [selectedSubject]: prev[selectedSubject].map(t =>
-        t.id === themeId ? { ...t, enabled: !t.enabled } : t
+  // Funciones para manejar el estado de temas
+  const toggleTema = (temaId: string) => {
+    setTemas(prev =>
+      prev.map(t =>
+        t.id === temaId ? { ...t, estado: !t.estado } : t
       )
-    }));
+    );
   };
 
-  const toggleSubtheme = (themeId: string, subthemeId: string) => {
-    setThemes(prev => ({
-      ...prev,
-      [selectedSubject]: prev[selectedSubject].map(t =>
-        t.id === themeId
-          ? {
-              ...t,
-              subthemes: t.subthemes.map(st =>
-                st.id === subthemeId ? { ...st, enabled: !st.enabled } : st
-              )
-            }
-          : t
-      )
-    }));
-  };
-
-  const toggleExpand = (themeId: string) => {
-    setExpandedThemes(prev => ({ ...prev, [themeId]: !prev[themeId] }));
+  const toggleExpand = (temaId: string) => {
+    const isExpanding = !expandedThemes[temaId];
+    setExpandedThemes(prev => ({ ...prev, [temaId]: isExpanding }));
+    
+    // Cargar subtemas cuando se expande
+    if (isExpanding) {
+      loadSubtemas(temaId);
+    }
   };
 
   // Obtener el tema/color según el índice del área seleccionada
@@ -331,104 +347,116 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
           </p>
         </div>
 
-        <div className="space-y-4">
-          {themes[selectedSubject]?.map((theme) => (
-            <div
-              key={theme.id}
-              className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg"
-            >
-              {/* Theme Header */}
-              <div className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1">
+        {/* Sección de Temas */}
+        {temasLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+              <p className="text-gray-600 text-sm">Cargando temas...</p>
+            </div>
+          </div>
+        ) : temasError ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center mb-6">
+            <p className="text-yellow-600 text-sm">{temasError}</p>
+          </div>
+        ) : temas.length === 0 ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+            <p className="text-gray-600">No hay temas disponibles para esta área</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {temas.map((tema) => (
+              <div
+                key={tema.id}
+                className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg"
+              >
+                {/* Tema Header */}
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1">
+                      <button
+                        onClick={() => toggleExpand(tema.id)}
+                        className="text-gray-400 hover:text-[#3A4A5B] transition-colors flex-shrink-0"
+                      >
+                        {expandedThemes[tema.id] ? (
+                          <ChevronDown className="w-5 h-5" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5" />
+                        )}
+                      </button>
+                      <div className="flex-1">
+                        <h4 className="text-[#3A4A5B] text-lg font-semibold">{tema.nombre}</h4>
+                        <p className="text-gray-600 text-sm mt-1">{tema.descripcion}</p>
+                      </div>
+                    </div>
+                    
                     <button
-                      onClick={() => toggleExpand(theme.id)}
-                      className="text-gray-400 hover:text-[#3A4A5B] transition-colors"
+                      onClick={() => toggleTema(tema.id)}
+                      className="flex items-center gap-2 group ml-6 flex-shrink-0"
                     >
-                      {expandedThemes[theme.id] ? (
-                        <ChevronDown className="w-5 h-5" />
+                      {tema.estado ? (
+                        <>
+                          <span className="text-sm text-[#7ED6A7]">Habilitado</span>
+                          <ToggleRight 
+                            className="w-12 h-12 transition-colors" 
+                            style={{ color: currentColor.primary }}
+                          />
+                        </>
                       ) : (
-                        <ChevronRight className="w-5 h-5" />
+                        <>
+                          <span className="text-sm text-gray-400">Deshabilitado</span>
+                          <ToggleLeft className="w-12 h-12 text-gray-400 group-hover:text-gray-500 transition-colors" />
+                        </>
                       )}
                     </button>
-                    <div className="flex-1">
-                      <h4 className="text-[#3A4A5B] text-lg">{theme.name}</h4>
-                      <p className="text-gray-500 text-sm">
-                        {theme.subthemes.length} subtemas • {theme.subthemes.filter(st => st.enabled).length} habilitados
-                      </p>
-                    </div>
                   </div>
-                  
-                  <button
-                    onClick={() => toggleTheme(theme.id)}
-                    className="flex items-center gap-2 group"
-                  >
-                    {theme.enabled ? (
-                      <>
-                        <span className="text-sm text-[#7ED6A7]">Habilitado</span>
-                        <ToggleRight 
-                          className="w-12 h-12 transition-colors" 
-                          style={{ color: currentColor.primary }}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-sm text-gray-400">Deshabilitado</span>
-                        <ToggleLeft className="w-12 h-12 text-gray-400 group-hover:text-gray-500 transition-colors" />
-                      </>
-                    )}
-                  </button>
                 </div>
-              </div>
 
-              {/* Subthemes */}
-              {expandedThemes[theme.id] && (
-                <div 
-                  className="border-t px-6 pb-6 pt-4"
-                  style={{ borderColor: `${currentColor.primary}20` }}
-                >
-                  <div className="space-y-2">
-                    {theme.subthemes.map((subtheme) => (
-                      <div
-                        key={subtheme.id}
-                        className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div 
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: currentColor.primary }}
-                          ></div>
-                          <span className="text-[#3A4A5B]">{subtheme.name}</span>
+                {/* Subtemas */}
+                {expandedThemes[tema.id] && (
+                  <div 
+                    className="border-t px-6 pb-6 pt-4"
+                    style={{ borderColor: `${currentColor.primary}20` }}
+                  >
+                    {subtemasLoading[tema.id] ? (
+                      <div className="flex justify-center items-center py-6">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                          <p className="text-gray-600 text-sm">Cargando subtemas...</p>
                         </div>
-                        
-                        <button
-                          onClick={() => toggleSubtheme(theme.id, subtheme.id)}
-                          className="flex items-center gap-2"
-                          disabled={!theme.enabled}
-                        >
-                          {subtheme.enabled && theme.enabled ? (
-                            <>
-                              <span className="text-sm text-[#7ED6A7]">Habilitado</span>
-                              <ToggleRight 
-                                className="w-10 h-10 transition-colors" 
-                                style={{ color: currentColor.primary }}
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-sm text-gray-400">Deshabilitado</span>
-                              <ToggleLeft className="w-10 h-10 text-gray-400 hover:text-gray-500 transition-colors" />
-                            </>
-                          )}
-                        </button>
                       </div>
-                    ))}
+                    ) : subtemas[tema.id] && subtemas[tema.id].length > 0 ? (
+                      <div className="space-y-2">
+                        {subtemas[tema.id].map((subtema) => (
+                          <div
+                            key={subtema.id}
+                            className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3">
+                                <div 
+                                  className="w-2 h-2 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: currentColor.primary }}
+                                ></div>
+                                <div>
+                                  <span className="text-[#3A4A5B] font-medium">{subtema.nombre}</span>
+                                  <p className="text-gray-500 text-xs mt-0.5">{subtema.descripcion}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-sm text-center py-4">No hay subtemas disponibles</p>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
 
         {/* Actions */}
         <div className="mt-8 flex gap-4 justify-end">
