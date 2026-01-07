@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Code, Database, BarChart3, ChevronDown, ChevronRight, ToggleLeft, ToggleRight } from 'lucide-react';
+import axios from 'axios';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
 interface ThemeManagementScreenProps {
   onBack: () => void;
+}
+
+interface Area {
+  id: string;
+  nombre: string;
+  descripcion: string;
 }
 
 interface Theme {
@@ -27,11 +34,67 @@ const subjectColors: Record<string, { primary: string; light: string; icon: any 
 };
 
 export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
-  const [selectedSubject, setSelectedSubject] = useState('fundamentos');
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState('');
   const [expandedThemes, setExpandedThemes] = useState<Record<string, boolean>>({
     't1': true,
     't2': true
   });
+
+  // Cargar áreas del backend
+  useEffect(() => {
+    const fetchAreas = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await axios.get('http://localhost:4000/areas', {
+          timeout: 5000,
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
+        
+        const data = response.data;
+        
+        if (!Array.isArray(data)) {
+          throw new Error('La respuesta no es un array de áreas');
+        }
+        
+        setAreas(data);
+        
+        // Establecer la primera área como seleccionada por defecto
+        if (data.length > 0) {
+          setSelectedSubject(data[0].id);
+        }
+      } catch (err) {
+        let errorMessage = 'Error desconocido al cargar las áreas';
+        
+        if (axios.isAxiosError(err)) {
+          if (err.code === 'ECONNREFUSED') {
+            errorMessage = 'No se pudo conectar al servidor en http://localhost:4000. ¿Está corriendo?';
+          } else if (err.response?.status === 404) {
+            errorMessage = 'El endpoint /areas no existe en el servidor.';
+          } else if (err.response?.status) {
+            errorMessage = `Error ${err.response.status}: ${err.response.statusText}`;
+          } else if (err.message) {
+            errorMessage = err.message;
+          }
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        
+        setError(errorMessage);
+        console.error('Error fetching areas:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAreas();
+  }, []);
   
   const [subjects] = useState([
     { id: 'fundamentos', name: 'Fundamentos de Programación' },
@@ -142,9 +205,41 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
     setExpandedThemes(prev => ({ ...prev, [themeId]: !prev[themeId] }));
   };
 
-  const currentColor = subjectColors[selectedSubject];
-  const currentSubject = subjects.find(s => s.id === selectedSubject);
+  // Obtener el tema/color según el índice del área seleccionada
+  const getColorByIndex = (index: number): string => {
+    const colorKeys = Object.keys(subjectColors);
+    return colorKeys[index % colorKeys.length];
+  };
+
+  const areaIndex = areas.findIndex(a => a.id === selectedSubject);
+  const currentColorKey = areaIndex >= 0 ? getColorByIndex(areaIndex) : Object.keys(subjectColors)[0];
+  const currentColor = subjectColors[currentColorKey];
+  const currentSubject = areas.find(s => s.id === selectedSubject);
   const SubjectIcon = currentColor.icon;
+
+  // Mostrar estado de carga
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando áreas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar error si ocurre
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <p className="text-red-600 font-semibold mb-2">Error al cargar las áreas</p>
+          <p className="text-red-500 text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
@@ -179,39 +274,47 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
         {/* Subject Selector */}
         <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
           <h3 className="text-[#3A4A5B] mb-4">Seleccionar Materia</h3>
-          <div className="grid grid-cols-3 gap-4">
-            {subjects.map((subject) => {
-              const Icon = subjectColors[subject.id].icon;
-              const color = subjectColors[subject.id].primary;
-              const isSelected = selectedSubject === subject.id;
-              
-              return (
-                <button
-                  key={subject.id}
-                  onClick={() => setSelectedSubject(subject.id)}
-                  className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                    isSelected
-                      ? 'border-current shadow-lg transform scale-105'
-                      : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-                  }`}
-                  style={{
-                    borderColor: isSelected ? color : undefined,
-                    backgroundColor: isSelected ? `${color}10` : 'white'
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="p-2 rounded-lg"
-                      style={{ backgroundColor: `${color}15` }}
-                    >
-                      <Icon className="w-6 h-6" style={{ color }} />
+          {areas.length === 0 ? (
+            <p className="text-gray-500 text-center">No hay áreas disponibles</p>
+          ) : (
+            <div className={`grid gap-4 ${areas.length >= 3 ? 'grid-cols-3' : `grid-cols-${areas.length}`}`}>
+              {areas.map((area, index) => {
+                const colorKey = getColorByIndex(index);
+                const Icon = subjectColors[colorKey].icon;
+                const color = subjectColors[colorKey].primary;
+                const isSelected = selectedSubject === area.id;
+                
+                return (
+                  <button
+                    key={area.id}
+                    onClick={() => setSelectedSubject(area.id)}
+                    className={`p-4 rounded-xl border-2 transition-all duration-300 ${
+                      isSelected
+                        ? 'border-current shadow-lg transform scale-105'
+                        : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                    }`}
+                    style={{
+                      borderColor: isSelected ? color : undefined,
+                      backgroundColor: isSelected ? `${color}10` : 'white'
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="p-2 rounded-lg"
+                        style={{ backgroundColor: `${color}15` }}
+                      >
+                        <Icon className="w-6 h-6" style={{ color }} />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[#3A4A5B] text-sm font-semibold">{area.nombre}</div>
+                        <div className="text-gray-500 text-xs">{area.descripcion}</div>
+                      </div>
                     </div>
-                    <span className="text-[#3A4A5B] text-sm">{subject.name}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Theme List */}
@@ -221,10 +324,10 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
         >
           <div className="flex items-center gap-4 mb-2">
             <SubjectIcon className="w-8 h-8" />
-            <h2 className="text-2xl">{currentSubject?.name}</h2>
+            <h2 className="text-2xl">{currentSubject?.nombre || 'Selecciona una materia'}</h2>
           </div>
           <p className="text-white/90">
-            Administra qué temas y subtemas están disponibles para los estudiantes
+            {currentSubject?.descripcion || 'Administra qué temas y subtemas están disponibles para los estudiantes'}
           </p>
         </div>
 
