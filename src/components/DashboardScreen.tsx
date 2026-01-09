@@ -7,11 +7,12 @@ interface Subject {
 }
 
 interface DashboardScreenProps {
+  userName?: string; // Nuevo prop opcional
   onSubjectSelect: (subject: Subject) => void;
   onLogout: () => void;
 }
 
-export function DashboardScreen({ onSubjectSelect, onLogout }: DashboardScreenProps) {
+export function DashboardScreen({ userName, onSubjectSelect, onLogout }: DashboardScreenProps) {
   const subjects = [
     {
       id: 'fundamentos',
@@ -86,7 +87,7 @@ export function DashboardScreen({ onSubjectSelect, onLogout }: DashboardScreenPr
         <div className="bg-gradient-to-r from-[#4A90E2] to-[#7ED6A7] rounded-2xl p-8 mb-8 text-white shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-3xl mb-2">¡Bienvenido de nuevo, Juan! 👋</h2>
+              <h2 className="text-2xl font-bold text-[#3A4A5B]">¡Hola, {userName || 'Estudiante'}!</h2>
               <p className="text-white/90 text-lg">Continúa tu aprendizaje donde lo dejaste</p>
             </div>
             <BookOpen className="w-20 h-20 text-white/30" />

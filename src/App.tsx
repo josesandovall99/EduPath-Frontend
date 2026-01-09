@@ -14,11 +14,13 @@ import { QuizActivityView } from './components/QuizActivityView';
 import { UMLDiagramView } from './components/UMLDiagramView';
 import { AIWorkshopView } from './components/AIWorkshopView';
 import { ChatbotButton } from './components/ChatbotButton';
+import { ChangePasswordScreen } from './components/changePassword'; // Asegúrate de importar tu componente
 
 type Screen = 
   | 'login' 
   | 'admin-register'
   | 'dashboard' 
+  | 'change-password' // Nueva pantalla
   | 'admin-dashboard'
   | 'admin-themes'
   | 'admin-contents'
@@ -30,6 +32,16 @@ type Screen =
   | 'quiz-activity'
   | 'uml-diagram'
   | 'ai-workshop';
+
+
+
+// Interfaz para la sesión del usuario
+interface UserSession {
+  id: number;
+  personaId: number;
+  nombre: string;
+  codigo: string;
+}
 
 interface Subject {
   id: string;
@@ -48,7 +60,34 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
+  const [userData, setUserData] = useState<{id: number, personaId: number, nombre: string} | null>(null);
+  const [userSession, setUserSession] = useState<UserSession | null>(null);
+  
 
+  // Función que se llama cuando el login es exitoso
+  // 2. Función manejadora del Login Exitoso
+  const handleLoginSuccess = (apiResponse: any) => {
+    // Guardamos los datos importantes que vienen del backend
+    setUserSession({
+      id: apiResponse.estudiante.id,
+      personaId: apiResponse.estudiante.personaId,
+      nombre: apiResponse.estudiante.nombre,
+      codigo: apiResponse.estudiante.codigo
+    });
+
+    // Decidimos a dónde ir basado en el flag 'primerIngreso'
+    if (apiResponse.primerIngreso) {
+      setCurrentScreen('change-password');
+    } else {
+      setCurrentScreen('dashboard');
+    }
+  };
+
+  /*const handleLogout = () => {
+    setUserSession(null);
+    setCurrentScreen('login');
+  };*/
+  
   // Student login (Google)
   const handleLogin = () => {
     setCurrentScreen('dashboard');
@@ -158,28 +197,28 @@ export default function App() {
     <div className="min-h-screen bg-white">
       {currentScreen === 'login' && (
         <LoginScreen 
-          onLogin={handleLogin}
-          onAdminLogin={handleAdminLogin}
-          onShowRegister={handleShowRegister}
+          onLoginSuccess={handleLoginSuccess} // Conectamos la función
+          onAdminLogin={() => setCurrentScreen('admin-dashboard')} 
+          onShowRegister={() => setCurrentScreen('admin-register')} 
         />
       )}
 
-      {currentScreen === 'admin-register' && (
-        <AdminRegisterScreen
-          onBack={handleBackToLogin}
-          onRegister={handleRegister}
+      {/* Pantalla de Cambio de Contraseña */}
+      {currentScreen === 'change-password' && userSession && (
+        <ChangePasswordScreen 
+          personaId={userSession.personaId} // Pasamos el ID necesario
+          onComplete={() => setCurrentScreen('dashboard')} // Al terminar, va al dashboard
+          isFirstLogin={true}
         />
       )}
-      
-      {currentScreen === 'dashboard' && (
-        <>
-          <DashboardScreen 
-            onSubjectSelect={handleSubjectSelect}
-            onLogout={handleLogout}
-          />
-          <ChatbotButton />
-        </>
-      )}
+
+      {currentScreen === 'dashboard' && userSession && (
+              <DashboardScreen 
+                userName={userSession.nombre} // Pasamos el nombre para el saludo
+                onSubjectSelect={handleSubjectSelect}
+                onLogout={handleLogout}
+              />
+            )}
 
       {currentScreen === 'admin-dashboard' && (
         <AdminDashboard
