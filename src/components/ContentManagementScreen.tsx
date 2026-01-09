@@ -110,6 +110,8 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
         ? `http://localhost:4000/contenidos/${selectedContent?.id}`
         : 'http://localhost:4000/contenidos';
 
+      const descripcionHtml = quillRef.current ? quillRef.current.root.innerHTML : formData.descripcion;
+
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -118,7 +120,7 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
         body: JSON.stringify({
           titulo: formData.titulo,
           tipo: formData.tipo,
-          descripcion: formData.descripcion,
+          descripcion: descripcionHtml,
           url: formData.url,
           tema_id: parseInt(formData.tema_id),
           subtema_id: parseInt(formData.subtema_id)
@@ -177,6 +179,9 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
         tema_id: '',
         subtema_id: ''
       });
+      if (quillRef.current) {
+        quillRef.current.root.innerHTML = '';
+      }
       setIsEditMode(false);
       setSelectedContent(null);
 
@@ -248,16 +253,69 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
 
   // Rich text editor ref and helpers
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const quillRef = useRef<any>(null);
 
-  // When modal opens in edit mode, populate editor HTML
+  // Initialize Quill when modal opens and sync content
   useEffect(() => {
-    if (showCreateModal && isEditMode && selectedContent && editorRef.current) {
-      editorRef.current.innerHTML = selectedContent.descripcion || '';
-      setFormData(prev => ({ ...prev, descripcion: selectedContent.descripcion || '' }));
+    // When the modal opens, (re)create the Quill instance so the toolbar
+    // and editor are always freshly rendered. Register custom font and
+    // numeric size whitelists so the toolbar shows desired options.
+    if (showCreateModal && editorRef.current && (window as any).Quill) {
+      try {
+        const Quill = (window as any).Quill;
+        // Register size as STYLE attributor (applies font-size in px, not classes)
+        const SizeStyle = Quill.import('attributors/style/size');
+        SizeStyle.whitelist = ['10px','12px','14px','16px','18px','20px','24px','32px'];
+        Quill.register(SizeStyle, true);
+
+        // Register fonts as STYLE attributor 
+        const FontStyle = Quill.import('attributors/style/font');
+        FontStyle.whitelist = ['Arial','Monospace','Algerian'];
+        Quill.register(FontStyle, true);
+      } catch (err) {
+        console.warn('Quill format registration failed', err);
+      }
+
+      // Ensure container is empty before creating Quill
+      editorRef.current.innerHTML = '';
+      quillRef.current = new (window as any).Quill(editorRef.current, {
+        theme: 'snow',
+        placeholder: 'Ingrese la descripción del contenido',
+        modules: {
+          toolbar: [
+            [{ 'font': ['Arial','Monospace','Algerian'] }],
+            [{ 'size': ['10px','12px','14px','16px','18px','20px','24px','32px'] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ 'color': [] }, { 'background': [] }],
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+            [{ 'align': [] }],
+            ['link', 'image', 'video'],
+            ['clean']
+          ]
+        }
+      });
+
+      // Set default size to 14px
+      quillRef.current.format('size', '14px');
+
+      // Determine initial content (edit mode takes precedence)
+      const initialHtml = isEditMode && selectedContent ? (selectedContent.descripcion || '') : (formData.descripcion || '');
+      quillRef.current.root.innerHTML = initialHtml;
+      setFormData(prev => ({ ...prev, descripcion: initialHtml }));
+
+      quillRef.current.on('text-change', () => {
+        setFormData(prev => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
+      });
     }
-    if (showCreateModal && !isEditMode && editorRef.current) {
-      editorRef.current.innerHTML = formData.descripcion || '';
-    }
+
+    // Cleanup: when modal closes, remove Quill's DOM and clear ref so it
+    // will be recreated next time the modal opens (prevents toolbar missing).
+    return () => {
+      if (!showCreateModal && quillRef.current) {
+        if (editorRef.current) editorRef.current.innerHTML = '';
+        quillRef.current = null;
+      }
+    };
   }, [showCreateModal, isEditMode, selectedContent]);
 
   const filteredContents = filterType === 'all' 
@@ -527,9 +585,10 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
 
       {/* Modal de Crear/Editar Contenido */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-auto">
+                  <div className="bg-white rounded-xl shadow-xl p-4 sm:p-6 w-[1640px] max-w-[80%] max-h-[90vh] overflow-auto relative" style={{ borderLeft: '6px solid rgba(74,144,226,0.08)', width: 1640, maxWidth: '95%', maxHeight: '90vh' }}>
+                  <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl" style={{ background: 'linear-gradient(90deg, rgba(74,144,226,0.12), rgba(74,144,226,0.06))' }} />
+                  <div className="flex items-center justify-between mb-6 pt-2">
               <h2 className="text-2xl font-bold text-[#3A4A5B]">
                 {isEditMode ? 'Editar Contenido' : 'Crear Nuevo Contenido'}
               </h2>
@@ -547,7 +606,7 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                     subtema_id: ''
                   });
                 }}
-                className="text-gray-400 hover:text-gray-600 text-2xl"
+                      className="text-gray-400 hover:text-[#4A90E2] text-2xl"
               >
                 ✕
               </button>
@@ -587,39 +646,12 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                 <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
                   Descripción *
                 </label>
-
-                <div className="mb-2 flex gap-2">
-                  <button type="button" onClick={() => document.execCommand('bold')} className="px-2 py-1 border rounded">B</button>
-                  <button type="button" onClick={() => document.execCommand('italic')} className="px-2 py-1 border rounded">I</button>
-                  <button type="button" onClick={() => document.execCommand('underline')} className="px-2 py-1 border rounded">U</button>
-                  <button type="button" onClick={() => {
-                    const sel = window.getSelection();
-                    if (!sel || sel.rangeCount === 0) return;
-                    const range = sel.getRangeAt(0);
-                    const text = range.toString().toUpperCase();
-                    document.execCommand('insertHTML', false, `<span style=\"text-transform:uppercase\">${text}</span>`);
-                  }} className="px-2 py-1 border rounded">Mayúsculas</button>
-                  <button type="button" onClick={() => {
-                    const sel = window.getSelection();
-                    if (!sel || sel.rangeCount === 0) return;
-                    const range = sel.getRangeAt(0);
-                    const text = range.toString().toLowerCase();
-                    document.execCommand('insertHTML', false, `<span style=\"text-transform:lowercase\">${text}</span>`);
-                  }} className="px-2 py-1 border rounded">Minúsculas</button>
-                  <button type="button" onClick={() => document.execCommand('fontSize', false, '4')} className="px-2 py-1 border rounded">A+</button>
-                  <button type="button" onClick={() => document.execCommand('fontSize', false, '2')} className="px-2 py-1 border rounded">A-</button>
-                </div>
-
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onInput={(e) => setFormData(prev => ({ ...prev, descripcion: (e.target as HTMLDivElement).innerHTML }))}
-                  className="w-full min-h-[100px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                  data-placeholder="Ingrese la descripción del contenido"
-                  style={{ whiteSpace: 'pre-wrap' }}
-                >
-                  {/* El contenido HTML se sincroniza en showCreateModal effect */}
+                <div className="quill-editor-container">
+                  <div
+                    ref={editorRef}
+                    className="w-full"
+                    data-placeholder="Ingrese la descripción del contenido"
+                  />
                 </div>
               </div>
 
