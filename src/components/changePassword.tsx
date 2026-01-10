@@ -1,25 +1,16 @@
-import { useState } from 'react';
-import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
-import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import React, { useState } from 'react';
+import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 
-interface ChangePasswordScreenProps {
-  onComplete: () => void;
-  onBack?: () => void;
-  isFirstLogin?: boolean;
-  // Añadimos personaId como prop para saber a quién actualizar
-  personaId: number; 
-}
-
-export function ChangePasswordScreen({ onComplete, onBack, isFirstLogin = false, personaId }: ChangePasswordScreenProps) {
+export function ChangePasswordScreen({ onComplete, isFirstLogin = false, personaId }) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  // Validaciones de contraseña (se mantienen igual) 
+  // 1. Definimos las reglas
   const passwordRequirements = [
     { label: 'Mínimo 8 caracteres', met: newPassword.length >= 8 },
     { label: 'Al menos una letra mayúscula', met: /[A-Z]/.test(newPassword) },
@@ -30,23 +21,22 @@ export function ChangePasswordScreen({ onComplete, onBack, isFirstLogin = false,
   const allRequirementsMet = passwordRequirements.every(req => req.met);
   const passwordsMatch = newPassword === confirmPassword && newPassword !== '';
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setError('');
 
     if (!allRequirementsMet || !passwordsMatch) return;
 
     setLoading(true);
-
     try {
-      // Llamada al endpoint que creamos en el backend 
+      // Nota: Asegúrate de que el puerto sea el correcto (4000 para backend)
       const response = await fetch('http://localhost:4000/estudiante/cambiar-password-inicial', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          personaId: personaId, // Pasado por props desde el Login
+          personaId: personaId, 
           nuevaContraseña: newPassword
         }),
       });
@@ -57,125 +47,166 @@ export function ChangePasswordScreen({ onComplete, onBack, isFirstLogin = false,
         throw new Error(data.mensaje || 'Error al actualizar la contraseña');
       }
 
-      // Éxito: Mostrar pantalla de confirmación 
       setSuccess(true);
-      
-      // Esperar 2 segundos y llamar a onComplete para redirigir al Dashboard
       setTimeout(() => {
         onComplete();
       }, 2000);
 
     } catch (err: any) {
-      setError(err.message || 'Ocurrió un error inesperado');
+      setError(err?.message || String(err) || 'Ocurrió un error inesperado');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#4A6FA5] to-[#166088] p-8">
-    <div className="w-full max-w-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#4A90E2] via-[#5B9FED] to-[#7ED6A7] p-8">
+      <div className="w-full max-w-md mx-auto"> {/* Card más estrecho para coincidir con el diseño */}
 
-      {/* Header */}
-      <div className="mb-8 text-center">
-        <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl shadow-lg flex items-center justify-center p-4">
-          <img src={logoImage} alt="EduPath Logo" className="w-full h-full object-contain" />
+        {/* Header */}
+        <div className="mb-8 text-center">
+             {/* Asegúrate que la imagen cargue, si no pon un placeholder */}
+            <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl shadow-lg flex items-center justify-center p-4">
+             <span className="text-3xl">🎓</span>
+            </div>
+            
+          <h1 className="text-white mb-2 text-3xl font-bold">
+            {isFirstLogin ? 'Cambio de Contraseña' : 'Actualizar Contraseña'}
+          </h1>
+          <p className="text-white/90">
+            {isFirstLogin
+              ? 'Por seguridad, configura tu nueva clave de acceso.'
+              : 'Mantén tu cuenta segura.'}
+          </p>
         </div>
-        <h1 className="text-white mb-2 text-3xl">
-          {isFirstLogin ? 'Cambio de Contraseña Obligatorio' : 'Cambiar Contraseña'}
-        </h1>
-        <p className="text-white/90">
-          {isFirstLogin
-            ? 'Por tu seguridad, debes cambiar tu contraseña temporal'
-            : 'Actualiza tu contraseña para mantener tu cuenta segura'}
-        </p>
-      </div>
 
-      {/* Card */}
-      <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
 
-        {/* Aviso primer login */}
-        {isFirstLogin && (
-          <div className="bg-orange-50 border-b border-orange-200 p-4 flex gap-3">
-            <AlertCircle className="w-5 h-5 text-[#F5A97F]" />
-            <p className="text-sm text-[#3A4A5B]">
-              <strong>Importante:</strong> Debes crear una nueva contraseña segura.
-            </p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-
-          {/* Error */}
-          {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 text-sm border border-red-100">
-              <AlertCircle className="w-4 h-4" />
-              {error}
+          {isFirstLogin && (
+            <div className="bg-blue-50 border-b border-blue-100 p-4 flex gap-3">
+              <AlertCircle className="w-5 h-5 text-blue-500 shrink-0" />
+              <p className="text-sm text-blue-700">
+                <strong>Importante:</strong> Crea una contraseña que recuerdes fácilmente.
+              </p>
             </div>
           )}
 
-          {/* Nueva contraseña */}
-          <div>
-            <label className="block text-[#3A4A5B] mb-2">Nueva contraseña</label>
-            <div className="relative">
-              <input
-                type={showNew ? 'text' : 'password'}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Nueva contraseña"
-                className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-[#F5A97F] outline-none"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowNew(!showNew)}
-                className="absolute right-3 top-3 text-gray-400"
-              >
-                {showNew ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
-          </div>
+          <form onSubmit={handleSubmit} className="p-8 space-y-6">
 
-          {/* Confirmar contraseña */}
-          <div>
-            <label className="block text-[#3A4A5B] mb-2">Confirmar contraseña</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-[#F5A97F] outline-none"
-              required
-            />
-            {confirmPassword && (
-              <p className={`text-sm mt-2 ${passwordsMatch ? 'text-green-500' : 'text-red-500'}`}>
-                {passwordsMatch ? 'Las contraseñas coinciden' : 'Las contraseñas no coinciden'}
-              </p>
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 text-sm border border-red-100">
+                <AlertCircle className="w-4 h-4" />
+                {error}
+              </div>
             )}
+
+        {/* Nueva contraseña */}
+              <div>
+                <label className="block text-[#3A4A5B] font-medium mb-2 text-sm">Nueva contraseña</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type={showNew ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Crea una contraseña segura"
+                    className="w-full border border-gray-300 rounded-lg p-3 pl-11 pr-12 bg-white focus:outline-none focus:ring-2 focus:ring-[#4A90E2] transition-all placeholder:text-gray-300"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNew(!showNew)}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showNew ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+
+                {/* Requisitos (Lógica Source 1 con Estilo Source 2) [cite: 25, 69] */}
+                <div className="mt-4 space-y-3 bg-gray-50 p-5 rounded-xl">
+                  <p className="text-xs text-[#3A4A5B] font-semibold mb-1">Requisitos de contraseña:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {passwordRequirements.map((req, index) => (
+                      <div key={index} className="flex items-center gap-2 text-sm">
+                        {req.met ? (
+                          <CheckCircle className="w-5 h-5 text-[#7ED6A7]" />
+                        ) : (
+                          <div className="w-5 h-5 border-2 border-gray-200 rounded-full" />
+                        )}
+                        <span className={req.met ? 'text-[#7ED6A7]' : 'text-gray-400'}>{req.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Confirmar contraseña - Ahora con Ojo y Candado */}
+              <div>
+                <label className="block text-[#3A4A5B] font-medium mb-2 text-sm">Confirmar nueva contraseña</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repite la nueva contraseña"
+                    className={`w-full border rounded-lg p-3 pl-11 pr-12 bg-white outline-none transition-all ${
+                        passwordsMatch && confirmPassword 
+                        ? 'border-[#7ED6A7] focus:ring-2 focus:ring-[#7ED6A7]' 
+                        : 'border-gray-300 focus:ring-2 focus:ring-[#4A90E2]'
+                    } placeholder:text-gray-300`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                
+                {confirmPassword && !passwordsMatch && (
+                  <div className="mt-2 flex items-center gap-2 text-red-500">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-xs font-medium">Las contraseñas no coinciden</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Botón con el color de la imagen [cite: 89] */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading || !allRequirementsMet || !passwordsMatch}
+                  className={`w-full py-4 rounded-lg text-white font-medium text-lg shadow-md transition-all flex items-center justify-center gap-2 ${
+                    loading || !allRequirementsMet || !passwordsMatch
+                      ? 'bg-[#F5A97F] cursor-not-allowed shadow-none' 
+                      : 'bg-[#F5A97F] hover:bg-[#F39759] hover:shadow-lg'
+                  }`}
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Lock className="w-5 h-5" />
+                      <span>Confirmar cambio de contraseña</span>
+                    </>
+                  )}
+                </button>
+              </div>
+          </form>
+        </div>
+
+        {/* Footer simple */}
+        {!success && (
+          <div className="mt-6 text-center">
+             <p className="text-white/60 text-xs">EduPath © 2024</p>
           </div>
-
-          {/* Botón */}
-          <button
-            type="submit"
-            disabled={loading || !allRequirementsMet || !passwordsMatch}
-            className={`w-full py-4 rounded-lg text-white font-bold transition-all ${
-              loading || !allRequirementsMet || !passwordsMatch
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-[#F5A97F] hover:bg-[#F39759]'
-            }`}
-          >
-            {loading ? 'Procesando...' : 'Confirmar cambio'}
-          </button>
-
-        </form>
+        )}
       </div>
-
-      {!success && (
-        <p className="mt-6 text-center text-white/80 text-sm">
-          ¿Necesitas ayuda? Contacta al administrador del sistema
-        </p>
-      )}
     </div>
-  </div>
-);
-
+  );
 }

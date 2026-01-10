@@ -198,6 +198,7 @@ export default function App() {
       {currentScreen === 'login' && (
         <LoginScreen 
           onLoginSuccess={handleLoginSuccess} // Conectamos la función
+          onLogin={handleLogin}
           onAdminLogin={() => setCurrentScreen('admin-dashboard')} 
           onShowRegister={() => setCurrentScreen('admin-register')} 
         />
