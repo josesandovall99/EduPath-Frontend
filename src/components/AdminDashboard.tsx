@@ -1,5 +1,8 @@
-import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock } from 'lucide-react';
+import { useState } from 'react';
+import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBranch } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { ContentManagementScreen } from './ContentManagementScreen';
+import { SequenceManagementScreen } from './SequenceManagementScreen';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -7,6 +10,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'contents' | 'sequences'>('dashboard');
   const stats = [
     { label: 'Materias activas', value: '3', icon: BookOpen, color: '#4A90E2', trend: '+0%' },
     { label: 'Temas disponibles', value: '12', icon: FileEdit, color: '#7ED6A7', trend: '+2' },
@@ -29,7 +33,17 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       description: 'Crear, editar y eliminar contenidos teóricos. Administra videos, documentos y recursos por tema.',
       icon: FileEdit,
       color: '#7ED6A7',
-      gradient: 'from-[#7ED6A7] to-[#90E0B7]'
+      gradient: 'from-[#7ED6A7] to-[#90E0B7]',
+      onClick: () => setCurrentScreen('contents')
+    },
+    {
+      id: 'sequences',
+      title: 'Gestión de Secuencias',
+      description: 'Define el orden de los contenidos dentro de temas y subtemas. Visualiza y gestiona flujos de aprendizaje.',
+      icon: GitBranch,
+      color: '#06B6D4',
+      gradient: 'from-[#06B6D4] to-[#14B8A6]',
+      onClick: () => setCurrentScreen('sequences')
     },
     {
       id: 'reports',
@@ -48,6 +62,15 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       gradient: 'from-[#A78BFA] to-[#B79BFA]'
     }
   ];
+
+  // Renderizar la pantalla actual
+  if (currentScreen === 'contents') {
+    return <ContentManagementScreen onBack={() => setCurrentScreen('dashboard')} />;
+  }
+
+  if (currentScreen === 'sequences') {
+    return <SequenceManagementScreen onBack={() => setCurrentScreen('dashboard')} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
@@ -114,7 +137,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             return (
               <button
                 key={action.id}
-                onClick={() => onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students')}
+                onClick={() => action.onClick ? action.onClick() : onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students')}
                 className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-8 text-left group hover:transform hover:scale-[1.02]"
               >
                 <div className="flex items-start justify-between mb-4">
