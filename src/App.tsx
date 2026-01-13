@@ -14,7 +14,8 @@ import { QuizActivityView } from './components/QuizActivityView';
 import { UMLDiagramView } from './components/UMLDiagramView';
 import { AIWorkshopView } from './components/AIWorkshopView';
 import { ChatbotButton } from './components/ChatbotButton';
-import { ChangePasswordScreen } from './components/changePassword'; // Asegúrate de importar tu componente
+import { ChangePasswordScreen } from './components/changePassword';
+import { StudentUploadScreen } from './components/StudentUploadScreen';
 
 type Screen = 
   | 'login' 
@@ -31,6 +32,7 @@ type Screen =
   | 'theory-content'
   | 'quiz-activity'
   | 'uml-diagram'
+  | 'admin-upload' // 1. Agregamos este estado
   | 'ai-workshop';
 
 
@@ -221,10 +223,25 @@ export default function App() {
               />
             )}
 
+      {/* DASHBOARD ADMIN */}
       {currentScreen === 'admin-dashboard' && (
         <AdminDashboard
           onLogout={handleLogout}
-          onNavigate={handleAdminNavigate}
+          onNavigate={(section) => {
+            // 2. Manejamos la navegación según el botón presionado
+            if (section === 'themes') setCurrentScreen('admin-themes');
+            if (section === 'contents') setCurrentScreen('admin-contents');
+            if (section === 'reports') setCurrentScreen('admin-reports');
+            if (section === 'students') setCurrentScreen('admin-students');
+            if (section === 'upload') setCurrentScreen('admin-upload'); 
+          }}
+        />
+      )}
+
+      {/* 3. Renderizamos la pantalla de carga masiva */}
+      {currentScreen === 'admin-upload' && (
+        <StudentUploadScreen 
+          onBack={() => setCurrentScreen('admin-dashboard')} 
         />
       )}
 

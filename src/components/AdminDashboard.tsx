@@ -1,12 +1,17 @@
+<<<<<<< HEAD
 import { useState } from 'react';
 import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBranch } from 'lucide-react';
+=======
+import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, Upload } from 'lucide-react';
+// @ts-ignore: imported via figma plugin at build time
+>>>>>>> abdac6376461124caa257bc8da9e30c87e6e0e58
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ContentManagementScreen } from './ContentManagementScreen';
 import { SequenceManagementScreen } from './SequenceManagementScreen';
 
 interface AdminDashboardProps {
   onLogout: () => void;
-  onNavigate: (section: 'themes' | 'contents' | 'reports' | 'students') => void;
+  onNavigate: (section: 'themes' | 'contents' | 'reports' | 'students' | 'upload') => void;
 }
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
@@ -60,6 +65,14 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: Users,
       color: '#A78BFA',
       gradient: 'from-[#A78BFA] to-[#B79BFA]'
+    },
+    {
+      id: 'upload',
+      title: 'Carga Masiva de Estudiantes',
+      description: 'Importa múltiples estudiantes desde un archivo Excel. Crea usuarios automáticamente y envía credenciales.',
+      icon: Upload,
+      color: '#F472B6',
+      gradient: 'from-[#F472B6] to-[#FB87C6]'
     }
   ];
 
@@ -132,13 +145,50 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
 
         {/* Main Actions Grid */}
         <div className="grid grid-cols-2 gap-6 mb-8">
-          {actions.map((action) => {
+          {actions.slice(0, 4).map((action) => {
             const Icon = action.icon;
             return (
               <button
                 key={action.id}
+<<<<<<< HEAD
                 onClick={() => action.onClick ? action.onClick() : onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students')}
+=======
+                onClick={() => onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students' | 'upload')}
+>>>>>>> abdac6376461124caa257bc8da9e30c87e6e0e58
                 className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-8 text-left group hover:transform hover:scale-[1.02]"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div 
+                    className={`p-4 rounded-xl bg-gradient-to-br ${action.gradient} shadow-md`}
+                  >
+                    <Icon className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="text-gray-400 group-hover:text-[#4A90E2] transition-colors">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+                <h2 className="text-[#3A4A5B] mb-2 text-xl group-hover:text-[#4A90E2] transition-colors">
+                  {action.title}
+                </h2>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {action.description}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Additional Action - Upload Students (Full Width) */}
+        <div className="mb-8">
+          {actions.slice(4).map((action) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={action.id}
+                onClick={() => onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students' | 'upload')}
+                className="w-full bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-8 text-left group hover:transform hover:scale-[1.01]"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div 
