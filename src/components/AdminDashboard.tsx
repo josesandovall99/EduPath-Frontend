@@ -1,13 +1,10 @@
-<<<<<<< HEAD
 import { useState } from 'react';
 import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBranch } from 'lucide-react';
-=======
-import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, Upload } from 'lucide-react';
-// @ts-ignore: imported via figma plugin at build time
->>>>>>> abdac6376461124caa257bc8da9e30c87e6e0e58
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ContentManagementScreen } from './ContentManagementScreen';
 import { SequenceManagementScreen } from './SequenceManagementScreen';
+import { Upload } from "lucide-react";
+
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -150,11 +147,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             return (
               <button
                 key={action.id}
-<<<<<<< HEAD
                 onClick={() => action.onClick ? action.onClick() : onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students')}
-=======
-                onClick={() => onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students' | 'upload')}
->>>>>>> abdac6376461124caa257bc8da9e30c87e6e0e58
                 className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-8 text-left group hover:transform hover:scale-[1.02]"
               >
                 <div className="flex items-start justify-between mb-4">
