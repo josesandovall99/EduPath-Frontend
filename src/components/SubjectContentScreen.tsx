@@ -1,4 +1,5 @@
 import { ArrowLeft, CheckCircle2, Clock, FileText, PlayCircle, Edit, Share2, Users } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
 interface Subject {
@@ -9,7 +10,7 @@ interface Subject {
 interface SubjectContentScreenProps {
   subject: Subject;
   onBack: () => void;
-  onContentSelect?: (content: Content) => void;
+  onContentSelect?: (content: Content, temaId: string) => void;
 }
 
 interface Content {
@@ -18,6 +19,26 @@ interface Content {
   type: 'video' | 'document' | 'activity' | 'quiz' | 'uml' | 'workshop';
   duration?: string;
   status: 'completed' | 'in-progress' | 'not-started';
+}
+
+interface Tema {
+  id: number;
+  nombre: string;
+  area_id: number;
+}
+
+interface Subtema {
+  id: number;
+  nombre: string;
+  tema_id: number;
+}
+
+interface Contenido {
+  id: number;
+  titulo: string;
+  tipo: string;
+  duracion?: string;
+  subtema_id: number;
 }
 
 // Colores por materia
@@ -29,6 +50,28 @@ const subjectColors: Record<string, { primary: string; light: string; icon: any 
 
 const getSubjectColor = (subjectId: string) => {
   return subjectColors[subjectId] || { primary: '#4A90E2', light: '#E3F2FD' };
+};
+
+const API_BASE_URL = '/api';
+
+const FALLBACK_CONTENT: Content[] = [
+  { id: '1', title: 'Introducción al curso', type: 'video', duration: '15 min', status: 'completed' },
+  { id: '2', title: 'Conceptos básicos', type: 'document', status: 'completed' },
+  { id: '3', title: 'Variables y tipos de datos', type: 'video', duration: '25 min', status: 'in-progress' },
+  { id: '4', title: 'Ejercicios prácticos - Módulo 1', type: 'activity', status: 'in-progress' },
+  { id: '5', title: 'Estructuras de control', type: 'video', duration: '30 min', status: 'not-started' },
+];
+
+const mapTipoToType = (tipo: string): Content['type'] => {
+  const tipoMap: Record<string, Content['type']> = {
+    'video': 'video',
+    'documento': 'document',
+    'actividad': 'activity',
+    'cuestionario': 'quiz',
+    'uml': 'uml',
+    'taller': 'workshop'
+  };
+  return tipoMap[tipo.toLowerCase()] || 'document';
 };
 
 const contentData: Content[] = [
@@ -78,7 +121,72 @@ const getStatusBadge = (status: Content['status']) => {
 };
 
 export function SubjectContentScreen({ subject, onBack, onContentSelect }: SubjectContentScreenProps) {
+  const [contentList, setContentList] = useState<Content[]>([]);
+  const [temasMap, setTemasMap] = useState<Map<string, string>>(new Map()); // Map content.id to temaId
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const colors = getSubjectColor(subject.id);
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        console.log('🔄 Fetching temas for area:', subject.id);
+
+        // Obtener todos los temas del área
+        const temasResponse = await fetch(`${API_BASE_URL}/temas/por-area/${subject.id}`);
+
+        // ✅ Validación: Verificar si response es exitosa
+        if (!temasResponse.ok) {
+          throw new Error(`Failed to fetch temas: HTTP ${temasResponse.status}`);
+        }
+
+        const contentType = temasResponse.headers.get('content-type');
+        if (!contentType?.includes('application/json')) {
+          throw new Error(`Invalid response type from /temas/por-area. Expected JSON, got: ${contentType}`);
+        }
+
+        const temas: Tema[] = await temasResponse.json();
+        console.log('✅ Temas loaded:', temas);
+
+        // Transformar temas a formato Content
+        const transformedContent = temas.map((tema) => ({
+          id: tema.id.toString(),
+          title: tema.nombre,
+          type: 'document' as const,
+          duration: undefined,
+          status: 'not-started' as const
+        }));
+
+        // Create map of content.id -> temaId
+        const newTemasMap = new Map<string, string>();
+        temas.forEach((tema) => {
+          newTemasMap.set(tema.id.toString(), tema.id.toString());
+        });
+        setTemasMap(newTemasMap);
+
+        if (transformedContent.length === 0) {
+          console.warn('⚠️ No temas found, using fallback data');
+          setContentList(FALLBACK_CONTENT);
+          setError('No se encontraron temas en la BD. Se muestran datos de prueba.');
+        } else {
+          setContentList(transformedContent);
+        }
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+        console.error('❌ Error al obtener temas:', errorMessage);
+        setError(`Error: ${errorMessage}. Se muestran datos de prueba.`);
+        setContentList(FALLBACK_CONTENT);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContent();
+  }, [subject.id]);
   
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
@@ -168,14 +276,32 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect }: Subje
           <h3 className="text-[#3A4A5B] mb-4 text-xl">Contenidos del Curso</h3>
         </div>
 
+        {error && (
+          <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <p className="text-yellow-700 text-sm">⚠️ {error}</p>
+          </div>
+        )}
+
         <div className="space-y-3">
-          {contentData.map((content) => {
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Cargando contenidos...</p>
+            </div>
+          ) : contentList.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No hay contenidos disponibles</p>
+            </div>
+          ) : (
+          contentList.map((content) => {
             const Icon = getTypeIcon(content.type);
             return (
               <button
                 key={content.id}
                 className="w-full bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 p-5 text-left group"
-                onClick={() => onContentSelect && onContentSelect(content)}
+                onClick={() => {
+                  const temaId = temasMap.get(content.id) || content.id;
+                  onContentSelect && onContentSelect(content, temaId);
+                }}
               >
                 <div className="flex items-center gap-4">
                   {/* Type Icon */}
@@ -219,7 +345,8 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect }: Subje
                 </div>
               </button>
             );
-          })}
+          })
+          )}
         </div>
 
         {/* Additional Resources */}

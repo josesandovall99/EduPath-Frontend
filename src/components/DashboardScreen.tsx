@@ -1,9 +1,15 @@
 import { LogOut, Code, Database, BarChart3, BookOpen, Clock, CheckCircle2, TrendingUp } from 'lucide-react';
-
+import { useState, useEffect } from 'react';
 
 interface Subject {
   id: string;
   name: string;
+}
+
+interface Area {
+  id: number;
+  nombre: string;
+  descripcion?: string;
 }
 
 interface DashboardScreenProps {
@@ -12,39 +18,93 @@ interface DashboardScreenProps {
   onLogout: () => void;
 }
 
+const colorPalette = ['#4A90E2', '#7ED6A7', '#F5A97F', '#FFB84D', '#A78BFA', '#EC4899'];
+
+// Configurar URL del API
+// Con proxy en vite.config.ts: usa rutas relativas '/api'
+// Sin proxy: usa 'http://localhost:3000/api'
+const API_BASE_URL = '/api';
+
+// Fallback data por si falla el fetch
+const FALLBACK_SUBJECTS = [
+  {
+    id: '1',
+    name: 'Fundamentos de Programación',
+    icon: Code,
+    color: '#4A90E2',
+    progress: 65,
+    topics: 12,
+    completed: 8,
+    nextTopic: 'Funciones y Procedimientos'
+  },
+  {
+    id: '2',
+    name: 'Análisis de Sistemas',
+    icon: Database,
+    color: '#7ED6A7',
+    progress: 45,
+    topics: 10,
+    completed: 4,
+    nextTopic: 'Diagramas de Secuencia'
+  }
+];
+
 export function DashboardScreen({ userName, onSubjectSelect, onLogout }: DashboardScreenProps) {
-  const subjects = [
-    {
-      id: 'fundamentos',
-      name: 'Fundamentos de Programación',
-      icon: Code,
-      color: '#4A90E2',
-      progress: 65,
-      topics: 12,
-      completed: 8,
-      nextTopic: 'Funciones y Procedimientos'
-    },
-    {
-      id: 'analisis',
-      name: 'Análisis de Sistemas',
-      icon: Database,
-      color: '#7ED6A7',
-      progress: 45,
-      topics: 10,
-      completed: 4,
-      nextTopic: 'Diagramas de Secuencia'
-    },
-    {
-      id: 'alcance',
-      name: 'Alcance, Tiempo y Costo',
-      icon: BarChart3,
-      color: '#F5A97F',
-      progress: 30,
-      topics: 8,
-      completed: 2,
-      nextTopic: 'Gestión del Cronograma'
-    }
-  ];
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAreas = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        console.log('🔄 Fetching areas from:', `${API_BASE_URL}/areas`);
+
+        const response = await fetch(`${API_BASE_URL}/areas`);
+
+        // ✅ Validación crítica: verificar si la respuesta es exitosa
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType?.includes('application/json')) {
+          throw new Error(`Invalid content type. Expected JSON, got: ${contentType}`);
+        }
+
+        const areas = await response.json();
+        console.log('✅ Areas loaded successfully:', areas);
+
+        // Transformar áreas a formato de subjects
+        const transformedSubjects = areas.map((area: Area, index: number) => ({
+          id: area.id.toString(),
+          name: area.nombre,
+          icon: Code,
+          color: colorPalette[index % colorPalette.length],
+          progress: Math.floor(Math.random() * 100),
+          topics: Math.floor(Math.random() * 15) + 5,
+          completed: Math.floor(Math.random() * 10) + 1,
+          nextTopic: 'Próximo tema disponible'
+        }));
+
+        setSubjects(transformedSubjects);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+        console.error('❌ Error fetching areas:', errorMessage);
+        setError(`No se pudieron cargar las áreas: ${errorMessage}`);
+        
+        // Usar fallback data
+        console.log('📦 Using fallback data');
+        setSubjects(FALLBACK_SUBJECTS);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAreas();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
@@ -100,7 +160,25 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout }: Dashboa
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {subjects.map((subject) => {
+          {loading && (
+            <div className="col-span-3 text-center py-8">
+              <p className="text-gray-500">Cargando materias...</p>
+            </div>
+          )}
+          
+          {error && (
+            <div className="col-span-3 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+              <p className="text-yellow-700 text-sm">⚠️ {error}</p>
+              <p className="text-yellow-600 text-xs mt-2">Se están mostrando datos de prueba.</p>
+            </div>
+          )}
+          
+          {!loading && subjects.length === 0 ? (
+            <div className="col-span-3 text-center py-8">
+              <p className="text-gray-500">No hay áreas disponibles</p>
+            </div>
+          ) : (
+          subjects.map((subject) => {
             const Icon = subject.icon;
             return (
               <button
@@ -160,7 +238,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout }: Dashboa
                 </div>
               </button>
             );
-          })}
+          })
+          )}
         </div>
 
         {/* Recent Activity */}

@@ -62,6 +62,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
+  const [selectedTemaId, setSelectedTemaId] = useState<string | null>(null);
   const [userData, setUserData] = useState<{id: number, personaId: number, nombre: string} | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   
@@ -157,8 +158,11 @@ export default function App() {
     }
   };
 
-  const handleContentSelect = (content: Content) => {
+  const handleContentSelect = (content: Content, temaId?: string) => {
     setSelectedContent(content);
+    if (temaId) {
+      setSelectedTemaId(temaId);
+    }
     
     // Determine which view to show based on subject and content type
     if (selectedSubject?.name === 'Fundamentos de Programación') {
@@ -287,6 +291,7 @@ export default function App() {
           <TheoryContentView
             subjectName={selectedSubject.name}
             content={selectedContent}
+            temaId={selectedTemaId || undefined}
             onBack={handleBackToSubject}
           />
           <ChatbotButton />
