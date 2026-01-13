@@ -63,7 +63,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout }: Dashboa
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-[#3A4A5B]">Juan Estudiante</p>
+                <p className="text-[#3A4A5B]">{userName || 'Estudiante'}</p>
                 <p className="text-gray-500 text-sm">Ingeniería de Sistemas</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-[#4A90E2] to-[#5B9FED] rounded-full flex items-center justify-center text-white shadow-md">
