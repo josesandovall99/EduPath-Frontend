@@ -63,6 +63,14 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
   const [selectedTema, setSelectedTema] = useState('');
   const [selectedSubtema, setSelectedSubtema] = useState('');
 
+  // Modal-specific filtros (no afectan los filtros de la pantalla)
+  const [modalSelectedArea, setModalSelectedArea] = useState('');
+  const [modalSelectedTema, setModalSelectedTema] = useState('');
+  const [modalSelectedSubtema, setModalSelectedSubtema] = useState('');
+  const [modalTemas, setModalTemas] = useState<Tema[]>([]);
+  const [modalSubtemas, setModalSubtemas] = useState<Subtema[]>([]);
+  const [modalContents, setModalContents] = useState<ContentItem[]>([]);
+
   const [formData, setFormData] = useState({
     contenido_origen_id: '',
     contenido_destino_id: '',
@@ -114,9 +122,9 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
   // Obtener contenidos filtrados por área, tema y subtema
   const getFilteredContents = () => {
     return contents.filter(c => {
-      if (selectedArea && c.area_id !== parseInt(selectedArea)) return false;
-      if (selectedTema && c.tema_id !== parseInt(selectedTema)) return false;
-      if (selectedSubtema && c.subtema_id !== parseInt(selectedSubtema)) return false;
+      if (selectedArea && Number(c.area_id) !== Number(selectedArea)) return false;
+      if (selectedTema && Number(c.tema_id) !== Number(selectedTema)) return false;
+      if (selectedSubtema && Number(c.subtema_id) !== Number(selectedSubtema)) return false;
       return true;
     });
   };
@@ -142,6 +150,128 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
     });
 
     return used;
+  };
+
+  // --- Modal-specific helpers to filtrar contenidos dentro del modal Crear Secuencia ---
+  const getFilteredModalContents = () => {
+    console.log('DEBUG: getFilteredModalContents filters:', { modalSelectedArea, modalSelectedTema, modalSelectedSubtema }, 'modalTemas:', modalTemas.map(t=>t.id), 'modalContents sample:', modalContents.slice(0,3).map(c=>({ id: c.id, titulo: c.titulo, tema_id: c.tema_id, subtema_id: c.subtema_id })));
+    return modalContents.filter(c => {
+      // Note: Contenido model doesn't include area_id, so when an area is selected
+      // we filter by tema (themes belonging to that area) using modalTemas.
+      if (modalSelectedArea) {
+        const allowedTemaIds = modalTemas.map(t => Number(t.id));
+        if (!allowedTemaIds.includes(Number(c.tema_id))) return false;
+      }
+
+      if (modalSelectedTema && Number(c.tema_id) !== Number(modalSelectedTema)) return false;
+      if (modalSelectedSubtema && Number(c.subtema_id) !== Number(modalSelectedSubtema)) return false;
+      return true;
+    });
+  };
+
+  const getAvailableOriginModalContents = () => {
+    const filtered = getFilteredModalContents();
+    const used = getUsedContents();
+    const available = filtered.filter(c => !used.both.has(c.id) && !used.origin.has(c.id));
+    console.log('DEBUG: getAvailableOriginModalContents -> filteredCount:', filtered.length, 'availableCount:', available.length, 'used:', { origin: Array.from(used.origin), destination: Array.from(used.destination), both: Array.from(used.both) });
+    return available;
+  };
+
+  const getAvailableDestinationModalContents = () => {
+    const filtered = getFilteredModalContents();
+    const used = getUsedContents();
+    const available = filtered.filter(c => !used.both.has(c.id) && !used.destination.has(c.id));
+    console.log('DEBUG: getAvailableDestinationModalContents -> filteredCount:', filtered.length, 'availableCount:', available.length, 'used:', { origin: Array.from(used.origin), destination: Array.from(used.destination), both: Array.from(used.both) });
+    return available;
+  };
+
+  const handleModalFilterChange = async (filterType: string, value: string) => {
+    if (filterType === 'area') {
+      setModalSelectedArea(value);
+      setModalSelectedTema('');
+      setModalSelectedSubtema('');
+      setModalTemas([]);
+      setModalSubtemas([]);
+      // Al seleccionar un área, obtener los temas del backend y luego filtrar contenidos
+      if (value) {
+        try {
+          const res = await fetch(`http://localhost:4000/temas/por-area/${value}`);
+          if (!res.ok) throw new Error('Error cargando temas');
+          const data = await res.json();
+          setModalTemas(data);
+
+          // Filtrar contenidos por tema perteneciente a la área seleccionada
+          const temaIds = data.map((t: Tema) => Number(t.id));
+          const filtered = contents.filter(c => temaIds.includes(Number(c.tema_id)));
+          console.log('DEBUG: Filtrando modalContents por área -> temaIds:', temaIds, 'result:', filtered.map(fc => ({ id: fc.id, titulo: fc.titulo })));
+          setModalContents(filtered);
+        } catch (err) {
+          console.error('Error cargando temas para modal:', err);
+          setModalTemas([]);
+          setModalContents([]);
+        }
+      } else {
+        // Si deselecciona área, restaurar todos los contenidos
+        setModalContents(contents);
+      }
+
+    } else if (filterType === 'tema') {
+      setModalSelectedTema(value);
+      setModalSelectedSubtema('');
+      setModalSubtemas([]);
+
+      // Filtrar contenidos por el tema seleccionado (y por área si aplica)
+      if (value) {
+        const filtered = contents.filter(c => Number(c.tema_id) === Number(value) && (!modalSelectedArea || modalTemas.some(t => Number(t.id) === Number(c.tema_id))));
+        console.log('DEBUG: Filtrando modalContents por tema -> temaId:', value, 'result:', filtered.map(fc => ({ id: fc.id, titulo: fc.titulo })));
+        setModalContents(filtered);
+
+        try {
+          const res = await fetch(`http://localhost:4000/subtemas/por-tema/${value}`);
+          if (!res.ok) throw new Error('Error cargando subtemas');
+          const data = await res.json();
+          setModalSubtemas(data);
+        } catch (err) {
+          console.error('Error cargando subtemas para modal:', err);
+          setModalSubtemas([]);
+        }
+      } else {
+        // Si se deselecciona tema, restaurar según área
+        if (modalSelectedArea) {
+          const temaIds = modalTemas.map((t: Tema) => Number(t.id));
+          setModalContents(contents.filter(c => temaIds.includes(Number(c.tema_id))));
+        } else {
+          setModalContents(contents);
+        }
+      }
+    } else if (filterType === 'subtema') {
+      setModalSelectedSubtema(value);
+
+      if (value) {
+        try {
+          const url = `http://localhost:4000/contenidos/subtema/${value}`;
+          console.log('Cargando contenidos para modal desde:', url);
+          const res = await fetch(url);
+          if (!res.ok) {
+            const errorData = await res.text();
+            console.error('Error response (modal contenidos by subtema):', errorData);
+            throw new Error(`Error ${res.status}: ${res.statusText}`);
+          }
+          const data = await res.json();
+          console.log('DEBUG: Respuesta /contenidos/subtema/:', res.status, res.statusText, 'items:', Array.isArray(data) ? data.length : 'not-array', data.slice ? data.map((d: any) => ({ id: d.id, titulo: d.titulo, subtema_id: d.subtema_id })) : data);
+          setModalContents(data);
+        } catch (err) {
+          console.error('Error cargando contenidos por subtema (modal):', err);
+          setModalContents([]);
+        }
+      } else {
+        // Si se deselecciona el subtema, recargar según área/tema seleccionados
+        setModalContents(contents.filter(c =>
+          (!modalSelectedArea || Number(c.area_id) === Number(modalSelectedArea)) &&
+          (!modalSelectedTema || Number(c.tema_id) === Number(modalSelectedTema))
+        ));
+      }
+    }
   };
 
   // Filtrar contenidos disponibles para origen
@@ -412,6 +542,14 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
             <button
               onClick={() => {
                 resetForm();
+                // Inicializar filtros del modal sin afectar filtros de página
+                setModalSelectedArea('');
+                setModalSelectedTema('');
+                setModalSelectedSubtema('');
+                setModalTemas([]);
+                setModalSubtemas([]);
+                setModalContents(contents);
+                console.log('DEBUG: Abriendo modal crear secuencia. Contenidos totales disponibles:', contents.length, contents.map(c => c.titulo));
                 setShowCreateModal(true);
               }}
               className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] text-white rounded-lg hover:shadow-lg transition-all duration-300"
@@ -677,6 +815,13 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                 onClick={() => {
                   setShowCreateModal(false);
                   resetForm();
+                  // Limpiar estado del modal
+                  setModalSelectedArea('');
+                  setModalSelectedTema('');
+                  setModalSelectedSubtema('');
+                  setModalTemas([]);
+                  setModalSubtemas([]);
+                  setModalContents([]);
                 }}
                 className="text-gray-400 hover:text-gray-600 text-2xl"
               >
@@ -694,8 +839,8 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                       Área
                     </label>
                     <select
-                      value={selectedArea}
-                      onChange={(e) => handleFilterChange('area', e.target.value)}
+                      value={modalSelectedArea}
+                      onChange={(e) => handleModalFilterChange('area', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                     >
                       <option value="">Todas las áreas</option>
@@ -712,13 +857,13 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                       Tema
                     </label>
                     <select
-                      value={selectedTema}
-                      onChange={(e) => handleFilterChange('tema', e.target.value)}
-                      disabled={!selectedArea}
+                      value={modalSelectedTema}
+                      onChange={(e) => handleModalFilterChange('tema', e.target.value)}
+                      disabled={!modalSelectedArea}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Todos los temas</option>
-                      {filteredTemas.map(tema => (
+                      {modalTemas.map(tema => (
                         <option key={tema.id} value={tema.id}>
                           {tema.nombre}
                         </option>
@@ -731,13 +876,13 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                       Subtema
                     </label>
                     <select
-                      value={selectedSubtema}
-                      onChange={(e) => handleFilterChange('subtema', e.target.value)}
-                      disabled={!selectedTema}
+                      value={modalSelectedSubtema}
+                      onChange={(e) => handleModalFilterChange('subtema', e.target.value)}
+                      disabled={!modalSelectedTema}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Todos los subtemas</option>
-                      {filteredSubtemas.map(subtema => (
+                      {modalSubtemas.map(subtema => (
                         <option key={subtema.id} value={subtema.id}>
                           {subtema.nombre}
                         </option>
@@ -760,7 +905,7 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                   required
                 >
                   <option value="">Seleccionar contenido origen</option>
-                  {getAvailableOriginContents().map(c => (
+                  {getAvailableOriginModalContents().map(c => (
                     <option key={c.id} value={c.id}>
                       {c.titulo} ({c.tipo})
                     </option>
@@ -781,7 +926,7 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                   required
                 >
                   <option value="">Seleccionar contenido destino</option>
-                  {getAvailableDestinationContents().map(c => (
+                  {getAvailableDestinationModalContents().map(c => (
                     <option key={c.id} value={c.id}>
                       {c.titulo} ({c.tipo})
                     </option>
@@ -827,6 +972,12 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                   onClick={() => {
                     setShowCreateModal(false);
                     resetForm();
+                    setModalSelectedArea('');
+                    setModalSelectedTema('');
+                    setModalSelectedSubtema('');
+                    setModalTemas([]);
+                    setModalSubtemas([]);
+                    setModalContents([]);
                   }}
                   disabled={isLoading}
                   className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
