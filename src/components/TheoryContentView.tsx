@@ -254,10 +254,14 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
   }, [temaId]);
 
   // Fetch contenidos for a specific subtema
+  // ...existing code...
+
+  // Fetch contenidos for a specific subtema
   const loadContenidosForSubtema = async (subtemaId: string, modulosActuales?: Module[]) => {
     try {
       console.log(`🔄 Fetching contenidos for subtemaId: ${subtemaId}`);
-      const response = await fetch(`${API_BASE_URL}/contenidos/subtema/${subtemaId}`);
+      // Usar el nuevo endpoint que ordena por secuencia
+      const response = await fetch(`${API_BASE_URL}/secuencias-contenido/subtema/${subtemaId}/ordenados`);
       
       if (!response.ok) {
         console.warn(`⚠️ HTTP ${response.status} when fetching contenidos`);
@@ -270,7 +274,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       }
 
       const contenidos: Contenido[] = await response.json();
-      console.log('✅ Contenidos fetched:', contenidos);
+      console.log('✅ Contenidos fetched ordenados por secuencia:', contenidos);
 
       // Transform contenidos to ModuleItem format
       const items = contenidos.map((contenido: Contenido) => ({
@@ -283,7 +287,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         url: contenido.url,
       }));
 
-      // Update the module with the loaded items using a callback to ensure we get current state
+      // Update the module with the loaded items
       setModules(prevModules => 
         prevModules.map(m => 
           m.id === subtemaId 
@@ -302,6 +306,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       );
     }
   };
+
+// ...existing code...
 
   const toggleModule = (moduleId: string) => {
     setModules(prevModules => {

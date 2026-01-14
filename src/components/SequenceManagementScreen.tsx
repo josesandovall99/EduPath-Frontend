@@ -2,11 +2,31 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
+interface Area {
+  id: number;
+  nombre: string;
+}
+
+interface Tema {
+  id: number;
+  nombre: string;
+  area_id: number;
+}
+
+interface Subtema {
+  id: number;
+  nombre: string;
+  tema_id: number;
+}
+
 interface ContentItem {
   id: number;
   titulo: string;
   tipo: 'video' | 'document' | 'activity';
   descripcion?: string;
+  area_id?: number;
+  tema_id?: number;
+  subtema_id?: number;
 }
 
 interface Sequence {
@@ -24,6 +44,9 @@ interface SequenceManagementScreenProps {
 }
 
 export function SequenceManagementScreen({ onBack }: SequenceManagementScreenProps) {
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [temas, setTemas] = useState<Tema[]>([]);
+  const [subtemas, setSubtemas] = useState<Subtema[]>([]);
   const [contents, setContents] = useState<ContentItem[]>([]);
   const [sequences, setSequences] = useState<Sequence[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -34,6 +57,11 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Filtros
+  const [selectedArea, setSelectedArea] = useState('');
+  const [selectedTema, setSelectedTema] = useState('');
+  const [selectedSubtema, setSelectedSubtema] = useState('');
 
   const [formData, setFormData] = useState({
     contenido_origen_id: '',
@@ -50,21 +78,21 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
   const loadData = async () => {
     setIsLoadingData(true);
     try {
-      const [contentsRes, sequencesRes] = await Promise.all([
+      const [areasRes, contentsRes, sequencesRes] = await Promise.all([
+        fetch('http://localhost:4000/areas'),
         fetch('http://localhost:4000/contenidos'),
         fetch('http://localhost:4000/secuencias-contenido')
       ]);
 
-      if (!contentsRes.ok || !sequencesRes.ok) {
-        throw new Error(`Error al cargar datos: Contents ${contentsRes.status}, Sequences ${sequencesRes.status}`);
+      if (!areasRes.ok || !contentsRes.ok || !sequencesRes.ok) {
+        throw new Error('Error al cargar datos');
       }
 
+      const areasData = await areasRes.json();
       const contentsData = await contentsRes.json();
       const sequencesData = await sequencesRes.json();
 
-      console.log('Contenidos cargados:', contentsData);
-      console.log('Secuencias cargadas:', sequencesData);
-
+      setAreas(areasData);
       setContents(contentsData);
       setSequences(sequencesData);
     } catch (err) {
@@ -75,12 +103,132 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
     }
   };
 
+  // Obtener temas filtrados por área
+  // Ya están filtrados del backend, así que usarlos directamente
+  const filteredTemas = temas;
+
+  // Obtener subtemas filtrados por tema
+  // Ya están filtrados del backend, así que usarlos directamente
+  const filteredSubtemas = subtemas;
+
+  // Obtener contenidos filtrados por área, tema y subtema
+  const getFilteredContents = () => {
+    return contents.filter(c => {
+      if (selectedArea && c.area_id !== parseInt(selectedArea)) return false;
+      if (selectedTema && c.tema_id !== parseInt(selectedTema)) return false;
+      if (selectedSubtema && c.subtema_id !== parseInt(selectedSubtema)) return false;
+      return true;
+    });
+  };
+
+  // Obtener contenidos usados en secuencias
+  const getUsedContents = () => {
+    const used = {
+      origin: new Set<number>(),
+      destination: new Set<number>(),
+      both: new Set<number>()
+    };
+
+    sequences.forEach(seq => {
+      const isOrigin = sequences.some(s => s.contenido_origen_id === seq.contenido_origen_id);
+      const isDestination = sequences.some(s => s.contenido_destino_id === seq.contenido_destino_id);
+      
+      if (isOrigin && isDestination && seq.contenido_origen_id === seq.contenido_destino_id) {
+        used.both.add(seq.contenido_origen_id);
+      } else {
+        if (isOrigin) used.origin.add(seq.contenido_origen_id);
+        if (isDestination) used.destination.add(seq.contenido_destino_id);
+      }
+    });
+
+    return used;
+  };
+
+  // Filtrar contenidos disponibles para origen
+  const getAvailableOriginContents = () => {
+    const filtered = getFilteredContents();
+    const used = getUsedContents();
+    
+    return filtered.filter(c => 
+      !used.both.has(c.id) && !used.origin.has(c.id)
+    );
+  };
+
+  // Filtrar contenidos disponibles para destino
+  const getAvailableDestinationContents = () => {
+    const filtered = getFilteredContents();
+    const used = getUsedContents();
+    
+    return filtered.filter(c => 
+      !used.both.has(c.id) && !used.destination.has(c.id)
+    );
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'estado') {
       setFormData(prev => ({ ...prev, [name]: value === 'true' }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleFilterChange = async (filterType: string, value: string) => {
+    if (filterType === 'area') {
+      setSelectedArea(value);
+      setSelectedTema('');
+      setSelectedSubtema('');
+      
+      // Cargar temas del área seleccionada
+      if (value) {
+        try {
+          const url = `http://localhost:4000/temas/por-area/${value}`;
+          console.log('Cargando temas desde:', url);
+          const res = await fetch(url);
+          console.log('Respuesta de temas:', res.status, res.statusText);
+          if (!res.ok) {
+            const errorData = await res.text();
+            console.error('Error response:', errorData);
+            throw new Error(`Error ${res.status}: ${res.statusText}`);
+          }
+          const data = await res.json();
+          console.log('Temas cargados:', data);
+          setTemas(data);
+        } catch (err) {
+          console.error('Error cargando temas:', err);
+          setTemas([]);
+        }
+      } else {
+        setTemas([]);
+      }
+    } else if (filterType === 'tema') {
+      setSelectedTema(value);
+      setSelectedSubtema('');
+      
+      // Cargar subtemas del tema seleccionado
+      if (value) {
+        try {
+          const url = `http://localhost:4000/subtemas/por-tema/${value}`;
+          console.log('Cargando subtemas desde:', url);
+          const res = await fetch(url);
+          console.log('Respuesta de subtemas:', res.status, res.statusText);
+          if (!res.ok) {
+            const errorData = await res.text();
+            console.error('Error response:', errorData);
+            throw new Error(`Error ${res.status}: ${res.statusText}`);
+          }
+          const data = await res.json();
+          console.log('Subtemas cargados:', data);
+          setSubtemas(data);
+        } catch (err) {
+          console.error('Error cargando subtemas:', err);
+          setSubtemas([]);
+        }
+      } else {
+        setSubtemas([]);
+      }
+    } else if (filterType === 'subtema') {
+      setSelectedSubtema(value);
     }
   };
 
@@ -323,6 +471,68 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
           </div>
         </div>
 
+        {/* Filtros */}
+        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+          <h3 className="text-lg font-semibold text-[#3A4A5B] mb-4">Filtrar por:</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
+                Área
+              </label>
+              <select
+                value={selectedArea}
+                onChange={(e) => handleFilterChange('area', e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+              >
+                <option value="">Todas las áreas</option>
+                {areas.map(area => (
+                  <option key={area.id} value={area.id}>
+                    {area.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
+                Tema
+              </label>
+              <select
+                value={selectedTema}
+                onChange={(e) => handleFilterChange('tema', e.target.value)}
+                disabled={!selectedArea}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">Todos los temas</option>
+                {filteredTemas.map(tema => (
+                  <option key={tema.id} value={tema.id}>
+                    {tema.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
+                Subtema
+              </label>
+              <select
+                value={selectedSubtema}
+                onChange={(e) => handleFilterChange('subtema', e.target.value)}
+                disabled={!selectedTema}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">Todos los subtemas</option>
+                {filteredSubtemas.map(subtema => (
+                  <option key={subtema.id} value={subtema.id}>
+                    {subtema.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
         {/* Search */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="relative">
@@ -475,6 +685,68 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
             </div>
 
             <form onSubmit={isEditMode ? handleUpdateSequence : handleCreateSequence} className="space-y-4">
+              {/* Filtros en Modal */}
+              <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                <h4 className="text-sm font-medium text-[#3A4A5B] mb-3">Filtrar contenidos:</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Área
+                    </label>
+                    <select
+                      value={selectedArea}
+                      onChange={(e) => handleFilterChange('area', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                    >
+                      <option value="">Todas las áreas</option>
+                      {areas.map(area => (
+                        <option key={area.id} value={area.id}>
+                          {area.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Tema
+                    </label>
+                    <select
+                      value={selectedTema}
+                      onChange={(e) => handleFilterChange('tema', e.target.value)}
+                      disabled={!selectedArea}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Todos los temas</option>
+                      {filteredTemas.map(tema => (
+                        <option key={tema.id} value={tema.id}>
+                          {tema.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Subtema
+                    </label>
+                    <select
+                      value={selectedSubtema}
+                      onChange={(e) => handleFilterChange('subtema', e.target.value)}
+                      disabled={!selectedTema}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Todos los subtemas</option>
+                      {filteredSubtemas.map(subtema => (
+                        <option key={subtema.id} value={subtema.id}>
+                          {subtema.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {/* Contenido Origen */}
               <div>
                 <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
@@ -488,7 +760,7 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                   required
                 >
                   <option value="">Seleccionar contenido origen</option>
-                  {contents.map(c => (
+                  {getAvailableOriginContents().map(c => (
                     <option key={c.id} value={c.id}>
                       {c.titulo} ({c.tipo})
                     </option>
@@ -509,7 +781,7 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                   required
                 >
                   <option value="">Seleccionar contenido destino</option>
-                  {contents.map(c => (
+                  {getAvailableDestinationContents().map(c => (
                     <option key={c.id} value={c.id}>
                       {c.titulo} ({c.tipo})
                     </option>
