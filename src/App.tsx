@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Toaster } from './components/ui/sonner';
 import { LoginScreen } from './components/LoginScreen';
 import { AdminRegisterScreen } from './components/AdminRegisterScreen';
 import { DashboardScreen } from './components/DashboardScreen';
@@ -201,6 +202,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
+      <Toaster position="top-right" richColors />
       {currentScreen === 'login' && (
         <LoginScreen 
           onLoginSuccess={handleLoginSuccess} // Conectamos la función

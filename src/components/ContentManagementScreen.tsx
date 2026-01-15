@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Plus, FileText, PlayCircle, Edit, Trash2, Eye, EyeOff, Search, Loader } from 'lucide-react';
+import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
 interface ContentManagementScreenProps {
@@ -48,8 +49,6 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
 
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   // Cargar contenidos al montar el componente
   useEffect(() => {
@@ -91,7 +90,9 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
       setContents(contenidosMapeados);
     } catch (err) {
       console.error('Error cargando contenidos:', err);
-      setError('No se pudieron cargar los contenidos');
+      toast.error('Error', {
+        description: 'No se pudieron cargar los contenidos'
+      });
     } finally {
       setIsLoadingData(false);
     }
@@ -101,8 +102,6 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
   const handleSubmitContent = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
       const method = isEditMode ? 'PUT' : 'POST';
@@ -150,7 +149,10 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
             : c
         );
         setContents(contenidosActualizados);
-        setSuccess('Contenido actualizado exitosamente');
+        toast.success('✓ Contenido actualizado', {
+          description: 'El contenido se ha actualizado exitosamente',
+          duration: 5000
+        });
       } else {
         // Agregar nuevo contenido
         const nuevoItemLocal: ContentItem = {
@@ -167,7 +169,13 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
           url: contenidoActualizado.url
         };
         setContents([...contents, nuevoItemLocal]);
-        setSuccess('Contenido creado exitosamente');
+        
+        // Toast informativo para nuevo contenido
+        toast.warning('⚠️ Nuevo contenido creado', {
+          description: `"${contenidoActualizado.titulo}" ha sido creado. Debes agregarlo a la Secuencia de Contenido para ordenarlo dentro del subtema.`,
+          duration: 8000,
+          closeButton: true
+        });
       }
 
       // Limpiar formulario
@@ -190,7 +198,10 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
         setShowCreateModal(false);
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      toast.error('Error', {
+        description: errorMessage
+      });
     } finally {
       setIsLoading(false);
     }
@@ -218,7 +229,6 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
     }
 
     setIsLoading(true);
-    setError(null);
 
     try {
       const response = await fetch(`http://localhost:4000/contenidos/${id}`, {
@@ -233,11 +243,20 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
         throw new Error(errorData.message || 'Error al eliminar el contenido');
       }
 
+      const contenidoEliminado = contents.find(c => c.id === id);
       setContents(contents.filter(c => c.id !== id));
-      setSuccess('Contenido eliminado exitosamente');
-      setTimeout(() => setSuccess(null), 3000);
+      
+      // Toast informativo cuando se elimina contenido
+      toast.warning('⚠️ Contenido eliminado', {
+        description: `"${contenidoEliminado?.title}" ha sido eliminado. Si estaba en una secuencia, verifica y actualiza esa Secuencia de Contenido.`,
+        duration: 8000,
+        closeButton: true
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
+      toast.error('Error al eliminar', {
+        description: err instanceof Error ? err.message : 'Error desconocido'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -611,18 +630,6 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                 ✕
               </button>
             </div>
-
-            {error && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-                {error}
-              </div>
-            )}
-
-            {success && (
-              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-                {success}
-              </div>
-            )}
 
             <form onSubmit={handleSubmitContent} className="space-y-4">
               {/* Título */}

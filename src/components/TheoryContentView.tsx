@@ -261,7 +261,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
   const loadContenidosForSubtema = async (subtemaId: string, modulosActuales?: Module[]) => {
     try {
       console.log(`🔄 Fetching contenidos for subtemaId: ${subtemaId}`);
-      // Usar el nuevo endpoint que ordena por secuencia
+      // Usar el nuevo endpoint que ordena por secuencia del backend
       const response = await fetch(`${API_BASE_URL}/secuencias-contenido/subtema/${subtemaId}/ordenados`);
       
       if (!response.ok) {
