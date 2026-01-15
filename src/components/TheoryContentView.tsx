@@ -121,6 +121,7 @@ interface ModuleItem {
   completed?: boolean;
   descripcion?: string;
   url?: string;
+  recommended?: boolean;
 }
 
 interface Contenido {
@@ -276,8 +277,33 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       const contenidos: Contenido[] = await response.json();
       console.log('✅ Contenidos fetched ordenados por secuencia:', contenidos);
 
-      // Transform contenidos to ModuleItem format
-      const items = contenidos.map((contenido: Contenido) => ({
+      // Obtener todas las secuencias para identificar qué contenidos están en alguna secuencia
+      let sequencias: any[] = [];
+      try {
+        const seqResp = await fetch(`${API_BASE_URL}/secuencias-contenido`);
+        if (seqResp.ok) {
+          sequencias = await seqResp.json();
+        } else {
+          console.warn('No se pudo obtener secuencias, status:', seqResp.status);
+        }
+      } catch (e) {
+        console.warn('Error al obtener secuencias:', e);
+      }
+
+      const contenidoIds = new Set(contenidos.map(c => c.id));
+      const sequencedIds = new Set<number>();
+      sequencias.forEach(s => {
+        const ori = s.contenido_origen_id ?? s.origen?.id;
+        const dst = s.contenido_destino_id ?? s.destino?.id;
+        if (ori && contenidoIds.has(ori)) sequencedIds.add(ori);
+        if (dst && contenidoIds.has(dst)) sequencedIds.add(dst);
+      });
+
+      // Filtrar solo contenidos que forman parte de alguna secuencia
+      const contenidosSecuenciados = contenidos.filter(c => sequencedIds.has(c.id));
+
+      // Transform contenidosSecuenciados to ModuleItem format
+      const items: ModuleItem[] = contenidosSecuenciados.map((contenido: Contenido, idx: number) => ({
         id: contenido.id.toString(),
         title: contenido.titulo,
         duration: undefined,
@@ -285,9 +311,10 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         completed: false,
         descripcion: contenido.descripcion,
         url: contenido.url,
+        recommended: idx === 0
       }));
 
-      // Update the module with the loaded items
+      // Update the module with the loaded items (only sequenced)
       setModules(prevModules => 
         prevModules.map(m => 
           m.id === subtemaId 
@@ -295,6 +322,18 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
             : m
         )
       );
+
+      // Seleccionar el primer contenido secuenciado automáticamente si existe
+      if (items.length > 0) {
+        const first = items[0];
+        setSelectedContentId(first.id);
+        setSelectedContentData(first);
+        onContentChange?.(first.id);
+      } else {
+        // Si no hay contenidos secuenciados, limpiar selección
+        setSelectedContentId(null);
+        setSelectedContentData(null);
+      }
     } catch (err) {
       console.error('❌ Error fetching contenidos:', err);
       setModules(prevModules => 
