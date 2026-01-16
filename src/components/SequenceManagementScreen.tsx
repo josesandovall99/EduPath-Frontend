@@ -382,14 +382,19 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
         body: JSON.stringify(payload)
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al crear la secuencia');
+        // Capturar el error específico del backend (prioridad: error > message)
+        const errorMessage = data.error || data.message || 'Error al crear la secuencia';
+        console.log('Validaciones realizadas:', data.validacionesRealizadas);
+        throw new Error(errorMessage);
       }
 
-      const newSequence = await response.json();
-      setSequences([...sequences, newSequence]);
+      // Éxito - la respuesta puede venir en data.secuencia o directamente en data
+      setSequences([...sequences, data.secuencia || data]);
       setSuccess('Secuencia creada exitosamente');
+      console.log('Validaciones completadas:', data.validacionesRealizadas);
       resetForm();
       setTimeout(() => setShowCreateModal(false), 1500);
     } catch (err) {
@@ -433,14 +438,20 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
         body: JSON.stringify(payload)
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al actualizar la secuencia');
+        // Capturar el error específico del backend (prioridad: error > message)
+        const errorMessage = data.error || data.message || 'Error al actualizar la secuencia';
+        console.log('Validaciones realizadas:', data.validacionesRealizadas);
+        throw new Error(errorMessage);
       }
 
-      const updatedSequence = await response.json();
+      // Éxito - la respuesta puede venir en data.secuencia o directamente en data
+      const updatedSequence = data.secuencia || data;
       setSequences(sequences.map(s => s.id === selectedSequence.id ? updatedSequence : s));
       setSuccess('Secuencia actualizada exitosamente');
+      console.log('Validaciones completadas:', data.validacionesRealizadas);
       resetForm();
       setTimeout(() => setShowCreateModal(false), 1500);
     } catch (err) {
