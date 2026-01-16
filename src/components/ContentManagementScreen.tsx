@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plus, FileText, PlayCircle, Edit, Trash2, Eye, EyeOff, Search, Loader } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, PlayCircle, Edit, Trash2, Eye, EyeOff, Search, Loader, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
@@ -37,6 +37,8 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
   const [filterType, setFilterType] = useState<string>('all');
   const [contents, setContents] = useState<ContentItem[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [contentToDelete, setContentToDelete] = useState<ContentItem | null>(null);
 
   const [formData, setFormData] = useState<CreateContentFormData>({
     titulo: '',
@@ -224,14 +226,22 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
 
   // Función para eliminar contenido
   const handleDeleteContent = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar este contenido?')) {
-      return;
+    const content = contents.find(c => c.id === id);
+    if (content) {
+      setContentToDelete(content);
+      setShowDeleteConfirmation(true);
     }
+  };
+
+  // Función para confirmar eliminación
+  const confirmDeleteContent = async () => {
+    if (!contentToDelete) return;
 
     setIsLoading(true);
+    setShowDeleteConfirmation(false);
 
     try {
-      const response = await fetch(`http://localhost:4000/contenidos/${id}`, {
+      const response = await fetch(`http://localhost:4000/contenidos/${contentToDelete.id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -243,22 +253,21 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
         throw new Error(errorData.message || 'Error al eliminar el contenido');
       }
 
-      const contenidoEliminado = contents.find(c => c.id === id);
-      setContents(contents.filter(c => c.id !== id));
+      setContents(contents.filter(c => c.id !== contentToDelete.id));
       
       // Toast informativo cuando se elimina contenido
       toast.warning('⚠️ Contenido eliminado', {
-        description: `"${contenidoEliminado?.title}" ha sido eliminado. Si estaba en una secuencia, verifica y actualiza esa Secuencia de Contenido.`,
+        description: `"${contentToDelete.title}" ha sido eliminado. Si estaba en una secuencia, verifica y actualiza esa Secuencia de Contenido.`,
         duration: 8000,
         closeButton: true
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
       toast.error('Error al eliminar', {
         description: err instanceof Error ? err.message : 'Error desconocido'
       });
     } finally {
       setIsLoading(false);
+      setContentToDelete(null);
     }
   };
 
@@ -757,6 +766,66 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Eliminación */}
+      {showDeleteConfirmation && contentToDelete && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', maxWidth: '420px', width: '100%', padding: '32px' }}>
+            
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+              <div style={{ flexShrink: 0 }}>
+                <AlertTriangle style={{ width: '32px', height: '32px', color: '#dc2626' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#3A4A5B', marginBottom: '16px' }}>
+                  Eliminar contenido
+                </h3>
+                <p style={{ color: '#4b5563', marginBottom: '16px', lineHeight: '1.5' }}>
+                  ¿Estás seguro de que deseas eliminar <strong>"{contentToDelete.title}"</strong>?
+                </p>
+                
+                <div style={{ backgroundColor: '#fef3c7', borderLeft: '4px solid #f59e0b', borderRadius: '6px', padding: '12px', marginBottom: '24px' }}>
+                  <p style={{ fontSize: '14px', color: '#78350f', lineHeight: '1.6' }}>
+                    <strong>⚠️ Importante:</strong> Si este contenido está vinculado a una <strong>Secuencia de Contenido</strong>, la secuencia se verá afectada y se redireccionará automáticamente al siguiente contenido.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirmation(false);
+                  setContentToDelete(null);
+                }}
+                disabled={isLoading}
+                style={{ padding: '8px 16px', color: '#374151', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isLoading ? 'not-allowed' : 'pointer', fontWeight: '500', opacity: isLoading ? 0.5 : 1 }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteContent}
+                disabled={isLoading}
+                style={{ padding: '8px 16px', color: 'white', backgroundColor: '#dc2626', borderRadius: '8px', border: 'none', cursor: isLoading ? 'not-allowed' : 'pointer', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '8px', opacity: isLoading ? 0.5 : 1 }}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 style={{ width: '16px', height: '16px' }} />
+                    Sí, eliminar
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
