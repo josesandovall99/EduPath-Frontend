@@ -21,33 +21,56 @@ const handleStudentLogin = async () => {
     setError('');
     setLoading(true);
 
-    // Helper to post a payload and return response info
-    const postPayload = async (payload: Record<string, any>) => {
-      console.debug('Intentando payload:', payload);
-      try {
-        const res = await fetch('http://localhost:4000/estudiante/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(payload),
-        });
-
-        const text = await res.text();
-        let body: any = undefined;
-        try { body = text ? JSON.parse(text) : undefined; } catch { body = { mensaje: text }; }
-
-        return { ok: res.ok, status: res.status, body };
-      } catch (networkErr: any) {
-        return { ok: false, status: 0, body: { mensaje: String(networkErr) } };
-      }
+    const parseResponse = async (res: Response) => {
+      const text = await res.text();
+      try { return { ok: res.ok, status: res.status, body: text ? JSON.parse(text) : undefined }; }
+      catch { return { ok: res.ok, status: res.status, body: { mensaje: text } }; }
     };
 
     try {
-      // Candidate payloads to try (in order). We keep the original first.
+      // 1) Intentar login como administrador primero
+      try {
+        const adminRes = await fetch('http://localhost:4000/administrador/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ codigoAcceso: codigoEstudiantil, contraseña: password }),
+        });
+
+        const adminParsed = await parseResponse(adminRes);
+        if (adminParsed.ok) {
+          // Si es admin y credenciales correctas, redirigimos al dashboard admin
+          onAdminLogin && onAdminLogin();
+          setLoading(false);
+          return;
+        }
+
+        if (adminParsed.status && adminParsed.status >= 500) {
+          setError(`Servidor: ${adminParsed.status} - ${adminParsed.body?.mensaje || 'Error interno'}`);
+          setLoading(false);
+          return;
+        }
+        // Si 401/404 seguimos intentando como estudiante
+      } catch (netErr) {
+        console.warn('No se pudo comprobar administrador:', netErr);
+        // continuamos con intento de estudiante
+      }
+
+      // 2) Intentar login como estudiante (manteniendo compatibilidad con distintas cargas)
+      const postPayload = async (payload: Record<string, any>) => {
+        try {
+          const res = await fetch('http://localhost:4000/estudiante/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          return await parseResponse(res);
+        } catch (networkErr: any) {
+          return { ok: false, status: 0, body: { mensaje: String(networkErr) } };
+        }
+      };
+
       const candidates = [
-        { codigoEstudiantil: codigoEstudiantil, contraseña: password, password },
+        { codigoEstudiantil: codigoEstudiantil, contraseña: password },
         { codigoEstudiantil: codigoEstudiantil, password },
         { codigo: codigoEstudiantil, password },
         { username: codigoEstudiantil, password },
@@ -60,25 +83,20 @@ const handleStudentLogin = async () => {
         const result = await postPayload(payload);
         attempts.push({ payload, status: result.status, body: result.body });
         if (result.ok) {
-          // Success
           onLoginSuccess(result.body);
           setLoading(false);
           return;
         }
 
-        // If non-auth error (e.g., 500), we stop and show it
         if (result.status && result.status >= 500) {
           setError(`Servidor: ${result.status} - ${result.body?.mensaje || result.body?.message || 'Error interno'}`);
           setLoading(false);
           return;
         }
-
-        // Continue on 401/400 to try other payloads
       }
 
-      // If we reach here, all attempts failed — show consolidated message
       const summary = attempts.map(a => `payload=${Object.keys(a.payload).join(',')} status=${a.status} msg=${a.body?.mensaje || a.body?.message || JSON.stringify(a.body)}`).join(' | ');
-      setError(`Autenticación fallida (401). Intentos: ${summary}`);
+      setError(`Autenticación fallida. Intentos: ${summary}`);
 
     } catch (err: any) {
       console.error('Login error:', err);
