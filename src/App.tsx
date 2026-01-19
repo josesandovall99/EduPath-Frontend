@@ -288,13 +288,14 @@ export default function App() {
         </>
       )}
 
-      {currentScreen === 'theory-content' && selectedContent && selectedSubject && (
+      {currentScreen === 'theory-content' && selectedContent && selectedSubject && userSession && (
         <>
           <TheoryContentView
             subjectName={selectedSubject.name}
             content={selectedContent}
             temaId={selectedTemaId || undefined}
             onBack={handleBackToSubject}
+            estudianteId={userSession.id}
           />
           <ChatbotButton />
         </>

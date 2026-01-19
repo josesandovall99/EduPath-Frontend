@@ -119,6 +119,7 @@ interface ModuleItem {
   duration?: string;
   type: 'video' | 'document' | 'activity' | 'workshop';
   completed?: boolean;
+  visualizado?: boolean;
   descripcion?: string;
   url?: string;
   recommended?: boolean;
@@ -144,6 +145,7 @@ interface TheoryContentViewProps {
   temaId?: string;
   onBack: () => void;
   onContentChange?: (contentId: string) => void;
+  estudianteId?: number;
 }
 
 // Colores por materia
@@ -178,7 +180,7 @@ const mapTipoToType = (tipo: string): ModuleItem['type'] => {
   return tipoMap[tipo.toLowerCase()] || 'document';
 };
 
-export function TheoryContentView({ subjectName, content, temaId, onBack, onContentChange }: TheoryContentViewProps) {
+export function TheoryContentView({ subjectName, content, temaId, onBack, onContentChange, estudianteId }: TheoryContentViewProps) {
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -196,6 +198,67 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       document.head.appendChild(styleSheet);
     }
   }, []);
+
+  // Obtener estado de visualización del contenido
+  const obtenerEstadoVisualizacion = async (contenidoId: string) => {
+    if (!estudianteId) return false;
+    
+    try {
+      const response = await fetch(
+        `http://localhost:4000/contenidos/verificar-visualizacion?contenido_id=${contenidoId}&estudiante_id=${estudianteId}`
+      );
+      
+      if (!response.ok) {
+        console.warn('No se pudo obtener estado de visualización');
+        return false;
+      }
+      
+      const data = await response.json();
+      return data.visualizado || false;
+    } catch (err) {
+      console.error('Error al obtener estado de visualización:', err);
+      return false;
+    }
+  };
+
+  // Marcar contenido como visualizado
+  const marcarContenidoVisualizado = async (contenidoId: string) => {
+    if (!estudianteId) {
+      console.warn('No hay estudiante_id disponible');
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:4000/contenidos/marcar-visualizado`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contenido_id: parseInt(contenidoId),
+          estudiante_id: estudianteId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Actualizar el estado del módulo para mostrar que fue visualizado
+      setModules(prevModules =>
+        prevModules.map(m => ({
+          ...m,
+          items: m.items.map(item =>
+            item.id === contenidoId ? { ...item, visualizado: true } : item
+          )
+        }))
+      );
+
+      console.log('✅ Contenido marcado como visualizado');
+    } catch (err) {
+      console.error('❌ Error al marcar contenido como visualizado:', err);
+    }
+  };
 
   // Fetch subtemas when temaId changes
   useEffect(() => {
@@ -303,16 +366,24 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       const contenidosSecuenciados = contenidos.filter(c => sequencedIds.has(c.id));
 
       // Transform contenidosSecuenciados to ModuleItem format
-      const items: ModuleItem[] = contenidosSecuenciados.map((contenido: Contenido, idx: number) => ({
-        id: contenido.id.toString(),
-        title: contenido.titulo,
-        duration: undefined,
-        type: mapTipoToType(contenido.tipo),
-        completed: false,
-        descripcion: contenido.descripcion,
-        url: contenido.url,
-        recommended: idx === 0
-      }));
+      const items: ModuleItem[] = await Promise.all(
+        contenidosSecuenciados.map(async (contenido: Contenido, idx: number) => {
+          // Cargar estado de visualización para cada contenido
+          const visualizado = await obtenerEstadoVisualizacion(contenido.id.toString());
+          
+          return {
+            id: contenido.id.toString(),
+            title: contenido.titulo,
+            duration: undefined,
+            type: mapTipoToType(contenido.tipo),
+            completed: false,
+            visualizado: visualizado,
+            descripcion: contenido.descripcion,
+            url: contenido.url,
+            recommended: idx === 0
+          };
+        })
+      );
 
       // Update the module with the loaded items (only sequenced)
       setModules(prevModules => 
@@ -366,6 +437,23 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       }
     });
   };
+
+  // Marcar contenido como visualizado cuando se selecciona
+  useEffect(() => {
+    if (selectedContentId && estudianteId) {
+      // Verificar si ya fue visualizado
+      const item = modules.flatMap(m => m.items).find(i => i.id === selectedContentId);
+      
+      // Si no ha sido visualizado aún, marcar después de 3 segundos
+      if (item && !item.visualizado) {
+        const timer = setTimeout(() => {
+          marcarContenidoVisualizado(selectedContentId);
+        }, 3000);
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [selectedContentId, estudianteId, modules]);
 
   const getItemIcon = (type: string) => {
     switch (type) {
@@ -446,8 +534,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                               : 'border-gray-200'
                           }`}
                         >
-                          <div className="w-5 h-5 border-2 rounded flex items-center justify-center flex-shrink-0" style={{ borderColor: item.completed ? subjectColor : isSelected ? subjectColor : '#E5E7EB' }}>
-                            {item.completed && <CheckCircle2 className="w-4 h-4" style={{ color: subjectColor }} />}
+                          <div className="w-5 h-5 border-2 rounded flex items-center justify-center flex-shrink-0" style={{ borderColor: item.completed || item.visualizado ? subjectColor : isSelected ? subjectColor : '#E5E7EB' }}>
+                            {(item.completed || item.visualizado) && <CheckCircle2 className="w-4 h-4" style={{ color: subjectColor }} />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className={`${isSelected ? 'text-blue-600 font-semibold' : 'text-[#3A4A5B]'} group-hover:text-[#4A90E2] transition-colors truncate`}>{item.title}</div>
