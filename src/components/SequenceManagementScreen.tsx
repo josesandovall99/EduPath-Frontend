@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight, ChevronUp, ChevronDown, ArrowDownUp } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
 interface Area {
@@ -137,15 +137,16 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
       both: new Set<number>()
     };
 
+    // Recorrer todas las secuencias para identificar contenidos usados
     sequences.forEach(seq => {
-      const isOrigin = sequences.some(s => s.contenido_origen_id === seq.contenido_origen_id);
-      const isDestination = sequences.some(s => s.contenido_destino_id === seq.contenido_destino_id);
-      
-      if (isOrigin && isDestination && seq.contenido_origen_id === seq.contenido_destino_id) {
-        used.both.add(seq.contenido_origen_id);
-      } else {
-        if (isOrigin) used.origin.add(seq.contenido_origen_id);
-        if (isDestination) used.destination.add(seq.contenido_destino_id);
+      used.origin.add(seq.contenido_origen_id);
+      used.destination.add(seq.contenido_destino_id);
+    });
+
+    // Identificar contenidos que son tanto origen como destino
+    used.origin.forEach(id => {
+      if (used.destination.has(id)) {
+        used.both.add(id);
       }
     });
 
@@ -172,16 +173,70 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
   const getAvailableOriginModalContents = () => {
     const filtered = getFilteredModalContents();
     const used = getUsedContents();
-    const available = filtered.filter(c => !used.both.has(c.id) && !used.origin.has(c.id));
-    console.log('DEBUG: getAvailableOriginModalContents -> filteredCount:', filtered.length, 'availableCount:', available.length, 'used:', { origin: Array.from(used.origin), destination: Array.from(used.destination), both: Array.from(used.both) });
+    const currentDestinoId = formData.contenido_destino_id ? parseInt(formData.contenido_destino_id) : null;
+    
+    // En modo edición, permitir mantener el origen actual aunque esté usado en otra secuencia
+    const currentOrigenId = isEditMode && selectedSequence 
+      ? selectedSequence.contenido_origen_id 
+      : null;
+    
+    const available = filtered.filter(c => {
+      // Excluir contenidos que son tanto origen como destino (excepto el actual en edición)
+      // Estos contenidos ya están completamente usados
+      if (used.both.has(c.id) && c.id !== currentOrigenId) {
+        return false;
+      }
+      
+      // Excluir contenidos que ya son origen en otras secuencias (excepto el actual en edición)
+      // Esto evita que un contenido aparezca como opción de origen si ya es origen en otra secuencia
+      if (used.origin.has(c.id) && c.id !== currentOrigenId) {
+        return false;
+      }
+      
+      // Excluir el contenido seleccionado actualmente como destino
+      // Para evitar seleccionar el mismo contenido como origen y destino
+      if (currentDestinoId && c.id === currentDestinoId) {
+        return false;
+      }
+      
+      return true;
+    });
+    
     return available;
   };
 
   const getAvailableDestinationModalContents = () => {
     const filtered = getFilteredModalContents();
     const used = getUsedContents();
-    const available = filtered.filter(c => !used.both.has(c.id) && !used.destination.has(c.id));
-    console.log('DEBUG: getAvailableDestinationModalContents -> filteredCount:', filtered.length, 'availableCount:', available.length, 'used:', { origin: Array.from(used.origin), destination: Array.from(used.destination), both: Array.from(used.both) });
+    const currentOrigenId = formData.contenido_origen_id ? parseInt(formData.contenido_origen_id) : null;
+    
+    // En modo edición, permitir mantener el destino actual aunque esté usado en otra secuencia
+    const currentDestinoId = isEditMode && selectedSequence 
+      ? selectedSequence.contenido_destino_id 
+      : null;
+    
+    const available = filtered.filter(c => {
+      // Excluir contenidos que son tanto origen como destino (excepto el actual en edición)
+      // Estos contenidos ya están completamente usados
+      if (used.both.has(c.id) && c.id !== currentDestinoId) {
+        return false;
+      }
+      
+      // Excluir contenidos que ya son destino en otras secuencias (excepto el actual en edición)
+      // Esto evita que un contenido aparezca como opción de destino si ya es destino en otra secuencia
+      if (used.destination.has(c.id) && c.id !== currentDestinoId) {
+        return false;
+      }
+      
+      // Excluir el contenido seleccionado actualmente como origen
+      // Para evitar seleccionar el mismo contenido como origen y destino
+      if (currentOrigenId && c.id === currentOrigenId) {
+        return false;
+      }
+      
+      return true;
+    });
+    
     return available;
   };
 
@@ -296,8 +351,27 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    
     if (name === 'estado') {
       setFormData(prev => ({ ...prev, [name]: value === 'true' }));
+    } else if (name === 'contenido_origen_id') {
+      // Si se cambia el origen, limpiar el destino si es el mismo contenido
+      setFormData(prev => {
+        const newValue = value;
+        if (prev.contenido_destino_id === newValue && newValue) {
+          return { ...prev, [name]: newValue, contenido_destino_id: '' };
+        }
+        return { ...prev, [name]: newValue };
+      });
+    } else if (name === 'contenido_destino_id') {
+      // Si se cambia el destino, limpiar el origen si es el mismo contenido
+      setFormData(prev => {
+        const newValue = value;
+        if (prev.contenido_origen_id === newValue && newValue) {
+          return { ...prev, [name]: newValue, contenido_origen_id: '' };
+        }
+        return { ...prev, [name]: newValue };
+      });
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -369,28 +443,82 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
     setSuccess(null);
 
     try {
-      const payload = {
-        contenido_origen_id: parseInt(formData.contenido_origen_id),
-        contenido_destino_id: parseInt(formData.contenido_destino_id),
-        descripcion: formData.descripcion || null,
-        estado: formData.estado
-      };
+      const origenId = parseInt(formData.contenido_origen_id);
+      const destinoId = parseInt(formData.contenido_destino_id);
 
-      const response = await fetch('http://localhost:4000/secuencias-contenido', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al crear la secuencia');
+      // Validar que origen y destino no sean el mismo
+      if (origenId === destinoId) {
+        setError('El contenido origen no puede ser el mismo que el destino');
+        setIsLoading(false);
+        return;
       }
 
-      const newSequence = await response.json();
-      setSequences([...sequences, newSequence]);
+      // Si estamos insertando en el medio de una secuencia existente
+      // Ejemplo: B->C, insertamos X entre B y C
+      // Resultado: B->X (origen siempre es el anterior) y X->C (destino del intermedio es el destino original)
+      if (insertAfterSequenceId) {
+        const afterSequence = sequences.find(s => s.id === insertAfterSequenceId);
+        if (afterSequence) {
+          // Guardar el destino original de la secuencia existente (C)
+          const destinoOriginal = afterSequence.contenido_destino_id;
+          
+          // El origen SIEMPRE debe ser el que ya está (B)
+          // El destino es el nuevo contenido intermedio (X)
+          // Paso 1: Actualizar la secuencia existente B->C para que sea B->X
+          await fetch(`http://localhost:4000/secuencias-contenido/${insertAfterSequenceId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contenido_origen_id: afterSequence.contenido_origen_id, // B (siempre el anterior)
+              contenido_destino_id: origenId, // X (el nuevo contenido intermedio)
+              descripcion: afterSequence.descripcion,
+              estado: afterSequence.estado
+            })
+          });
+
+          // Paso 2: Crear nueva secuencia X->C (desde el contenido intermedio al destino original)
+          await fetch('http://localhost:4000/secuencias-contenido', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contenido_origen_id: origenId, // X es origen (el intermedio)
+              contenido_destino_id: destinoOriginal, // C es destino (el destino original)
+              descripcion: formData.descripcion || null,
+              estado: formData.estado
+            })
+          });
+        }
+      } else {
+        // Creación normal de secuencia
+        const payload = {
+          contenido_origen_id: origenId,
+          contenido_destino_id: destinoId,
+          descripcion: formData.descripcion || null,
+          estado: formData.estado
+        };
+
+        const response = await fetch('http://localhost:4000/secuencias-contenido', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Error al crear la secuencia');
+        }
+      }
+
+      // Recargar todas las secuencias del backend para tener el estado actualizado
+      const sequencesRes = await fetch('http://localhost:4000/secuencias-contenido');
+      if (sequencesRes.ok) {
+        const sequencesData = await sequencesRes.json();
+        setSequences(sequencesData);
+      }
+
       setSuccess('Secuencia creada exitosamente');
       resetForm();
+      setInsertAfterSequenceId(null);
       setTimeout(() => setShowCreateModal(false), 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -420,9 +548,19 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
     setSuccess(null);
 
     try {
+      const origenId = parseInt(formData.contenido_origen_id);
+      const destinoId = parseInt(formData.contenido_destino_id);
+
+      // Validar que origen y destino no sean el mismo
+      if (origenId === destinoId) {
+        setError('El contenido origen no puede ser el mismo que el destino');
+        setIsLoading(false);
+        return;
+      }
+
       const payload = {
-        contenido_origen_id: parseInt(formData.contenido_origen_id),
-        contenido_destino_id: parseInt(formData.contenido_destino_id),
+        contenido_origen_id: origenId,
+        contenido_destino_id: destinoId,
         descripcion: formData.descripcion || null,
         estado: formData.estado
       };
@@ -438,8 +576,13 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
         throw new Error(errorData.message || 'Error al actualizar la secuencia');
       }
 
-      const updatedSequence = await response.json();
-      setSequences(sequences.map(s => s.id === selectedSequence.id ? updatedSequence : s));
+      // Recargar todas las secuencias del backend para tener el estado actualizado
+      const sequencesRes = await fetch('http://localhost:4000/secuencias-contenido');
+      if (sequencesRes.ok) {
+        const sequencesData = await sequencesRes.json();
+        setSequences(sequencesData);
+      }
+
       setSuccess('Secuencia actualizada exitosamente');
       resetForm();
       setTimeout(() => setShowCreateModal(false), 1500);
@@ -462,9 +605,14 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
         throw new Error('Error al cambiar estado');
       }
 
-      const updated = await response.json();
-      setSequences(sequences.map(s => s.id === id ? updated.secuencia : s));
-      setSuccess(`Secuencia ${updated.secuencia.estado ? 'habilitada' : 'inhabilitada'}`);
+      // Recargar todas las secuencias del backend para tener el estado actualizado
+      const sequencesRes = await fetch('http://localhost:4000/secuencias-contenido');
+      if (sequencesRes.ok) {
+        const sequencesData = await sequencesRes.json();
+        setSequences(sequencesData);
+      }
+
+      setSuccess(`Secuencia ${currentEstado ? 'inhabilitada' : 'habilitada'}`);
       setTimeout(() => setSuccess(null), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -478,17 +626,55 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
 
     setIsLoading(true);
     try {
+      const seqToDelete = sequences.find(s => s.id === id);
+      if (!seqToDelete) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Encontrar la secuencia anterior (que apunta al origen de la que se va a eliminar)
+      const prevSeq = sequences.find(s => 
+        s.id !== id && 
+        s.contenido_destino_id === seqToDelete.contenido_origen_id &&
+        s.estado // Solo secuencias activas
+      );
+
+      // Encontrar la secuencia siguiente (que tiene como origen el destino de la que se va a eliminar)
+      const nextSeq = sequences.find(s => 
+        s.id !== id && 
+        s.contenido_origen_id === seqToDelete.contenido_destino_id &&
+        s.estado // Solo secuencias activas
+      );
+
+      // Preparar payload para el backend con las secuencias adyacentes
+      // El backend se encargará de reconectar automáticamente
+      const deletePayload: any = {};
+      if (prevSeq && nextSeq) {
+        deletePayload.prevSequenceId = prevSeq.id;
+        deletePayload.nextSequenceId = nextSeq.id;
+      }
+
       const response = await fetch(`http://localhost:4000/secuencias-contenido/${id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(deletePayload)
       });
 
       if (!response.ok) {
         throw new Error('Error al eliminar la secuencia');
       }
 
-      setSequences(sequences.filter(s => s.id !== id));
-      setSuccess('Secuencia eliminada exitosamente');
+      // Recargar todas las secuencias del backend para tener el estado actualizado
+      const sequencesRes = await fetch('http://localhost:4000/secuencias-contenido');
+      if (sequencesRes.ok) {
+        const sequencesData = await sequencesRes.json();
+        setSequences(sequencesData);
+      }
+
+      setSuccess(prevSeq && nextSeq 
+        ? 'Secuencia eliminada y cadena reorganizada automáticamente' 
+        : 'Secuencia eliminada exitosamente'
+      );
       setTimeout(() => setSuccess(null), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -514,6 +700,262 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
     const term = searchTerm.toLowerCase();
     return origen.toLowerCase().includes(term) || destino.toLowerCase().includes(term) || seq.descripcion?.toLowerCase().includes(term);
   });
+
+  // Construir secuencia ordenada visualmente (cadena de contenidos)
+  const buildOrderedSequence = () => {
+    if (sequences.length === 0) return [];
+
+    const sequenceMap = new Map<number, number>(); // origen_id -> destino_id
+    const destinos = new Set<number>();
+    const secuenciasActivas = sequences.filter(s => s.estado);
+
+    // Construir mapa de secuencias
+    secuenciasActivas.forEach(seq => {
+      sequenceMap.set(seq.contenido_origen_id, seq.contenido_destino_id);
+      destinos.add(seq.contenido_destino_id);
+    });
+
+    // Encontrar contenidos iniciales (que no son destino)
+    const contenidosIniciales = new Set<number>();
+    secuenciasActivas.forEach(seq => {
+      if (!destinos.has(seq.contenido_origen_id)) {
+        contenidosIniciales.add(seq.contenido_origen_id);
+      }
+    });
+
+    // Si no hay iniciales, usar el primer origen disponible
+    if (contenidosIniciales.size === 0 && secuenciasActivas.length > 0) {
+      contenidosIniciales.add(secuenciasActivas[0].contenido_origen_id);
+    }
+
+    const ordered: Array<{ contenido_id: number; sequence_id?: number; isStart: boolean }> = [];
+    const visited = new Set<number>();
+
+    // Función recursiva para construir la cadena
+    const addToChain = (contenidoId: number, isStart: boolean = false) => {
+      if (visited.has(contenidoId)) return;
+      
+      const contenido = contents.find(c => c.id === contenidoId);
+      if (!contenido) return;
+
+      // Encontrar la secuencia que tiene este contenido como origen
+      const seq = secuenciasActivas.find(s => s.contenido_origen_id === contenidoId);
+      
+      ordered.push({
+        contenido_id: contenidoId,
+        sequence_id: seq?.id,
+        isStart
+      });
+      visited.add(contenidoId);
+
+      // Continuar con el destino
+      const destinoId = sequenceMap.get(contenidoId);
+      if (destinoId) {
+        addToChain(destinoId, false);
+      }
+    };
+
+    // Construir todas las cadenas desde los iniciales
+    contenidosIniciales.forEach(initId => {
+      addToChain(initId, true);
+    });
+
+    // Agregar contenidos que están en secuencias pero no fueron visitados (ramas)
+    secuenciasActivas.forEach(seq => {
+      if (!visited.has(seq.contenido_origen_id)) {
+        const contenido = contents.find(c => c.id === seq.contenido_origen_id);
+        if (contenido) {
+          ordered.push({
+            contenido_id: seq.contenido_origen_id,
+            sequence_id: seq.id,
+            isStart: false
+          });
+        }
+      }
+      if (!visited.has(seq.contenido_destino_id)) {
+        const contenido = contents.find(c => c.id === seq.contenido_destino_id);
+        if (contenido) {
+          ordered.push({
+            contenido_id: seq.contenido_destino_id,
+            sequence_id: seq.id,
+            isStart: false
+          });
+        }
+      }
+    });
+
+    return ordered;
+  };
+
+  const orderedSequence = buildOrderedSequence();
+
+  // Función para guardar el nuevo orden después de drag and drop
+  const handleSaveOrder = async (newOrder: Array<{ contenido_id: number; sequence_id?: number }>) => {
+    setIsLoading(true);
+    try {
+      // Extraer solo los IDs de contenido en el nuevo orden
+      const contenidosOrdenados = newOrder.map(item => item.contenido_id);
+
+      // Usar el nuevo endpoint de reordenamiento
+      const response = await fetch('http://localhost:4000/secuencias-contenido/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contenidos: contenidosOrdenados
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al guardar el orden');
+      }
+
+      const result = await response.json();
+
+      // Recargar secuencias para reflejar los cambios
+      const sequencesRes = await fetch('http://localhost:4000/secuencias-contenido');
+      if (sequencesRes.ok) {
+        const sequencesData = await sequencesRes.json();
+        setSequences(sequencesData);
+        setSuccess(`Orden actualizado: ${result.secuenciasCreadas} creadas, ${result.secuenciasEliminadas} eliminadas`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar el orden');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Función para mover secuencia arriba (intercambiar destinos con la anterior)
+  // Ejemplo: A->B, B->C -> A->C, C->B (intercambia B y C)
+  const handleMoveUp = async (sequenceId: number) => {
+    const seq = sequences.find(s => s.id === sequenceId);
+    if (!seq) return;
+
+    setIsLoading(true);
+    try {
+      // Encontrar la secuencia que apunta al origen de la actual (secuencia anterior)
+      const prevSeq = sequences.find(s => 
+        s.id !== sequenceId &&
+        s.contenido_destino_id === seq.contenido_origen_id &&
+        s.estado
+      );
+
+      if (!prevSeq) {
+        setIsLoading(false);
+        return; // No hay secuencia anterior, ya está al inicio
+      }
+
+      // Intercambiar los destinos: prev.destino <-> seq.destino
+      const tempDestino = prevSeq.contenido_destino_id;
+      
+      await Promise.all([
+        // Actualizar secuencia anterior: origen -> destino de la actual
+        fetch(`http://localhost:4000/secuencias-contenido/${prevSeq.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contenido_origen_id: prevSeq.contenido_origen_id,
+            contenido_destino_id: seq.contenido_destino_id,
+            descripcion: prevSeq.descripcion,
+            estado: prevSeq.estado
+          })
+        }),
+        // Actualizar secuencia actual: origen -> destino anterior
+        fetch(`http://localhost:4000/secuencias-contenido/${sequenceId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contenido_origen_id: seq.contenido_origen_id,
+            contenido_destino_id: tempDestino,
+            descripcion: seq.descripcion,
+            estado: seq.estado
+          })
+        })
+      ]);
+
+      // Recargar secuencias
+      const sequencesRes = await fetch('http://localhost:4000/secuencias-contenido');
+      if (sequencesRes.ok) {
+        const sequencesData = await sequencesRes.json();
+        setSequences(sequencesData);
+        setSuccess('Secuencia reorganizada exitosamente');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al reorganizar');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Función para mover secuencia abajo (intercambiar destinos con la siguiente)
+  // Ejemplo: A->B, B->C -> A->C, C->B (intercambia B y C)
+  const handleMoveDown = async (sequenceId: number) => {
+    const seq = sequences.find(s => s.id === sequenceId);
+    if (!seq) return;
+
+    setIsLoading(true);
+    try {
+      // Encontrar la secuencia que sale del destino de la actual (secuencia siguiente)
+      const nextSeq = sequences.find(s => 
+        s.id !== sequenceId &&
+        s.contenido_origen_id === seq.contenido_destino_id &&
+        s.estado
+      );
+
+      if (!nextSeq) {
+        setIsLoading(false);
+        return; // No hay secuencia siguiente, ya está al final
+      }
+
+      // Intercambiar los destinos: seq.destino <-> next.destino
+      const tempDestino = seq.contenido_destino_id;
+      
+      await Promise.all([
+        // Actualizar secuencia actual: origen -> destino de la siguiente
+        fetch(`http://localhost:4000/secuencias-contenido/${sequenceId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contenido_origen_id: seq.contenido_origen_id,
+            contenido_destino_id: nextSeq.contenido_destino_id,
+            descripcion: seq.descripcion,
+            estado: seq.estado
+          })
+        }),
+        // Actualizar secuencia siguiente: origen -> destino anterior de la actual
+        fetch(`http://localhost:4000/secuencias-contenido/${nextSeq.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contenido_origen_id: tempDestino, // Ahora el origen es el destino anterior
+            contenido_destino_id: nextSeq.contenido_destino_id,
+            descripcion: nextSeq.descripcion,
+            estado: nextSeq.estado
+          })
+        })
+      ]);
+
+      // Recargar secuencias
+      const sequencesRes = await fetch('http://localhost:4000/secuencias-contenido');
+      if (sequencesRes.ok) {
+        const sequencesData = await sequencesRes.json();
+        setSequences(sequencesData);
+        setSuccess('Secuencia reorganizada exitosamente');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al reorganizar');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Estado para insertar en medio
+  const [insertAfterSequenceId, setInsertAfterSequenceId] = useState<number | null>(null);
+  
+  // Estado para drag and drop
+  const [draggedItem, setDraggedItem] = useState<number | null>(null);
+  const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -542,6 +984,7 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
             <button
               onClick={() => {
                 resetForm();
+                setInsertAfterSequenceId(null);
                 // Inicializar filtros del modal sin afectar filtros de página
                 setModalSelectedArea('');
                 setModalSelectedTema('');
@@ -707,7 +1150,115 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
           </div>
         ) : (
           <>
-            {/* Secuencias List */}
+            {/* Vista de Secuencias Ordenadas */}
+            {orderedSequence.length > 0 ? (
+              <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-[#3A4A5B]">Secuencia Ordenada</h3>
+                  <button
+                    onClick={() => setInsertAfterSequenceId(null)}
+                    className="text-sm text-gray-600 hover:text-[#4A90E2]"
+                  >
+                    {insertAfterSequenceId ? 'Cancelar inserción' : 'Vista completa'}
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 rounded-lg overflow-x-auto">
+                  {orderedSequence.map((item, index) => {
+                    const contenido = contents.find(c => c.id === item.contenido_id);
+                    const sequence = item.sequence_id ? sequences.find(s => s.id === item.sequence_id) : null;
+                    const isLast = index === orderedSequence.length - 1;
+                    const isDragging = draggedItem === index;
+                    const isDraggedOver = draggedOverIndex === index;
+
+                    return (
+                      <div 
+                        key={`${item.contenido_id}-${index}`} 
+                        className="flex items-center gap-2"
+                      >
+                        <div className="flex flex-col items-center gap-2">
+                          <div 
+                            className="relative"
+                            draggable
+                            onDragStart={(e) => {
+                              setDraggedItem(index);
+                              e.dataTransfer.effectAllowed = 'move';
+                              e.dataTransfer.setData('text/plain', index.toString());
+                            }}
+                            onDragEnd={() => {
+                              if (draggedItem !== null && draggedOverIndex !== null && draggedItem !== draggedOverIndex) {
+                                // Reorganizar el array
+                                const newOrder = [...orderedSequence];
+                                const [removed] = newOrder.splice(draggedItem, 1);
+                                newOrder.splice(draggedOverIndex, 0, removed);
+                                
+                                // Guardar el nuevo orden
+                                handleSaveOrder(newOrder);
+                              }
+                              setDraggedItem(null);
+                              setDraggedOverIndex(null);
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                              setDraggedOverIndex(index);
+                            }}
+                            onDragLeave={() => {
+                              if (draggedOverIndex === index) {
+                                setDraggedOverIndex(null);
+                              }
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              // El drop se maneja en onDragEnd
+                            }}
+                          >
+                            <div
+                              className={`px-4 py-2 rounded-lg text-white font-semibold min-w-[150px] text-center cursor-move hover:opacity-90 transition-opacity ${
+                                isDragging ? 'opacity-50 scale-95' : ''
+                              } ${
+                                isDraggedOver ? 'ring-2 ring-[#4A90E2] ring-offset-2' : ''
+                              }`}
+                              style={{ backgroundColor: getTypeColor(contenido?.tipo || '') }}
+                              title={`${contenido?.titulo || 'N/A'} - Arrastra para reorganizar`}
+                            >
+                              {contenido?.titulo || 'N/A'}
+                            </div>
+                          </div>
+                          {insertAfterSequenceId === item.sequence_id && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              ↓ Insertar aquí
+                            </div>
+                          )}
+                        </div>
+                        {!isLast && (
+                          <div className="flex flex-col items-center">
+                            <ArrowRight className="w-5 h-5 text-gray-400" />
+                            {item.sequence_id && (
+                              <button
+                                onClick={() => {
+                                  if (insertAfterSequenceId === item.sequence_id) {
+                                    setInsertAfterSequenceId(null);
+                                    setShowCreateModal(true);
+                                  } else {
+                                    setInsertAfterSequenceId(item.sequence_id);
+                                  }
+                                }}
+                                className="mt-1 text-xs text-[#4A90E2] hover:underline"
+                                title="Insertar contenido aquí"
+                              >
+                                + Insertar
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Lista Completa de Secuencias */}
             <div className="space-y-4">
               {filteredSequences.length === 0 ? (
                 <div className="bg-white rounded-xl shadow-md p-12 text-center">
@@ -808,13 +1359,21 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-[#3A4A5B]">
-                {isEditMode ? 'Editar Secuencia' : 'Crear Nueva Secuencia'}
-              </h2>
+              <div>
+                <h2 className="text-2xl font-bold text-[#3A4A5B]">
+                  {isEditMode ? 'Editar Secuencia' : insertAfterSequenceId ? 'Insertar Contenido en Secuencia' : 'Crear Nueva Secuencia'}
+                </h2>
+                {insertAfterSequenceId && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Se insertará en el medio de la secuencia seleccionada
+                  </p>
+                )}
+              </div>
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   resetForm();
+                  setInsertAfterSequenceId(null);
                   // Limpiar estado del modal
                   setModalSelectedArea('');
                   setModalSelectedTema('');
