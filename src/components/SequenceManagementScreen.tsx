@@ -446,6 +446,7 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
       const origenId = parseInt(formData.contenido_origen_id);
       const destinoId = parseInt(formData.contenido_destino_id);
 
+<<<<<<< HEAD
       // Validar que origen y destino no sean el mismo
       if (origenId === destinoId) {
         setError('El contenido origen no puede ser el mismo que el destino');
@@ -516,7 +517,27 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
         setSequences(sequencesData);
       }
 
+=======
+      const response = await fetch('http://localhost:4000/secuencias-contenido', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Capturar el error específico del backend (prioridad: error > message)
+        const errorMessage = data.error || data.message || 'Error al crear la secuencia';
+        console.log('Validaciones realizadas:', data.validacionesRealizadas);
+        throw new Error(errorMessage);
+      }
+
+      // Éxito - la respuesta puede venir en data.secuencia o directamente en data
+      setSequences([...sequences, data.secuencia || data]);
+>>>>>>> 25b0e1d70b81c81e15b9bac58d97ebe9d8132551
       setSuccess('Secuencia creada exitosamente');
+      console.log('Validaciones completadas:', data.validacionesRealizadas);
       resetForm();
       setInsertAfterSequenceId(null);
       setTimeout(() => setShowCreateModal(false), 1500);
@@ -571,11 +592,16 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
         body: JSON.stringify(payload)
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al actualizar la secuencia');
+        // Capturar el error específico del backend (prioridad: error > message)
+        const errorMessage = data.error || data.message || 'Error al actualizar la secuencia';
+        console.log('Validaciones realizadas:', data.validacionesRealizadas);
+        throw new Error(errorMessage);
       }
 
+<<<<<<< HEAD
       // Recargar todas las secuencias del backend para tener el estado actualizado
       const sequencesRes = await fetch('http://localhost:4000/secuencias-contenido');
       if (sequencesRes.ok) {
@@ -583,7 +609,13 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
         setSequences(sequencesData);
       }
 
+=======
+      // Éxito - la respuesta puede venir en data.secuencia o directamente en data
+      const updatedSequence = data.secuencia || data;
+      setSequences(sequences.map(s => s.id === selectedSequence.id ? updatedSequence : s));
+>>>>>>> 25b0e1d70b81c81e15b9bac58d97ebe9d8132551
       setSuccess('Secuencia actualizada exitosamente');
+      console.log('Validaciones completadas:', data.validacionesRealizadas);
       resetForm();
       setTimeout(() => setShowCreateModal(false), 1500);
     } catch (err) {
