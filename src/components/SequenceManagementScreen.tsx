@@ -517,27 +517,7 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
         setSequences(sequencesData);
       }
 
-
-      const response = await fetch('http://localhost:4000/secuencias-contenido', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Capturar el error específico del backend (prioridad: error > message)
-        const errorMessage = data.error || data.message || 'Error al crear la secuencia';
-        console.log('Validaciones realizadas:', data.validacionesRealizadas);
-        throw new Error(errorMessage);
-      }
-
-      // Éxito - la respuesta puede venir en data.secuencia o directamente en data
-      setSequences([...sequences, data.secuencia || data]);
-
       setSuccess('Secuencia creada exitosamente');
-      console.log('Validaciones completadas:', data.validacionesRealizadas);
       resetForm();
       setInsertAfterSequenceId(null);
       setTimeout(() => setShowCreateModal(false), 1500);
