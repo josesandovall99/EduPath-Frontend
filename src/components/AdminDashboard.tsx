@@ -3,16 +3,25 @@ import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBra
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ContentManagementScreen } from './ContentManagementScreen';
 import { SequenceManagementScreen } from './SequenceManagementScreen';
+import { SubtemaSequenceManagementScreen } from './SubtemaSequenceManagementScreen';
+import { AreasManagementScreen } from './AreasManagementScreen';
+import { TemasManagementScreen } from './TemasManagementScreen';
 import { Upload } from "lucide-react";
 
 
 interface AdminDashboardProps {
   onLogout: () => void;
-  onNavigate: (section: 'themes' | 'contents' | 'reports' | 'students' | 'upload') => void;
+  onNavigate: (section: 'themes' | 'contents' | 'reports' | 'students' | 'upload' | 'subtema-sequences') => void;
 }
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'contents' | 'sequences'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents'>('dashboard');
+  const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
+  const [selectedAreaName, setSelectedAreaName] = useState<string>('');
+  const [selectedTemaId, setSelectedTemaId] = useState<number | null>(null);
+  const [selectedTemaName, setSelectedTemaName] = useState<string>('');
+  const [selectedSubtemaId, setSelectedSubtemaId] = useState<number | null>(null);
+  const [selectedSubtemaNombre, setSelectedSubtemaNombre] = useState<string>('');
   const stats = [
     { label: 'Materias activas', value: '3', icon: BookOpen, color: '#4A90E2', trend: '+0%' },
     { label: 'Temas disponibles', value: '12', icon: FileEdit, color: '#7ED6A7', trend: '+2' },
@@ -39,13 +48,13 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       onClick: () => setCurrentScreen('contents')
     },
     {
-      id: 'sequences',
-      title: 'Gestión de Secuencias',
-      description: 'Define el orden de los contenidos dentro de temas y subtemas. Visualiza y gestiona flujos de aprendizaje.',
+      id: 'subtema-sequences',
+      title: 'Gestión de Secuencias de Subtemas',
+      description: 'Organiza el orden de los subtemas dentro de cada tema. Controla la secuencia de enseñanza por materia.',
       icon: GitBranch,
-      color: '#06B6D4',
-      gradient: 'from-[#06B6D4] to-[#14B8A6]',
-      onClick: () => setCurrentScreen('sequences')
+      color: '#8B5CF6',
+      gradient: 'from-[#8B5CF6] to-[#A78BFA]',
+      onClick: () => setCurrentScreen('areas')
     },
     {
       id: 'reports',
@@ -74,12 +83,74 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   ];
 
   // Renderizar la pantalla actual
-  if (currentScreen === 'contents') {
-    return <ContentManagementScreen onBack={() => setCurrentScreen('dashboard')} />;
+  if (currentScreen === 'areas') {
+    return <AreasManagementScreen 
+      onBack={() => setCurrentScreen('dashboard')}
+      onSelectArea={(areaId, areaName) => {
+        setSelectedAreaId(areaId);
+        setSelectedAreaName(areaName);
+        setCurrentScreen('temas');
+      }}
+    />;
   }
 
-  if (currentScreen === 'sequences') {
-    return <SequenceManagementScreen onBack={() => setCurrentScreen('dashboard')} />;
+  if (currentScreen === 'temas') {
+    return <TemasManagementScreen 
+      areaId={selectedAreaId!}
+      areaName={selectedAreaName}
+      onBack={() => {
+        setSelectedAreaId(null);
+        setSelectedAreaName('');
+        setCurrentScreen('areas');
+      }}
+      onSelectTema={(temaId, temaName) => {
+        setSelectedTemaId(temaId);
+        setSelectedTemaName(temaName);
+        setCurrentScreen('subtema-sequences');
+      }}
+    />;
+  }
+
+  if (currentScreen === 'subtema-sequences') {
+    return <SubtemaSequenceManagementScreen 
+      onBack={() => {
+        setSelectedAreaId(null);
+        setSelectedAreaName('');
+        setSelectedTemaId(null);
+        setSelectedTemaName('');
+        setCurrentScreen('dashboard');
+      }}
+      onSelectSubtema={(subtemaId, temaId, subtemaNombre) => {
+        setSelectedSubtemaId(subtemaId);
+        setSelectedSubtemaNombre(subtemaNombre);
+        setCurrentScreen('contents');
+      }}
+      areaId={selectedAreaId || undefined}
+      areaName={selectedAreaName}
+      temaId={selectedTemaId || undefined}
+      temaName={selectedTemaName}
+    />;
+  }
+
+  if (currentScreen === 'contents') {
+    // Si viene de un subtema, mostrar SequenceManagementScreen con filtro
+    if (selectedSubtemaId && selectedTemaId) {
+      return <SequenceManagementScreen 
+        onBack={() => {
+          setSelectedSubtemaId(null);
+          setSelectedSubtemaNombre('');
+          setCurrentScreen('subtema-sequences');
+        }}
+        subtemaId={selectedSubtemaId}
+        temaId={selectedTemaId}
+        areaId={selectedAreaId || undefined}
+        areaName={selectedAreaName}
+        temaName={selectedTemaName}
+        subtemaNombre={selectedSubtemaNombre}
+      />;
+    }
+    // Si no, mostrar ContentManagementScreen (para otros usos)
+    return <ContentManagementScreen onBack={() => setCurrentScreen('dashboard')} />;
   }
 
   return (
@@ -147,7 +218,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             return (
               <button
                 key={action.id}
-                onClick={() => action.onClick ? action.onClick() : onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students' | 'upload')}
+                onClick={() => action.onClick ? action.onClick() : onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students' | 'upload' | 'subtema-sequences')}
                 className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-8 text-left group hover:transform hover:scale-[1.02]"
               >
                 <div className="flex items-start justify-between mb-4">

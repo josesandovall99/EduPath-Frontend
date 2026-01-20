@@ -178,6 +178,77 @@ const mapTipoToType = (tipo: string): ModuleItem['type'] => {
   return tipoMap[tipo.toLowerCase()] || 'document';
 };
 
+// Función para ordenar subtemas basado en secuencias
+const orderSubtemasBySequence = (subtemas: any[], sequences: any[]): any[] => {
+  if (!Array.isArray(sequences) || sequences.length === 0) {
+    return subtemas;
+  }
+
+  // Crear un mapa de secuencias
+  const sequenceMap = new Map<number, number>();
+  const destinos = new Set<number>();
+  const origen_ids = new Set<number>();
+
+  // Filtrar solo secuencias activas
+  const activeSequences = sequences.filter(s => s.estado);
+
+  activeSequences.forEach(seq => {
+    const origen = seq.subtema_origen_id;
+    const destino = seq.subtema_destino_id;
+    
+    if (origen && destino) {
+      sequenceMap.set(origen, destino);
+      destinos.add(destino);
+      origen_ids.add(origen);
+    }
+  });
+
+  // Encontrar subtemas iniciales (no son destino de ninguna secuencia)
+  const initialSubtemas = new Set<number>();
+  subtemas.forEach(s => {
+    if (!destinos.has(s.id)) {
+      initialSubtemas.add(s.id);
+    }
+  });
+
+  // Si no hay subtemas iniciales pero hay secuencias, usar el primer origen
+  if (initialSubtemas.size === 0 && origen_ids.size > 0) {
+    initialSubtemas.add(Array.from(origen_ids)[0]);
+  }
+
+  // Construir el orden recorriendo las secuencias
+  const ordered: any[] = [];
+  const visited = new Set<number>();
+  const subtemasMap = new Map(subtemas.map(s => [s.id, s]));
+
+  const addToChain = (subtemaId: number) => {
+    if (visited.has(subtemaId)) return;
+
+    const subtema = subtemasMap.get(subtemaId);
+    if (subtema) {
+      ordered.push(subtema);
+      visited.add(subtemaId);
+
+      const nextId = sequenceMap.get(subtemaId);
+      if (nextId) {
+        addToChain(nextId);
+      }
+    }
+  };
+
+  // Procesar cadenas iniciales
+  initialSubtemas.forEach(id => addToChain(id));
+
+  // Agregar subtemas no visitados al final
+  subtemas.forEach(s => {
+    if (!visited.has(s.id)) {
+      ordered.push(s);
+    }
+  });
+
+  return ordered;
+};
+
 export function TheoryContentView({ subjectName, content, temaId, onBack, onContentChange }: TheoryContentViewProps) {
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(false);
@@ -221,8 +292,23 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
           throw new Error('Response is not JSON');
         }
 
-        const subtemas = await response.json();
-        console.log('✅ Subtemas fetched:', subtemas);
+        let subtemas = await response.json();
+        console.log('✅ Subtemas fetched (sin ordenar):', subtemas);
+
+        // Cargar secuencias de subtemas para ordenarlos
+        try {
+          const seqResponse = await fetch(`${API_BASE_URL}/secuencias-subtema`);
+          if (seqResponse.ok) {
+            const sequences = await seqResponse.json();
+            console.log('✅ Secuencias de subtemas cargadas:', sequences);
+            
+            // Ordenar subtemas basado en las secuencias
+            subtemas = orderSubtemasBySequence(subtemas, sequences);
+            console.log('✅ Subtemas ordenados por secuencia:', subtemas);
+          }
+        } catch (err) {
+          console.warn('⚠️ Error cargando secuencias, usando orden original:', err);
+        }
 
         // Transform subtemas to modules format
         const transformedModules: Module[] = Array.isArray(subtemas)

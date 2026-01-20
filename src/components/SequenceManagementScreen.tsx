@@ -41,9 +41,15 @@ interface Sequence {
 
 interface SequenceManagementScreenProps {
   onBack: () => void;
+  subtemaId?: number;
+  temaId?: number;
+  areaId?: number;
+  areaName?: string;
+  temaName?: string;
+  subtemaNombre?: string;
 }
 
-export function SequenceManagementScreen({ onBack }: SequenceManagementScreenProps) {
+export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, areaName, temaName, subtemaNombre }: SequenceManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
   const [subtemas, setSubtemas] = useState<Subtema[]>([]);
@@ -83,24 +89,81 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
     loadData();
   }, []);
 
+  // Si viene un subtemaId, establecer los filtros automáticamente
+  useEffect(() => {
+    if (areaId !== undefined && temaId && subtemaId) {
+      setSelectedArea(areaId.toString());
+      setSelectedTema(temaId.toString());
+      setSelectedSubtema(subtemaId.toString());
+      
+      // Pre-llenar los filtros del modal también
+      setModalSelectedArea(areaId.toString());
+      setModalSelectedTema(temaId.toString());
+      setModalSelectedSubtema(subtemaId.toString());
+      
+      // Cargar temas del área en el modal
+      const temasArea = temas.filter(t => Number(t.area_id) === Number(areaId));
+      setModalTemas(temasArea);
+      
+      // Cargar subtemas del tema en el modal
+      const filtered = subtemas.filter(s => s.tema_id === temaId);
+      setModalSubtemas(filtered);
+      
+      // Cargar contenidos del subtema en el modal
+      const contenidosFiltered = contents.filter(c => c.subtema_id === subtemaId);
+      setModalContents(contenidosFiltered);
+    }
+  }, [areaId, temaId, subtemaId, temas, subtemas, contents]);
+
+  // Cuando se abre el modal, asegurar que los filtros estén pre-llenados
+  useEffect(() => {
+    if (showCreateModal && areaId !== undefined && temaId && subtemaId) {
+      setModalSelectedArea(areaId.toString());
+      setModalSelectedTema(temaId.toString());
+      setModalSelectedSubtema(subtemaId.toString());
+      
+      // Cargar los datos del modal
+      const temasArea = temas.filter(t => Number(t.area_id) === Number(areaId));
+      setModalTemas(temasArea);
+      
+      const filtered = subtemas.filter(s => s.tema_id === temaId);
+      setModalSubtemas(filtered);
+      
+      // Cargar contenidos del subtema
+      const contenidosFiltered = contents.filter(c => c.subtema_id === subtemaId);
+      setModalContents(contenidosFiltered);
+    }
+  }, [showCreateModal, areaId, temaId, subtemaId, temas, subtemas, contents]);
+
   const loadData = async () => {
     setIsLoadingData(true);
     try {
-      const [areasRes, contentsRes, sequencesRes] = await Promise.all([
+      const [areasRes, temasRes, subtemasRes, contentsRes, sequencesRes] = await Promise.all([
         fetch('http://localhost:4000/areas'),
+        fetch('http://localhost:4000/temas'),
+        fetch('http://localhost:4000/subtemas'),
         fetch('http://localhost:4000/contenidos'),
         fetch('http://localhost:4000/secuencias-contenido')
       ]);
 
-      if (!areasRes.ok || !contentsRes.ok || !sequencesRes.ok) {
+      if (!areasRes.ok || !temasRes.ok || !subtemasRes.ok || !contentsRes.ok || !sequencesRes.ok) {
         throw new Error('Error al cargar datos');
       }
 
       const areasData = await areasRes.json();
-      const contentsData = await contentsRes.json();
+      const temasData = await temasRes.json();
+      const subtemasData = await subtemasRes.json();
+      let contentsData = await contentsRes.json();
       const sequencesData = await sequencesRes.json();
 
+      // Si se proporciona un subtemaId, filtrar contenidos solo de ese subtema
+      if (subtemaId) {
+        contentsData = contentsData.filter((c: ContentItem) => c.subtema_id === subtemaId);
+      }
+
       setAreas(areasData);
+      setTemas(temasData);
+      setSubtemas(subtemasData);
       setContents(contentsData);
       setSequences(sequencesData);
     } catch (err) {
@@ -155,10 +218,12 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
 
   // --- Modal-specific helpers to filtrar contenidos dentro del modal Crear Secuencia ---
   const getFilteredModalContents = () => {
-    console.log('DEBUG: getFilteredModalContents filters:', { modalSelectedArea, modalSelectedTema, modalSelectedSubtema }, 'modalTemas:', modalTemas.map(t=>t.id), 'modalContents sample:', modalContents.slice(0,3).map(c=>({ id: c.id, titulo: c.titulo, tema_id: c.tema_id, subtema_id: c.subtema_id })));
+    // Si viene de un subtema específico, solo mostrar contenidos de ese subtema
+    if (subtemaId) {
+      return modalContents.filter(c => c.subtema_id === subtemaId);
+    }
+    
     return modalContents.filter(c => {
-      // Note: Contenido model doesn't include area_id, so when an area is selected
-      // we filter by tema (themes belonging to that area) using modalTemas.
       if (modalSelectedArea) {
         const allowedTemaIds = modalTemas.map(t => Number(t.id));
         if (!allowedTemaIds.includes(Number(c.tema_id))) return false;
@@ -989,22 +1054,50 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-[#3A4A5B]">Gestión de Secuencias</h1>
-                <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                <h1 className="text-[#3A4A5B]">
+                  {subtemaId ? 'Gestión de Secuencias de Contenidos' : 'Gestión de Secuencias'}
+                </h1>
+                {subtemaId && areaName && temaName && subtemaNombre && (
+                  <p className="text-gray-500 text-sm">
+                    Área: {areaName} → Tema: {temaName} → Subtema: {subtemaNombre}
+                  </p>
+                )}
+                {subtemaId && !areaName && (
+                  <p className="text-gray-500 text-sm">
+                    Subtema: {subtemas.find(s => s.id === subtemaId)?.nombre}
+                  </p>
+                )}
+                {!subtemaId && (
+                  <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                )}
               </div>
             </div>
             <button
               onClick={() => {
                 resetForm();
                 setInsertAfterSequenceId(null);
-                // Inicializar filtros del modal sin afectar filtros de página
-                setModalSelectedArea('');
-                setModalSelectedTema('');
-                setModalSelectedSubtema('');
-                setModalTemas([]);
-                setModalSubtemas([]);
-                setModalContents(contents);
-                console.log('DEBUG: Abriendo modal crear secuencia. Contenidos totales disponibles:', contents.length, contents.map(c => c.titulo));
+                // Pre-fill filters if all context is provided
+                if (areaId !== undefined && temaId && subtemaId) {
+                  setModalSelectedArea(areaId.toString());
+                  setModalSelectedTema(temaId.toString());
+                  setModalSelectedSubtema(subtemaId.toString());
+                  
+                  const temasArea = temas.filter(t => Number(t.area_id) === Number(areaId));
+                  setModalTemas(temasArea);
+                  
+                  const filtered = subtemas.filter(s => s.tema_id === temaId);
+                  setModalSubtemas(filtered);
+                  
+                  const contenidosFiltered = contents.filter(c => c.subtema_id === subtemaId);
+                  setModalContents(contenidosFiltered);
+                } else {
+                  setModalSelectedArea('');
+                  setModalSelectedTema('');
+                  setModalSelectedSubtema('');
+                  setModalTemas([]);
+                  setModalSubtemas([]);
+                  setModalContents(contents);
+                }
                 setShowCreateModal(true);
               }}
               className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] text-white rounded-lg hover:shadow-lg transition-all duration-300"
@@ -1075,7 +1168,8 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
               <select
                 value={selectedArea}
                 onChange={(e) => handleFilterChange('area', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                disabled={subtemaId !== undefined}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">Todas las áreas</option>
                 {areas.map(area => (
@@ -1093,7 +1187,7 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
               <select
                 value={selectedTema}
                 onChange={(e) => handleFilterChange('tema', e.target.value)}
-                disabled={!selectedArea}
+                disabled={!selectedArea || subtemaId !== undefined}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">Todos los temas</option>
@@ -1112,7 +1206,7 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
               <select
                 value={selectedSubtema}
                 onChange={(e) => handleFilterChange('subtema', e.target.value)}
-                disabled={!selectedTema}
+                disabled={!selectedTema || subtemaId !== undefined}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">Todos los subtemas</option>
@@ -1252,7 +1346,7 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                                     setInsertAfterSequenceId(null);
                                     setShowCreateModal(true);
                                   } else {
-                                    setInsertAfterSequenceId(item.sequence_id);
+                                    setInsertAfterSequenceId(item.sequence_id || null);
                                   }
                                 }}
                                 className="mt-1 text-xs text-[#4A90E2] hover:underline"
@@ -1411,8 +1505,9 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                     </label>
                     <select
                       value={modalSelectedArea}
-                      onChange={(e) => handleModalFilterChange('area', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                      onChange={(e) => !subtemaId && handleModalFilterChange('area', e.target.value)}
+                      disabled={subtemaId !== undefined}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Todas las áreas</option>
                       {areas.map(area => (
@@ -1429,8 +1524,8 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                     </label>
                     <select
                       value={modalSelectedTema}
-                      onChange={(e) => handleModalFilterChange('tema', e.target.value)}
-                      disabled={!modalSelectedArea}
+                      onChange={(e) => !subtemaId && handleModalFilterChange('tema', e.target.value)}
+                      disabled={!modalSelectedArea || subtemaId !== undefined}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Todos los temas</option>
@@ -1448,8 +1543,8 @@ export function SequenceManagementScreen({ onBack }: SequenceManagementScreenPro
                     </label>
                     <select
                       value={modalSelectedSubtema}
-                      onChange={(e) => handleModalFilterChange('subtema', e.target.value)}
-                      disabled={!modalSelectedTema}
+                      onChange={(e) => !subtemaId && handleModalFilterChange('subtema', e.target.value)}
+                      disabled={!modalSelectedTema || subtemaId !== undefined}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Todos los subtemas</option>

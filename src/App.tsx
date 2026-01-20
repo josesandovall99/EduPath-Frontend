@@ -17,12 +17,14 @@ import { AIWorkshopView } from './components/AIWorkshopView';
 import { ChatbotButton } from './components/ChatbotButton';
 import { ChangePasswordScreen } from './components/changePassword';
 import { StudentUploadScreen } from './components/StudentUploadScreen';
+import { SequenceManagementScreen } from './components/SequenceManagementScreen';
+import { SubtemaSequenceManagementScreen } from './components/SubtemaSequenceManagementScreen';
 
 type Screen = 
   | 'login' 
   | 'admin-register'
   | 'dashboard' 
-  | 'change-password' // Nueva pantalla
+  | 'change-password'
   | 'admin-dashboard'
   | 'admin-themes'
   | 'admin-contents'
@@ -33,7 +35,9 @@ type Screen =
   | 'theory-content'
   | 'quiz-activity'
   | 'uml-diagram'
-  | 'admin-upload' // 1. Agregamos este estado
+  | 'admin-upload'
+  | 'admin-sequences'
+  | 'admin-subtema-sequences'
   | 'ai-workshop';
 
 
@@ -64,6 +68,7 @@ export default function App() {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [selectedTemaId, setSelectedTemaId] = useState<string | null>(null);
+  const [selectedSubtemaId, setSelectedSubtemaId] = useState<number | null>(null);
   const [userData, setUserData] = useState<{id: number, personaId: number, nombre: string} | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   
@@ -234,12 +239,13 @@ export default function App() {
         <AdminDashboard
           onLogout={handleLogout}
           onNavigate={(section) => {
-            // 2. Manejamos la navegación según el botón presionado
             if (section === 'themes') setCurrentScreen('admin-themes');
             if (section === 'contents') setCurrentScreen('admin-contents');
             if (section === 'reports') setCurrentScreen('admin-reports');
             if (section === 'students') setCurrentScreen('admin-students');
-            if (section === 'upload') setCurrentScreen('admin-upload'); 
+            if (section === 'upload') setCurrentScreen('admin-upload');
+            if (section === 'sequences') setCurrentScreen('admin-sequences');
+            if (section === 'subtema-sequences') setCurrentScreen('admin-subtema-sequences');
           }}
         />
       )}
@@ -248,6 +254,25 @@ export default function App() {
       {currentScreen === 'admin-upload' && (
         <StudentUploadScreen 
           onBack={() => setCurrentScreen('admin-dashboard')} 
+        />
+      )}
+
+      {currentScreen === 'admin-sequences' && (
+        <SequenceManagementScreen 
+          onBack={() => setCurrentScreen('admin-dashboard')}
+          subtemaId={selectedSubtemaId || undefined}
+          temaId={selectedTemaId ? parseInt(selectedTemaId) : undefined}
+        />
+      )}
+
+      {currentScreen === 'admin-subtema-sequences' && (
+        <SubtemaSequenceManagementScreen 
+          onBack={() => setCurrentScreen('admin-dashboard')}
+          onSelectSubtema={(subtemaId, temaId) => {
+            setSelectedSubtemaId(subtemaId);
+            setSelectedTemaId(temaId.toString());
+            setCurrentScreen('admin-sequences');
+          }}
         />
       )}
 
