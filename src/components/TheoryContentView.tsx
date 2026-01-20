@@ -186,7 +186,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
   const [error, setError] = useState<string | null>(null);
   const [selectedContentId, setSelectedContentId] = useState<string | null>(null);
   const [selectedContentData, setSelectedContentData] = useState<ModuleItem | null>(null);
-  const [currentProgress] = useState(8);
+  const [currentProgress, setCurrentProgress] = useState(0);
+  const [loadingProgress, setLoadingProgress] = useState(false);
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
 
   // Inyectar estilos en el documento
@@ -198,6 +199,11 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       document.head.appendChild(styleSheet);
     }
   }, []);
+
+  // Cargar progreso dinámico del estudiante
+  useEffect(() => {
+    obtenerProgresoArea();
+  }, [temaId, estudianteId]);
 
   // Obtener estado de visualización del contenido
   const obtenerEstadoVisualizacion = async (contenidoId: string) => {
@@ -218,6 +224,39 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     } catch (err) {
       console.error('Error al obtener estado de visualización:', err);
       return false;
+    }
+  };
+
+  // Obtener progreso dinámico del estudiante en el área
+  const obtenerProgresoArea = async () => {
+    if (!estudianteId || !temaId) {
+      console.warn('No hay estudiante_id o temaId disponibles');
+      return;
+    }
+
+    setLoadingProgress(true);
+    try {
+      const url = `http://localhost:4000/progresos/por-area?area_id=${temaId}&estudiante_id=${estudianteId}`;
+      console.log(`🔄 Obteniendo progreso desde: ${url}`);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Error ${response.status}:`, errorText);
+        setCurrentProgress(0);
+        return;
+      }
+      
+      const data = await response.json();
+      const porcentaje = data.resumen?.porcentajeTotalArea || 0;
+      setCurrentProgress(Math.round(porcentaje));
+      console.log(`✅ Progreso del área: ${porcentaje}%`);
+    } catch (err) {
+      console.error('❌ Error al obtener progreso:', err);
+      setCurrentProgress(0);
+    } finally {
+      setLoadingProgress(false);
     }
   };
 
