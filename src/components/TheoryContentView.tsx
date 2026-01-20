@@ -180,7 +180,7 @@ const mapTipoToType = (tipo: string): ModuleItem['type'] => {
   return tipoMap[tipo.toLowerCase()] || 'document';
 };
 
-<<<<<<< HEAD
+
 // Función para ordenar subtemas basado en secuencias
 const orderSubtemasBySequence = (subtemas: any[], sequences: any[]): any[] => {
   if (!Array.isArray(sequences) || sequences.length === 0) {
@@ -252,10 +252,10 @@ const orderSubtemasBySequence = (subtemas: any[], sequences: any[]): any[] => {
   return ordered;
 };
 
-export function TheoryContentView({ subjectName, content, temaId, onBack, onContentChange }: TheoryContentViewProps) {
-=======
+
+
 export function TheoryContentView({ subjectName, content, temaId, onBack, onContentChange, estudianteId }: TheoryContentViewProps) {
->>>>>>> 6ce4132886d616dcdf405a5bb41430788850d334
+
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
