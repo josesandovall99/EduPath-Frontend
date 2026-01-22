@@ -231,6 +231,7 @@ export default function App() {
                 userName={userSession.nombre} // Pasamos el nombre para el saludo
                 onSubjectSelect={handleSubjectSelect}
                 onLogout={handleLogout}
+                estudianteId={userSession.id}
               />
             )}
 
@@ -292,12 +293,13 @@ export default function App() {
         <StudentTrackingScreen onBack={handleBackToAdminDashboard} />
       )}
       
-      {currentScreen === 'subject-content' && selectedSubject && (
+      {currentScreen === 'subject-content' && selectedSubject && userSession && (
         <>
           <SubjectContentScreen 
             subject={selectedSubject}
             onBack={handleBackToDashboard}
             onContentSelect={handleContentSelect}
+            estudianteId={userSession.id}
           />
           <ChatbotButton />
         </>

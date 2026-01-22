@@ -11,6 +11,7 @@ interface SubjectContentScreenProps {
   subject: Subject;
   onBack: () => void;
   onContentSelect?: (content: Content, temaId: string) => void;
+  estudianteId?: number;
 }
 
 interface Content {
@@ -120,12 +121,52 @@ const getStatusBadge = (status: Content['status']) => {
   }
 };
 
-export function SubjectContentScreen({ subject, onBack, onContentSelect }: SubjectContentScreenProps) {
+export function SubjectContentScreen({ subject, onBack, onContentSelect, estudianteId }: SubjectContentScreenProps) {
   const [contentList, setContentList] = useState<Content[]>([]);
   const [temasMap, setTemasMap] = useState<Map<string, string>>(new Map()); // Map content.id to temaId
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentProgress, setCurrentProgress] = useState(0);
+  const [loadingProgress, setLoadingProgress] = useState(false);
   const colors = getSubjectColor(subject.id);
+
+  // Obtener progreso dinámico del estudiante en el área
+  const obtenerProgresoArea = async () => {
+    if (!estudianteId || !subject.id) {
+      console.warn('No hay estudiante_id o subject.id disponibles');
+      return;
+    }
+
+    setLoadingProgress(true);
+    try {
+      const url = `http://localhost:4000/progresos/por-area?area_id=${subject.id}&estudiante_id=${estudianteId}`;
+      console.log(`🔄 Obteniendo progreso desde: ${url}`);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Error ${response.status}:`, errorText);
+        setCurrentProgress(0);
+        return;
+      }
+      
+      const data = await response.json();
+      const porcentaje = data.resumen?.porcentajeTotalArea || 0;
+      setCurrentProgress(Math.round(porcentaje));
+      console.log(`✅ Progreso del área: ${porcentaje}%`);
+    } catch (err) {
+      console.error('❌ Error al obtener progreso:', err);
+      setCurrentProgress(0);
+    } finally {
+      setLoadingProgress(false);
+    }
+  };
+
+  // Cargar progreso dinámico del estudiante
+  useEffect(() => {
+    obtenerProgresoArea();
+  }, [subject.id, estudianteId]);
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -250,7 +291,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect }: Subje
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5" />
-                  <span>65% completado</span>
+                  <span>{currentProgress}% completado</span>
                 </div>
               </div>
             </div>
@@ -261,12 +302,14 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect }: Subje
         <div className="bg-white rounded-xl shadow-md p-6 mb-8">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[#3A4A5B]">Tu Progreso</h3>
-            <span className="text-2xl" style={{ color: colors.primary }}>65%</span>
+            <span className="text-2xl" style={{ color: colors.primary }}>
+              {loadingProgress ? '...' : `${currentProgress}%`}
+            </span>
           </div>
           <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
             <div 
               className="h-full rounded-full transition-all duration-500"
-              style={{ width: '65%', backgroundColor: colors.primary }}
+              style={{ width: `${currentProgress}%`, backgroundColor: colors.primary }}
             ></div>
           </div>
         </div>

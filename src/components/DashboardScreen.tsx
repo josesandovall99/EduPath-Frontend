@@ -16,6 +16,7 @@ interface DashboardScreenProps {
   userName?: string; // Nuevo prop opcional
   onSubjectSelect: (subject: Subject) => void;
   onLogout: () => void;
+  estudianteId?: number;
 }
 
 const colorPalette = ['#4A90E2', '#7ED6A7', '#F5A97F', '#FFB84D', '#A78BFA', '#EC4899'];
@@ -49,10 +50,37 @@ const FALLBACK_SUBJECTS = [
   }
 ];
 
-export function DashboardScreen({ userName, onSubjectSelect, onLogout }: DashboardScreenProps) {
+export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudianteId }: DashboardScreenProps) {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [progresosPorArea, setProgresosPorArea] = useState<Map<number, number>>(new Map());
+  const [loadingProgresos, setLoadingProgresos] = useState(false);
+
+  // Obtener progreso de una área específica
+  const obtenerProgresoArea = async (areaId: number) => {
+    if (!estudianteId) {
+      console.warn('No hay estudiante_id disponible');
+      return 0;
+    }
+
+    try {
+      const url = `http://localhost:4000/progresos/por-area?area_id=${areaId}&estudiante_id=${estudianteId}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.warn(`⚠️ Error al obtener progreso del área ${areaId}:`, response.status);
+        return 0;
+      }
+      
+      const data = await response.json();
+      const porcentaje = data.resumen?.porcentajeTotalArea || 0;
+      return Math.round(porcentaje);
+    } catch (err) {
+      console.error(`❌ Error al obtener progreso del área ${areaId}:`, err);
+      return 0;
+    }
+  };
 
   useEffect(() => {
     const fetchAreas = async () => {
@@ -83,7 +111,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout }: Dashboa
           name: area.nombre,
           icon: Code,
           color: colorPalette[index % colorPalette.length],
-          progress: Math.floor(Math.random() * 100),
+          progress: 0, // Se cargará dinámicamente después
           topics: Math.floor(Math.random() * 15) + 5,
           completed: Math.floor(Math.random() * 10) + 1,
           nextTopic: 'Próximo tema disponible'
@@ -106,6 +134,27 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout }: Dashboa
     fetchAreas();
   }, []);
 
+  // Cargar progreso de todas las áreas cuando se carguen
+  useEffect(() => {
+    if (subjects.length > 0 && estudianteId) {
+      setLoadingProgresos(true);
+      const cargarProgresos = async () => {
+        const nuevosProgresos = new Map<number, number>();
+        
+        for (const subject of subjects) {
+          const areaId = parseInt(subject.id);
+          const progreso = await obtenerProgresoArea(areaId);
+          nuevosProgresos.set(areaId, progreso);
+        }
+        
+        setProgresosPorArea(nuevosProgresos);
+        setLoadingProgresos(false);
+      };
+      
+      cargarProgresos();
+    }
+  }, [subjects, estudianteId]);
+
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
       {/* Header */}
@@ -118,7 +167,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout }: Dashboa
               </div>
               <div>
                 <h1 className="text-[#3A4A5B]">EduPath</h1>
-                <p className="text-gray-500 text-sm">Panel del Estudiante</p>
+                <p className="text-gray-500 text-sm">Panel del Estudiante XD</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -180,6 +229,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout }: Dashboa
           ) : (
           subjects.map((subject) => {
             const Icon = subject.icon;
+            const areaId = parseInt(subject.id);
+            const progresoReal = progresosPorArea.get(areaId) || 0;
             return (
               <button
                 key={subject.id}
@@ -210,13 +261,15 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout }: Dashboa
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-gray-600">Progreso</span>
-                    <span className="text-sm" style={{ color: subject.color }}>{subject.progress}%</span>
+                    <span className="text-sm" style={{ color: subject.color }}>
+                      {loadingProgresos ? '...' : `${progresoReal}%`}
+                    </span>
                   </div>
                   <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div 
                       className="h-full rounded-full transition-all duration-500"
                       style={{ 
-                        width: `${subject.progress}%`,
+                        width: `${progresoReal}%`,
                         backgroundColor: subject.color
                       }}
                     ></div>
