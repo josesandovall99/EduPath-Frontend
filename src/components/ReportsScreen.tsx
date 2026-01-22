@@ -5,6 +5,11 @@ import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png'
 
 import axios from 'axios';
 
+const api = axios.create({
+  baseURL: 'http://localhost:4000',
+  timeout: 15000
+});
+
 interface ReportsScreenProps {
   onBack: () => void;
 }
@@ -41,6 +46,8 @@ interface Filters {
 export function ReportsScreen({ onBack }: ReportsScreenProps) {
   const [activeTab, setActiveTab] = useState<'student' | 'date' | 'activity'>('student');
   const [showFilters, setShowFilters] = useState(true);
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     contentType: 'all',
     area: 'all',
@@ -65,23 +72,25 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
         setLoadingStudents(true);
 
         // 1) obtener áreas para luego pedir progreso por área por estudiante
-        const areasRes = await axios.get('http://localhost:4000/areas', { timeout: 5000 });
+        const areasRes = await api.get('/areas');
         const areas = Array.isArray(areasRes.data) ? areasRes.data : [];
+        console.log('[Reports] áreas recibidas:', areas.length, areas);
 
         // 2) obtener estudiantes — probar primero el endpoint singular '/estudiante' (el backend usa ese nombre)
         let students: any[] = [];
         try {
-          const studentsRes = await axios.get('http://localhost:4000/estudiante', { timeout: 5000 });
+          const studentsRes = await api.get('/estudiante');
           students = Array.isArray(studentsRes.data) ? studentsRes.data : (studentsRes.data ? [studentsRes.data] : []);
         } catch (err) {
           // Si falla, intentar el plural '/estudiantes' como alternativa
           try {
-            const studentsRes2 = await axios.get('http://localhost:4000/estudiantes', { timeout: 5000 });
+            const studentsRes2 = await api.get('/estudiantes');
             students = Array.isArray(studentsRes2.data) ? studentsRes2.data : [];
           } catch (e) {
             students = [];
           }
         }
+        console.log('[Reports] estudiantes recibidos:', students.length, students);
 
         if (students.length === 0) {
           // fallback a mock si no hay endpoint disponible
@@ -95,47 +104,56 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             // Obtener el resumen por área (contenidos/ejercicios/miniproyectos)
             let areaResumen: any = null;
             try {
-              const url = `http://localhost:4000/progresos/por-area?area_id=${area.id}&estudiante_id=${st.id}`;
-              const res = await axios.get(url, { timeout: 5000 });
+              const url = `/progresos/por-area?area_id=${area.id}&estudiante_id=${st.id}`;
+              const res = await api.get(url);
               areaResumen = res.data;
+              console.log('[Reports] progreso por área', { estudianteId: st.id, areaId: area.id, data: areaResumen });
             } catch (e) {
               areaResumen = null;
+              console.warn('[Reports] sin progreso por área', { estudianteId: st.id, areaId: area.id, error: e });
             }
 
             // Obtener temas del área y para cada tema obtener progreso y subtemas
             let topics: { name: string; progress: number; subtopics: { name: string; progress: number }[] }[] = [];
             try {
-              const temasRes = await axios.get(`http://localhost:4000/temas/por-area/${area.id}`, { timeout: 5000 });
+              const temasRes = await api.get(`/temas/por-area/${area.id}`);
               const temas = Array.isArray(temasRes.data) ? temasRes.data : [];
+              console.log('[Reports] temas por área', { areaId: area.id, total: temas.length, temas });
 
               topics = await Promise.all(temas.map(async (tema: any) => {
                 // progreso por tema
                 let temaProgress = 0;
                 try {
-                  const temaProgRes = await axios.get(`http://localhost:4000/progresos/por-tema?tema_id=${tema.id}&estudiante_id=${st.id}`, { timeout: 5000 });
+                  const temaProgRes = await api.get(`/progresos/por-tema?tema_id=${tema.id}&estudiante_id=${st.id}`);
                   // preferir porcentaje total del resumen si existe
                   temaProgress = temaProgRes.data?.resumen?.porcentajeTotalTema ?? temaProgRes.data?.progreso?.contenidos?.porcentaje ?? 0;
+                  console.log('[Reports] progreso por tema', { estudianteId: st.id, temaId: tema.id, data: temaProgRes.data });
                 } catch (e) {
                   temaProgress = 0;
+                  console.warn('[Reports] sin progreso por tema', { estudianteId: st.id, temaId: tema.id, error: e });
                 }
 
                 // subtemas del tema
                 let subtopics: { name: string; progress: number }[] = [];
                 try {
-                  const subRes = await axios.get(`http://localhost:4000/subtemas/por-tema/${tema.id}`, { timeout: 5000 });
+                  const subRes = await api.get(`/subtemas/por-tema/${tema.id}`);
                   const subs = Array.isArray(subRes.data) ? subRes.data : [];
+                  console.log('[Reports] subtemas por tema', { temaId: tema.id, total: subs.length, subtemas: subs });
                   subtopics = await Promise.all(subs.map(async (sub: any) => {
                     let subProgress = 0;
                     try {
-                      const subProgRes = await axios.get(`http://localhost:4000/progresos/por-subtema?subtema_id=${sub.id}&estudiante_id=${st.id}`, { timeout: 5000 });
+                      const subProgRes = await api.get(`/progresos/por-subtema?subtema_id=${sub.id}&estudiante_id=${st.id}`);
                       subProgress = subProgRes.data?.resumen?.porcentajeTotalSubtema ?? subProgRes.data?.progreso?.contenidos?.porcentaje ?? 0;
+                      console.log('[Reports] progreso por subtema', { estudianteId: st.id, subtemaId: sub.id, data: subProgRes.data });
                     } catch (e) {
                       subProgress = 0;
+                      console.warn('[Reports] sin progreso por subtema', { estudianteId: st.id, subtemaId: sub.id, error: e });
                     }
                     return { name: sub.nombre || sub.name || `Subtema ${sub.id}`, progress: subProgress };
                   }));
                 } catch (e) {
                   subtopics = [];
+                  console.warn('[Reports] sin subtemas por tema', { temaId: tema.id, error: e });
                 }
 
                 return { name: tema.nombre || tema.name || `Tema ${tema.id}`, progress: Math.round(temaProgress), subtopics };
@@ -191,13 +209,57 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   };
 
   const handleExport = (format: 'pdf' | 'excel') => {
+    if (format === 'pdf') {
+      setShowPdfModal(true);
+      return;
+    }
     alert(`Exportando informe en formato ${format.toUpperCase()}...`);
+  };
+
+  const downloadPdf = async (type: 'student' | 'date' | 'activity') => {
+    if (type === 'student' && filters.student === 'all') {
+      alert('Selecciona un estudiante en los filtros para exportar el informe por estudiante.');
+      return;
+    }
+
+    try {
+      setPdfLoading(true);
+      const params = new URLSearchParams({ type });
+      if (type === 'student') {
+        params.append('estudiante_id', filters.student);
+      }
+
+      const response = await api.get(`/progresos/reporte-pdf?${params.toString()}`, {
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `reporte_${type}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setShowPdfModal(false);
+    } catch (error) {
+      console.error('Error descargando PDF:', error);
+      alert('No se pudo generar el PDF. Intenta nuevamente.');
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   const formatPercent = (value: number) => {
     if (!Number.isFinite(value)) return '0';
     const rounded = Math.round(value * 10) / 10;
     return Number.isInteger(rounded) ? `${rounded}` : `${rounded.toFixed(1)}`;
+  };
+
+  const normalizePercent = (value: number) => {
+    if (!Number.isFinite(value)) return 0;
+    return Math.min(100, Math.max(0, value));
   };
 
   const formatGrade = (value: number) => {
@@ -330,6 +392,49 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
         </button>
+
+        {showPdfModal && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+              <h3 className="text-[#3A4A5B] text-lg mb-2">Selecciona el tipo de informe</h3>
+              <p className="text-gray-500 text-sm mb-4">
+                Elige qué informe deseas descargar en PDF.
+              </p>
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  disabled={pdfLoading}
+                  onClick={() => downloadPdf('student')}
+                  className="px-4 py-2.5 bg-[#4A90E2] text-white rounded-lg hover:opacity-90 transition disabled:opacity-60"
+                >
+                  Progreso por Estudiante
+                </button>
+                <button
+                  disabled={pdfLoading}
+                  onClick={() => downloadPdf('date')}
+                  className="px-4 py-2.5 bg-[#7ED6A7] text-white rounded-lg hover:opacity-90 transition disabled:opacity-60"
+                >
+                  Progreso por Fecha de Creación
+                </button>
+                <button
+                  disabled={pdfLoading}
+                  onClick={() => downloadPdf('activity')}
+                  className="px-4 py-2.5 bg-[#F5A97F] text-white rounded-lg hover:opacity-90 transition disabled:opacity-60"
+                >
+                  Desempeño por Actividad
+                </button>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  disabled={pdfLoading}
+                  onClick={() => setShowPdfModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-[#3A4A5B] disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {loadingStudents && (
           <div className="bg-white rounded-xl shadow-md mb-6 p-6">
@@ -625,7 +730,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                 <div 
                                   className="h-full rounded-full transition-all"
                                   style={{ 
-                                    width: `${subject.progress}%`,
+                                    width: `${normalizePercent(subject.progress)}%`,
                                     backgroundColor: subject.color
                                   }}
                                 />
@@ -672,7 +777,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                           <div 
                                             className="h-full rounded-full"
                                             style={{ 
-                                              width: `${subtopic.progress}%`,
+                                              width: `${normalizePercent(subtopic.progress)}%`,
                                               backgroundColor: subject.color
                                             }}
                                           />
@@ -767,9 +872,9 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                         <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
                             <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
-                            <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Fundamentos</th>
-                            <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Análisis</th>
-                            <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Alcance</th>
+                            <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Gestion de Proyectos</th>
+                            <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Programacion</th>
+                            <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Analsis de sistemas</th>
                             <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Promedio</th>
                             <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estado</th>
                           </tr>
@@ -780,6 +885,9 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                               ? student.subjects.reduce((acc, s) => acc + s.progress, 0) / student.subjects.length
                               : 0;
                             const isLagging = avgProgress < 50;
+                            const subject0 = student.subjects[0];
+                            const subject1 = student.subjects[1];
+                            const subject2 = student.subjects[2];
                             
                             return (
                               <tr key={student.id} className="hover:bg-gray-50 transition-colors">
@@ -797,12 +905,12 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                       <div 
                                         className="h-full rounded-full"
                                         style={{ 
-                                          width: `${student.subjects[0].progress}%`,
+                                          width: `${normalizePercent(subject0?.progress ?? 0)}%`,
                                           backgroundColor: '#4A90E2'
                                         }}
                                       />
                                     </div>
-                                    <span className="text-sm text-gray-600">{formatPercent(student.subjects[0].progress)}%</span>
+                                    <span className="text-sm text-gray-600">{formatPercent(subject0?.progress ?? 0)}%</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3">
@@ -811,12 +919,12 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                       <div 
                                         className="h-full rounded-full"
                                         style={{ 
-                                          width: `${student.subjects[1].progress}%`,
+                                          width: `${normalizePercent(subject1?.progress ?? 0)}%`,
                                           backgroundColor: '#7ED6A7'
                                         }}
                                       />
                                     </div>
-                                    <span className="text-sm text-gray-600">{formatPercent(student.subjects[1].progress)}%</span>
+                                    <span className="text-sm text-gray-600">{formatPercent(subject1?.progress ?? 0)}%</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3">
@@ -825,12 +933,12 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                       <div 
                                         className="h-full rounded-full"
                                         style={{ 
-                                          width: `${student.subjects[2].progress}%`,
+                                          width: `${normalizePercent(subject2?.progress ?? 0)}%`,
                                           backgroundColor: '#F5A97F'
                                         }}
                                       />
                                     </div>
-                                    <span className="text-sm text-gray-600">{formatPercent(student.subjects[2].progress)}%</span>
+                                    <span className="text-sm text-gray-600">{formatPercent(subject2?.progress ?? 0)}%</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3">
