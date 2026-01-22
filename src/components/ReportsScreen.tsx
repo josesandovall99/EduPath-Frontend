@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Download, FileSpreadsheet, Filter, X, User, Calendar, Activity, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, BarChart3, Award } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+
+import axios from 'axios';
 
 interface ReportsScreenProps {
   onBack: () => void;
@@ -47,289 +49,136 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     student: 'all'
   });
 
-  // Datos mock de estudiantes
-  const studentsData: StudentProgress[] = [
-    {
-      id: '1',
-      name: 'Juan Pérez',
-      email: 'juan.perez@universidad.edu',
-      createdDate: '2025-09-15',
-      subjects: [
-        {
-          name: 'Fundamentos de Programación',
-          color: '#4A90E2',
-          progress: 85,
-          contentViewed: 24,
-          exercisesCompleted: 18,
-          miniprojectsSubmitted: 3,
-          topics: [
-            { 
-              name: 'Introducción a Python', 
-              progress: 100,
-              subtopics: [
-                { name: 'Variables y tipos de datos', progress: 100 },
-                { name: 'Estructuras de control', progress: 100 }
-              ]
-            },
-            { 
-              name: 'Estructuras de datos', 
-              progress: 75,
-              subtopics: [
-                { name: 'Listas y tuplas', progress: 100 },
-                { name: 'Diccionarios', progress: 50 }
-              ]
-            }
-          ]
-        },
-        {
-          name: 'Análisis de Sistemas',
-          color: '#7ED6A7',
-          progress: 70,
-          contentViewed: 18,
-          exercisesCompleted: 12,
-          miniprojectsSubmitted: 2,
-          topics: [
-            { 
-              name: 'Requerimientos', 
-              progress: 80,
-              subtopics: [
-                { name: 'Requerimientos funcionales', progress: 100 },
-                { name: 'Requerimientos no funcionales', progress: 60 }
-              ]
-            }
-          ]
-        },
-        {
-          name: 'Alcance, Tiempo y Costo',
-          color: '#F5A97F',
-          progress: 65,
-          contentViewed: 15,
-          exercisesCompleted: 10,
-          miniprojectsSubmitted: 1,
-          topics: [
-            { 
-              name: 'Gestión de Alcance', 
-              progress: 90,
-              subtopics: [
-                { name: 'Definición del alcance', progress: 100 },
-                { name: 'WBS', progress: 80 }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      id: '2',
-      name: 'María García',
-      email: 'maria.garcia@universidad.edu',
-      createdDate: '2025-09-15',
-      subjects: [
-        {
-          name: 'Fundamentos de Programación',
-          color: '#4A90E2',
-          progress: 92,
-          contentViewed: 28,
-          exercisesCompleted: 22,
-          miniprojectsSubmitted: 4,
-          topics: [
-            { 
-              name: 'Introducción a Python', 
-              progress: 100,
-              subtopics: [
-                { name: 'Variables y tipos de datos', progress: 100 },
-                { name: 'Estructuras de control', progress: 100 }
-              ]
-            },
-            { 
-              name: 'Estructuras de datos', 
-              progress: 90,
-              subtopics: [
-                { name: 'Listas y tuplas', progress: 100 },
-                { name: 'Diccionarios', progress: 80 }
-              ]
-            }
-          ]
-        },
-        {
-          name: 'Análisis de Sistemas',
-          color: '#7ED6A7',
-          progress: 88,
-          contentViewed: 22,
-          exercisesCompleted: 18,
-          miniprojectsSubmitted: 3,
-          topics: [
-            { 
-              name: 'Requerimientos', 
-              progress: 95,
-              subtopics: [
-                { name: 'Requerimientos funcionales', progress: 100 },
-                { name: 'Requerimientos no funcionales', progress: 90 }
-              ]
-            }
-          ]
-        },
-        {
-          name: 'Alcance, Tiempo y Costo',
-          color: '#F5A97F',
-          progress: 84,
-          contentViewed: 20,
-          exercisesCompleted: 15,
-          miniprojectsSubmitted: 2,
-          topics: [
-            { 
-              name: 'Gestión de Alcance', 
-              progress: 100,
-              subtopics: [
-                { name: 'Definición del alcance', progress: 100 },
-                { name: 'WBS', progress: 100 }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      id: '3',
-      name: 'Carlos López',
-      email: 'carlos.lopez@universidad.edu',
-      createdDate: '2025-10-20',
-      subjects: [
-        {
-          name: 'Fundamentos de Programación',
-          color: '#4A90E2',
-          progress: 58,
-          contentViewed: 16,
-          exercisesCompleted: 10,
-          miniprojectsSubmitted: 1,
-          topics: [
-            { 
-              name: 'Introducción a Python', 
-              progress: 80,
-              subtopics: [
-                { name: 'Variables y tipos de datos', progress: 100 },
-                { name: 'Estructuras de control', progress: 60 }
-              ]
-            },
-            { 
-              name: 'Estructuras de datos', 
-              progress: 40,
-              subtopics: [
-                { name: 'Listas y tuplas', progress: 60 },
-                { name: 'Diccionarios', progress: 20 }
-              ]
-            }
-          ]
-        },
-        {
-          name: 'Análisis de Sistemas',
-          color: '#7ED6A7',
-          progress: 45,
-          contentViewed: 12,
-          exercisesCompleted: 6,
-          miniprojectsSubmitted: 1,
-          topics: [
-            { 
-              name: 'Requerimientos', 
-              progress: 50,
-              subtopics: [
-                { name: 'Requerimientos funcionales', progress: 70 },
-                { name: 'Requerimientos no funcionales', progress: 30 }
-              ]
-            }
-          ]
-        },
-        {
-          name: 'Alcance, Tiempo y Costo',
-          color: '#F5A97F',
-          progress: 38,
-          contentViewed: 10,
-          exercisesCompleted: 5,
-          miniprojectsSubmitted: 0,
-          topics: [
-            { 
-              name: 'Gestión de Alcance', 
-              progress: 60,
-              subtopics: [
-                { name: 'Definición del alcance', progress: 80 },
-                { name: 'WBS', progress: 40 }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      id: '4',
-      name: 'Ana Martínez',
-      email: 'ana.martinez@universidad.edu',
-      createdDate: '2025-10-20',
-      subjects: [
-        {
-          name: 'Fundamentos de Programación',
-          color: '#4A90E2',
-          progress: 42,
-          contentViewed: 12,
-          exercisesCompleted: 8,
-          miniprojectsSubmitted: 0,
-          topics: [
-            { 
-              name: 'Introducción a Python', 
-              progress: 70,
-              subtopics: [
-                { name: 'Variables y tipos de datos', progress: 100 },
-                { name: 'Estructuras de control', progress: 40 }
-              ]
-            },
-            { 
-              name: 'Estructuras de datos', 
-              progress: 20,
-              subtopics: [
-                { name: 'Listas y tuplas', progress: 40 },
-                { name: 'Diccionarios', progress: 0 }
-              ]
-            }
-          ]
-        },
-        {
-          name: 'Análisis de Sistemas',
-          color: '#7ED6A7',
-          progress: 52,
-          contentViewed: 14,
-          exercisesCompleted: 8,
-          miniprojectsSubmitted: 1,
-          topics: [
-            { 
-              name: 'Requerimientos', 
-              progress: 60,
-              subtopics: [
-                { name: 'Requerimientos funcionales', progress: 80 },
-                { name: 'Requerimientos no funcionales', progress: 40 }
-              ]
-            }
-          ]
-        },
-        {
-          name: 'Alcance, Tiempo y Costo',
-          color: '#F5A97F',
-          progress: 48,
-          contentViewed: 13,
-          exercisesCompleted: 7,
-          miniprojectsSubmitted: 1,
-          topics: [
-            { 
-              name: 'Gestión de Alcance', 
-              progress: 70,
-              subtopics: [
-                { name: 'Definición del alcance', progress: 90 },
-                { name: 'WBS', progress: 50 }
-              ]
-            }
-          ]
-        }
-      ]
-    }
+  // Estado para estudiantes (se carga desde backend). Si falla, usamos fallbackMockStudents
+  const [studentsData, setStudentsData] = useState<StudentProgress[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState<boolean>(true);
+
+  // Fallback con el mock original reducido (solo estructura necesaria)
+  const fallbackMockStudents: StudentProgress[] = [
+    { id: '1', name: 'Juan Pérez', email: 'juan.perez@universidad.edu', createdDate: '2025-09-15', subjects: [] },
+    { id: '2', name: 'María García', email: 'maria.garcia@universidad.edu', createdDate: '2025-09-15', subjects: [] }
   ];
+
+  useEffect(() => {
+    const loadStudentsAndProgress = async () => {
+      try {
+        setLoadingStudents(true);
+
+        // 1) obtener áreas para luego pedir progreso por área por estudiante
+        const areasRes = await axios.get('http://localhost:4000/areas', { timeout: 5000 });
+        const areas = Array.isArray(areasRes.data) ? areasRes.data : [];
+
+        // 2) obtener estudiantes — probar primero el endpoint singular '/estudiante' (el backend usa ese nombre)
+        let students: any[] = [];
+        try {
+          const studentsRes = await axios.get('http://localhost:4000/estudiante', { timeout: 5000 });
+          students = Array.isArray(studentsRes.data) ? studentsRes.data : (studentsRes.data ? [studentsRes.data] : []);
+        } catch (err) {
+          // Si falla, intentar el plural '/estudiantes' como alternativa
+          try {
+            const studentsRes2 = await axios.get('http://localhost:4000/estudiantes', { timeout: 5000 });
+            students = Array.isArray(studentsRes2.data) ? studentsRes2.data : [];
+          } catch (e) {
+            students = [];
+          }
+        }
+
+        if (students.length === 0) {
+          // fallback a mock si no hay endpoint disponible
+          setStudentsData(fallbackMockStudents);
+          return;
+        }
+
+        // 3) por cada estudiante, obtener progreso por cada área y construir subjects
+        const studentsWithProgress: StudentProgress[] = await Promise.all(students.map(async (st: any) => {
+          const subjects = await Promise.all(areas.map(async (area: any, idx: number) => {
+            // Obtener el resumen por área (contenidos/ejercicios/miniproyectos)
+            let areaResumen: any = null;
+            try {
+              const url = `http://localhost:4000/progresos/por-area?area_id=${area.id}&estudiante_id=${st.id}`;
+              const res = await axios.get(url, { timeout: 5000 });
+              areaResumen = res.data;
+            } catch (e) {
+              areaResumen = null;
+            }
+
+            // Obtener temas del área y para cada tema obtener progreso y subtemas
+            let topics: { name: string; progress: number; subtopics: { name: string; progress: number }[] }[] = [];
+            try {
+              const temasRes = await axios.get(`http://localhost:4000/temas/por-area/${area.id}`, { timeout: 5000 });
+              const temas = Array.isArray(temasRes.data) ? temasRes.data : [];
+
+              topics = await Promise.all(temas.map(async (tema: any) => {
+                // progreso por tema
+                let temaProgress = 0;
+                try {
+                  const temaProgRes = await axios.get(`http://localhost:4000/progresos/por-tema?tema_id=${tema.id}&estudiante_id=${st.id}`, { timeout: 5000 });
+                  // preferir porcentaje total del resumen si existe
+                  temaProgress = temaProgRes.data?.resumen?.porcentajeTotalTema ?? temaProgRes.data?.progreso?.contenidos?.porcentaje ?? 0;
+                } catch (e) {
+                  temaProgress = 0;
+                }
+
+                // subtemas del tema
+                let subtopics: { name: string; progress: number }[] = [];
+                try {
+                  const subRes = await axios.get(`http://localhost:4000/subtemas/por-tema/${tema.id}`, { timeout: 5000 });
+                  const subs = Array.isArray(subRes.data) ? subRes.data : [];
+                  subtopics = await Promise.all(subs.map(async (sub: any) => {
+                    let subProgress = 0;
+                    try {
+                      const subProgRes = await axios.get(`http://localhost:4000/progresos/por-subtema?subtema_id=${sub.id}&estudiante_id=${st.id}`, { timeout: 5000 });
+                      subProgress = subProgRes.data?.resumen?.porcentajeTotalSubtema ?? subProgRes.data?.progreso?.contenidos?.porcentaje ?? 0;
+                    } catch (e) {
+                      subProgress = 0;
+                    }
+                    return { name: sub.nombre || sub.name || `Subtema ${sub.id}`, progress: subProgress };
+                  }));
+                } catch (e) {
+                  subtopics = [];
+                }
+
+                return { name: tema.nombre || tema.name || `Tema ${tema.id}`, progress: Math.round(temaProgress), subtopics };
+              }));
+            } catch (e) {
+              topics = [];
+            }
+
+            const contenidos = areaResumen?.progreso?.contenidos || { total: 0, completados: 0, porcentaje: 0 };
+            const ejercicios = areaResumen?.progreso?.ejercicios || { total: 0, completados: 0, porcentaje: 0 };
+            const miniproyectos = areaResumen?.progreso?.miniproyectos || { total: 0, completados: 0, porcentaje: 0 };
+
+            return {
+              name: area.nombre || `Área ${area.id}`,
+              color: ['#4A90E2', '#7ED6A7', '#F5A97F'][idx % 3],
+              progress: areaResumen?.resumen?.porcentajeTotalArea ?? contenidos.porcentaje ?? 0,
+              contentViewed: contenidos.completados ?? 0,
+              exercisesCompleted: ejercicios.completados ?? 0,
+              miniprojectsSubmitted: miniproyectos.completados ?? 0,
+              topics
+            };
+          }));
+
+          return {
+            id: String(st.id),
+            name: st.persona?.nombre || st.nombre || st.name || `${st.nombre || 'Estudiante'}`,
+            email: st.persona?.email || st.email || st.correo || '',
+            createdDate: st.createdAt ? st.createdAt.split('T')[0] : (st.createdDate || ''),
+            subjects
+          } as StudentProgress;
+        }));
+
+        setStudentsData(studentsWithProgress);
+      } catch (error) {
+        console.error('Error cargando estudiantes o áreas:', error);
+        setStudentsData(fallbackMockStudents);
+      } finally {
+        setLoadingStudents(false);
+      }
+    };
+
+    loadStudentsAndProgress();
+  }, []);
 
   const clearFilters = () => {
     setFilters({
@@ -345,6 +194,18 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     alert(`Exportando informe en formato ${format.toUpperCase()}...`);
   };
 
+  const formatPercent = (value: number) => {
+    if (!Number.isFinite(value)) return '0';
+    const rounded = Math.round(value * 10) / 10;
+    return Number.isInteger(rounded) ? `${rounded}` : `${rounded.toFixed(1)}`;
+  };
+
+  const formatGrade = (value: number) => {
+    if (!Number.isFinite(value)) return '0';
+    const rounded = Math.round(value * 10) / 10;
+    return Number.isInteger(rounded) ? `${rounded}` : `${rounded.toFixed(1)}`;
+  };
+
   // Calcular datos agrupados por fecha de creación
   const getDataByDate = () => {
     const grouped: { [key: string]: StudentProgress[] } = {};
@@ -356,14 +217,17 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     });
 
     return Object.entries(grouped).map(([date, students]) => {
-      const avgProgress = students.reduce((sum, s) => {
+      const sumAvg = students.reduce((sum, s) => {
         const totalProgress = s.subjects.reduce((acc, subj) => acc + subj.progress, 0);
-        return sum + (totalProgress / s.subjects.length);
-      }, 0) / students.length;
+        const avg = s.subjects.length ? totalProgress / s.subjects.length : 0;
+        return sum + avg;
+      }, 0);
+
+      const avgProgress = students.length ? sumAvg / students.length : 0;
 
       return {
         date,
-        avgProgress: Math.round(avgProgress),
+        avgProgress,
         studentCount: students.length,
         students
       };
@@ -391,18 +255,32 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
 
   // Datos para gráfica de progreso por materia
   const getSubjectProgressData = () => {
-    const subjects = ['Fundamentos de Programación', 'Análisis de Sistemas', 'Alcance, Tiempo y Costo'];
-    return subjects.map((subjectName, index) => {
-      const colors = ['#4A90E2', '#7ED6A7', '#F5A97F'];
-      const avgProgress = studentsData.reduce((sum, student) => {
+    const subjectMap = new Map<string, string>();
+    studentsData.forEach(student => {
+      student.subjects.forEach(subject => {
+        if (!subjectMap.has(subject.name)) {
+          subjectMap.set(subject.name, subject.color || '#4A90E2');
+        }
+      });
+    });
+
+    return Array.from(subjectMap.entries()).map(([subjectName, color]) => {
+      let total = 0;
+      let count = 0;
+      studentsData.forEach(student => {
         const subject = student.subjects.find(s => s.name === subjectName);
-        return sum + (subject?.progress || 0);
-      }, 0) / studentsData.length;
+        if (subject) {
+          total += subject.progress || 0;
+          count += 1;
+        }
+      });
+
+      const avgProgress = count ? total / count : 0;
 
       return {
         name: subjectName,
-        progress: Math.round(avgProgress),
-        color: colors[index]
+        progress: avgProgress,
+        color
       };
     });
   };
@@ -452,6 +330,23 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
         </button>
+
+        {loadingStudents && (
+          <div className="bg-white rounded-xl shadow-md mb-6 p-6">
+            <div className="flex items-center gap-4">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-200 rounded w-1/3 animate-pulse" />
+                <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse" />
+              </div>
+            </div>
+            <div className="mt-6 grid grid-cols-3 gap-4">
+              <div className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+              <div className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+              <div className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-md mb-6 overflow-hidden">
@@ -625,10 +520,16 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   <TrendingUp className="w-5 h-5 text-[#7ED6A7]" />
                 </div>
                 <div className="text-3xl text-[#3A4A5B] mb-1">
-                  {Math.round(studentsData.reduce((sum, s) => {
-                    const avg = s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length;
-                    return sum + avg;
-                  }, 0) / studentsData.length)}%
+                  {formatPercent(
+                    studentsData.length
+                      ? studentsData.reduce((sum, s) => {
+                          const avg = s.subjects.length
+                            ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
+                            : 0;
+                          return sum + avg;
+                        }, 0) / studentsData.length
+                      : 0
+                  )}%
                 </div>
                 <div className="text-xs text-gray-500">En todas las materias</div>
               </div>
@@ -640,7 +541,9 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                 </div>
                 <div className="text-3xl text-[#3A4A5B] mb-1">
                   {studentsData.filter(s => {
-                    const avg = s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length;
+                    const avg = s.subjects.length
+                      ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
+                      : 0;
                     return avg >= 70;
                   }).length}
                 </div>
@@ -654,7 +557,9 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                 </div>
                 <div className="text-3xl text-[#3A4A5B] mb-1">
                   {studentsData.filter(s => {
-                    const avg = s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length;
+                    const avg = s.subjects.length
+                      ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
+                      : 0;
                     return avg < 50;
                   }).length}
                 </div>
@@ -684,7 +589,11 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                       </div>
                       <div className="text-right">
                         <div className="text-2xl text-[#3A4A5B] mb-1">
-                          {Math.round(student.subjects.reduce((acc, s) => acc + s.progress, 0) / student.subjects.length)}%
+                          {formatPercent(
+                            student.subjects.length
+                              ? student.subjects.reduce((acc, s) => acc + s.progress, 0) / student.subjects.length
+                              : 0
+                          )}%
                         </div>
                         <div className="text-xs text-gray-500">Progreso general</div>
                       </div>
@@ -710,7 +619,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                             <div>
                               <div className="flex justify-between items-center mb-1">
                                 <span className="text-xs text-gray-600">Progreso</span>
-                                <span className="text-sm text-[#3A4A5B]">{subject.progress}%</span>
+                                <span className="text-sm text-[#3A4A5B]">{formatPercent(subject.progress)}%</span>
                               </div>
                               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                 <div 
@@ -752,7 +661,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                               <div key={topic.name} className="mb-3 last:mb-0">
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="text-sm text-[#3A4A5B]">{topic.name}</span>
-                                  <span className="text-sm text-gray-600">{topic.progress}%</span>
+                                  <span className="text-sm text-gray-600">{formatPercent(topic.progress)}%</span>
                                 </div>
                                 <div className="pl-4 space-y-1">
                                   {topic.subtopics.map((subtopic) => (
@@ -768,7 +677,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                             }}
                                           />
                                         </div>
-                                        <span className="text-gray-500 w-8">{subtopic.progress}%</span>
+                                        <span className="text-gray-500 w-8">{formatPercent(subtopic.progress)}%</span>
                                       </div>
                                     </div>
                                   ))}
@@ -848,7 +757,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                         <p className="text-gray-500 text-sm">{dateGroup.studentCount} estudiantes</p>
                       </div>
                       <div className="text-right">
-                        <div className="text-2xl text-[#3A4A5B] mb-1">{dateGroup.avgProgress}%</div>
+                        <div className="text-2xl text-[#3A4A5B] mb-1">{formatPercent(dateGroup.avgProgress)}%</div>
                         <div className="text-xs text-gray-500">Promedio de avance</div>
                       </div>
                     </div>
@@ -867,7 +776,9 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                           {dateGroup.students.map((student) => {
-                            const avgProgress = Math.round(student.subjects.reduce((acc, s) => acc + s.progress, 0) / student.subjects.length);
+                            const avgProgress = student.subjects.length
+                              ? student.subjects.reduce((acc, s) => acc + s.progress, 0) / student.subjects.length
+                              : 0;
                             const isLagging = avgProgress < 50;
                             
                             return (
@@ -891,7 +802,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                         }}
                                       />
                                     </div>
-                                    <span className="text-sm text-gray-600">{student.subjects[0].progress}%</span>
+                                    <span className="text-sm text-gray-600">{formatPercent(student.subjects[0].progress)}%</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3">
@@ -905,7 +816,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                         }}
                                       />
                                     </div>
-                                    <span className="text-sm text-gray-600">{student.subjects[1].progress}%</span>
+                                    <span className="text-sm text-gray-600">{formatPercent(student.subjects[1].progress)}%</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3">
@@ -919,11 +830,11 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                         }}
                                       />
                                     </div>
-                                    <span className="text-sm text-gray-600">{student.subjects[2].progress}%</span>
+                                    <span className="text-sm text-gray-600">{formatPercent(student.subjects[2].progress)}%</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3">
-                                  <span className="text-[#3A4A5B]">{avgProgress}%</span>
+                                  <span className="text-[#3A4A5B]">{formatPercent(avgProgress)}%</span>
                                 </td>
                                 <td className="px-4 py-3">
                                   {isLagging ? (
@@ -973,7 +884,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   </div>
                 </div>
                 <div className="text-xs text-gray-500">
-                  Promedio: {Math.round(studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0) / studentsData.length)} por estudiante
+                    Promedio: {studentsData.length ? Math.round(studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0) / studentsData.length) : 0} por estudiante
                 </div>
               </div>
 
@@ -990,7 +901,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   </div>
                 </div>
                 <div className="text-xs text-gray-500">
-                  Promedio: {Math.round(studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0) / studentsData.length)} por estudiante
+                  Promedio: {studentsData.length ? Math.round(studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0) / studentsData.length) : 0} por estudiante
                 </div>
               </div>
 
@@ -1007,7 +918,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   </div>
                 </div>
                 <div className="text-xs text-gray-500">
-                  Promedio: {Math.round(studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0) / studentsData.length)} por estudiante
+                  Promedio: {studentsData.length ? Math.round(studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0) / studentsData.length) : 0} por estudiante
                 </div>
               </div>
             </div>
@@ -1069,29 +980,35 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
               </div>
               
               <div className="p-6">
-                {['Fundamentos de Programación', 'Análisis de Sistemas', 'Alcance, Tiempo y Costo'].map((subjectName, index) => {
-                  const colors = ['#4A90E2', '#7ED6A7', '#F5A97F'];
-                  const color = colors[index];
-                  
+                {getSubjectProgressData().map((subject) => {
+                  const subjectName = subject.name;
+                  const color = subject.color;
+
                   const totalContent = studentsData.reduce((sum, s) => {
-                    const subject = s.subjects.find(subj => subj.name === subjectName);
-                    return sum + (subject?.contentViewed || 0);
-                  }, 0);
-                  
-                  const totalExercises = studentsData.reduce((sum, s) => {
-                    const subject = s.subjects.find(subj => subj.name === subjectName);
-                    return sum + (subject?.exercisesCompleted || 0);
-                  }, 0);
-                  
-                  const totalProjects = studentsData.reduce((sum, s) => {
-                    const subject = s.subjects.find(subj => subj.name === subjectName);
-                    return sum + (subject?.miniprojectsSubmitted || 0);
+                    const subj = s.subjects.find(subj => subj.name === subjectName);
+                    return sum + (subj?.contentViewed || 0);
                   }, 0);
 
-                  const avgProgress = Math.round(studentsData.reduce((sum, s) => {
-                    const subject = s.subjects.find(subj => subj.name === subjectName);
-                    return sum + (subject?.progress || 0);
-                  }, 0) / studentsData.length);
+                  const totalExercises = studentsData.reduce((sum, s) => {
+                    const subj = s.subjects.find(subj => subj.name === subjectName);
+                    return sum + (subj?.exercisesCompleted || 0);
+                  }, 0);
+
+                  const totalProjects = studentsData.reduce((sum, s) => {
+                    const subj = s.subjects.find(subj => subj.name === subjectName);
+                    return sum + (subj?.miniprojectsSubmitted || 0);
+                  }, 0);
+
+                  let avgProgress = 0;
+                  let count = 0;
+                  studentsData.forEach((s) => {
+                    const subj = s.subjects.find(subj => subj.name === subjectName);
+                    if (subj) {
+                      avgProgress += subj.progress || 0;
+                      count += 1;
+                    }
+                  });
+                  avgProgress = count ? avgProgress / count : 0;
 
                   return (
                     <div key={subjectName} className="mb-8 last:mb-0 border-b border-gray-200 last:border-0 pb-8 last:pb-0">
@@ -1107,7 +1024,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                         <div className="bg-gray-50 rounded-lg p-4">
                           <div className="text-sm text-gray-600 mb-1">Progreso Promedio</div>
                           <div className="flex items-center gap-2">
-                            <div className="text-2xl text-[#3A4A5B]">{avgProgress}%</div>
+                            <div className="text-2xl text-[#3A4A5B]">{formatPercent(avgProgress)}%</div>
                             <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                               <div 
                                 className="h-full rounded-full"
@@ -1124,7 +1041,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                           <div className="text-sm text-gray-600 mb-1">Contenidos Visualizados</div>
                           <div className="text-2xl text-[#3A4A5B]">{totalContent}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {Math.round(totalContent / studentsData.length)} por estudiante
+                            {studentsData.length ? Math.round(totalContent / studentsData.length) : 0} por estudiante
                           </div>
                         </div>
 
@@ -1132,7 +1049,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                           <div className="text-sm text-gray-600 mb-1">Ejercicios Completados</div>
                           <div className="text-2xl text-[#3A4A5B]">{totalExercises}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {Math.round(totalExercises / studentsData.length)} por estudiante
+                            {studentsData.length ? Math.round(totalExercises / studentsData.length) : 0} por estudiante
                           </div>
                         </div>
 
@@ -1140,7 +1057,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                           <div className="text-sm text-gray-600 mb-1">Miniproyectos Entregados</div>
                           <div className="text-2xl text-[#3A4A5B]">{totalProjects}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {Math.round(totalProjects / studentsData.length)} por estudiante
+                            {studentsData.length ? Math.round(totalProjects / studentsData.length) : 0} por estudiante
                           </div>
                         </div>
                       </div>
@@ -1162,7 +1079,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                               const subject = student.subjects.find(s => s.name === subjectName);
                               if (!subject) return null;
                               
-                              const estimatedGrade = (subject.progress / 100 * 5).toFixed(1);
+                              const estimatedGrade = (subject.progress / 100) * 5;
 
                               return (
                                 <tr key={student.id} className="hover:bg-gray-50 transition-colors">
@@ -1181,7 +1098,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                           }}
                                         />
                                       </div>
-                                      <span className="text-sm text-gray-600">{subject.progress}%</span>
+                                      <span className="text-sm text-gray-600">{formatPercent(subject.progress)}%</span>
                                     </div>
                                   </td>
                                   <td className="px-4 py-3">
@@ -1192,7 +1109,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                                         color: color
                                       }}
                                     >
-                                      {estimatedGrade}/5.0
+                                        {formatGrade(estimatedGrade)}/5.0
                                     </span>
                                   </td>
                                 </tr>
