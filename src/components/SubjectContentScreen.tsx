@@ -192,8 +192,11 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         const temas: Tema[] = await temasResponse.json();
         console.log('✅ Temas loaded:', temas);
 
+        // Ordenar temas por la columna 'orden' antes de transformar
+        const temasOrdenados = temas.sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0));
+
         // Transformar temas a formato Content
-        const transformedContent = temas.map((tema) => ({
+        const transformedContent = temasOrdenados.map((tema) => ({
           id: tema.id.toString(),
           title: tema.nombre,
           type: 'document' as const,
