@@ -335,11 +335,19 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
         estado: updatedEstado
       });
       
-      setTemas(prev =>
-        prev.map(t =>
-          t.id === tema.id ? { ...t, estado: updatedEstado } : t
-        )
-      );
+      // Recargar todos los temas para que coincidan con el orden de la BD
+      const response = await axios.get('http://localhost:4000/temas', {
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      const data = response.data;
+      if (Array.isArray(data)) {
+        const temasPorArea = data.filter(t => t.area_id === selectedSubject);
+        const temasOrdenados = temasPorArea.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+        setTemas(temasOrdenados);
+      }
     } catch (err) {
       console.error('Error toggling tema:', err);
       alert('Error al cambiar el estado del tema');
