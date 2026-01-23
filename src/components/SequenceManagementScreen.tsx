@@ -1120,6 +1120,15 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
           <span>Volver al Panel</span>
         </button>
 
+        {/* Informational Message */}
+        <div className="mb-8 p-6 bg-gradient-to-r from-[#4A90E2] to-[#357abd] text-white rounded-xl shadow-lg">
+          <h2 className="text-lg font-bold mb-2">Gestión de Secuencias de Contenidos</h2>
+          <p className="text-sm opacity-95">
+            Define el orden en que los estudiantes deben completar cada contenido dentro de un subtema.
+            Establece dependencias entre contenidos para crear una ruta de aprendizaje progresiva y estructurada.
+          </p>
+        </div>
+
         {/* Stats */}
         <div className="grid grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-md p-6">
@@ -1157,8 +1166,21 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
           </div>
         </div>
 
+        {/* Stats Helper Message */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] rounded-xl text-white">
+          <p className="text-sm">
+            📊 <span className="font-semibold">Estado de tus secuencias:</span> Supervisa el total de secuencias de contenidos, 
+            cuántas están activas guiando el flujo de aprendizaje, y cuántas están inactivas.
+          </p>
+        </div>
+
         {/* Filtros */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+          <div className="mb-4 pb-4 border-b border-gray-200">
+            <p className="text-sm text-gray-600">
+              📋 <span className="font-medium">Utiliza los filtros</span> para buscar secuencias específicas por área, tema o contenido.
+            </p>
+          </div>
           <h3 className="text-lg font-semibold text-[#3A4A5B] mb-4">Filtrar por:</h3>
           <div className="grid grid-cols-3 gap-4">
             <div>
@@ -1368,7 +1390,16 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
             <div className="space-y-4">
               {filteredSequences.length === 0 ? (
                 <div className="bg-white rounded-xl shadow-md p-12 text-center">
-                  <p className="text-gray-600">No hay secuencias. Crea una nueva para empezar.</p>
+                  <div className="mb-4 flex justify-center">
+                    <div className="w-16 h-16 bg-gradient-to-br from-[#4A90E2] to-[#357abd] rounded-full flex items-center justify-center opacity-10"></div>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">No hay secuencias disponibles</h3>
+                  <p className="text-gray-600 mb-4">
+                    Crea tu primera secuencia para establecer el orden de aprendizaje de los contenidos.
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    💡 Una secuencia define qué contenido debe completarse después de otro, creando un flujo educativo cohesivo.
+                  </p>
                 </div>
               ) : (
                 filteredSequences.map((sequence) => {
@@ -1492,6 +1523,14 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
               >
                 ✕
               </button>
+            </div>
+
+            {/* Helper Message */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <span className="font-semibold">💡 Consejo:</span> Selecciona un contenido origen y el destino que debe completarse después. 
+                Esto crea un flujo educativo que los estudiantes deben seguir.
+              </p>
             </div>
 
             <form onSubmit={isEditMode ? handleUpdateSequence : handleCreateSequence} className="space-y-4">
