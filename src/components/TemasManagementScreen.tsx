@@ -79,6 +79,15 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-8 py-8">
+        {/* Informational Message */}
+        <div className="mb-8 p-6 bg-gradient-to-r from-[#4A90E2] to-[#357abd] text-white rounded-xl shadow-lg">
+          <h2 className="text-lg font-bold mb-2">Selecciona un Tema</h2>
+          <p className="text-sm opacity-95">
+            Elige un tema para gestionar sus subtemas y contenidos asociados. 
+            Aquí podrás organizar la estructura de aprendizaje para este área.
+          </p>
+        </div>
+
         {loading ? (
           <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
             <div className="flex flex-col items-center gap-4">
@@ -98,7 +107,16 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }
           </div>
         ) : temas.length === 0 ? (
           <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <p className="text-gray-600">No hay temas disponibles en esta área.</p>
+            <div className="mb-4 flex justify-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-[#4A90E2] to-[#357abd] rounded-full flex items-center justify-center opacity-10"></div>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">No hay temas disponibles</h3>
+            <p className="text-gray-600 mb-4">
+              No se encontraron temas en esta área. Crea un nuevo tema para comenzar a organizar contenidos.
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              📚 Los temas son las categorías principales de aprendizaje dentro de cada área.
+            </p>
             <button
               onClick={onBack}
               className="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition-colors"

@@ -80,6 +80,15 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
           <span>Volver al Panel</span>
         </button>
 
+        {/* Informational Message */}
+        <div className="mb-8 p-6 bg-gradient-to-r from-[#4A90E2] to-[#357abd] text-white rounded-xl shadow-lg">
+          <h2 className="text-lg font-bold mb-2">Gestión de Contenido Educativo</h2>
+          <p className="text-sm opacity-95">
+            Selecciona un área para gestionar sus subtemas y contenidos. Desde aquí podrás organizar la estructura completa 
+            de aprendizaje, definir el orden de los temas y asignar materiales educativos a cada subtema.
+          </p>
+        </div>
+
         {/* Loading State */}
         {isLoading ? (
           <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
@@ -90,18 +99,20 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
             <p className="text-red-600">{error}</p>
           </div>
         ) : areas.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
-            <p className="text-gray-600">No hay áreas disponibles</p>
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <div className="mb-4 flex justify-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-[#4A90E2] to-[#357abd] rounded-full flex items-center justify-center opacity-10"></div>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">No hay áreas disponibles</h3>
+            <p className="text-gray-600 mb-4">
+              No se encontraron áreas en el sistema. Crea una nueva área para comenzar a organizar contenidos.
+            </p>
+            <p className="text-sm text-gray-500">
+              🎓 Las áreas son las categorías principales de aprendizaje en la plataforma educativa.
+            </p>
           </div>
         ) : (
           <>
-            {/* Description */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-              <p className="text-gray-600">
-                Selecciona un área para gestionar sus subtemas y contenidos. Desde aquí podrás organizar la estructura completa de aprendizaje.
-              </p>
-            </div>
-
             {/* Areas Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {areas.map((area, index) => {
