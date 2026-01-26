@@ -52,7 +52,6 @@ interface Filters {
 export function ReportsScreen({ onBack }: ReportsScreenProps) {
   const [activeTab, setActiveTab] = useState<'student' | 'date' | 'activity'>('student');
   const [showFilters, setShowFilters] = useState(true);
-  const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
   const [filters, setFilters] = useState<Filters>({
@@ -291,7 +290,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
 
   const handleExport = (format: 'pdf' | 'excel') => {
     if (format === 'pdf') {
-      setShowPdfModal(true);
+      downloadPdf(activeTab);
       return;
     }
     alert(`Exportando informe en formato ${format.toUpperCase()}...`);
@@ -302,15 +301,11 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
       alert('Aplica los filtros antes de descargar el informe.');
       return;
     }
-    if (type === 'student' && appliedFilters.student === 'all') {
-      alert('Selecciona un estudiante en los filtros para exportar el informe por estudiante.');
-      return;
-    }
 
     try {
       setPdfLoading(true);
       const params = new URLSearchParams({ type });
-      if (type === 'student') {
+      if (type === 'student' && appliedFilters.student !== 'all') {
         params.append('estudiante_id', appliedFilters.student);
       }
       if (appliedFilters.semester !== 'all') {
@@ -344,14 +339,24 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
 
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `reporte_${type}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      const printWindow = window.open(url, '_blank');
+
+      if (printWindow) {
+        const onReady = () => {
+          printWindow.focus();
+          printWindow.print();
+        };
+        printWindow.addEventListener('load', onReady);
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `reporte_${type}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+
       window.URL.revokeObjectURL(url);
-      setShowPdfModal(false);
     } catch (error) {
       console.error('Error descargando PDF:', error);
       alert('No se pudo generar el PDF. Intenta nuevamente.');
@@ -615,96 +620,11 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
           <span>Volver al Panel</span>
         </button>
 
-        {showPdfModal && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 p-6 sm:p-7">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <h3 className="text-[#3A4A5B] text-xl">Descargar informe en PDF</h3>
-                  <p className="text-gray-500 text-sm mt-1">
-                    Selecciona el tipo de informe. Se aplicarán los filtros actuales.
-                  </p>
-                </div>
-                <button
-                  disabled={pdfLoading}
-                  onClick={() => setShowPdfModal(false)}
-                  className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition disabled:opacity-60"
-                  aria-label="Cerrar"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3">
-                <button
-                  disabled={pdfLoading}
-                  onClick={() => downloadPdf('student')}
-                  className="group flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-[#4A90E2] to-[#5B9FED] text-white rounded-xl hover:shadow-lg transition disabled:opacity-60"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
-                      <User className="w-5 h-5" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-sm font-semibold">Progreso por Estudiante</div>
-                      <div className="text-xs text-white/80">Detalle individual y métricas clave</div>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-white/20 px-2 py-1 rounded-full">PDF</span>
-                </button>
-
-                <button
-                  disabled={pdfLoading}
-                  onClick={() => downloadPdf('date')}
-                  className="group flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-[#7ED6A7] to-[#8FE0B7] text-white rounded-xl hover:shadow-lg transition disabled:opacity-60"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
-                      <Calendar className="w-5 h-5" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-sm font-semibold">Progreso por Fecha de Creación</div>
-                      <div className="text-xs text-white/80">Comparativo de cohortes y tendencias</div>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-white/20 px-2 py-1 rounded-full">PDF</span>
-                </button>
-
-                <button
-                  disabled={pdfLoading}
-                  onClick={() => downloadPdf('activity')}
-                  className="group flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-[#F5A97F] to-[#F7B98F] text-white rounded-xl hover:shadow-lg transition disabled:opacity-60"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
-                      <Activity className="w-5 h-5" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-sm font-semibold">Desempeño por Actividad</div>
-                      <div className="text-xs text-white/80">Contenido, ejercicios y proyectos</div>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-white/20 px-2 py-1 rounded-full">PDF</span>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between mt-5">
-                {pdfLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-                    Generando PDF...
-                  </div>
-                ) : (
-                  <span className="text-xs text-gray-400">El PDF se descargará automáticamente.</span>
-                )}
-                <button
-                  disabled={pdfLoading}
-                  onClick={() => setShowPdfModal(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-[#3A4A5B] disabled:opacity-60"
-                >
-                  Cancelar
-                </button>
-              </div>
+        {pdfLoading && (
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl px-6 py-4 flex items-center gap-3">
+              <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-gray-600">Generando PDF...</span>
             </div>
           </div>
         )}
