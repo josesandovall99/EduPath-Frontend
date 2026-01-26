@@ -317,17 +317,8 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
       if (appliedFilters.dateTo) {
         params.append('dateTo', appliedFilters.dateTo);
       }
-      if (appliedFilters.area !== 'all') {
-        params.append('area', appliedFilters.area);
-      }
-      if (appliedFilters.topic !== 'all') {
-        params.append('topic', appliedFilters.topic);
-      }
       if (appliedFilters.status !== 'all') {
         params.append('status', appliedFilters.status);
-      }
-      if (appliedFilters.contentType !== 'all') {
-        params.append('contentType', appliedFilters.contentType);
       }
       if (appliedFilters.activityType !== 'all') {
         params.append('activityType', appliedFilters.activityType);
@@ -481,57 +472,15 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     return true;
   }) : [];
 
-  const areaValueMap: Record<string, string> = {
-    programming: 'Fundamentos de Programación',
-    analysis: 'Análisis de Sistemas',
-    management: 'Alcance, Tiempo y Costo'
-  };
-
-  const topicValueMap: Record<string, string> = {
-    python: 'Introducción a Python',
-    'data-structures': 'Estructuras de datos',
-    requirements: 'Requerimientos',
-    scope: 'Gestión de Alcance'
-  };
-
   const studentTabStudents = baseFilteredStudents.filter(student => {
-    if (appliedFilters.area !== 'all') {
-      const areaLabel = areaValueMap[appliedFilters.area] || appliedFilters.area;
-      const matchesArea = student.subjects.some(subject => subject.name.toLowerCase().includes(areaLabel.toLowerCase()));
-      if (!matchesArea) return false;
-    }
-
-    if (appliedFilters.topic !== 'all') {
-      const topicLabel = topicValueMap[appliedFilters.topic] || appliedFilters.topic;
-      const matchesTopic = student.subjects.some(subject =>
-        subject.topics.some(topic => topic.name.toLowerCase().includes(topicLabel.toLowerCase()))
-      );
-      if (!matchesTopic) return false;
-    }
-
     if (appliedFilters.status !== 'all') {
-      const avg = student.subjects.length
-        ? student.subjects.reduce((acc, subj) => acc + subj.progress, 0) / student.subjects.length
-        : 0;
-      if (appliedFilters.status === 'completed' && avg < 70) return false;
-      if (appliedFilters.status === 'in-progress' && (avg < 30 || avg >= 70)) return false;
-      if (appliedFilters.status === 'not-started' && avg >= 30) return false;
-    }
+      const hasSubjects = student.subjects.length > 0;
+      const allCompleted = hasSubjects && student.subjects.every(subj => (subj.progress || 0) >= 100);
+      const anyStarted = student.subjects.some(subj => (subj.progress || 0) > 0);
 
-    if (appliedFilters.contentType !== 'all') {
-      const totals = student.subjects.reduce(
-        (acc, subj) => {
-          acc.content += subj.contentViewed || 0;
-          acc.exercise += subj.exercisesCompleted || 0;
-          acc.miniproject += subj.miniprojectsSubmitted || 0;
-          return acc;
-        },
-        { content: 0, exercise: 0, miniproject: 0 }
-      );
-
-      if (appliedFilters.contentType === 'content' && totals.content === 0) return false;
-      if (appliedFilters.contentType === 'exercise' && totals.exercise === 0) return false;
-      if (appliedFilters.contentType === 'miniproject' && totals.miniproject === 0) return false;
+      if (appliedFilters.status === 'completed' && !allCompleted) return false;
+      if (appliedFilters.status === 'in-progress' && (!anyStarted || allCompleted)) return false;
+      if (appliedFilters.status === 'not-started' && anyStarted) return false;
     }
 
     return true;
@@ -746,35 +695,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             </div>
 
             {activeTab === 'student' && (
-              <div className="grid grid-cols-4 gap-4 mb-4">
-                <div>
-                  <label className="block text-[#3A4A5B] mb-2 text-sm">Tipo de Contenido</label>
-                  <select 
-                    value={filters.contentType}
-                    onChange={(e) => setFilters({...filters, contentType: e.target.value})}
-                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
-                  >
-                    <option value="all">Todos</option>
-                    <option value="content">Contenido</option>
-                    <option value="exercise">Ejercicio</option>
-                    <option value="miniproject">Miniproyecto</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[#3A4A5B] mb-2 text-sm">Área</label>
-                  <select 
-                    value={filters.area}
-                    onChange={(e) => setFilters({...filters, area: e.target.value})}
-                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
-                  >
-                    <option value="all">Todas las áreas</option>
-                    <option value="programming">Fundamentos de Programación</option>
-                    <option value="analysis">Análisis de Sistemas</option>
-                    <option value="management">Alcance, Tiempo y Costo</option>
-                  </select>
-                </div>
-
+              <div className="grid grid-cols-1 gap-4 mb-4">
                 <div>
                   <label className="block text-[#3A4A5B] mb-2 text-sm">Estado de Avance</label>
                   <select 
@@ -786,21 +707,6 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                     <option value="completed">Completado</option>
                     <option value="in-progress">En Progreso</option>
                     <option value="not-started">No Iniciado</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[#3A4A5B] mb-2 text-sm">Tema</label>
-                  <select 
-                    value={filters.topic}
-                    onChange={(e) => setFilters({...filters, topic: e.target.value})}
-                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
-                  >
-                    <option value="all">Todos los temas</option>
-                    <option value="python">Introducción a Python</option>
-                    <option value="data-structures">Estructuras de datos</option>
-                    <option value="requirements">Requerimientos</option>
-                    <option value="scope">Gestión de Alcance</option>
                   </select>
                 </div>
               </div>
