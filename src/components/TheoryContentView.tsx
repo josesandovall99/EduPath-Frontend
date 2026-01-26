@@ -280,6 +280,31 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     obtenerProgresoArea();
   }, [temaId, estudianteId]);
 
+  // Polling automático: actualizar progreso cada 30 segundos
+  useEffect(() => {
+    if (!estudianteId || !temaId) return;
+
+    const intervalId = setInterval(() => {
+      console.log('🔄 Actualizando progreso automáticamente...');
+      obtenerProgresoArea();
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(intervalId);
+  }, [temaId, estudianteId]);
+
+  // Actualizar progreso cuando la pestaña vuelve a ser visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && estudianteId && temaId) {
+        console.log('🔄 Pestaña visible de nuevo, actualizando progreso...');
+        obtenerProgresoArea();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [temaId, estudianteId]);
+
   // Obtener estado de visualización del contenido
   const obtenerEstadoVisualizacion = async (contenidoId: string) => {
     if (!estudianteId) return false;
@@ -434,6 +459,9 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
           console.log('🔄 Loading contenidos for first subtema:', transformedModules[0].id);
           loadContenidosForSubtema(transformedModules[0].id, transformedModules);
         }
+
+        // Actualizar progreso después de cargar contenidos
+        obtenerProgresoArea();
       } catch (err) {
         console.error('❌ Error fetching subtemas:', err);
         setError(`Error loading subtemas: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -575,8 +603,10 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       
       // Si no ha sido visualizado aún, marcar después de 3 segundos
       if (item && !item.visualizado) {
-        const timer = setTimeout(() => {
-          marcarContenidoVisualizado(selectedContentId);
+        const timer = setTimeout(async () => {
+          await marcarContenidoVisualizado(selectedContentId);
+          // Actualizar progreso después de marcar como visualizado
+          obtenerProgresoArea();
         }, 3000);
 
         return () => clearTimeout(timer);
