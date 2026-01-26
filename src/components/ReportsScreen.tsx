@@ -697,7 +697,17 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             {activeTab === 'student' && (
               <div className="grid grid-cols-1 gap-4 mb-4">
                 <div>
-                  <label className="block text-[#3A4A5B] mb-2 text-sm">Estado de Avance</label>
+                  <label className="flex items-center gap-2 text-[#3A4A5B] mb-2 text-sm">
+                    <span>Estado de Avance</span>
+                    <button
+                      type="button"
+                      className="text-gray-400 hover:text-gray-600"
+                      title="Completado: 100% en todas las áreas. En progreso: inició pero no terminó. No iniciado: 0% en todas las áreas."
+                      aria-label="Información sobre el estado de avance"
+                    >
+                      <AlertCircle className="w-4 h-4" />
+                    </button>
+                  </label>
                   <select 
                     value={filters.status}
                     onChange={(e) => setFilters({...filters, status: e.target.value})}
