@@ -20,7 +20,9 @@ interface StudentProgress {
   name: string;
   email: string;
   createdDate: string;
+  semester?: string | number;
   subjects: {
+    areaId?: string;
     name: string;
     color: string;
     progress: number;
@@ -41,6 +43,10 @@ interface Filters {
   status: string;
   topic: string;
   student: string;
+  semester: string;
+  dateFrom: string;
+  dateTo: string;
+  activityType: string;
 }
 
 export function ReportsScreen({ onBack }: ReportsScreenProps) {
@@ -48,13 +54,31 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   const [showFilters, setShowFilters] = useState(true);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [studentSearch, setStudentSearch] = useState('');
   const [filters, setFilters] = useState<Filters>({
     contentType: 'all',
     area: 'all',
     status: 'all',
     topic: 'all',
-    student: 'all'
+    student: 'all',
+    semester: 'all',
+    dateFrom: '',
+    dateTo: '',
+    activityType: 'all'
   });
+  const [appliedFilters, setAppliedFilters] = useState<Filters>({
+    contentType: 'all',
+    area: 'all',
+    status: 'all',
+    topic: 'all',
+    student: 'all',
+    semester: 'all',
+    dateFrom: '',
+    dateTo: '',
+    activityType: 'all'
+  });
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [hasAppliedFilters, setHasAppliedFilters] = useState(false);
 
   // Estado para estudiantes (se carga desde backend). Si falla, usamos fallbackMockStudents
   const [studentsData, setStudentsData] = useState<StudentProgress[]>([]);
@@ -62,14 +86,46 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
 
   // Fallback con el mock original reducido (solo estructura necesaria)
   const fallbackMockStudents: StudentProgress[] = [
-    { id: '1', name: 'Juan Pérez', email: 'juan.perez@universidad.edu', createdDate: '2025-09-15', subjects: [] },
-    { id: '2', name: 'María García', email: 'maria.garcia@universidad.edu', createdDate: '2025-09-15', subjects: [] }
+    { id: '1', name: 'Juan Pérez', email: 'juan.perez@universidad.edu', createdDate: '2025-09-15', semester: '1', subjects: [] },
+    { id: '2', name: 'María García', email: 'maria.garcia@universidad.edu', createdDate: '2025-09-15', semester: '2', subjects: [] }
   ];
 
   useEffect(() => {
     const loadStudentsAndProgress = async () => {
       try {
         setLoadingStudents(true);
+
+        // Nuevo endpoint agregado: resumen general con un solo llamado
+        try {
+          const resumenRes = await api.get('/progresos/resumen-general');
+          const resumenData = resumenRes.data || {};
+          if (Array.isArray(resumenData.students)) {
+            const palette = ['#4A90E2', '#7ED6A7', '#F5A97F'];
+            const areasList = Array.isArray(resumenData.areas) ? resumenData.areas : [];
+            const areaColorById = new Map(
+              areasList.map((area: any, idx: number) => [String(area.id), palette[idx % palette.length]])
+            );
+            const areaColorByName = new Map(
+              areasList.map((area: any, idx: number) => [area.nombre || area.name, palette[idx % palette.length]])
+            );
+
+            const normalizedStudents: StudentProgress[] = resumenData.students.map((student: any) => ({
+              ...student,
+              subjects: (student.subjects || []).map((subject: any, idx: number) => ({
+                ...subject,
+                color: subject.color
+                  || areaColorById.get(String(subject.areaId ?? ''))
+                  || areaColorByName.get(subject.name)
+                  || palette[idx % palette.length]
+              }))
+            }));
+
+            setStudentsData(normalizedStudents);
+            return;
+          }
+        } catch (e) {
+          // Si falla, continuar con el flujo anterior
+        }
 
         // 1) obtener áreas para luego pedir progreso por área por estudiante
         const areasRes = await api.get('/areas');
@@ -182,6 +238,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             name: st.persona?.nombre || st.nombre || st.name || `${st.nombre || 'Estudiante'}`,
             email: st.persona?.email || st.email || st.correo || '',
             createdDate: st.createdAt ? st.createdAt.split('T')[0] : (st.createdDate || ''),
+            semester: st.semestre ?? st.semester ?? st.persona?.semestre ?? st.semestreActual ?? '',
             subjects
           } as StudentProgress;
         }));
@@ -199,13 +256,37 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   }, []);
 
   const clearFilters = () => {
+    setStudentSearch('');
     setFilters({
       contentType: 'all',
       area: 'all',
       status: 'all',
       topic: 'all',
-      student: 'all'
+      student: 'all',
+      semester: 'all',
+      dateFrom: '',
+      dateTo: '',
+      activityType: 'all'
     });
+    setAppliedSearch('');
+    setAppliedFilters({
+      contentType: 'all',
+      area: 'all',
+      status: 'all',
+      topic: 'all',
+      student: 'all',
+      semester: 'all',
+      dateFrom: '',
+      dateTo: '',
+      activityType: 'all'
+    });
+    setHasAppliedFilters(false);
+  };
+
+  const applyFilters = () => {
+    setAppliedFilters(filters);
+    setAppliedSearch(studentSearch);
+    setHasAppliedFilters(true);
   };
 
   const handleExport = (format: 'pdf' | 'excel') => {
@@ -217,7 +298,11 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   };
 
   const downloadPdf = async (type: 'student' | 'date' | 'activity') => {
-    if (type === 'student' && filters.student === 'all') {
+    if (!hasAppliedFilters) {
+      alert('Aplica los filtros antes de descargar el informe.');
+      return;
+    }
+    if (type === 'student' && appliedFilters.student === 'all') {
       alert('Selecciona un estudiante en los filtros para exportar el informe por estudiante.');
       return;
     }
@@ -226,7 +311,31 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
       setPdfLoading(true);
       const params = new URLSearchParams({ type });
       if (type === 'student') {
-        params.append('estudiante_id', filters.student);
+        params.append('estudiante_id', appliedFilters.student);
+      }
+      if (appliedFilters.semester !== 'all') {
+        params.append('semester', appliedFilters.semester);
+      }
+      if (appliedFilters.dateFrom) {
+        params.append('dateFrom', appliedFilters.dateFrom);
+      }
+      if (appliedFilters.dateTo) {
+        params.append('dateTo', appliedFilters.dateTo);
+      }
+      if (appliedFilters.area !== 'all') {
+        params.append('area', appliedFilters.area);
+      }
+      if (appliedFilters.topic !== 'all') {
+        params.append('topic', appliedFilters.topic);
+      }
+      if (appliedFilters.status !== 'all') {
+        params.append('status', appliedFilters.status);
+      }
+      if (appliedFilters.contentType !== 'all') {
+        params.append('contentType', appliedFilters.contentType);
+      }
+      if (appliedFilters.activityType !== 'all') {
+        params.append('activityType', appliedFilters.activityType);
       }
 
       const response = await api.get(`/progresos/reporte-pdf?${params.toString()}`, {
@@ -269,9 +378,9 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   };
 
   // Calcular datos agrupados por fecha de creación
-  const getDataByDate = () => {
+  const getDataByDate = (sourceStudents: StudentProgress[]) => {
     const grouped: { [key: string]: StudentProgress[] } = {};
-    studentsData.forEach(student => {
+    sourceStudents.forEach(student => {
       if (!grouped[student.createdDate]) {
         grouped[student.createdDate] = [];
       }
@@ -297,14 +406,14 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   };
 
   // Datos para gráfica de actividades
-  const getActivityData = () => {
+  const getActivityData = (sourceStudents: StudentProgress[]) => {
     const activities = [
       { name: 'Contenidos Visualizados', value: 0 },
       { name: 'Ejercicios Completados', value: 0 },
       { name: 'Miniproyectos Entregados', value: 0 }
     ];
 
-    studentsData.forEach(student => {
+    sourceStudents.forEach(student => {
       student.subjects.forEach(subject => {
         activities[0].value += subject.contentViewed;
         activities[1].value += subject.exercisesCompleted;
@@ -316,9 +425,9 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   };
 
   // Datos para gráfica de progreso por materia
-  const getSubjectProgressData = () => {
+  const getSubjectProgressData = (sourceStudents: StudentProgress[]) => {
     const subjectMap = new Map<string, string>();
-    studentsData.forEach(student => {
+    sourceStudents.forEach(student => {
       student.subjects.forEach(subject => {
         if (!subjectMap.has(subject.name)) {
           subjectMap.set(subject.name, subject.color || '#4A90E2');
@@ -329,7 +438,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     return Array.from(subjectMap.entries()).map(([subjectName, color]) => {
       let total = 0;
       let count = 0;
-      studentsData.forEach(student => {
+      sourceStudents.forEach(student => {
         const subject = student.subjects.find(s => s.name === subjectName);
         if (subject) {
           total += subject.progress || 0;
@@ -346,6 +455,119 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
       };
     });
   };
+
+  const normalizedSearch = appliedSearch.trim().toLowerCase();
+  const semesterOptions = Array.from(
+    new Set(
+      studentsData
+        .map(student => (student.semester ?? '').toString().trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => {
+    const numA = Number(a);
+    const numB = Number(b);
+    if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numA - numB;
+    return a.localeCompare(b);
+  });
+  const baseFilteredStudents = hasAppliedFilters ? studentsData.filter(student => {
+    if (normalizedSearch && !student.name.toLowerCase().includes(normalizedSearch)) return false;
+    if (appliedFilters.student !== 'all' && student.id !== appliedFilters.student) return false;
+    if (appliedFilters.semester !== 'all' && String(student.semester ?? '') !== appliedFilters.semester) return false;
+    return true;
+  }) : [];
+
+  const areaValueMap: Record<string, string> = {
+    programming: 'Fundamentos de Programación',
+    analysis: 'Análisis de Sistemas',
+    management: 'Alcance, Tiempo y Costo'
+  };
+
+  const topicValueMap: Record<string, string> = {
+    python: 'Introducción a Python',
+    'data-structures': 'Estructuras de datos',
+    requirements: 'Requerimientos',
+    scope: 'Gestión de Alcance'
+  };
+
+  const studentTabStudents = baseFilteredStudents.filter(student => {
+    if (appliedFilters.area !== 'all') {
+      const areaLabel = areaValueMap[appliedFilters.area] || appliedFilters.area;
+      const matchesArea = student.subjects.some(subject => subject.name.toLowerCase().includes(areaLabel.toLowerCase()));
+      if (!matchesArea) return false;
+    }
+
+    if (appliedFilters.topic !== 'all') {
+      const topicLabel = topicValueMap[appliedFilters.topic] || appliedFilters.topic;
+      const matchesTopic = student.subjects.some(subject =>
+        subject.topics.some(topic => topic.name.toLowerCase().includes(topicLabel.toLowerCase()))
+      );
+      if (!matchesTopic) return false;
+    }
+
+    if (appliedFilters.status !== 'all') {
+      const avg = student.subjects.length
+        ? student.subjects.reduce((acc, subj) => acc + subj.progress, 0) / student.subjects.length
+        : 0;
+      if (appliedFilters.status === 'completed' && avg < 70) return false;
+      if (appliedFilters.status === 'in-progress' && (avg < 30 || avg >= 70)) return false;
+      if (appliedFilters.status === 'not-started' && avg >= 30) return false;
+    }
+
+    if (appliedFilters.contentType !== 'all') {
+      const totals = student.subjects.reduce(
+        (acc, subj) => {
+          acc.content += subj.contentViewed || 0;
+          acc.exercise += subj.exercisesCompleted || 0;
+          acc.miniproject += subj.miniprojectsSubmitted || 0;
+          return acc;
+        },
+        { content: 0, exercise: 0, miniproject: 0 }
+      );
+
+      if (appliedFilters.contentType === 'content' && totals.content === 0) return false;
+      if (appliedFilters.contentType === 'exercise' && totals.exercise === 0) return false;
+      if (appliedFilters.contentType === 'miniproject' && totals.miniproject === 0) return false;
+    }
+
+    return true;
+  });
+
+  const dateTabStudents = baseFilteredStudents.filter(student => {
+    if (!appliedFilters.dateFrom && !appliedFilters.dateTo) return true;
+    const created = student.createdDate ? new Date(student.createdDate) : null;
+    if (!created || Number.isNaN(created.getTime())) return false;
+    if (appliedFilters.dateFrom) {
+      const from = new Date(appliedFilters.dateFrom);
+      if (created < from) return false;
+    }
+    if (appliedFilters.dateTo) {
+      const to = new Date(appliedFilters.dateTo);
+      if (created > to) return false;
+    }
+    return true;
+  });
+
+  const activityTabStudents = baseFilteredStudents.filter(student => {
+    if (appliedFilters.activityType === 'all') return true;
+    const totals = student.subjects.reduce(
+      (acc, subj) => {
+        acc.content += subj.contentViewed || 0;
+        acc.exercise += subj.exercisesCompleted || 0;
+        acc.miniproject += subj.miniprojectsSubmitted || 0;
+        return acc;
+      },
+      { content: 0, exercise: 0, miniproject: 0 }
+    );
+
+    if (appliedFilters.activityType === 'content') return totals.content > 0;
+    if (appliedFilters.activityType === 'exercise') return totals.exercise > 0;
+    if (appliedFilters.activityType === 'miniproject') return totals.miniproject > 0;
+    return true;
+  });
+
+  const dateData = getDataByDate(dateTabStudents);
+  const activityData = getActivityData(activityTabStudents);
+  const subjectProgressData = getSubjectProgressData(activityTabStudents);
 
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
@@ -394,40 +616,91 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
         </button>
 
         {showPdfModal && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-              <h3 className="text-[#3A4A5B] text-lg mb-2">Selecciona el tipo de informe</h3>
-              <p className="text-gray-500 text-sm mb-4">
-                Elige qué informe deseas descargar en PDF.
-              </p>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 p-6 sm:p-7">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-[#3A4A5B] text-xl">Descargar informe en PDF</h3>
+                  <p className="text-gray-500 text-sm mt-1">
+                    Selecciona el tipo de informe. Se aplicarán los filtros actuales.
+                  </p>
+                </div>
+                <button
+                  disabled={pdfLoading}
+                  onClick={() => setShowPdfModal(false)}
+                  className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition disabled:opacity-60"
+                  aria-label="Cerrar"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 gap-3">
                 <button
                   disabled={pdfLoading}
                   onClick={() => downloadPdf('student')}
-                  className="px-4 py-2.5 bg-[#4A90E2] text-white rounded-lg hover:opacity-90 transition disabled:opacity-60"
+                  className="group flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-[#4A90E2] to-[#5B9FED] text-white rounded-xl hover:shadow-lg transition disabled:opacity-60"
                 >
-                  Progreso por Estudiante
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-semibold">Progreso por Estudiante</div>
+                      <div className="text-xs text-white/80">Detalle individual y métricas clave</div>
+                    </div>
+                  </div>
+                  <span className="text-xs bg-white/20 px-2 py-1 rounded-full">PDF</span>
                 </button>
+
                 <button
                   disabled={pdfLoading}
                   onClick={() => downloadPdf('date')}
-                  className="px-4 py-2.5 bg-[#7ED6A7] text-white rounded-lg hover:opacity-90 transition disabled:opacity-60"
+                  className="group flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-[#7ED6A7] to-[#8FE0B7] text-white rounded-xl hover:shadow-lg transition disabled:opacity-60"
                 >
-                  Progreso por Fecha de Creación
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-semibold">Progreso por Fecha de Creación</div>
+                      <div className="text-xs text-white/80">Comparativo de cohortes y tendencias</div>
+                    </div>
+                  </div>
+                  <span className="text-xs bg-white/20 px-2 py-1 rounded-full">PDF</span>
                 </button>
+
                 <button
                   disabled={pdfLoading}
                   onClick={() => downloadPdf('activity')}
-                  className="px-4 py-2.5 bg-[#F5A97F] text-white rounded-lg hover:opacity-90 transition disabled:opacity-60"
+                  className="group flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-[#F5A97F] to-[#F7B98F] text-white rounded-xl hover:shadow-lg transition disabled:opacity-60"
                 >
-                  Desempeño por Actividad
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                      <Activity className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-semibold">Desempeño por Actividad</div>
+                      <div className="text-xs text-white/80">Contenido, ejercicios y proyectos</div>
+                    </div>
+                  </div>
+                  <span className="text-xs bg-white/20 px-2 py-1 rounded-full">PDF</span>
                 </button>
               </div>
-              <div className="flex justify-end gap-2 mt-4">
+
+              <div className="flex items-center justify-between mt-5">
+                {pdfLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                    Generando PDF...
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400">El PDF se descargará automáticamente.</span>
+                )}
                 <button
                   disabled={pdfLoading}
                   onClick={() => setShowPdfModal(false)}
-                  className="px-4 py-2 text-gray-600 hover:text-[#3A4A5B] disabled:opacity-60"
+                  className="px-4 py-2 text-sm text-gray-600 hover:text-[#3A4A5B] disabled:opacity-60"
                 >
                   Cancelar
                 </button>
@@ -507,63 +780,20 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            <p className="text-xs text-gray-500 mb-4">
+              La información se muestra solo cuando se aplican los filtros.
+            </p>
             
-            <div className="grid grid-cols-5 gap-4 mb-4">
+            <div className="grid grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="block text-[#3A4A5B] mb-2 text-sm">Tipo de Contenido</label>
-                <select 
-                  value={filters.contentType}
-                  onChange={(e) => setFilters({...filters, contentType: e.target.value})}
+                <label className="block text-[#3A4A5B] mb-2 text-sm">Buscar estudiante</label>
+                <input
+                  type="text"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  placeholder="Escribe un nombre..."
                   className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
-                >
-                  <option value="all">Todos</option>
-                  <option value="content">Contenido</option>
-                  <option value="exercise">Ejercicio</option>
-                  <option value="miniproject">Miniproyecto</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[#3A4A5B] mb-2 text-sm">Área</label>
-                <select 
-                  value={filters.area}
-                  onChange={(e) => setFilters({...filters, area: e.target.value})}
-                  className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
-                >
-                  <option value="all">Todas las áreas</option>
-                  <option value="programming">Fundamentos de Programación</option>
-                  <option value="analysis">Análisis de Sistemas</option>
-                  <option value="management">Alcance, Tiempo y Costo</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[#3A4A5B] mb-2 text-sm">Estado de Avance</label>
-                <select 
-                  value={filters.status}
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
-                  className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
-                >
-                  <option value="all">Todos</option>
-                  <option value="completed">Completado</option>
-                  <option value="in-progress">En Progreso</option>
-                  <option value="not-started">No Iniciado</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[#3A4A5B] mb-2 text-sm">Tema</label>
-                <select 
-                  value={filters.topic}
-                  onChange={(e) => setFilters({...filters, topic: e.target.value})}
-                  className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
-                >
-                  <option value="all">Todos los temas</option>
-                  <option value="python">Introducción a Python</option>
-                  <option value="data-structures">Estructuras de datos</option>
-                  <option value="requirements">Requerimientos</option>
-                  <option value="scope">Gestión de Alcance</option>
-                </select>
+                />
               </div>
 
               <div>
@@ -579,7 +809,123 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className="block text-[#3A4A5B] mb-2 text-sm">Semestre</label>
+                <select
+                  value={filters.semester}
+                  onChange={(e) => setFilters({ ...filters, semester: e.target.value })}
+                  className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                >
+                  <option value="all">Todos los semestres</option>
+                  {semesterOptions.map((semester) => (
+                    <option key={semester} value={semester}>{semester}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            {activeTab === 'student' && (
+              <div className="grid grid-cols-4 gap-4 mb-4">
+                <div>
+                  <label className="block text-[#3A4A5B] mb-2 text-sm">Tipo de Contenido</label>
+                  <select 
+                    value={filters.contentType}
+                    onChange={(e) => setFilters({...filters, contentType: e.target.value})}
+                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="content">Contenido</option>
+                    <option value="exercise">Ejercicio</option>
+                    <option value="miniproject">Miniproyecto</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[#3A4A5B] mb-2 text-sm">Área</label>
+                  <select 
+                    value={filters.area}
+                    onChange={(e) => setFilters({...filters, area: e.target.value})}
+                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  >
+                    <option value="all">Todas las áreas</option>
+                    <option value="programming">Fundamentos de Programación</option>
+                    <option value="analysis">Análisis de Sistemas</option>
+                    <option value="management">Alcance, Tiempo y Costo</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[#3A4A5B] mb-2 text-sm">Estado de Avance</label>
+                  <select 
+                    value={filters.status}
+                    onChange={(e) => setFilters({...filters, status: e.target.value})}
+                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="completed">Completado</option>
+                    <option value="in-progress">En Progreso</option>
+                    <option value="not-started">No Iniciado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[#3A4A5B] mb-2 text-sm">Tema</label>
+                  <select 
+                    value={filters.topic}
+                    onChange={(e) => setFilters({...filters, topic: e.target.value})}
+                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  >
+                    <option value="all">Todos los temas</option>
+                    <option value="python">Introducción a Python</option>
+                    <option value="data-structures">Estructuras de datos</option>
+                    <option value="requirements">Requerimientos</option>
+                    <option value="scope">Gestión de Alcance</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'date' && (
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-[#3A4A5B] mb-2 text-sm">Fecha desde</label>
+                  <input
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => setFilters({...filters, dateFrom: e.target.value})}
+                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#3A4A5B] mb-2 text-sm">Fecha hasta</label>
+                  <input
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => setFilters({...filters, dateTo: e.target.value})}
+                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'activity' && (
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-[#3A4A5B] mb-2 text-sm">Tipo de Actividad</label>
+                  <select 
+                    value={filters.activityType}
+                    onChange={(e) => setFilters({...filters, activityType: e.target.value})}
+                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  >
+                    <option value="all">Todas</option>
+                    <option value="content">Contenidos</option>
+                    <option value="exercise">Ejercicios</option>
+                    <option value="miniproject">Miniproyectos</option>
+                  </select>
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button 
@@ -588,7 +934,10 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
               >
                 Limpiar Filtros
               </button>
-              <button className="px-5 py-2.5 bg-gradient-to-r from-[#4A90E2] to-[#5B9FED] text-white rounded-lg hover:shadow-lg transition-all text-sm">
+              <button
+                onClick={applyFilters}
+                className="px-5 py-2.5 bg-gradient-to-r from-[#4A90E2] to-[#5B9FED] text-white rounded-lg hover:shadow-lg transition-all text-sm"
+              >
                 Aplicar Filtros
               </button>
             </div>
@@ -606,7 +955,13 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
         )}
 
         {/* Content by Tab */}
-        {activeTab === 'student' && (
+        {!hasAppliedFilters && (
+          <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
+            La información se muestra solo cuando se aplican los filtros.
+          </div>
+        )}
+
+        {hasAppliedFilters && activeTab === 'student' && (
           <div className="space-y-6">
             {/* Resumen Cards */}
             <div className="grid grid-cols-4 gap-4">
@@ -615,7 +970,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   <span className="text-gray-600 text-sm">Total Estudiantes</span>
                   <User className="w-5 h-5 text-[#4A90E2]" />
                 </div>
-                <div className="text-3xl text-[#3A4A5B] mb-1">{studentsData.length}</div>
+                <div className="text-3xl text-[#3A4A5B] mb-1">{studentTabStudents.length}</div>
                 <div className="text-xs text-gray-500">Activos en el sistema</div>
               </div>
 
@@ -626,13 +981,13 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                 </div>
                 <div className="text-3xl text-[#3A4A5B] mb-1">
                   {formatPercent(
-                    studentsData.length
-                      ? studentsData.reduce((sum, s) => {
+                    studentTabStudents.length
+                      ? studentTabStudents.reduce((sum, s) => {
                           const avg = s.subjects.length
                             ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
                             : 0;
                           return sum + avg;
-                        }, 0) / studentsData.length
+                        }, 0) / studentTabStudents.length
                       : 0
                   )}%
                 </div>
@@ -645,7 +1000,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   <CheckCircle2 className="w-5 h-5 text-[#7ED6A7]" />
                 </div>
                 <div className="text-3xl text-[#3A4A5B] mb-1">
-                  {studentsData.filter(s => {
+                  {studentTabStudents.filter(s => {
                     const avg = s.subjects.length
                       ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
                       : 0;
@@ -661,7 +1016,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   <AlertCircle className="w-5 h-5 text-[#F5A97F]" />
                 </div>
                 <div className="text-3xl text-[#3A4A5B] mb-1">
-                  {studentsData.filter(s => {
+                  {studentTabStudents.filter(s => {
                     const avg = s.subjects.length
                       ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
                       : 0;
@@ -680,7 +1035,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
               </div>
               
               <div className="p-6">
-                {studentsData.map((student) => (
+                {studentTabStudents.map((student) => (
                   <div key={student.id} className="mb-8 last:mb-0 border-b border-gray-200 last:border-0 pb-8 last:pb-0">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
@@ -800,7 +1155,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
           </div>
         )}
 
-        {activeTab === 'date' && (
+        {hasAppliedFilters && activeTab === 'date' && (
           <div className="space-y-6">
             {/* Resumen por fecha */}
             <div className="grid grid-cols-2 gap-6">
@@ -810,7 +1165,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   Progreso Promedio por Cohorte
                 </h3>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={getDataByDate()}>
+                  <BarChart data={dateData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
@@ -828,7 +1183,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={getDataByDate()}
+                      data={dateData}
                       dataKey="studentCount"
                       nameKey="date"
                       cx="50%"
@@ -836,7 +1191,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                       outerRadius={100}
                       label={(entry) => `${entry.date}: ${entry.studentCount}`}
                     >
-                      {getDataByDate().map((entry, index) => (
+                      {dateData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={['#7ED6A7', '#4A90E2', '#F5A97F'][index % 3]} />
                       ))}
                     </Pie>
@@ -854,7 +1209,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
               </div>
               
               <div className="p-6">
-                {getDataByDate().map((dateGroup) => (
+                {dateData.map((dateGroup) => (
                   <div key={dateGroup.date} className="mb-8 last:mb-0 border-b border-gray-200 last:border-0 pb-8 last:pb-0">
                     <div className="flex items-center justify-between mb-4">
                       <div>
@@ -975,7 +1330,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
           </div>
         )}
 
-        {activeTab === 'activity' && (
+        {hasAppliedFilters && activeTab === 'activity' && (
           <div className="space-y-6">
             {/* Resumen de actividades */}
             <div className="grid grid-cols-3 gap-6">
@@ -986,13 +1341,13 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   </div>
                   <div>
                     <div className="text-2xl text-[#3A4A5B]">
-                      {studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0)}
+                      {activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0)}
                     </div>
                     <div className="text-sm text-gray-600">Contenidos Visualizados</div>
                   </div>
                 </div>
                 <div className="text-xs text-gray-500">
-                    Promedio: {studentsData.length ? Math.round(studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0) / studentsData.length) : 0} por estudiante
+                    Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0) / activityTabStudents.length) : 0} por estudiante
                 </div>
               </div>
 
@@ -1003,13 +1358,13 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   </div>
                   <div>
                     <div className="text-2xl text-[#3A4A5B]">
-                      {studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0)}
+                      {activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0)}
                     </div>
                     <div className="text-sm text-gray-600">Ejercicios Completados</div>
                   </div>
                 </div>
                 <div className="text-xs text-gray-500">
-                  Promedio: {studentsData.length ? Math.round(studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0) / studentsData.length) : 0} por estudiante
+                  Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0) / activityTabStudents.length) : 0} por estudiante
                 </div>
               </div>
 
@@ -1020,13 +1375,13 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   </div>
                   <div>
                     <div className="text-2xl text-[#3A4A5B]">
-                      {studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0)}
+                      {activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0)}
                     </div>
                     <div className="text-sm text-gray-600">Miniproyectos Entregados</div>
                   </div>
                 </div>
                 <div className="text-xs text-gray-500">
-                  Promedio: {studentsData.length ? Math.round(studentsData.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0) / studentsData.length) : 0} por estudiante
+                  Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0) / activityTabStudents.length) : 0} por estudiante
                 </div>
               </div>
             </div>
@@ -1041,7 +1396,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={getActivityData()}
+                      data={activityData}
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
@@ -1065,13 +1420,13 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                   Progreso por Materia
                 </h3>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={getSubjectProgressData()}>
+                  <BarChart data={subjectProgressData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip />
                     <Bar dataKey="progress" radius={[8, 8, 0, 0]}>
-                      {getSubjectProgressData().map((entry, index) => (
+                      {subjectProgressData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Bar>
@@ -1088,28 +1443,28 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
               </div>
               
               <div className="p-6">
-                {getSubjectProgressData().map((subject) => {
+                {subjectProgressData.map((subject) => {
                   const subjectName = subject.name;
                   const color = subject.color;
 
-                  const totalContent = studentsData.reduce((sum, s) => {
+                  const totalContent = activityTabStudents.reduce((sum, s) => {
                     const subj = s.subjects.find(subj => subj.name === subjectName);
                     return sum + (subj?.contentViewed || 0);
                   }, 0);
 
-                  const totalExercises = studentsData.reduce((sum, s) => {
+                  const totalExercises = activityTabStudents.reduce((sum, s) => {
                     const subj = s.subjects.find(subj => subj.name === subjectName);
                     return sum + (subj?.exercisesCompleted || 0);
                   }, 0);
 
-                  const totalProjects = studentsData.reduce((sum, s) => {
+                  const totalProjects = activityTabStudents.reduce((sum, s) => {
                     const subj = s.subjects.find(subj => subj.name === subjectName);
                     return sum + (subj?.miniprojectsSubmitted || 0);
                   }, 0);
 
                   let avgProgress = 0;
                   let count = 0;
-                  studentsData.forEach((s) => {
+                  activityTabStudents.forEach((s) => {
                     const subj = s.subjects.find(subj => subj.name === subjectName);
                     if (subj) {
                       avgProgress += subj.progress || 0;
@@ -1149,7 +1504,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                           <div className="text-sm text-gray-600 mb-1">Contenidos Visualizados</div>
                           <div className="text-2xl text-[#3A4A5B]">{totalContent}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {studentsData.length ? Math.round(totalContent / studentsData.length) : 0} por estudiante
+                            {activityTabStudents.length ? Math.round(totalContent / activityTabStudents.length) : 0} por estudiante
                           </div>
                         </div>
 
@@ -1157,7 +1512,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                           <div className="text-sm text-gray-600 mb-1">Ejercicios Completados</div>
                           <div className="text-2xl text-[#3A4A5B]">{totalExercises}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {studentsData.length ? Math.round(totalExercises / studentsData.length) : 0} por estudiante
+                            {activityTabStudents.length ? Math.round(totalExercises / activityTabStudents.length) : 0} por estudiante
                           </div>
                         </div>
 
@@ -1165,7 +1520,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                           <div className="text-sm text-gray-600 mb-1">Miniproyectos Entregados</div>
                           <div className="text-2xl text-[#3A4A5B]">{totalProjects}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {studentsData.length ? Math.round(totalProjects / studentsData.length) : 0} por estudiante
+                            {activityTabStudents.length ? Math.round(totalProjects / activityTabStudents.length) : 0} por estudiante
                           </div>
                         </div>
                       </div>
@@ -1183,7 +1538,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
-                            {studentsData.map((student) => {
+                            {activityTabStudents.map((student) => {
                               const subject = student.subjects.find(s => s.name === subjectName);
                               if (!subject) return null;
                               
