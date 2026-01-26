@@ -6,16 +6,17 @@ import { SequenceManagementScreen } from './SequenceManagementScreen';
 import { SubtemaSequenceManagementScreen } from './SubtemaSequenceManagementScreen';
 import { AreasManagementScreen } from './AreasManagementScreen';
 import { TemasManagementScreen } from './TemasManagementScreen';
+import { SubThemeManagementScreen } from './SubThemeManagementScreen';
 import { Upload } from "lucide-react";
 
 
 interface AdminDashboardProps {
   onLogout: () => void;
-  onNavigate: (section: 'themes' | 'contents' | 'reports' | 'students' | 'upload' | 'subtema-sequences') => void;
+  onNavigate: (section: 'themes' | 'contents' | 'reports' | 'students' | 'upload' | 'subtema-sequences' | 'subthemes') => void;
 }
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes'>('dashboard');
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [selectedAreaName, setSelectedAreaName] = useState<string>('');
   const [selectedTemaId, setSelectedTemaId] = useState<number | null>(null);
@@ -37,6 +38,15 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: BookOpen,
       color: '#4A90E2',
       gradient: 'from-[#4A90E2] to-[#5B9FED]'
+    },
+    {
+      id: 'subthemes',
+      title: 'Gestión de Subtemas',
+      description: 'Crear, editar y eliminar subtemas por tema. Administra la estructura de contenidos de cada materia.',
+      icon: FileEdit,
+      color: '#10B981',
+      gradient: 'from-[#10B981] to-[#34D399]',
+      onClick: () => setCurrentScreen('subthemes')
     },
     {
       id: 'contents',
@@ -83,6 +93,12 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   ];
 
   // Renderizar la pantalla actual
+  if (currentScreen === 'subthemes') {
+    return <SubThemeManagementScreen 
+      onBack={() => setCurrentScreen('dashboard')}
+    />;
+  }
+
   if (currentScreen === 'areas') {
     return <AreasManagementScreen 
       onBack={() => setCurrentScreen('dashboard')}
@@ -218,7 +234,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             return (
               <button
                 key={action.id}
-                onClick={() => action.onClick ? action.onClick() : onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students' | 'upload' | 'subtema-sequences')}
+                onClick={() => action.onClick ? action.onClick() : onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students' | 'upload' | 'subtema-sequences' | 'subthemes')}
                 className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-8 text-left group hover:transform hover:scale-[1.02]"
               >
                 <div className="flex items-start justify-between mb-4">
