@@ -130,11 +130,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'subtema-sequences') {
     return <SubtemaSequenceManagementScreen 
       onBack={() => {
-        setSelectedAreaId(null);
-        setSelectedAreaName('');
-        setSelectedTemaId(null);
-        setSelectedTemaName('');
-        setCurrentScreen('dashboard');
+        // Volver a temas (jerarquía: Subtema → Tema)
+        setCurrentScreen('temas');
       }}
       onSelectSubtema={(subtemaId, temaId, subtemaNombre) => {
         setSelectedSubtemaId(subtemaId);

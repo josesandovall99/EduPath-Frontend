@@ -568,8 +568,16 @@ export function SubtemaSequenceManagementScreen({
     const origen = subtemas.find(s => s.id === seq.subtema_origen_id);
     const destino = subtemas.find(s => s.id === seq.subtema_destino_id);
     
+    if (!origen || !destino) return false;
+    
+    // Filter by tema if temaId is provided (prioridad: solo mostrar secuencias de este tema)
+    if (temaId !== undefined) {
+      const matchesTema = Number(origen.tema_id) === Number(temaId) && Number(destino.tema_id) === Number(temaId);
+      if (!matchesTema) return false;
+    }
+    
     // Filter by area if areaId is provided
-    if (areaId !== undefined && origen && destino) {
+    if (areaId !== undefined) {
       const allowedTemaIds = temas
         .filter(t => Number(t.area_id) === Number(areaId))
         .map(t => Number(t.id));
@@ -591,9 +599,18 @@ export function SubtemaSequenceManagementScreen({
     const sequenceMap = new Map<number, number>();
     const destinos = new Set<number>();
     
-    // Filter sequences by area if areaId is provided
+    // Filter sequences by tema if temaId is provided (prioridad)
     let secuenciasActivas = sequences.filter(s => s.estado);
-    if (areaId !== undefined) {
+    if (temaId !== undefined) {
+      secuenciasActivas = secuenciasActivas.filter(seq => {
+        const origen = subtemas.find(s => s.id === seq.subtema_origen_id);
+        const destino = subtemas.find(s => s.id === seq.subtema_destino_id);
+        return origen && destino && 
+               Number(origen.tema_id) === Number(temaId) && 
+               Number(destino.tema_id) === Number(temaId);
+      });
+    } else if (areaId !== undefined) {
+      // Filter sequences by area if areaId is provided
       const allowedTemaIds = temas
         .filter(t => Number(t.area_id) === Number(areaId))
         .map(t => Number(t.id));
@@ -791,7 +808,7 @@ export function SubtemaSequenceManagementScreen({
           className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver al Panel</span>
+          <span>{temaId ? 'Volver a Temas' : 'Volver al Panel'}</span>
         </button>
 
         {/* Stats */}
@@ -824,7 +841,7 @@ export function SubtemaSequenceManagementScreen({
                 <EyeOff className="w-6 h-6 text-gray-500" />
               </div>
               <span className="text-3xl text-gray-500">
-                {sequences.filter(s => !s.estado).length}
+                {filteredSequences.filter(s => !s.estado).length}
               </span>
             </div>
             <p className="text-gray-600 text-sm">Inactivas</p>

@@ -69,6 +69,7 @@ export default function App() {
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [selectedTemaId, setSelectedTemaId] = useState<string | null>(null);
   const [selectedSubtemaId, setSelectedSubtemaId] = useState<number | null>(null);
+  const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
   const [userData, setUserData] = useState<{id: number, personaId: number, nombre: string} | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   
@@ -260,7 +261,14 @@ export default function App() {
 
       {currentScreen === 'admin-sequences' && (
         <SequenceManagementScreen 
-          onBack={() => setCurrentScreen('admin-dashboard')}
+          onBack={() => {
+            // Si viene de subtemas, volver a la pantalla de subtemas
+            if (selectedSubtemaId) {
+              setCurrentScreen('admin-subtema-sequences');
+            } else {
+              setCurrentScreen('admin-dashboard');
+            }
+          }}
           subtemaId={selectedSubtemaId || undefined}
           temaId={selectedTemaId ? parseInt(selectedTemaId) : undefined}
         />
@@ -268,12 +276,24 @@ export default function App() {
 
       {currentScreen === 'admin-subtema-sequences' && (
         <SubtemaSequenceManagementScreen 
-          onBack={() => setCurrentScreen('admin-dashboard')}
+          onBack={() => {
+            // Si viene de temas (tiene temaId), volver a temas
+            // Si no, volver al dashboard
+            if (selectedTemaId) {
+              // En App.tsx no hay pantalla de temas directa, así que volvemos al dashboard
+              // pero limpiamos el temaId para indicar que no venimos de temas
+              setSelectedTemaId(null);
+              setCurrentScreen('admin-dashboard');
+            } else {
+              setCurrentScreen('admin-dashboard');
+            }
+          }}
           onSelectSubtema={(subtemaId, temaId) => {
             setSelectedSubtemaId(subtemaId);
             setSelectedTemaId(temaId.toString());
             setCurrentScreen('admin-sequences');
           }}
+          temaId={selectedTemaId ? parseInt(selectedTemaId) : undefined}
         />
       )}
 

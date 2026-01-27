@@ -772,8 +772,20 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
   };
 
   const filteredSequences = sequences.filter(seq => {
-    const origen = contents.find(c => c.id === seq.contenido_origen_id)?.titulo || '';
-    const destino = contents.find(c => c.id === seq.contenido_destino_id)?.titulo || '';
+    const origenContent = contents.find(c => c.id === seq.contenido_origen_id);
+    const destinoContent = contents.find(c => c.id === seq.contenido_destino_id);
+    
+    // Si se proporciona subtemaId, solo mostrar secuencias de contenidos de ese subtema
+    if (subtemaId !== undefined) {
+      if (!origenContent || !destinoContent) return false;
+      if (origenContent.subtema_id !== subtemaId || destinoContent.subtema_id !== subtemaId) {
+        return false;
+      }
+    }
+    
+    // Filtrar por término de búsqueda
+    const origen = origenContent?.titulo || '';
+    const destino = destinoContent?.titulo || '';
     const term = searchTerm.toLowerCase();
     return origen.toLowerCase().includes(term) || destino.toLowerCase().includes(term) || seq.descripcion?.toLowerCase().includes(term);
   });
@@ -1117,7 +1129,7 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
           className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver al Panel</span>
+          <span>{subtemaId ? 'Volver a Secuencias de Subtemas' : 'Volver al Panel'}</span>
         </button>
 
         {/* Informational Message */}
@@ -1136,7 +1148,7 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
               <div className="p-3 bg-blue-100 rounded-lg">
                 <ArrowRight className="w-6 h-6 text-[#4A90E2]" />
               </div>
-              <span className="text-3xl text-[#4A90E2]">{sequences.length}</span>
+              <span className="text-3xl text-[#4A90E2]">{filteredSequences.length}</span>
             </div>
             <p className="text-gray-600 text-sm">Total Secuencias</p>
           </div>
@@ -1147,7 +1159,7 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
                 <Eye className="w-6 h-6 text-[#7ED6A7]" />
               </div>
               <span className="text-3xl text-[#7ED6A7]">
-                {sequences.filter(s => s.estado).length}
+                {filteredSequences.filter(s => s.estado).length}
               </span>
             </div>
             <p className="text-gray-600 text-sm">Activas</p>
