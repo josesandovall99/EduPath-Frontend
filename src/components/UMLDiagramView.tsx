@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Square, GitMerge, Share2, Boxes, Diamond, RotateCcw, Redo2, Trash2, BookOpen, Save, Send } from 'lucide-react';
+import { ArrowLeft, Square, GitMerge, Share2, Boxes, Diamond, RotateCcw, Redo2, Trash2, BookOpen, Save, Send, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import * as joint from 'jointjs';
 import 'jointjs/dist/joint.css';
 
@@ -73,6 +73,9 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
   const [validationWarnings, setValidationWarnings] = useState<ValidationError[]>([]);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+
+  // Estados para zoom
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   // Actualizar los refs cuando cambien los estados
   useEffect(() => {
@@ -353,11 +356,29 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
       setIsValidating(false);
     }
   };
+
+  // Funciones de zoom
+  const zoomIn = () => {
+    const newZoom = Math.min(zoomLevel + 0.1, 2);
+    setZoomLevel(newZoom);
+    paperRef.current?.scale(newZoom, newZoom);
+  };
+
+  const zoomOut = () => {
+    const newZoom = Math.max(zoomLevel - 0.1, 0.5);
+    setZoomLevel(newZoom);
+    paperRef.current?.scale(newZoom, newZoom);
+  };
+
+  const resetZoom = () => {
+    setZoomLevel(1);
+    paperRef.current?.scale(1, 1);
+  };
   
   const subjectColor = '#7ED6A7'; // Análisis de Sistemas
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] flex">
+    <div className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-200">
       {/* Modal de Errores de Validación */}
       {showErrorModal && validationErrors.length > 0 && (
         <div style={{
@@ -722,270 +743,208 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
             : `Modo ${drawingMode}: Selecciona la PRIMERA clase`}
         </div>
       )}
-      {/* Left Sidebar */}
-      <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto shadow-sm">
-        <div 
-          className="p-4 border-b border-gray-200 text-white"
-          style={{ background: `linear-gradient(135deg, ${subjectColor} 0%, ${subjectColor}dd 100%)` }}
-        >
-          <div className="flex items-center gap-3">
-            <Boxes className="w-5 h-5" />
-            <span className="text-sm">Herramientas UML</span>
+
+      {/* Header con botón de validar */}
+      <div className="bg-gradient-to-r from-[#7ED6A7] to-[#7ED6A7]/90 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md">
+            <Boxes className="w-5 h-5 text-[#7ED6A7]" />
+          </div>
+          <div>
+            <h2 className="text-white font-bold text-lg">Editor de Diagramas UML</h2>
+            <p className="text-white/80 text-sm">{activity.title}</p>
           </div>
         </div>
+        <button 
+          onClick={validateDiagram}
+          disabled={isValidating}
+          className="px-6 py-2 rounded-lg bg-white text-[#7ED6A7] shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+        >
+          <Send className="w-4 h-4" />
+          {isValidating ? 'Validando...' : 'Validar y Enviar'}
+        </button>
+      </div>
 
-        {/* UML Tools */}
-        <div className="p-4">
-          <div className="mb-6">
-            <h3 className="text-sm text-gray-500 mb-3">Elementos</h3>
-            <div className="space-y-2">
+      {/* Layout Horizontal: Sidebar + Canvas */}
+      <div className="flex" style={{ height: '650px' }}>
+        {/* Sidebar izquierdo con herramientas - 30% */}
+        <div className="bg-gray-50 border-r border-gray-200 overflow-y-auto p-3 flex-shrink-0" style={{ width: '30%' }}>
+          {/* Herramientas UML */}
+          <div className="mb-4">
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Elementos UML</h3>
+            <div className="space-y-1.5">
               <button 
                 onClick={addClass}
-                className="w-full p-3 border-2 border-gray-200 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 group hover:border-green-400"
-               
+                className="w-full p-2 bg-white border border-gray-200 rounded-lg hover:border-[#7ED6A7] hover:bg-[#7ED6A7]/5 text-left text-xs transition-all flex items-center gap-2 group"
               >
-                <div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${subjectColor}15` }}
-                >
-                  <Square className="w-4 h-4" style={{ color: subjectColor }} />
+                <div className="w-6 h-6 bg-[#7ED6A7]/10 rounded flex items-center justify-center group-hover:bg-[#7ED6A7]/20">
+                  <Square className="w-3 h-3 text-[#7ED6A7]" />
                 </div>
-                <span className="text-[#3A4A5B]">Clase</span>
+                <span className="text-[#3A4A5B] font-medium">Clase</span>
               </button>
+
               <button 
                 onClick={() => startDrawingRelation('association')}
-                className={`w-full p-3 border-2 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 ${
-                  drawingMode === 'association' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-400'
-                }`}>
-                <div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${subjectColor}15` }}
-                >
-                  <Share2 className="w-4 h-4" style={{ color: subjectColor }} />
+                className={`w-full p-2 bg-white border rounded-lg text-left text-xs transition-all flex items-center gap-2 ${
+                  drawingMode === 'association' ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300'
+                }`}
+              >
+                <div className="w-6 h-6 bg-blue-50 rounded flex items-center justify-center">
+                  <Share2 className="w-3 h-3 text-blue-500" />
                 </div>
-                <span className="text-[#3A4A5B]">Asociación</span>
+                <span className="text-[#3A4A5B] font-medium">Asociación</span>
               </button>
+
               <button 
                 onClick={() => startDrawingRelation('inheritance')}
-                className={`w-full p-3 border-2 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 ${
-                  drawingMode === 'inheritance' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-purple-400'
-                }`}>
-                <div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${subjectColor}15` }}
-                >
-                  <GitMerge className="w-4 h-4" style={{ color: subjectColor }} />
+                className={`w-full p-2 bg-white border rounded-lg text-left text-xs transition-all flex items-center gap-2 ${
+                  drawingMode === 'inheritance' ? 'border-purple-400 bg-purple-50' : 'border-gray-200 hover:border-purple-300'
+                }`}
+              >
+                <div className="w-6 h-6 bg-purple-50 rounded flex items-center justify-center">
+                  <GitMerge className="w-3 h-3 text-purple-500" />
                 </div>
-                <span className="text-[#3A4A5B]">Herencia</span>
+                <span className="text-[#3A4A5B] font-medium">Herencia</span>
               </button>
+
               <button 
                 onClick={() => startDrawingRelation('aggregation')}
-                className={`w-full p-3 border-2 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 ${
-                  drawingMode === 'aggregation' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-400'
-                }`}>
-                <div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${subjectColor}15` }}
-                >
-                  <Diamond className="w-4 h-4" style={{ color: subjectColor }} />
+                className={`w-full p-2 bg-white border rounded-lg text-left text-xs transition-all flex items-center gap-2 ${
+                  drawingMode === 'aggregation' ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:border-orange-300'
+                }`}
+              >
+                <div className="w-6 h-6 bg-orange-50 rounded flex items-center justify-center">
+                  <Diamond className="w-3 h-3 text-orange-500" />
                 </div>
-                <span className="text-[#3A4A5B]">Agregación</span>
+                <span className="text-[#3A4A5B] font-medium">Agregación</span>
               </button>
+
               <button 
                 onClick={() => startDrawingRelation('composition')}
-                className={`w-full p-3 border-2 rounded-lg hover:shadow-md text-left text-sm transition-all flex items-center gap-3 ${
-                  drawingMode === 'composition' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-indigo-400'
-                }`}>
-                <div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${subjectColor}15` }}
-                >
-                  <Diamond className="w-4 h-4 fill-current" style={{ color: subjectColor }} />
+                className={`w-full p-2 bg-white border rounded-lg text-left text-xs transition-all flex items-center gap-2 ${
+                  drawingMode === 'composition' ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                <div className="w-6 h-6 bg-indigo-50 rounded flex items-center justify-center">
+                  <Diamond className="w-3 h-3 fill-current text-indigo-500" />
                 </div>
-                <span className="text-[#3A4A5B]">Composición</span>
+                <span className="text-[#3A4A5B] font-medium">Composición</span>
               </button>
             </div>
           </div>
 
-          <div className="mb-6">
-            <h3 className="text-sm text-gray-500 mb-3">Acciones</h3>
-            <div className="space-y-2">
-              <button 
-                onClick={clearDiagram}
-                className="w-full p-3 border-2 border-gray-200 rounded-lg hover:bg-red-50 text-sm text-[#3A4A5B] flex items-center gap-2 transition-all hover:border-red-300">
-                <Trash2 className="w-4 h-4 text-gray-500" />
-                Limpiar diagrama
-              </button>
+          {/* Acciones */}
+          <div>
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Acciones</h3>
+            <div className="space-y-1.5">
               <button 
                 onClick={undo}
-                className="w-full p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-[#3A4A5B] flex items-center gap-2 transition-all hover:border-gray-400">
-                <RotateCcw className="w-4 h-4 text-gray-500" />
-                Deshacer
+                className="w-full p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-xs text-[#3A4A5B] flex items-center gap-2 transition-all"
+              >
+                <RotateCcw className="w-3 h-3 text-gray-500" />
+                <span className="font-medium">Deshacer</span>
               </button>
               <button 
                 onClick={redo}
-                className="w-full p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-[#3A4A5B] flex items-center gap-2 transition-all hover:border-gray-400">
-                <Redo2 className="w-4 h-4 text-gray-500" />
-                Rehacer
+                className="w-full p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-xs text-[#3A4A5B] flex items-center gap-2 transition-all"
+              >
+                <Redo2 className="w-3 h-3 text-gray-500" />
+                <span className="font-medium">Rehacer</span>
+              </button>
+              <button 
+                onClick={clearDiagram}
+                className="w-full p-2 bg-white border border-red-200 rounded-lg hover:bg-red-50 text-xs text-red-600 flex items-center gap-2 transition-all"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span className="font-medium">Limpiar</span>
               </button>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Right Content Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
-                  <img src='https://tse1.mm.bing.net/th/id/OIP.RfniSZo5EqSsXFGeP-zRuQHaE7?cb=ucfimg2&ucfimg=1&rs=1&pid=ImgDetMain&o=7&rm=3' alt="EduPath" className="w-full h-full object-contain" />
+        {/* Área principal del canvas - 70% */}
+        <div className="flex-1 flex flex-col bg-white overflow-hidden">
+          {/* Editor de clase seleccionada */}
+          {selectedElement && !drawingMode && (
+            <div className="bg-gradient-to-r from-blue-50 to-white px-6 py-3 border-b border-blue-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-sm">✏️</span>
                 </div>
                 <div>
-                  <h1 className="text-[#3A4A5B]">Análisis de Sistemas</h1>
-                  <p className="text-gray-500 text-sm">{activity.title}</p>
+                  <label className="text-sm font-semibold text-[#3A4A5B]">Clase Seleccionada</label>
+                  {!isEditingClass && (
+                    <p className="text-xs text-gray-500 font-mono">{classText.split('\n')[0] || 'Sin nombre'}</p>
+                  )}
                 </div>
               </div>
-              <div className="flex gap-3">
-                <button className="border-2 border-gray-300 px-5 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-700 transition-all flex items-center gap-2">
-                  <Save className="w-4 h-4" />
-                  Guardar borrador
-                </button>
               <button 
-                onClick={validateDiagram}
-                disabled={isValidating}
-                className="px-6 py-2 rounded-lg text-white shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: subjectColor }}
-              >
-                <Send className="w-4 h-4" />
-                {isValidating ? 'Validando...' : 'Enviar diagrama'}
-              </button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Main Content */}
-        <div className="flex-1 flex">
-          {/* Instructions Panel */}
-          <div className="w-96 border-r border-gray-200 bg-white p-6 overflow-y-auto">
-            {/* Back Button */}
-            <button 
-              onClick={onBack}
-              className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-              <span>Volver</span>
-            </button>
-
-            <h2 className="text-[#3A4A5B] mb-4">Instrucciones</h2>
-            <div className="space-y-4 text-gray-700 text-sm">
-              <p>
-                Crea un diagrama de clases UML para un sistema de gestión de biblioteca 
-                que incluya las siguientes entidades:
-              </p>
-              <ul className="list-disc list-inside space-y-2 text-gray-600 ml-2">
-                <li>Libro (con atributos: título, autor, ISBN)</li>
-                <li>Usuario (con atributos: nombre, ID, email)</li>
-                <li>Préstamo (con atributos: fecha inicio, fecha fin)</li>
-              </ul>
-              <div 
-                className="border-l-4 pl-4 p-3 rounded-r-lg"
+                onClick={() => setIsEditingClass(!isEditingClass)}
+                className="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all shadow-sm"
                 style={{ 
-                  borderColor: subjectColor,
-                  backgroundColor: `${subjectColor}15`
+                  backgroundColor: isEditingClass ? '#ff6b6b' : '#7ED6A7',
+                  color: 'white'
                 }}
               >
-                <p className="text-[#3A4A5B]">
-                  <strong>Nota:</strong> Asegúrate de incluir las relaciones apropiadas 
-                  entre las clases y sus multiplicidades.
-                </p>
-              </div>
-              <p>
-                Usa las herramientas del panel izquierdo para crear los elementos del 
-                diagrama. Puedes arrastrar los elementos en el lienzo para organizarlos.
-              </p>
+                {isEditingClass ? '✕ Cancelar' : '✏️ Editar'}
+              </button>
             </div>
+          )}
 
-            <div className="mt-6 border-t border-gray-200 pt-6">
-              <h3 className="text-[#3A4A5B] mb-3">Criterios de evaluación</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 rounded flex items-center justify-center" style={{ borderColor: subjectColor }}>
-                    <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: subjectColor }}></div>
-                  </div>
-                  <span className="text-gray-700">Clases correctamente definidas</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-gray-300 rounded"></div>
-                  <span className="text-gray-600">Atributos apropiados</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-gray-300 rounded"></div>
-                  <span className="text-gray-600">Relaciones bien establecidas</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-gray-300 rounded"></div>
-                  <span className="text-gray-600">Multiplicidades indicadas</span>
-                </div>
-              </div>
+          {/* Panel de edición expandido */}
+          {isEditingClass && selectedElement && (
+            <div className="bg-white px-6 py-4 border-b border-gray-200">
+              <textarea
+                value={classText}
+                onChange={(e) => setClassText(e.target.value)}
+                rows={5}
+                className="w-full border-2 border-gray-300 focus:border-[#7ED6A7] p-3 font-mono rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#7ED6A7]/20"
+                placeholder="NombreClase&#10;- atributo: tipo&#10;+ metodo(): retorno"
+              />
+              <button 
+                onClick={updateClassText} 
+                className="mt-2 px-6 py-2 rounded-lg text-white transition-all font-semibold shadow-md hover:shadow-lg"
+                style={{ backgroundColor: '#7ED6A7' }}
+              >
+                💾 Guardar Cambios
+              </button>
             </div>
-          </div>
+          )}
 
-          {/* Diagram Canvas */}
-          <div className="flex-1 bg-[#F2F2F2] p-6 overflow-hidden flex flex-col">
-            {selectedElement && !drawingMode && (
-              <div className="mb-4 bg-white p-4 rounded-lg shadow-md">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="block text-sm font-medium text-[#3A4A5B]">Clase Seleccionada</label>
-                  <button 
-                    onClick={() => setIsEditingClass(!isEditingClass)}
-                    className="px-3 py-1 rounded text-sm transition-all"
-                    style={{ 
-                      backgroundColor: isEditingClass ? '#ff6b6b' : subjectColor,
-                      color: 'white'
-                    }}
-                  >
-                    {isEditingClass ? '❌ Cancelar' : '✏️ Editar'}
-                  </button>
-                </div>
-                
-                {isEditingClass && (
-                  <>
-                    <textarea
-                      value={classText}
-                      onChange={(e) => setClassText(e.target.value)}
-                      rows={4}
-                      className="w-full border border-gray-300 p-2 font-mono rounded text-sm mb-2"
-                      placeholder="Nombre\n- atributo: tipo\n+ metodo(): retorno"
-                    />
-                    <button 
-                      onClick={updateClassText} 
-                      className="w-full px-4 py-2 rounded text-white transition-all"
-                      style={{ backgroundColor: subjectColor }}
-                    >
-                      💾 Guardar Cambios
-                    </button>
-                  </>
-                )}
-                
-                {!isEditingClass && (
-                  <div className="text-sm text-gray-600 font-mono whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">
-                    {classText || 'Sin contenido'}
-                  </div>
-                )}
-              </div>
-            )}
+          {/* Canvas principal */}
+          <div className="flex-1 p-6 bg-gray-50 overflow-hidden relative">
             <div 
               ref={containerRef} 
-              style={{ 
-                flex: 1,
-                border: '2px solid #ddd',
-                borderRadius: '0.5rem',
-                backgroundColor: '#ffffff'
-              }} 
+              className="w-full h-full bg-white rounded-xl shadow-inner border-2 border-gray-200"
             />
+            
+            {/* Controles de zoom flotantes */}
+            <div className="absolute top-8 right-8 flex flex-col gap-2 bg-white rounded-lg shadow-lg border border-gray-200 p-2">
+              <button
+                onClick={zoomIn}
+                className="p-2 hover:bg-gray-100 rounded transition-colors"
+                title="Acercar (Zoom +)"
+              >
+                <ZoomIn className="w-4 h-4 text-gray-700" />
+              </button>
+              <button
+                onClick={resetZoom}
+                className="p-2 hover:bg-gray-100 rounded transition-colors"
+                title="Restablecer Zoom"
+              >
+                <Maximize2 className="w-4 h-4 text-gray-700" />
+              </button>
+              <button
+                onClick={zoomOut}
+                className="p-2 hover:bg-gray-100 rounded transition-colors"
+                title="Alejar (Zoom -)"
+              >
+                <ZoomOut className="w-4 h-4 text-gray-700" />
+              </button>
+              <div className="text-[10px] text-center text-gray-500 px-1 py-1 border-t border-gray-200">
+                {Math.round(zoomLevel * 100)}%
+              </div>
+            </div>
           </div>
         </div>
       </div>

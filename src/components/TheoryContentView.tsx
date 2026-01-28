@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Play, FileText, CheckCircle2, SkipBack, SkipForward, BookOpen, ChevronDown, ChevronRight, Loader } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { ProgrammingContentView } from './ProgrammingContentView';
+import { UMLDiagramView } from './UMLDiagramView';
+import { QuizActivityView } from './QuizActivityView';
 
 // Estilos para renderizado de HTML
 const htmlContentStyles = `
@@ -123,6 +126,7 @@ interface ModuleItem {
   descripcion?: string;
   url?: string;
   recommended?: boolean;
+  ejercicioData?: Ejercicio; // Datos del ejercicio si este ítem es un ejercicio
 }
 
 interface Contenido {
@@ -133,6 +137,21 @@ interface Contenido {
   url?: string;
   tema_id: number;
   subtema_id: number;
+}
+
+interface Ejercicio {
+  id: number;
+  contenido_id: number;
+  puntos: number;
+  resultado_ejercicio: string;
+  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas';
+  configuracion?: any;
+  actividad?: {
+    id: number;
+    titulo: string;
+    descripcion?: string;
+    nivel_dificultad?: 'facil' | 'medio' | 'dificil';
+  };
 }
 
 interface TheoryContentViewProps {
@@ -263,6 +282,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
   const [selectedContentData, setSelectedContentData] = useState<ModuleItem | null>(null);
   const [currentProgress, setCurrentProgress] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(false);
+  const [ejercicioAsociado, setEjercicioAsociado] = useState<Ejercicio | null>(null);
+  const [loadingEjercicio, setLoadingEjercicio] = useState(false);
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
 
   // Inyectar estilos en el documento
@@ -396,6 +417,47 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       console.log('✅ Contenido marcado como visualizado');
     } catch (err) {
       console.error('❌ Error al marcar contenido como visualizado:', err);
+    }
+  };
+
+  // Cargar ejercicio asociado a un contenido
+  const cargarEjercicioAsociado = async (contenidoId: string) => {
+    setLoadingEjercicio(true);
+    setEjercicioAsociado(null);
+    
+    try {
+      console.log(`🔄 Buscando ejercicio para contenido_id: ${contenidoId}`);
+      const response = await fetch(`http://localhost:4000/ejercicios`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const ejercicios: Ejercicio[] = await response.json();
+      
+      console.log('📦 Ejercicios recibidos del backend:', ejercicios);
+      console.log('🔍 Buscando ejercicio con contenido_id:', parseInt(contenidoId));
+      
+      // Buscar el ejercicio que coincida con el contenido_id
+      const ejercicio = ejercicios.find(ej => {
+        console.log(`   Comparando: ej.contenido_id=${ej.contenido_id} (tipo: ${typeof ej.contenido_id}) vs contenidoId=${parseInt(contenidoId)} (tipo: ${typeof parseInt(contenidoId)})`);
+        // Comparar ambos como números para evitar problemas de tipo string vs number
+        return Number(ej.contenido_id) === parseInt(contenidoId);
+      });
+      
+      if (ejercicio) {
+        console.log('✅ Ejercicio encontrado:', ejercicio);
+        setEjercicioAsociado(ejercicio);
+      } else {
+        console.log('ℹ️ No hay ejercicio asociado a este contenido');
+        console.log('💡 Ejercicios disponibles:', ejercicios.map(ej => ({ id: ej.id, contenido_id: ej.contenido_id })));
+        setEjercicioAsociado(null);
+      }
+    } catch (err) {
+      console.error('❌ Error al cargar ejercicio asociado:', err);
+      setEjercicioAsociado(null);
+    } finally {
+      setLoadingEjercicio(false);
     }
   };
 
@@ -542,6 +604,78 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         })
       );
 
+      // Cargar ejercicios asociados y agregarlos como ítems separados
+      try {
+        console.log('🔄 Cargando ejercicios asociados para agregar al menú...');
+        const ejerciciosResponse = await fetch('http://localhost:4000/ejercicios');
+        
+        if (ejerciciosResponse.ok) {
+          const todosEjercicios: Ejercicio[] = await ejerciciosResponse.json();
+          console.log('📦 Todos los ejercicios del backend:', todosEjercicios);
+          
+          // IDs de contenidos de este subtema
+          const contenidoIdsDeEsteSubtema = contenidosSecuenciados.map(c => c.id);
+          console.log('📋 IDs de contenidos en este subtema:', contenidoIdsDeEsteSubtema);
+          
+          // Mostrar contenido_id de cada ejercicio para debug
+          console.log('🔍 Ejercicios y sus contenido_id:');
+          todosEjercicios.forEach(ej => {
+            console.log(`   - Ejercicio ${ej.id}: contenido_id=${ej.contenido_id} (tipo: ${typeof ej.contenido_id})`);
+          });
+          
+          // Filtrar ejercicios que pertenecen a contenidos de este subtema
+          const ejerciciosDeEsteSubtema = todosEjercicios.filter(ej => {
+            const match = contenidoIdsDeEsteSubtema.includes(String(ej.contenido_id));
+            console.log(`   Comparando ejercicio ${ej.id} con contenido_id=${ej.contenido_id} → ${match ? '✅' : '❌'}`);
+            return match;
+          });
+          
+          console.log(`✅ Encontrados ${ejerciciosDeEsteSubtema.length} ejercicios para este subtema`, ejerciciosDeEsteSubtema);
+          
+          // Crear nuevo array con contenidos y ejercicios intercalados
+          const itemsConEjercicios: ModuleItem[] = [];
+          
+          items.forEach(contenidoItem => {
+            // Agregar el contenido
+            itemsConEjercicios.push(contenidoItem);
+            
+            // Buscar ejercicios asociados a este contenido
+            const ejerciciosDeEsteContenido = ejerciciosDeEsteSubtema.filter(ej => 
+              Number(ej.contenido_id) === Number(contenidoItem.id)
+            );
+            
+            // Agregar cada ejercicio justo después del contenido
+            ejerciciosDeEsteContenido.forEach(ejercicio => {
+              console.log(`   📝 Agregando ejercicio "${ejercicio.actividad?.titulo}" después del contenido "${contenidoItem.title}"`);
+              
+              const ejercicioItem: ModuleItem = {
+                id: `ejercicio-${ejercicio.id}`,
+                title: `📝 ${ejercicio.actividad?.titulo || 'Ejercicio Práctico'}`,
+                duration: undefined,
+                type: 'activity',
+                completed: false,
+                visualizado: false,
+                descripcion: ejercicio.actividad?.descripcion || '',
+                url: undefined,
+                recommended: false,
+                ejercicioData: ejercicio
+              };
+              
+              itemsConEjercicios.push(ejercicioItem);
+            });
+          });
+          
+          console.log(`✅ Total de ítems en menú: ${itemsConEjercicios.length} (${items.length} contenidos + ${ejerciciosDeEsteSubtema.length} ejercicios)`);
+          
+          // Reemplazar el array items con el nuevo que incluye ejercicios
+          items.length = 0;
+          items.push(...itemsConEjercicios);
+        }
+      } catch (err) {
+        console.error('⚠️ Error al cargar ejercicios para el menú:', err);
+        // No es crítico, continuar sin ejercicios
+      }
+
       // Update the module with the loaded items (only sequenced)
       setModules(prevModules => 
         prevModules.map(m => 
@@ -683,9 +817,21 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                         <button
                           key={item.id}
                           onClick={() => {
-                            setSelectedContentId(item.id);
-                            setSelectedContentData(item);
-                            onContentChange?.(item.id);
+                            // Si es un ejercicio, manejarlo de forma especial
+                            if (item.ejercicioData) {
+                              console.log('📝 Seleccionando ejercicio:', item.ejercicioData);
+                              setSelectedContentId(item.id);
+                              setSelectedContentData(null); // No hay contenido asociado
+                              setEjercicioAsociado(item.ejercicioData); // Cargar el ejercicio directamente
+                              setLoadingEjercicio(false);
+                            } else {
+                              // Es un contenido normal
+                              setSelectedContentId(item.id);
+                              setSelectedContentData(item);
+                              onContentChange?.(item.id);
+                              // Cargar ejercicio asociado si existe
+                              cargarEjercicioAsociado(item.id);
+                            }
                           }}
                           className={`w-full text-left p-3 border rounded-lg hover:bg-gray-50 flex items-center gap-3 text-sm transition-all group ${
                             isSelected 
@@ -757,9 +903,78 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
             </button>
 
             {/* Content Display */}
+            {/* Caso 1: Solo ejercicio (sin contenido) */}
+            {!selectedContentData && ejercicioAsociado && (
+              <div className="mb-6">
+                {/* Título del ejercicio */}
+                <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div 
+                      className="w-12 h-12 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: `${subjectColor}20` }}
+                    >
+                      📝
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-[#3A4A5B]">
+                        {ejercicioAsociado.actividad?.titulo || 'Ejercicio Práctico'}
+                      </h2>
+                      {ejercicioAsociado.actividad?.descripcion && (
+                        <p className="text-gray-600 text-sm mt-1">
+                          {ejercicioAsociado.actividad?.descripcion}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                      {ejercicioAsociado.tipo_ejercicio}
+                    </span>
+                    <span className="text-gray-600">
+                      {ejercicioAsociado.puntos} puntos
+                    </span>
+                  </div>
+                </div>
+
+                {/* Componente del ejercicio */}
+                {ejercicioAsociado.tipo_ejercicio === 'Compilador' && (
+                  <ProgrammingContentView
+                    content={{
+                      id: ejercicioAsociado.contenido_id?.toString() || '0',
+                      title: ejercicioAsociado.actividad?.titulo || 'Ejercicio',
+                      type: 'activity'
+                    }}
+                    onBack={onBack}
+                  />
+                )}
+
+                {ejercicioAsociado.tipo_ejercicio === 'Diagramas UML' && (
+                  <UMLDiagramView
+                    activity={{
+                      id: ejercicioAsociado.id.toString(),
+                      title: ejercicioAsociado.actividad?.titulo || 'Ejercicio'
+                    }}
+                    onBack={onBack}
+                  />
+                )}
+
+                {ejercicioAsociado.tipo_ejercicio === 'Preguntas' && (
+                  <QuizActivityView
+                    subjectName={subjectName}
+                    activity={{
+                      id: ejercicioAsociado.id.toString(),
+                      title: ejercicioAsociado.actividad?.titulo || 'Ejercicio'
+                    }}
+                    onBack={onBack}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Caso 2: Contenido (con o sin ejercicio) */}
             {selectedContentData && (
               <>
-                {/* Content Display */}
+                {/* Mostrar SIEMPRE el contenido primero */}
                 {selectedContentData.type === 'video' ? (
                   <div className="mb-6">
                     {selectedContentData.url ? (
@@ -890,6 +1105,58 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     </div>
                   </div>
                 )}
+
+                {/* Ejercicio Asociado - Mostrar DESPUÉS del contenido */}
+                {loadingEjercicio ? (
+                  <div className="flex justify-center items-center p-12 bg-white rounded-xl shadow-md mb-6">
+                    <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
+                    <span className="ml-3 text-gray-600">Cargando ejercicio...</span>
+                  </div>
+                ) : ejercicioAsociado ? (
+                  <div className="mb-6">
+                    {/* Separador visual */}
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+                      <span className="text-sm font-medium text-[#3A4A5B] px-3 py-1 bg-gradient-to-r from-[#4A90E2] to-[#7ED6A7] text-white rounded-full shadow-md">
+                        📝 Ejercicio Práctico
+                      </span>
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+                    </div>
+
+                    {/* Mostrar componente según tipo de ejercicio */}
+                    {ejercicioAsociado.tipo_ejercicio === 'Compilador' && (
+                      <ProgrammingContentView
+                        content={{
+                          id: selectedContentData.id,
+                          title: ejercicioAsociado.actividad?.titulo || selectedContentData.title,
+                          type: 'activity'
+                        }}
+                        onBack={onBack}
+                      />
+                    )}
+
+                    {ejercicioAsociado.tipo_ejercicio === 'Diagramas UML' && (
+                      <UMLDiagramView
+                        activity={{
+                          id: ejercicioAsociado.id.toString(),
+                          title: ejercicioAsociado.actividad?.titulo || selectedContentData.title
+                        }}
+                        onBack={onBack}
+                      />
+                    )}
+
+                    {ejercicioAsociado.tipo_ejercicio === 'Preguntas' && (
+                      <QuizActivityView
+                        subjectName={subjectName}
+                        activity={{
+                          id: ejercicioAsociado.id.toString(),
+                          title: ejercicioAsociado.actividad?.titulo || selectedContentData.title
+                        }}
+                        onBack={onBack}
+                      />
+                    )}
+                  </div>
+                ) : null}
 
                 {/* Additional Resources */}
                 <div className="rounded-2xl border border-gray-200 bg-white p-6 mb-6 shadow-md">

@@ -42,7 +42,7 @@ export function ProgrammingContentView({ content, onBack }: ProgrammingContentVi
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
+    <div className="bg-[#F2F2F2] rounded-lg overflow-hidden">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-full mx-auto px-8 py-4">
@@ -70,7 +70,7 @@ export function ProgrammingContentView({ content, onBack }: ProgrammingContentVi
         </div>
       </header>
 
-      <div className="flex h-[calc(100vh-88px)]">
+      <div className="flex" style={{ minHeight: '600px' }}>
         {/* Panel Izquierdo: Contenido */}
         <div className="w-1/2 border-r border-gray-200 bg-white overflow-y-auto">
           <div className="p-6">
