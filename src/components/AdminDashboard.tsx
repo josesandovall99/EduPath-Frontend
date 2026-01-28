@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBranch } from 'lucide-react';
+import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBranch, ClipboardList } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ContentManagementScreen } from './ContentManagementScreen';
 import { SequenceManagementScreen } from './SequenceManagementScreen';
@@ -7,6 +7,7 @@ import { SubtemaSequenceManagementScreen } from './SubtemaSequenceManagementScre
 import { AreasManagementScreen } from './AreasManagementScreen';
 import { TemasManagementScreen } from './TemasManagementScreen';
 import { SubThemeManagementScreen } from './SubThemeManagementScreen';
+import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
 import { Upload } from "lucide-react";
 
 
@@ -16,7 +17,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes' | 'miniproyectos'>('dashboard');
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [selectedAreaName, setSelectedAreaName] = useState<string>('');
   const [selectedTemaId, setSelectedTemaId] = useState<number | null>(null);
@@ -65,6 +66,15 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       color: '#8B5CF6',
       gradient: 'from-[#8B5CF6] to-[#A78BFA]',
       onClick: () => setCurrentScreen('areas')
+    },
+    {
+      id: 'miniproyectos',
+      title: 'Gestión de Miniproyectos',
+      description: 'Selecciona y edita miniproyectos existentes y su actividad asociada.',
+      icon: ClipboardList,
+      color: '#0EA5E9',
+      gradient: 'from-[#0EA5E9] to-[#38BDF8]',
+      onClick: () => setCurrentScreen('miniproyectos')
     },
     {
       id: 'reports',
@@ -143,6 +153,14 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       temaId={selectedTemaId || undefined}
       temaName={selectedTemaName}
     />;
+  }
+
+  if (currentScreen === 'miniproyectos') {
+    return (
+      <MiniproyectoManagementScreen
+        onBack={() => setCurrentScreen('dashboard')}
+      />
+    );
   }
 
   if (currentScreen === 'contents') {
