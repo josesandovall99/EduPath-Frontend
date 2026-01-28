@@ -1,4 +1,5 @@
 import { LogOut, Code, Database, BarChart3, BookOpen, Clock, CheckCircle2, TrendingUp } from 'lucide-react';
+import { ChatbotButton } from './ChatbotButton';
 import { useState, useEffect } from 'react';
 
 interface Subject {
@@ -329,6 +330,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           </div>
         </div>
       </main>
+      <ChatbotButton />
     </div>
   );
 }
