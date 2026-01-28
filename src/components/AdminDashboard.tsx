@@ -8,6 +8,7 @@ import { AreasManagementScreen } from './AreasManagementScreen';
 import { TemasManagementScreen } from './TemasManagementScreen';
 import { SubThemeManagementScreen } from './SubThemeManagementScreen';
 import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
+import { ExerciseManagementScreen } from './ExerciseManagementScreen';
 import { Upload } from "lucide-react";
 
 
@@ -17,7 +18,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes' | 'miniproyectos'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes' | 'miniproyectos' | 'ejercicios'>('dashboard');
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [selectedAreaName, setSelectedAreaName] = useState<string>('');
   const [selectedTemaId, setSelectedTemaId] = useState<number | null>(null);
@@ -57,6 +58,15 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       color: '#7ED6A7',
       gradient: 'from-[#7ED6A7] to-[#90E0B7]',
       onClick: () => setCurrentScreen('contents')
+    },
+    {
+      id: 'ejercicios',
+      title: 'Gestión de Ejercicios',
+      description: 'Crear y editar ejercicios asociados a contenidos específicos.',
+      icon: ClipboardList,
+      color: '#0EA5E9',
+      gradient: 'from-[#0EA5E9] to-[#38BDF8]',
+      onClick: () => setCurrentScreen('ejercicios')
     },
     {
       id: 'subtema-sequences',
@@ -158,6 +168,14 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'miniproyectos') {
     return (
       <MiniproyectoManagementScreen
+        onBack={() => setCurrentScreen('dashboard')}
+      />
+    );
+  }
+
+  if (currentScreen === 'ejercicios') {
+    return (
+      <ExerciseManagementScreen
         onBack={() => setCurrentScreen('dashboard')}
       />
     );

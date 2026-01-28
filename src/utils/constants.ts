@@ -1,0 +1,1 @@
+export const TIPO_ACTIVIDAD_EJERCICIO_ID = 1;
