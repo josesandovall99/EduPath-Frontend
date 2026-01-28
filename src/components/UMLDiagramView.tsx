@@ -919,29 +919,54 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
             />
             
             {/* Controles de zoom flotantes */}
-            <div className="absolute top-8 right-8 flex flex-col gap-2 bg-white rounded-lg shadow-lg border border-gray-200 p-2">
+            <div 
+              className="flex flex-col gap-1 bg-white rounded-lg shadow-lg border border-gray-300 p-1.5"
+              style={{
+                position: 'absolute',
+                top: '32px',
+                right: '32px',
+                zIndex: 1000,
+              }}
+            >
               <button
                 onClick={zoomIn}
-                className="p-2 hover:bg-gray-100 rounded transition-colors"
+                className="p-2.5 hover:bg-gray-100 rounded-md transition-colors flex items-center justify-center"
                 title="Acercar (Zoom +)"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                }}
               >
-                <ZoomIn className="w-4 h-4 text-gray-700" />
+                <ZoomIn className="w-5 h-5 text-gray-700" />
               </button>
+              <div className="border-t border-gray-200 my-0.5"></div>
               <button
                 onClick={resetZoom}
-                className="p-2 hover:bg-gray-100 rounded transition-colors"
-                title="Restablecer Zoom"
+                className="p-2.5 hover:bg-gray-100 rounded-md transition-colors flex items-center justify-center"
+                title="Restablecer Zoom (100%)"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                }}
               >
-                <Maximize2 className="w-4 h-4 text-gray-700" />
+                <Maximize2 className="w-5 h-5 text-gray-700" />
               </button>
+              <div className="border-t border-gray-200 my-0.5"></div>
               <button
                 onClick={zoomOut}
-                className="p-2 hover:bg-gray-100 rounded transition-colors"
+                className="p-2.5 hover:bg-gray-100 rounded-md transition-colors flex items-center justify-center"
                 title="Alejar (Zoom -)"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                }}
               >
-                <ZoomOut className="w-4 h-4 text-gray-700" />
+                <ZoomOut className="w-5 h-5 text-gray-700" />
               </button>
-              <div className="text-[10px] text-center text-gray-500 px-1 py-1 border-t border-gray-200">
+              <div className="text-[11px] text-center text-gray-600 font-semibold px-2 py-1.5 border-t border-gray-200 bg-gray-50 rounded-b-md">
                 {Math.round(zoomLevel * 100)}%
               </div>
             </div>
