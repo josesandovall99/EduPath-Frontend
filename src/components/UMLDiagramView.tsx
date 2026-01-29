@@ -33,13 +33,15 @@ interface ValidationResponse {
 }
 
 interface EjercicioResponse {
-  ejercicioId: string;
+  ejercicioId?: string;
+  intentoId?: number;
   esCorrecta: boolean;
   puntosObtenidos: number;
   detalle: {
     errors: ValidationError[];
     warnings: ValidationError[];
   };
+  retroalimentacion?: string;
 }
 
 interface MultiplicityDialog {
@@ -83,6 +85,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
   const [validationWarnings, setValidationWarnings] = useState<ValidationError[]>([]);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [ejercicioAprobado, setEjercicioAprobado] = useState(false); // Nuevo estado
 
   // Estados para zoom
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -321,12 +324,12 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     }
   };
 
-  // Validación rápida (preview) - usa el mismo endpoint que enviar
+  // Validación rápida (preview) - usa /resolver (no guarda intento)
   const validateDiagram = async () => {
     setIsValidating(true);
     const json = graphRef.current?.toJSON();
     
-    console.log('📤 Enviando diagrama (preview):', json);
+    console.log('📤 Validando diagrama (preview):', json);
     
     try {
       const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/resolver`, {
@@ -365,7 +368,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
         setValidationErrors([]);
         setValidationWarnings(warnings);
         setShowErrorModal(false);
-        alert(`✓ Diagrama válido (preview)\nPuntos: ${data.puntosObtenidos}`);
+        alert(`✓ Diagrama válido (preview)\n\nPuntos: ${data.puntosObtenidos}\nCorrecto: ${data.esCorrecta ? 'Sí' : 'No'}`);
       }
     } catch (error) {
       console.error('❌ Error completo:', error);
@@ -375,30 +378,92 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     }
   };
 
-  // Enviar y calificar el diagrama (mismo endpoint que preview)
+  // Enviar y calificar el diagrama (usa /enviar - UN SOLO INTENTO)
   const submitDiagram = async () => {
     setIsValidating(true);
     const json = graphRef.current?.toJSON();
     
-    console.log('📤 Enviando diagrama:', json);
-    console.log('📍 URL:', `http://localhost:4000/ejercicios/${activity.id}/resolver`);
+    // Obtener estudiante_id del localStorage
+    const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
+    
+    if (!estudianteId) {
+      alert('❌ Error: No se encontró el ID del estudiante. Por favor, inicia sesión nuevamente.');
+      setIsValidating(false);
+      return;
+    }
+    
+    console.log('📤 Enviando diagrama para calificar:', json);
+    console.log('👤 Estudiante ID:', estudianteId);
+    console.log('📍 URL:', `http://localhost:4000/ejercicios/${activity.id}/enviar`);
     
     try {
-      const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/resolver`, {
+      const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/enviar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ diagram: json })
+        body: JSON.stringify({ 
+          estudiante_id: estudianteId,
+          respuesta: { diagram: json }
+        })
       });
 
       console.log('📥 Response status:', response.status);
       
-      const data: EjercicioResponse = await response.json();
+      const data: any = await response.json();
       console.log('📥 Response data:', data);
 
-      const errors = data.detalle?.errors || [];
-      const warnings = data.detalle?.warnings || [];
+      // 429 - Evaluación en curso (evitar doble clic)
+      if (response.status === 429) {
+        const mensaje = data.message || data.error || 'Evaluación en curso';
+        alert(`⏳ ${mensaje}\n\nPor favor espera a que termine la evaluación actual.`);
+        setIsValidating(false);
+        return;
+      }
 
-      if (!data.esCorrecta && errors.length > 0) {
+      // 409 - Ya existe una respuesta registrada (bloquear permanentemente)
+      if (response.status === 409) {
+        const mensaje = data.message || data.error || 'Ya existe una respuesta registrada para este ejercicio';
+        setEjercicioAprobado(true);
+        alert(`⚠️ ${mensaje}\n\nNo puedes enviar más respuestas.\n\nContacta al administrador si necesitas resetear el ejercicio.`);
+        setIsValidating(false);
+        return;
+      }
+
+      // Verificar si la respuesta tiene estructura válida (200 OK)
+      if (!response.ok) {
+        const mensajeError = data.message || data.error || 'Error al enviar el diagrama';
+        alert(`❌ Error del servidor: ${mensajeError}`);
+        setIsValidating(false);
+        return;
+      }
+
+      // 200 - Respuesta procesada exitosamente (correcta o incorrecta)
+      const ejercicioData = data as EjercicioResponse;
+      const errors = ejercicioData.detalle?.errors || [];
+      const warnings = ejercicioData.detalle?.warnings || [];
+      
+      // Bloquear botón después del primer envío (ya no hay reintentos)
+      setEjercicioAprobado(true);
+      
+      // Si la respuesta es CORRECTA
+      if (ejercicioData.esCorrecta) {
+        setValidationErrors([]);
+        setValidationWarnings([]);
+        setShowErrorModal(false);
+        
+        let mensaje = `✅ ¡Felicidades! Respuesta correcta\n\nPuntos obtenidos: ${ejercicioData.puntosObtenidos}`;
+        
+        if (ejercicioData.intentoId) {
+          mensaje += `\nIntento registrado: #${ejercicioData.intentoId}`;
+        }
+        
+        if (ejercicioData.retroalimentacion) {
+          mensaje += `\n\nRetroalimentación:\n${ejercicioData.retroalimentacion}`;
+        }
+        
+        alert(mensaje);
+      } 
+      // Si la respuesta es INCORRECTA
+      else {
         // Resaltar elementos con error en rojo
         errors.forEach(err => {
           if (err.elementId) {
@@ -417,19 +482,66 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
         setValidationErrors(errors);
         setValidationWarnings(warnings);
         setShowErrorModal(true);
-      } else {
-        // Diagrama enviado y calificado exitosamente
-        setValidationErrors([]);
-        setValidationWarnings(warnings);
-        setShowErrorModal(false);
-        alert(`✓ Diagrama enviado y calificado correctamente\n\nPuntos obtenidos: ${data.puntosObtenidos}\nRespuesta correcta: ${data.esCorrecta ? 'Sí' : 'No'}`);
-        // Aquí podrías mostrar la calificación o redirigir
+        
+        // Mensaje adicional
+        let mensaje = `❌ Respuesta incorrecta\n\nPuntos obtenidos: ${ejercicioData.puntosObtenidos}`;
+        
+        if (ejercicioData.intentoId) {
+          mensaje += `\nIntento registrado: #${ejercicioData.intentoId}`;
+        }
+        
+        if (errors.length > 0) {
+          mensaje += `\n\nSe encontraron ${errors.length} error${errors.length !== 1 ? 'es' : ''}. Revisa los detalles en el panel.`;
+        }
+        
+        if (ejercicioData.retroalimentacion) {
+          mensaje += `\n\nRetroalimentación:\n${ejercicioData.retroalimentacion}`;
+        }
+        
+        mensaje += `\n\n⚠️ Ya no puedes volver a intentar este ejercicio.`;
+        
+        alert(mensaje);
       }
     } catch (error) {
       console.error('❌ Error completo:', error);
       alert('❌ Error al enviar el diagrama. Backend no disponible en este momento.');
     } finally {
       setIsValidating(false);
+    }
+  };
+
+  // Ver retroalimentación del ejercicio
+  const verRetroalimentacion = async () => {
+    try {
+      const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/retroalimentacion`);
+      
+      if (!response.ok) {
+        alert('❌ No se pudo obtener la retroalimentación.');
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('📖 Retroalimentación:', data);
+      
+      // Mostrar retroalimentación en un alert o modal
+      let mensaje = '📖 Retroalimentación del Ejercicio\n\n';
+      
+      if (data.salidaEsperada) {
+        mensaje += `Salida esperada:\n${JSON.stringify(data.salidaEsperada, null, 2)}\n\n`;
+      }
+      
+      if (data.retroalimentacion) {
+        mensaje += `${data.retroalimentacion}`;
+      }
+      
+      if (data.feedback) {
+        mensaje += `${data.feedback}`;
+      }
+      
+      alert(mensaje);
+    } catch (error) {
+      console.error('Error al obtener retroalimentación:', error);
+      alert('❌ Error al obtener la retroalimentación.');
     }
   };
 
@@ -834,7 +946,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
         <div className="flex items-center gap-3">
           <button 
             onClick={validateDiagram}
-            disabled={isValidating}
+            disabled={isValidating || ejercicioAprobado}
             className="px-5 py-2 rounded-lg bg-white/90 text-[#7ED6A7] shadow-md hover:shadow-lg hover:bg-white transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
           >
             <BookOpen className="w-4 h-4" />
@@ -842,11 +954,12 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
           </button>
           <button 
             onClick={submitDiagram}
-            disabled={isValidating}
+            disabled={isValidating || ejercicioAprobado}
             className="px-6 py-2 rounded-lg bg-white text-[#7ED6A7] shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+            title={ejercicioAprobado ? 'Ejercicio ya aprobado' : 'Enviar y calificar'}
           >
             <Send className="w-4 h-4" />
-            {isValidating ? 'Enviando...' : 'Enviar y Calificar'}
+            {ejercicioAprobado ? 'Aprobado' : isValidating ? 'Enviando...' : 'Enviar y Calificar'}
           </button>
         </div>
       </div>

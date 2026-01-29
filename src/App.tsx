@@ -78,12 +78,20 @@ export default function App() {
   // 2. Función manejadora del Login Exitoso
   const handleLoginSuccess = (apiResponse: any) => {
     // Guardamos los datos importantes que vienen del backend
-    setUserSession({
+    const session = {
       id: apiResponse.estudiante.id,
       personaId: apiResponse.estudiante.personaId,
       nombre: apiResponse.estudiante.nombre,
       codigo: apiResponse.estudiante.codigo
-    });
+    };
+    
+    setUserSession(session);
+    
+    // Guardar en localStorage para que esté disponible en otros componentes
+    localStorage.setItem('estudianteId', apiResponse.estudiante.id.toString());
+    localStorage.setItem('personaId', apiResponse.estudiante.personaId.toString());
+    localStorage.setItem('nombreEstudiante', apiResponse.estudiante.nombre);
+    localStorage.setItem('codigoEstudiante', apiResponse.estudiante.codigo);
 
     // Decidimos a dónde ir basado en el flag 'primerIngreso'
     if (apiResponse.primerIngreso) {
@@ -125,12 +133,24 @@ export default function App() {
     setCurrentScreen('login');
     setSelectedSubject(null);
     setSelectedContent(null);
+    setUserSession(null);
+    // Limpiar localStorage
+    localStorage.removeItem('estudianteId');
+    localStorage.removeItem('personaId');
+    localStorage.removeItem('nombreEstudiante');
+    localStorage.removeItem('codigoEstudiante');
   };
 
   const handleLogout = () => {
     setCurrentScreen('login');
     setSelectedSubject(null);
     setSelectedContent(null);
+    setUserSession(null);
+    // Limpiar localStorage
+    localStorage.removeItem('estudianteId');
+    localStorage.removeItem('personaId');
+    localStorage.removeItem('nombreEstudiante');
+    localStorage.removeItem('codigoEstudiante');
   };
 
   const handleSubjectSelect = (subject: Subject) => {
