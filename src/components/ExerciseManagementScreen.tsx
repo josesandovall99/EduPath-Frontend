@@ -18,7 +18,7 @@ interface EjercicioItem {
   contenido_id: number;
   puntos: number;
   resultado_ejercicio: string;
-  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas';
+  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción multiple' | 'Ordenar' | 'Relacionar';
   configuracion?: any;
   actividad?: {
     id: number;
@@ -53,7 +53,7 @@ interface ExerciseFormData {
     contenido_id: number | '';
     puntos: number | '';
     resultado_ejercicio: string;
-    tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas';
+    tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción multiple' | 'Ordenar' | 'Relacionar';
     configuracion: any;
   };
 }
@@ -89,6 +89,197 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
           required
         />
         <p className="text-xs text-gray-500 mt-1">Este código se usará para validar la respuesta del estudiante</p>
+      </div>
+    </div>
+  );
+}
+
+// Configuración: Opción múltiple
+function MultipleChoiceConfig({ formData, setFormData }: { formData: ExerciseFormData; setFormData: React.Dispatch<React.SetStateAction<ExerciseFormData>> }) {
+  const cfg = formData.ejercicio.configuracion || { enunciado: '', opciones: ['', '', '', ''], correctaIndex: 0 };
+
+  const setCfg = (update: any) => {
+    setFormData(prev => ({
+      ...prev,
+      ejercicio: { ...prev.ejercicio, configuracion: { ...cfg, ...update } }
+    }));
+  };
+
+  return (
+    <div className="space-y-4 p-4 bg-green-50 rounded-lg border border-green-200">
+      <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración: Opción múltiple</h3>
+      <div>
+        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Enunciado *</label>
+        <input
+          type="text"
+          value={cfg.enunciado}
+          onChange={(e) => setCfg({ enunciado: e.target.value })}
+          placeholder="Escribe la pregunta"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-[#3A4A5B]">Opciones * (marca la correcta)</label>
+        {(cfg.opciones || []).map((op: string, idx: number) => (
+          <div key={idx} className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="mc-correcta"
+              checked={cfg.correctaIndex === idx}
+              onChange={() => setCfg({ correctaIndex: idx })}
+              className="w-4 h-4 text-[#4A90E2] border-gray-300 focus:ring-[#4A90E2]"
+            />
+            <input
+              type="text"
+              value={op}
+              onChange={(e) => {
+                const opciones = [...(cfg.opciones || [])];
+                opciones[idx] = e.target.value;
+                setCfg({ opciones });
+              }}
+              placeholder={`Opción ${idx + 1}`}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Configuración: Ordenar
+function OrderingConfig({ formData, setFormData }: { formData: ExerciseFormData; setFormData: React.Dispatch<React.SetStateAction<ExerciseFormData>> }) {
+  const cfg = formData.ejercicio.configuracion || { enunciado: '', items: ['Item 1', 'Item 2', 'Item 3'] };
+
+  const setCfg = (update: any) => {
+    setFormData(prev => ({
+      ...prev,
+      ejercicio: { ...prev.ejercicio, configuracion: { ...cfg, ...update } }
+    }));
+  };
+
+  const moveItem = (index: number, dir: -1 | 1) => {
+    const items = [...(cfg.items || [])];
+    const newIndex = index + dir;
+    if (newIndex < 0 || newIndex >= items.length) return;
+    const [item] = items.splice(index, 1);
+    items.splice(newIndex, 0, item);
+    setCfg({ items });
+  };
+
+  const addItem = () => {
+    setCfg({ items: [...(cfg.items || []), `Item ${((cfg.items || []).length + 1)}`] });
+  };
+
+  const removeItem = (index: number) => {
+    const items = [...(cfg.items || [])];
+    items.splice(index, 1);
+    setCfg({ items });
+  };
+
+  return (
+    <div className="space-y-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+      <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración: Ordenar</h3>
+      <div>
+        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Enunciado *</label>
+        <input
+          type="text"
+          value={cfg.enunciado}
+          onChange={(e) => setCfg({ enunciado: e.target.value })}
+          placeholder="Describe la tarea a ordenar"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-[#3A4A5B]">Ítems (en orden correcto) *</label>
+        {(cfg.items || []).map((it: string, idx: number) => (
+          <div key={idx} className="flex items-center gap-2">
+            <span className="w-6 text-gray-500 text-sm">{idx + 1}.</span>
+            <input
+              type="text"
+              value={it}
+              onChange={(e) => {
+                const items = [...(cfg.items || [])];
+                items[idx] = e.target.value;
+                setCfg({ items });
+              }}
+              placeholder={`Ítem ${idx + 1}`}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
+            />
+            <button type="button" className="px-2 py-1 border rounded" onClick={() => moveItem(idx, -1)}>↑</button>
+            <button type="button" className="px-2 py-1 border rounded" onClick={() => moveItem(idx, 1)}>↓</button>
+            <button type="button" className="px-2 py-1 text-red-600 border rounded" onClick={() => removeItem(idx)}>✕</button>
+          </div>
+        ))}
+        <button type="button" className="mt-2 px-3 py-1 bg-[#7ED6A7] text-white rounded" onClick={addItem}>Agregar ítem</button>
+      </div>
+    </div>
+  );
+}
+
+// Configuración: Relacionar
+function MatchingConfig({ formData, setFormData }: { formData: ExerciseFormData; setFormData: React.Dispatch<React.SetStateAction<ExerciseFormData>> }) {
+  const cfg = formData.ejercicio.configuracion || { enunciado: '', pares: [{ concepto: '', definicion: '' }] };
+
+  const setCfg = (update: any) => {
+    setFormData(prev => ({
+      ...prev,
+      ejercicio: { ...prev.ejercicio, configuracion: { ...cfg, ...update } }
+    }));
+  };
+
+  const addPair = () => setCfg({ pares: [...(cfg.pares || []), { concepto: '', definicion: '' }] });
+  const removePair = (idx: number) => {
+    const pares = [...(cfg.pares || [])];
+    pares.splice(idx, 1);
+    setCfg({ pares });
+  };
+
+  return (
+    <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+      <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración: Relacionar</h3>
+      <div>
+        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Enunciado *</label>
+        <input
+          type="text"
+          value={cfg.enunciado}
+          onChange={(e) => setCfg({ enunciado: e.target.value })}
+          placeholder="Indica cómo deben relacionarse los conceptos"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-[#3A4A5B]">Pares concepto/definición *</label>
+        {(cfg.pares || []).map((p: any, idx: number) => (
+          <div key={idx} className="grid grid-cols-2 gap-2 items-center">
+            <input
+              type="text"
+              value={p.concepto}
+              onChange={(e) => {
+                const pares = [...(cfg.pares || [])];
+                pares[idx] = { ...pares[idx], concepto: e.target.value };
+                setCfg({ pares });
+              }}
+              placeholder={`Concepto ${idx + 1}`}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={p.definicion}
+                onChange={(e) => {
+                  const pares = [...(cfg.pares || [])];
+                  pares[idx] = { ...pares[idx], definicion: e.target.value };
+                  setCfg({ pares });
+                }}
+                placeholder={`Definición ${idx + 1}`}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
+              />
+              <button type="button" className="px-2 py-1 text-red-600 border rounded" onClick={() => removePair(idx)}>✕</button>
+            </div>
+          </div>
+        ))}
+        <button type="button" className="mt-2 px-3 py-1 bg-[#7ED6A7] text-white rounded" onClick={addPair}>Agregar par</button>
       </div>
     </div>
   );
@@ -471,6 +662,15 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     
     // Determinar configuración según tipo
     let configuracion = item.configuracion || {};
+    // Detectar el subtipo real desde la configuración para ejercicios de tipo "Preguntas"
+    let tipoReal = item.tipo_ejercicio;
+    if (item.tipo_ejercicio === 'Preguntas' && configuracion.tipo) {
+      if (configuracion.tipo === 'opcion-multiple') tipoReal = 'Opción multiple';
+      else if (configuracion.tipo === 'ordenar') tipoReal = 'Ordenar';
+      else if (configuracion.tipo === 'relacionar') tipoReal = 'Relacionar';
+      else if (configuracion.tipo === 'cuestionario') tipoReal = 'Preguntas';
+    }
+
     if (!item.tipo_ejercicio || item.tipo_ejercicio === 'Compilador') {
       configuracion = {
         tipo: 'programacion',
@@ -481,10 +681,29 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
       configuracion = {
         opciones: configuracion.opciones || {}
       };
-    } else if (item.tipo_ejercicio === 'Preguntas') {
+    } else if (tipoReal === 'Preguntas') {
       configuracion = {
         tipo: 'cuestionario',
         preguntas: configuracion.preguntas || []
+      };
+    } else if (tipoReal === 'Opción multiple') {
+      configuracion = {
+        tipo: 'opcion-multiple',
+        enunciado: configuracion.enunciado || '',
+        opciones: configuracion.opciones || ['', '', '', ''],
+        correctaIndex: typeof configuracion.correctaIndex === 'number' ? configuracion.correctaIndex : 0,
+      };
+    } else if (tipoReal === 'Ordenar') {
+      configuracion = {
+        tipo: 'ordenar',
+        enunciado: configuracion.enunciado || '',
+        items: Array.isArray(configuracion.items) ? configuracion.items : ['Item 1', 'Item 2', 'Item 3'],
+      };
+    } else if (tipoReal === 'Relacionar') {
+      configuracion = {
+        tipo: 'relacionar',
+        enunciado: configuracion.enunciado || '',
+        pares: Array.isArray(configuracion.pares) ? configuracion.pares : [{ concepto: '', definicion: '' }],
       };
     }
 
@@ -500,7 +719,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         contenido_id: item.contenido_id || '',
         puntos: item.puntos || '',
         resultado_ejercicio: item.resultado_ejercicio || '',
-        tipo_ejercicio: item.tipo_ejercicio || 'Compilador',
+        tipo_ejercicio: tipoReal as ExerciseFormData['ejercicio']['tipo_ejercicio'],
         configuracion
       }
     });
@@ -542,13 +761,19 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
           nuevaConfiguracion = { opciones: {} };
         } else if (value === 'Preguntas') {
           nuevaConfiguracion = { tipo: 'cuestionario', preguntas: [] };
+        } else if (value === 'Opción multiple') {
+          nuevaConfiguracion = { tipo: 'opcion-multiple', enunciado: '', opciones: ['', '', '', ''], correctaIndex: 0 };
+        } else if (value === 'Ordenar') {
+          nuevaConfiguracion = { tipo: 'ordenar', enunciado: '', items: ['Item 1', 'Item 2', 'Item 3'] };
+        } else if (value === 'Relacionar') {
+          nuevaConfiguracion = { tipo: 'relacionar', enunciado: '', pares: [{ concepto: '', definicion: '' }] };
         }
         
         setFormData((prev) => ({
           ...prev,
           ejercicio: {
             ...prev.ejercicio,
-            tipo_ejercicio: value as 'Compilador' | 'Diagramas UML' | 'Preguntas',
+            tipo_ejercicio: value as ExerciseFormData['ejercicio']['tipo_ejercicio'],
             configuracion: nuevaConfiguracion,
             resultado_ejercicio: '' // Limpiar al cambiar tipo
           }
@@ -585,6 +810,24 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         toast.error('Respuesta requerida', { description: 'Define la respuesta esperada.' });
         return;
       }
+    } else if (formData.ejercicio.tipo_ejercicio === 'Opción multiple') {
+      const cfg = formData.ejercicio.configuracion;
+      if (!cfg?.enunciado || !Array.isArray(cfg.opciones) || cfg.opciones.some((o: string) => !o)) {
+        toast.error('Opción múltiple incompleta', { description: 'Define enunciado y todas las opciones.' });
+        return;
+      }
+    } else if (formData.ejercicio.tipo_ejercicio === 'Ordenar') {
+      const cfg = formData.ejercicio.configuracion;
+      if (!cfg?.enunciado || !Array.isArray(cfg.items) || cfg.items.length < 2) {
+        toast.error('Ordenar incompleto', { description: 'Define enunciado y al menos dos ítems.' });
+        return;
+      }
+    } else if (formData.ejercicio.tipo_ejercicio === 'Relacionar') {
+      const cfg = formData.ejercicio.configuracion;
+      if (!cfg?.enunciado || !Array.isArray(cfg.pares) || cfg.pares.some((p: any) => !p.concepto || !p.definicion)) {
+        toast.error('Relacionar incompleto', { description: 'Agrega pares con concepto y definición.' });
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -605,6 +848,14 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         };
       }
 
+      // Mapear tipo_ejercicio para el backend
+      // El backend solo acepta: "Compilador", "Diagramas UML", "Preguntas"
+      // Opción multiple, Ordenar, Relacionar son subtipos de Preguntas
+      let tipoEjercicioBackend = formData.ejercicio.tipo_ejercicio;
+      if (['Opción multiple', 'Ordenar', 'Relacionar'].includes(formData.ejercicio.tipo_ejercicio)) {
+        tipoEjercicioBackend = 'Preguntas';
+      }
+
       const body = JSON.stringify({
         actividad: {
           titulo: formData.actividad.titulo,
@@ -616,7 +867,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
           contenido_id: formData.ejercicio.contenido_id,
           puntos: formData.ejercicio.puntos,
           resultado_ejercicio: formData.ejercicio.resultado_ejercicio,
-          tipo_ejercicio: formData.ejercicio.tipo_ejercicio,
+          tipo_ejercicio: tipoEjercicioBackend,
           configuracion: configuracionFinal
         }
       });
@@ -875,11 +1126,17 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                   <option value="Compilador">Compilador</option>
                   <option value="Diagramas UML">Diagramas UML</option>
                   <option value="Preguntas">Preguntas</option>
+                  <option value="Opción multiple">Opción múltiple</option>
+                  <option value="Ordenar">Ordenar</option>
+                  <option value="Relacionar">Relacionar</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
                   {formData.ejercicio.tipo_ejercicio === 'Compilador' && 'Ejercicio de programación con ejecución de código'}
                   {formData.ejercicio.tipo_ejercicio === 'Diagramas UML' && 'Ejercicio de creación de diagramas UML'}
                   {formData.ejercicio.tipo_ejercicio === 'Preguntas' && 'Cuestionario con preguntas y respuestas'}
+                  {formData.ejercicio.tipo_ejercicio === 'Opción multiple' && 'Pregunta de opción múltiple (una correcta)'}
+                  {formData.ejercicio.tipo_ejercicio === 'Ordenar' && 'Ordenar ítems para formar la secuencia correcta'}
+                  {formData.ejercicio.tipo_ejercicio === 'Relacionar' && 'Relacionar conceptos con definiciones'}
                 </p>
               </div>
 
@@ -940,6 +1197,18 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
 
               {formData.ejercicio.tipo_ejercicio === 'Preguntas' && (
                 <PreguntasConfig formData={formData} setFormData={setFormData} />
+              )}
+
+              {formData.ejercicio.tipo_ejercicio === 'Opción multiple' && (
+                <MultipleChoiceConfig formData={formData} setFormData={setFormData} />
+              )}
+
+              {formData.ejercicio.tipo_ejercicio === 'Ordenar' && (
+                <OrderingConfig formData={formData} setFormData={setFormData} />
+              )}
+
+              {formData.ejercicio.tipo_ejercicio === 'Relacionar' && (
+                <MatchingConfig formData={formData} setFormData={setFormData} />
               )}
 
               <div className="flex gap-3 justify-end">

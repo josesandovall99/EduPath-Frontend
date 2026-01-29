@@ -4,6 +4,9 @@ import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png'
 import { ProgrammingContentView } from './ProgrammingContentView';
 import { UMLDiagramView } from './UMLDiagramView';
 import { QuizActivityView } from './QuizActivityView';
+import { MultipleChoiceExercise } from './MultipleChoiceExercise';
+import { OrderingExercise } from './OrderingExercise';
+import { MatchingExercise } from './MatchingExercise';
 
 // Estilos para renderizado de HTML
 const htmlContentStyles = `
@@ -144,7 +147,7 @@ interface Ejercicio {
   contenido_id: number;
   puntos: number;
   resultado_ejercicio: string;
-  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas';
+  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción multiple' | 'Ordenar' | 'Relacionar';
   configuracion?: any;
   actividad?: {
     id: number;
@@ -447,7 +450,20 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       
       if (ejercicio) {
         console.log('✅ Ejercicio encontrado:', ejercicio);
-        setEjercicioAsociado(ejercicio);
+        
+        // Detectar el subtipo real desde la configuración para ejercicios de tipo "Preguntas"
+        let ejercicioConTipoReal = { ...ejercicio };
+        if (ejercicio.tipo_ejercicio === 'Preguntas' && ejercicio.configuracion?.tipo) {
+          if (ejercicio.configuracion.tipo === 'opcion-multiple') {
+            ejercicioConTipoReal.tipo_ejercicio = 'Opción multiple';
+          } else if (ejercicio.configuracion.tipo === 'ordenar') {
+            ejercicioConTipoReal.tipo_ejercicio = 'Ordenar';
+          } else if (ejercicio.configuracion.tipo === 'relacionar') {
+            ejercicioConTipoReal.tipo_ejercicio = 'Relacionar';
+          }
+        }
+        
+        setEjercicioAsociado(ejercicioConTipoReal);
       } else {
         console.log('ℹ️ No hay ejercicio asociado a este contenido');
         console.log('💡 Ejercicios disponibles:', ejercicios.map(ej => ({ id: ej.id, contenido_id: ej.contenido_id })));
@@ -822,7 +838,20 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                               console.log('📝 Seleccionando ejercicio:', item.ejercicioData);
                               setSelectedContentId(item.id);
                               setSelectedContentData(null); // No hay contenido asociado
-                              setEjercicioAsociado(item.ejercicioData); // Cargar el ejercicio directamente
+                              
+                              // Detectar el subtipo real desde la configuración para ejercicios de tipo "Preguntas"
+                              let ejercicioConTipoReal = { ...item.ejercicioData };
+                              if (item.ejercicioData.tipo_ejercicio === 'Preguntas' && item.ejercicioData.configuracion?.tipo) {
+                                if (item.ejercicioData.configuracion.tipo === 'opcion-multiple') {
+                                  ejercicioConTipoReal.tipo_ejercicio = 'Opción multiple';
+                                } else if (item.ejercicioData.configuracion.tipo === 'ordenar') {
+                                  ejercicioConTipoReal.tipo_ejercicio = 'Ordenar';
+                                } else if (item.ejercicioData.configuracion.tipo === 'relacionar') {
+                                  ejercicioConTipoReal.tipo_ejercicio = 'Relacionar';
+                                }
+                              }
+                              
+                              setEjercicioAsociado(ejercicioConTipoReal); // Cargar el ejercicio directamente
                               setLoadingEjercicio(false);
                             } else {
                               // Es un contenido normal
@@ -965,6 +994,33 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                       id: ejercicioAsociado.id.toString(),
                       title: ejercicioAsociado.actividad?.titulo || 'Ejercicio'
                     }}
+                    onBack={onBack}
+                  />
+                )}
+
+                {ejercicioAsociado.tipo_ejercicio === 'Opción multiple' && (
+                  <MultipleChoiceExercise
+                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
+                    enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Selecciona la opción correcta'}
+                    opciones={Array.isArray(ejercicioAsociado.configuracion?.opciones) ? ejercicioAsociado.configuracion?.opciones : undefined}
+                    onBack={onBack}
+                  />
+                )}
+
+                {ejercicioAsociado.tipo_ejercicio === 'Ordenar' && (
+                  <OrderingExercise
+                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
+                    enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Ordena los elementos correctamente'}
+                    items={Array.isArray(ejercicioAsociado.configuracion?.items) ? ejercicioAsociado.configuracion?.items : undefined}
+                    onBack={onBack}
+                  />
+                )}
+
+                {ejercicioAsociado.tipo_ejercicio === 'Relacionar' && (
+                  <MatchingExercise
+                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
+                    enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Relaciona conceptos con definiciones'}
+                    pares={Array.isArray(ejercicioAsociado.configuracion?.pares) ? ejercicioAsociado.configuracion?.pares : undefined}
                     onBack={onBack}
                   />
                 )}
@@ -1152,6 +1208,33 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                           id: ejercicioAsociado.id.toString(),
                           title: ejercicioAsociado.actividad?.titulo || selectedContentData.title
                         }}
+                        onBack={onBack}
+                      />
+                    )}
+
+                    {ejercicioAsociado.tipo_ejercicio === 'Opción multiple' && (
+                      <MultipleChoiceExercise
+                        activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || selectedContentData.title }}
+                        enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Selecciona la opción correcta'}
+                        opciones={Array.isArray(ejercicioAsociado.configuracion?.opciones) ? ejercicioAsociado.configuracion?.opciones : undefined}
+                        onBack={onBack}
+                      />
+                    )}
+
+                    {ejercicioAsociado.tipo_ejercicio === 'Ordenar' && (
+                      <OrderingExercise
+                        activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || selectedContentData.title }}
+                        enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Ordena los elementos correctamente'}
+                        items={Array.isArray(ejercicioAsociado.configuracion?.items) ? ejercicioAsociado.configuracion?.items : undefined}
+                        onBack={onBack}
+                      />
+                    )}
+
+                    {ejercicioAsociado.tipo_ejercicio === 'Relacionar' && (
+                      <MatchingExercise
+                        activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || selectedContentData.title }}
+                        enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Relaciona conceptos con definiciones'}
+                        pares={Array.isArray(ejercicioAsociado.configuracion?.pares) ? ejercicioAsociado.configuracion?.pares : undefined}
                         onBack={onBack}
                       />
                     )}

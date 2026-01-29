@@ -6,7 +6,7 @@ export interface SubmitResult<T = any> {
 
 /**
  * POST an exercise submission to the backend using the new contract.
- * Endpoint: POST /ejercicios/:id/enviar
+ * Endpoint: POST /ejercicios/:id/enviar-respuesta
  * Body: { estudiante_id, respuesta }
  */
 export async function submitExercise(
@@ -15,10 +15,12 @@ export async function submitExercise(
   estudianteId?: string | number
 ): Promise<SubmitResult> {
   try {
-    const res = await fetch(`http://localhost:4000/ejercicios/${ejercicioId}/enviar`, {
+    const body = { estudiante_id: estudianteId, respuesta };
+    console.log('📤 Enviando ejercicio:', ejercicioId, 'Body:', JSON.stringify(body, null, 2));
+    const res = await fetch(`http://localhost:4000/ejercicios/${ejercicioId}/enviar-respuesta`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estudiante_id: estudianteId, respuesta })
+      body: JSON.stringify(body)
     });
 
     let data: any = null;
