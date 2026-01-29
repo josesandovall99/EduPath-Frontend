@@ -378,103 +378,53 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     }
   };
 
-  // Enviar y calificar el diagrama (usa /enviar - UN SOLO INTENTO)
+  // Enviar y calificar el diagrama (usa /enviar con nueva lógica de estados)
   const submitDiagram = async () => {
     setIsValidating(true);
     const json = graphRef.current?.toJSON();
-    
-    // Obtener estudiante_id del localStorage
+
     const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
-    
     if (!estudianteId) {
       alert('❌ Error: No se encontró el ID del estudiante. Por favor, inicia sesión nuevamente.');
       setIsValidating(false);
       return;
     }
-    
-    console.log('📤 Enviando diagrama para calificar:', json);
-    console.log('👤 Estudiante ID:', estudianteId);
-    console.log('📍 URL:', `http://localhost:4000/ejercicios/${activity.id}/enviar`);
-    
+
     try {
       const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/enviar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          estudiante_id: estudianteId,
-          respuesta: { diagram: json }
-        })
+        body: JSON.stringify({ estudiante_id: estudianteId, respuesta: { diagram: json } })
       });
 
-      console.log('📥 Response status:', response.status);
-      
-      const data: any = await response.json();
-      console.log('📥 Response data:', data);
+      const data: any = await response.json().catch(() => ({}));
 
-      // 429 - Evaluación en curso (evitar doble clic)
+      // 429: Evaluación en curso (evitar doble click)
       if (response.status === 429) {
-        const mensaje = data.message || data.error || 'Evaluación en curso';
-        alert(`⏳ ${mensaje}\n\nPor favor espera a que termine la evaluación actual.`);
+        alert(`⏳ ${data?.message || data?.error || 'Evaluación en curso'}\n\nIntenta nuevamente en unos segundos.`);
         setIsValidating(false);
         return;
       }
 
-      // 409 - Ya existe una respuesta registrada (bloquear permanentemente)
+      // 409: Ejercicio ya aprobado (bloquear envíos)
       if (response.status === 409) {
-        const mensaje = data.message || data.error || 'Ya existe una respuesta registrada para este ejercicio';
         setEjercicioAprobado(true);
-        alert(`⚠️ ${mensaje}\n\nNo puedes enviar más respuestas.\n\nContacta al administrador si necesitas resetear el ejercicio.`);
+        alert(`⚠️ ${data?.message || data?.error || 'Ejercicio ya aprobado'}`);
         setIsValidating(false);
         return;
       }
 
-      // Verificar si la respuesta tiene estructura válida (200 OK)
-      if (!response.ok) {
-        const mensajeError = data.message || data.error || 'Error al enviar el diagrama';
-        alert(`❌ Error del servidor: ${mensajeError}`);
-        setIsValidating(false);
-        return;
-      }
+      // 400: Incorrecta - mostrar feedback y permitir reintento inmediato
+      if (response.status === 400) {
+        const ejercicioData = data as EjercicioResponse;
+        const errors = ejercicioData.detalle?.errors || [];
+        const warnings = ejercicioData.detalle?.warnings || [];
 
-      // 200 - Respuesta procesada exitosamente (correcta o incorrecta)
-      const ejercicioData = data as EjercicioResponse;
-      const errors = ejercicioData.detalle?.errors || [];
-      const warnings = ejercicioData.detalle?.warnings || [];
-      
-      // Bloquear botón después del primer envío (ya no hay reintentos)
-      setEjercicioAprobado(true);
-      
-      // Si la respuesta es CORRECTA
-      if (ejercicioData.esCorrecta) {
-        setValidationErrors([]);
-        setValidationWarnings([]);
-        setShowErrorModal(false);
-        
-        let mensaje = `✅ ¡Felicidades! Respuesta correcta\n\nPuntos obtenidos: ${ejercicioData.puntosObtenidos}`;
-        
-        if (ejercicioData.intentoId) {
-          mensaje += `\nIntento registrado: #${ejercicioData.intentoId}`;
-        }
-        
-        if (ejercicioData.retroalimentacion) {
-          mensaje += `\n\nRetroalimentación:\n${ejercicioData.retroalimentacion}`;
-        }
-        
-        alert(mensaje);
-      } 
-      // Si la respuesta es INCORRECTA
-      else {
-        // Resaltar elementos con error en rojo
         errors.forEach(err => {
           if (err.elementId) {
             const element = graphRef.current?.getCell(err.elementId);
             if (element) {
-              element.attr({
-                body: {
-                  stroke: '#f44336',
-                  strokeWidth: 3
-                }
-              });
+              element.attr({ body: { stroke: '#f44336', strokeWidth: 3 } });
             }
           }
         });
@@ -482,29 +432,39 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
         setValidationErrors(errors);
         setValidationWarnings(warnings);
         setShowErrorModal(true);
-        
-        // Mensaje adicional
-        let mensaje = `❌ Respuesta incorrecta\n\nPuntos obtenidos: ${ejercicioData.puntosObtenidos}`;
-        
-        if (ejercicioData.intentoId) {
-          mensaje += `\nIntento registrado: #${ejercicioData.intentoId}`;
-        }
-        
-        if (errors.length > 0) {
-          mensaje += `\n\nSe encontraron ${errors.length} error${errors.length !== 1 ? 'es' : ''}. Revisa los detalles en el panel.`;
-        }
-        
-        if (ejercicioData.retroalimentacion) {
-          mensaje += `\n\nRetroalimentación:\n${ejercicioData.retroalimentacion}`;
-        }
-        
-        mensaje += `\n\n⚠️ Ya no puedes volver a intentar este ejercicio.`;
-        
-        alert(mensaje);
+
+        let msg = `❌ Respuesta incorrecta`;
+        if (typeof ejercicioData.puntosObtenidos === 'number') msg += `\n\nPuntos obtenidos: ${ejercicioData.puntosObtenidos}`;
+        if (ejercicioData.retroalimentacion) msg += `\n\nRetroalimentación:\n${ejercicioData.retroalimentacion}`;
+        alert(msg);
+
+        // Permitir reintento
+        setEjercicioAprobado(false);
+        setIsValidating(false);
+        return;
       }
+
+      // 200: Correcta - mostrar feedback y puntos, bloquear envíos
+      if (response.status === 200) {
+        const ejercicioData = data as EjercicioResponse;
+        setValidationErrors([]);
+        setValidationWarnings([]);
+        setShowErrorModal(false);
+        setEjercicioAprobado(true);
+
+        let msg = `✅ ¡Correcta!`;
+        if (typeof ejercicioData.puntosObtenidos === 'number') msg += `\n\nPuntos obtenidos: ${ejercicioData.puntosObtenidos}`;
+        if (ejercicioData.retroalimentacion) msg += `\n\nRetroalimentación:\n${ejercicioData.retroalimentacion}`;
+        alert(msg);
+        setIsValidating(false);
+        return;
+      }
+
+      // Otros errores
+      alert(`❌ Error del servidor: ${data?.message || data?.error || 'Error desconocido'}`);
     } catch (error) {
       console.error('❌ Error completo:', error);
-      alert('❌ Error al enviar el diagrama. Backend no disponible en este momento.');
+      alert('❌ Error al enviar el diagrama. Backend no disponible.');
     } finally {
       setIsValidating(false);
     }

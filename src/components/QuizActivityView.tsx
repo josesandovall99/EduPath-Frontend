@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, CheckCircle2, Play, FileText, Lightbulb, SkipBack, SkipForward } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { submitExercise } from '../utils/submitExercise';
 
 interface QuizActivityViewProps {
   subjectName: string;
@@ -22,6 +23,10 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [expandedModule, setExpandedModule] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aprobado, setAprobado] = useState(false);
+  const [feedback, setFeedback] = useState<string>('');
+  const [puntos, setPuntos] = useState<number | null>(null);
   
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
 
@@ -34,6 +39,58 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
       'Seguridad de datos'
     ],
     correctAnswer: 1
+  };
+
+  const indexToLetter = (idx: number) => ['A', 'B', 'C', 'D', 'E'][idx] || 'A';
+
+  const handleSubmit = async () => {
+    if (selectedAnswer === null) return;
+    setIsSubmitting(true);
+    const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
+    if (!estudianteId) {
+      alert('❌ No se encontró el ID del estudiante. Inicia sesión.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const payload = { respuestas: { p1: indexToLetter(selectedAnswer) } };
+    const result = await submitExercise(activity.id, payload, estudianteId!);
+
+    if (result.status === 429) {
+      alert(`⏳ ${result.message || 'Evaluación en curso'}`);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (result.status === 409) {
+      setAprobado(true);
+      alert(`⚠️ ${result.message || 'Ejercicio ya aprobado'}`);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (result.status === 400) {
+      const data: any = result.data || {};
+      setFeedback(data?.retroalimentacion || 'Respuesta incorrecta. Puedes reintentar.');
+      if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
+      alert(`❌ Incorrecta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
+      setAprobado(false);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (result.status === 200) {
+      const data: any = result.data || {};
+      setAprobado(true);
+      setFeedback(data?.retroalimentacion || '¡Correcto!');
+      if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
+      alert(`✅ Correcta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
+      setIsSubmitting(false);
+      return;
+    }
+
+    alert(`❌ Error del servidor: ${result.message || 'Error desconocido'}`);
+    setIsSubmitting(false);
   };
 
   return (
@@ -175,14 +232,23 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
 
               {/* Submit Button */}
               <div className="mt-8 flex justify-center">
-                <button 
-                  disabled={selectedAnswer === null}
+                <button
+                  onClick={handleSubmit}
+                  disabled={selectedAnswer === null || isSubmitting || aprobado}
                   className="px-8 py-3 rounded-xl text-white shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: selectedAnswer === null ? '#9CA3AF' : subjectColor }}
+                  style={{ backgroundColor: (selectedAnswer === null || isSubmitting || aprobado) ? '#9CA3AF' : subjectColor }}
+                  title={aprobado ? 'Ejercicio ya aprobado' : 'Enviar respuesta'}
                 >
-                  Enviar respuesta
+                  {aprobado ? 'Aprobado' : isSubmitting ? 'Enviando...' : 'Enviar respuesta'}
                 </button>
               </div>
+
+              {feedback && (
+                <div className="mt-4 p-4 rounded-lg border" style={{ borderColor: subjectColor }}>
+                  <div className="text-sm text-gray-700">{feedback}</div>
+                  {puntos !== null && <div className="text-sm mt-2" style={{ color: subjectColor }}>Puntos obtenidos: {puntos}</div>}
+                </div>
+              )}
             </div>
 
             {/* Help Card */}
