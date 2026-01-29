@@ -32,6 +32,16 @@ interface ValidationResponse {
   warnings?: ValidationError[];
 }
 
+interface EjercicioResponse {
+  ejercicioId: string;
+  esCorrecta: boolean;
+  puntosObtenidos: number;
+  detalle: {
+    errors: ValidationError[];
+    warnings: ValidationError[];
+  };
+}
+
 interface MultiplicityDialog {
   isOpen: boolean;
   sourceId: string | null;
@@ -311,22 +321,29 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     }
   };
 
+  // Validación rápida (preview) - usa el mismo endpoint que enviar
   const validateDiagram = async () => {
     setIsValidating(true);
     const json = graphRef.current?.toJSON();
     
+    console.log('📤 Enviando diagrama (preview):', json);
+    
     try {
-      const response = await fetch('http://localhost:4000/diagrams/validate', {
+      const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/resolver`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ diagram: json })
       });
 
-      const data: ValidationResponse = await response.json();
+      const data: EjercicioResponse = await response.json();
+      console.log('📥 Response (preview):', data);
 
-      if (!data.success && data.errors) {
+      const errors = data.detalle?.errors || [];
+      const warnings = data.detalle?.warnings || [];
+
+      if (!data.esCorrecta && errors.length > 0) {
         // Resaltar elementos con error en rojo
-        data.errors.forEach(err => {
+        errors.forEach(err => {
           if (err.elementId) {
             const element = graphRef.current?.getCell(err.elementId);
             if (element) {
@@ -340,18 +357,77 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
           }
         });
 
-        setValidationErrors(data.errors);
-        setValidationWarnings(data.warnings || []);
+        setValidationErrors(errors);
+        setValidationWarnings(warnings);
         setShowErrorModal(true);
       } else {
         // Diagrama válido
         setValidationErrors([]);
-        setValidationWarnings(data.warnings || []);
+        setValidationWarnings(warnings);
         setShowErrorModal(false);
-        alert('✓ Diagrama válido');
+        alert(`✓ Diagrama válido (preview)\nPuntos: ${data.puntosObtenidos}`);
       }
     } catch (error) {
+      console.error('❌ Error completo:', error);
       alert('❌ Error al validar. Backend no disponible en este momento.');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  // Enviar y calificar el diagrama (mismo endpoint que preview)
+  const submitDiagram = async () => {
+    setIsValidating(true);
+    const json = graphRef.current?.toJSON();
+    
+    console.log('📤 Enviando diagrama:', json);
+    console.log('📍 URL:', `http://localhost:4000/ejercicios/${activity.id}/resolver`);
+    
+    try {
+      const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/resolver`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ diagram: json })
+      });
+
+      console.log('📥 Response status:', response.status);
+      
+      const data: EjercicioResponse = await response.json();
+      console.log('📥 Response data:', data);
+
+      const errors = data.detalle?.errors || [];
+      const warnings = data.detalle?.warnings || [];
+
+      if (!data.esCorrecta && errors.length > 0) {
+        // Resaltar elementos con error en rojo
+        errors.forEach(err => {
+          if (err.elementId) {
+            const element = graphRef.current?.getCell(err.elementId);
+            if (element) {
+              element.attr({
+                body: {
+                  stroke: '#f44336',
+                  strokeWidth: 3
+                }
+              });
+            }
+          }
+        });
+
+        setValidationErrors(errors);
+        setValidationWarnings(warnings);
+        setShowErrorModal(true);
+      } else {
+        // Diagrama enviado y calificado exitosamente
+        setValidationErrors([]);
+        setValidationWarnings(warnings);
+        setShowErrorModal(false);
+        alert(`✓ Diagrama enviado y calificado correctamente\n\nPuntos obtenidos: ${data.puntosObtenidos}\nRespuesta correcta: ${data.esCorrecta ? 'Sí' : 'No'}`);
+        // Aquí podrías mostrar la calificación o redirigir
+      }
+    } catch (error) {
+      console.error('❌ Error completo:', error);
+      alert('❌ Error al enviar el diagrama. Backend no disponible en este momento.');
     } finally {
       setIsValidating(false);
     }
@@ -744,7 +820,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
         </div>
       )}
 
-      {/* Header con botón de validar */}
+      {/* Header con botones de validar y enviar */}
       <div className="bg-gradient-to-r from-[#7ED6A7] to-[#7ED6A7]/90 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md">
@@ -755,14 +831,24 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
             <p className="text-white/80 text-sm">{activity.title}</p>
           </div>
         </div>
-        <button 
-          onClick={validateDiagram}
-          disabled={isValidating}
-          className="px-6 py-2 rounded-lg bg-white text-[#7ED6A7] shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-        >
-          <Send className="w-4 h-4" />
-          {isValidating ? 'Validando...' : 'Validar y Enviar'}
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={validateDiagram}
+            disabled={isValidating}
+            className="px-5 py-2 rounded-lg bg-white/90 text-[#7ED6A7] shadow-md hover:shadow-lg hover:bg-white transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+          >
+            <BookOpen className="w-4 h-4" />
+            {isValidating ? 'Validando...' : 'Preview'}
+          </button>
+          <button 
+            onClick={submitDiagram}
+            disabled={isValidating}
+            className="px-6 py-2 rounded-lg bg-white text-[#7ED6A7] shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+          >
+            <Send className="w-4 h-4" />
+            {isValidating ? 'Enviando...' : 'Enviar y Calificar'}
+          </button>
+        </div>
       </div>
 
       {/* Layout Horizontal: Sidebar + Canvas */}
