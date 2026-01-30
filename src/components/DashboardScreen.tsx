@@ -58,6 +58,18 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
   const [progresosPorArea, setProgresosPorArea] = useState<Map<number, number>>(new Map());
   const [loadingProgresos, setLoadingProgresos] = useState(false);
 
+  // Función para obtener áreas permitidas según el semestre
+  const obtenerAreasPermitidas = (semestre: number): string[] => {
+    if (semestre >= 1 && semestre <= 4) {
+      return ['Fundamentos de Programación', 'Fundamentos de programación'];
+    } else if (semestre >= 5 && semestre <= 6) {
+      return ['Fundamentos de Programación', 'Fundamentos de programación', 'Análisis', 'Analisis'];
+    } else if (semestre >= 7 && semestre <= 10) {
+      return ['Fundamentos de Programación', 'Fundamentos de programación', 'Análisis', 'Analisis', 'Gestión de Proyectos', 'Gestion de Proyectos'];
+    }
+    return []; // Si el semestre está fuera de rango
+  };
+
   // Obtener progreso de una área específica
   const obtenerProgresoArea = async (areaId: number) => {
     if (!estudianteId) {
@@ -106,8 +118,24 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         const areas = await response.json();
         console.log('✅ Areas loaded successfully:', areas);
 
+        // 🔒 FILTRO DE SEGURIDAD: Obtener semestre del estudiante
+        // NOTA: Esto debería venir del backend en producción
+        const semestre = parseInt(localStorage.getItem('semestreEstudiante') || '1');
+        const areasPermitidas = obtenerAreasPermitidas(semestre);
+        
+        // Filtrar áreas según el semestre
+        const areasFiltradas = areas.filter((area: Area) => 
+          areasPermitidas.some(permitida => 
+            area.nombre.toLowerCase().includes(permitida.toLowerCase()) ||
+            permitida.toLowerCase().includes(area.nombre.toLowerCase())
+          )
+        );
+
+        console.log(`🎓 Semestre ${semestre} - Áreas permitidas:`, areasPermitidas);
+        console.log('✅ Áreas filtradas:', areasFiltradas);
+
         // Transformar áreas a formato de subjects
-        const transformedSubjects = areas.map((area: Area, index: number) => ({
+        const transformedSubjects = areasFiltradas.map((area: Area, index: number) => ({
           id: area.id.toString(),
           name: area.nombre,
           icon: Code,
