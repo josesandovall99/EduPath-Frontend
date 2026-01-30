@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Send, MessageSquare, CheckCircle2, Circle, Lightbulb, FileText, Check, Save, Bot } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Lightbulb, FileText, Check, Save } from 'lucide-react';
 
 
 interface AIWorkshopViewProps {
@@ -7,16 +7,13 @@ interface AIWorkshopViewProps {
   workshop: {
     id: string;
     title: string;
+    isMiniproyecto?: boolean;
+    actividadId?: number;
   };
   onBack: () => void;
+  estudianteId?: number;
 }
 
-interface Message {
-  id: string;
-  sender: 'ai' | 'student';
-  text: string;
-  timestamp: string;
-}
 
 // Colores por materia
 const subjectColors: Record<string, string> = {
@@ -25,50 +22,102 @@ const subjectColors: Record<string, string> = {
   'Fundamentos de Programación': '#4A90E2'
 };
 
-export function AIWorkshopView({ subjectName, workshop, onBack }: AIWorkshopViewProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      sender: 'ai',
-      text: '¡Hola! Soy el representante de TechCorp. Necesitamos desarrollar un sistema de gestión para nuestra empresa. ¿Podrías ayudarnos a analizar los requisitos?',
-      timestamp: '10:00'
-    },
-    {
-      id: '2',
-      sender: 'ai',
-      text: 'Necesitamos llevar control de nuestros proyectos, empleados y clientes. ¿Qué información necesitas de mí para empezar?',
-      timestamp: '10:01'
-    }
-  ]);
-  
-  const [inputText, setInputText] = useState('');
+const workshopConfigs = {
+  analysis: {
+    description: (
+      <>
+        En este taller interactuarás con un cliente simulado por IA que te 
+        presentará un proyecto real. Tu objetivo es realizar el análisis de 
+        requisitos completo del sistema.
+      </>
+    ),
+    tasks: [
+      'Identificar stakeholders del proyecto',
+      'Recopilar requisitos funcionales',
+      'Definir requisitos no funcionales',
+      'Crear casos de uso principales',
+      'Validar requisitos con el cliente'
+    ],
+    iframeSrc: 'https://zenoembed.textcortex.com/?embed_id=emb_01kg7mwvbgfw2r9tjcat0get0c'
+  },
+  management: {
+    description: (
+      <>
+        En este taller interactuarás con un cliente simulado por IA. Tu objetivo 
+        es determinar el alcance, crear un cronograma y estimar los costos del 
+        proyecto propuesto.
+      </>
+    ),
+    tasks: [
+      'Definir alcance del proyecto',
+      'Identificar entregables principales',
+      'Crear cronograma del proyecto',
+      'Estimar costos y recursos',
+      'Presentar propuesta al cliente'
+    ],
+    iframeSrc: 'https://zenoembed.textcortex.com/?embed_id=emb_01kg7w1f7aep7axvz2r0wjw6jm'
+  }
+};
+
+const API_BASE_URL = '/api';
+
+export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: AIWorkshopViewProps) {
   const [currentTask, setCurrentTask] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const totalTasks = 5;
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
+  const isManagementWorkshop = workshop.actividadId === 13 || subjectName === 'Alcance, Tiempo y Costo';
+  const workshopConfig = isManagementWorkshop ? workshopConfigs.management : workshopConfigs.analysis;
 
-  const handleSendMessage = () => {
-    if (!inputText.trim()) return;
+  const resolveEstudianteId = () => {
+    if (estudianteId) return estudianteId;
+    const stored = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
+    return stored ? parseInt(stored, 10) : null;
+  };
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      sender: 'student',
-      text: inputText,
-      timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-    };
+  const handlePersistProgress = async (estado: 'ENVIADO' | 'COMPLETADO') => {
+    if (!workshop.isMiniproyecto) return;
+    const esId = resolveEstudianteId();
+    const miniId = parseInt(workshop.id, 10);
+    if (!esId || isNaN(miniId)) {
+      setSaveMessage('No se pudo identificar estudiante o miniproyecto.');
+      return;
+    }
 
-    setMessages([...messages, newMessage]);
-    setInputText('');
+    const respuesta = JSON.stringify({
+      mensajes: [],
+      tareaActual: currentTask,
+      totalTareas: totalTasks
+    });
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'ai',
-        text: 'Excelente pregunta. Déjame darte más detalles sobre ese aspecto...',
-        timestamp: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages(prev => [...prev, aiResponse]);
-    }, 1500);
+    setIsSaving(true);
+    setSaveMessage(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/respuestas-miniproyecto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          respuesta,
+          estudiante_id: esId,
+          miniproyecto_id: miniId,
+          estado
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.mensaje || 'Error al guardar el progreso');
+      }
+
+      setSaveMessage(estado === 'COMPLETADO' ? 'Miniproyecto completado.' : 'Progreso guardado.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al guardar el progreso';
+      setSaveMessage(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -88,19 +137,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack }: AIWorkshopView
         <div className="p-6 border-b border-gray-200">
           <h3 className="text-[#3A4A5B] mb-3">Descripción del Taller</h3>
           <p className="text-gray-700 text-sm mb-4">
-            {subjectName === 'Análisis de Sistemas' ? (
-              <>
-                En este taller interactuarás con un cliente simulado por IA que te 
-                presentará un proyecto real. Tu objetivo es realizar el análisis de 
-                requisitos completo del sistema.
-              </>
-            ) : (
-              <>
-                En este taller interactuarás con un cliente simulado por IA. Tu objetivo 
-                es determinar el alcance, crear un cronograma y estimar los costos del 
-                proyecto propuesto.
-              </>
-            )}
+            {workshopConfig.description}
           </p>
           
           {/* Progress */}
@@ -131,75 +168,16 @@ export function AIWorkshopView({ subjectName, workshop, onBack }: AIWorkshopView
         <div className="p-6">
           <h3 className="text-[#3A4A5B] mb-4">Tareas a Completar</h3>
           <div className="space-y-3">
-            {subjectName === 'Análisis de Sistemas' ? (
-              <>
-                <TaskItem 
-                  number={1} 
-                  text="Identificar stakeholders del proyecto"
-                  completed={true}
-                  subjectColor={subjectColor}
-                />
-                <TaskItem 
-                  number={2} 
-                  text="Recopilar requisitos funcionales"
-                  completed={false}
-                  active={true}
-                  subjectColor={subjectColor}
-                />
-                <TaskItem 
-                  number={3} 
-                  text="Definir requisitos no funcionales"
-                  completed={false}
-                  subjectColor={subjectColor}
-                />
-                <TaskItem 
-                  number={4} 
-                  text="Crear casos de uso principales"
-                  completed={false}
-                  subjectColor={subjectColor}
-                />
-                <TaskItem 
-                  number={5} 
-                  text="Validar requisitos con el cliente"
-                  completed={false}
-                  subjectColor={subjectColor}
-                />
-              </>
-            ) : (
-              <>
-                <TaskItem 
-                  number={1} 
-                  text="Definir alcance del proyecto"
-                  completed={true}
-                  subjectColor={subjectColor}
-                />
-                <TaskItem 
-                  number={2} 
-                  text="Identificar entregables principales"
-                  completed={false}
-                  active={true}
-                  subjectColor={subjectColor}
-                />
-                <TaskItem 
-                  number={3} 
-                  text="Crear cronograma del proyecto"
-                  completed={false}
-                  subjectColor={subjectColor}
-                />
-                <TaskItem 
-                  number={4} 
-                  text="Estimar costos y recursos"
-                  completed={false}
-                  subjectColor={subjectColor}
-                />
-                <TaskItem 
-                  number={5} 
-                  text="Presentar propuesta al cliente"
-                  completed={false}
-                  subjectColor={subjectColor}
-                />
-              </>
-            )}
+            {workshopConfig.tasks.map((task, index) => (
+              <TaskItem
+                key={task}
+                number={index + 1}
+                text={task}
+                completed={index === 0}
+                active={index === 1}
+                subjectColor={subjectColor}
+              />
+            ))}
           </div>
 
           {/* Help Section */}
@@ -274,9 +252,9 @@ export function AIWorkshopView({ subjectName, workshop, onBack }: AIWorkshopView
           </div>
         </header>
 
-        {/* Chat Messages */}
+        {/* Chat */}
         <div className="flex-1 overflow-y-auto bg-[#F2F2F2] p-6">
-          <div className="max-w-4xl mx-auto space-y-4">
+          <div className="max-w-6xl mx-auto space-y-4">
             {/* Back Button */}
             <button 
               onClick={onBack}
@@ -285,82 +263,14 @@ export function AIWorkshopView({ subjectName, workshop, onBack }: AIWorkshopView
               <span>Volver</span>
             </button>
 
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.sender === 'student' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`max-w-2xl ${message.sender === 'student' ? 'order-2' : 'order-1'}`}>
-                  <div className="flex items-start gap-3">
-                    {message.sender === 'ai' && (
-                      <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center p-2 flex-shrink-0 shadow-sm"
-                        style={{ backgroundColor: `${subjectColor}20` }}
-                      >
-                        <img src={'https://tse1.mm.bing.net/th/id/OIP.RfniSZo5EqSsXFGeP-zRuQHaE7?cb=ucfimg2&ucfimg=1&rs=1&pid=ImgDetMain&o=7&rm=3'} alt="AI" className="w-full h-full object-contain" />
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <div 
-                        className="p-4 rounded-2xl shadow-sm border"
-                        style={{
-                          borderColor: message.sender === 'ai' ? '#E5E7EB' : subjectColor,
-                          backgroundColor: message.sender === 'ai' ? 'white' : `${subjectColor}15`
-                        }}
-                      >
-                        <p className="text-gray-800 text-sm">{message.text}</p>
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1 px-2">
-                        {message.timestamp}
-                      </div>
-                    </div>
-                    {message.sender === 'student' && (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#4A90E2] to-[#5B9FED] flex items-center justify-center flex-shrink-0 shadow-sm">
-                        <span className="text-white text-xs">TÚ</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* Typing indicator placeholder */}
-            <div className="text-gray-400 text-sm italic pl-14">
-              {/* El cliente está escribiendo... */}
-            </div>
-          </div>
-        </div>
-
-        {/* Input Area */}
-        <div className="bg-white border-t border-gray-200 p-6 shadow-lg">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex gap-3">
-              <textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                placeholder="Escribe tu pregunta o respuesta al cliente..."
-                className="flex-1 border-2 border-gray-300 rounded-xl p-4 bg-white outline-none focus:border-[#4A90E2] resize-none transition-colors"
-                rows={3}
+            <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+              <iframe
+                src={workshopConfig.iframeSrc}
+                width="100%"
+                height="760"
+                frameBorder={0}
+                title="Chatbot cliente"
               />
-              <button
-                onClick={handleSendMessage}
-                className="px-8 rounded-xl text-white self-end shadow-md hover:shadow-lg transition-all flex items-center gap-2"
-                style={{ backgroundColor: subjectColor }}
-              >
-                <Send className="w-4 h-4" />
-                Enviar
-              </button>
-            </div>
-            
-            <div className="flex items-center gap-2 mt-3 text-sm text-gray-500">
-              <Lightbulb className="w-4 h-4" />
-              <span>Tip: Presiona Enter para enviar, Shift+Enter para nueva línea</span>
             </div>
           </div>
         </div>
@@ -372,12 +282,18 @@ export function AIWorkshopView({ subjectName, workshop, onBack }: AIWorkshopView
               Tarea actual: <span style={{ color: subjectColor }}>{currentTask} de {totalTasks}</span>
             </div>
             <div className="flex items-center gap-3">
-              <button className="border-2 border-gray-300 px-5 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-700 text-sm transition-all flex items-center gap-2">
+              <button
+                onClick={() => handlePersistProgress('ENVIADO')}
+                disabled={isSaving || !workshop.isMiniproyecto}
+                className="border-2 border-gray-300 px-5 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-700 text-sm transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
                 <Save className="w-4 h-4" />
                 Guardar progreso
               </button>
               <button 
-                className="px-6 py-2 rounded-lg text-white shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                onClick={() => handlePersistProgress('COMPLETADO')}
+                disabled={isSaving || !workshop.isMiniproyecto}
+                className="px-6 py-2 rounded-lg text-white shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ backgroundColor: subjectColor }}
               >
                 <CheckCircle2 className="w-4 h-4" />
@@ -385,6 +301,11 @@ export function AIWorkshopView({ subjectName, workshop, onBack }: AIWorkshopView
               </button>
             </div>
           </div>
+          {saveMessage && (
+            <div className="mt-3 px-4 text-sm text-gray-600">
+              {saveMessage}
+            </div>
+          )}
         </div>
       </div>
     </div>

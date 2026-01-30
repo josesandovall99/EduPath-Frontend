@@ -8,7 +8,9 @@ import { submitExercise } from '../utils/submitExercise';
 interface Content {
   id: string;
   title: string;
-  type: 'video' | 'document';
+  type: 'video' | 'document' | 'activity' | 'quiz' | 'uml' | 'workshop';
+  isMiniproyecto?: boolean;
+  actividadId?: number;
 }
 
 interface ProgrammingContentViewProps {

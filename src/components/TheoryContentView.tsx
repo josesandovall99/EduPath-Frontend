@@ -162,7 +162,9 @@ interface TheoryContentViewProps {
   content: {
     id: string;
     title: string;
-    type: 'video' | 'document';
+    type: 'video' | 'document' | 'activity' | 'quiz' | 'uml' | 'workshop';
+    isMiniproyecto?: boolean;
+    actividadId?: number;
   };
   temaId?: string;
   onBack: () => void;

@@ -10,7 +10,7 @@ interface Subject {
 interface SubjectContentScreenProps {
   subject: Subject;
   onBack: () => void;
-  onContentSelect?: (content: Content, temaId: string) => void;
+  onContentSelect?: (content: Content, temaId?: string) => void;
   estudianteId?: number;
 }
 
@@ -20,6 +20,8 @@ interface Content {
   type: 'video' | 'document' | 'activity' | 'quiz' | 'uml' | 'workshop';
   duration?: string;
   status: 'completed' | 'in-progress' | 'not-started';
+  isMiniproyecto?: boolean;
+  actividadId?: number;
 }
 
 interface Tema {
@@ -40,6 +42,15 @@ interface Contenido {
   tipo: string;
   duracion?: string;
   subtema_id: number;
+}
+
+interface MiniproyectoApiItem {
+  id: number;
+  actividad_id: number;
+  entregable?: string;
+  respuesta_miniproyecto?: string;
+  Area?: { id: number; nombre: string };
+  Actividad?: { id: number; titulo?: string; descripcion?: string; nivel_dificultad?: string };
 }
 
 // Colores por materia
@@ -99,8 +110,9 @@ const getTypeIcon = (type: Content['type']) => {
   }
 };
 
-const getTypeLabel = (type: Content['type']) => {
-  switch (type) {
+const getTypeLabel = (content: Content) => {
+  if (content.isMiniproyecto) return 'Miniproyecto';
+  switch (content.type) {
     case 'video': return 'Video';
     case 'document': return 'Documento';
     case 'activity': return 'Actividad';
@@ -129,6 +141,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
   const [currentProgress, setCurrentProgress] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(false);
   const colors = getSubjectColor(subject.id);
+  const totalTemas = contentList.length;
 
   // Obtener progreso dinámico del estudiante en el área
   const obtenerProgresoArea = async () => {
@@ -204,6 +217,28 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           status: 'not-started' as const
         }));
 
+        // Obtener miniproyectos del área y agregarlos al final como tema fijo
+        let miniproyectosContent: Content[] = [];
+        try {
+          const minisResponse = await fetch(`${API_BASE_URL}/miniproyectos?area_id=${subject.id}`);
+          if (minisResponse.ok) {
+            const minis: MiniproyectoApiItem[] = await minisResponse.json();
+            miniproyectosContent = (Array.isArray(minis) ? minis : []).map((mini) => ({
+              id: mini.id.toString(),
+              title: mini.Actividad?.titulo || 'Miniproyecto',
+              type: [11, 13].includes(Number(mini.actividad_id)) ? 'workshop' : 'activity',
+              duration: undefined,
+              status: 'not-started' as const,
+              isMiniproyecto: true,
+              actividadId: Number(mini.actividad_id)
+            }));
+          } else {
+            console.warn('⚠️ No se pudieron cargar miniproyectos del área');
+          }
+        } catch (minisError) {
+          console.warn('⚠️ Error al cargar miniproyectos:', minisError);
+        }
+
         // Create map of content.id -> temaId
         const newTemasMap = new Map<string, string>();
         temas.forEach((tema) => {
@@ -211,12 +246,14 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         });
         setTemasMap(newTemasMap);
 
-        if (transformedContent.length === 0) {
+        const fullContent = [...transformedContent, ...miniproyectosContent];
+
+        if (fullContent.length === 0) {
           console.warn('⚠️ No temas found, using fallback data');
           setContentList(FALLBACK_CONTENT);
           setError('No se encontraron temas en la BD. Se muestran datos de prueba.');
         } else {
-          setContentList(transformedContent);
+          setContentList(fullContent);
         }
 
       } catch (error) {
@@ -286,7 +323,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
               <div className="flex gap-6 text-white/90">
                 <div className="flex items-center gap-2">
                   <PlayCircle className="w-5 h-5" />
-                  <span>12 temas</span>
+                  <span>{totalTemas} temas</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5" />
@@ -342,9 +379,13 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
             const Icon = getTypeIcon(content.type);
             return (
               <button
-                key={content.id}
+                key={`${content.id}-${content.isMiniproyecto ? 'miniproyecto' : 'tema'}`}
                 className="w-full bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 p-5 text-left group"
                 onClick={() => {
+                  if (content.isMiniproyecto) {
+                    onContentSelect && onContentSelect(content);
+                    return;
+                  }
                   const temaId = temasMap.get(content.id) || content.id;
                   onContentSelect && onContentSelect(content, temaId);
                 }}
@@ -369,7 +410,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                       )}
                     </div>
                     <div className="flex gap-4 text-sm text-gray-600">
-                      <span>{getTypeLabel(content.type)}</span>
+                      <span>{getTypeLabel(content)}</span>
                       {content.duration && (
                         <>
                           <span>•</span>

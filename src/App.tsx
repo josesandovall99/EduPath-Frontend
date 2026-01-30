@@ -10,6 +10,7 @@ import { ReportsScreen } from './components/ReportsScreen';
 import { StudentTrackingScreen } from './components/StudentTrackingScreen';
 import { SubjectContentScreen } from './components/SubjectContentScreen';
 import { ProgrammingContentView } from './components/ProgrammingContentView';
+import { ProgrammingMiniproyectoView } from './components/ProgrammingMiniproyectoView';
 import { TheoryContentView } from './components/TheoryContentView';
 import { QuizActivityView } from './components/QuizActivityView';
 import { UMLDiagramView } from './components/UMLDiagramView';
@@ -32,6 +33,7 @@ type Screen =
   | 'admin-students'
   | 'subject-content' 
   | 'programming-content'
+  | 'programming-miniproyecto'
   | 'theory-content'
   | 'quiz-activity'
   | 'uml-diagram'
@@ -61,6 +63,8 @@ interface Content {
   type: 'video' | 'document' | 'activity' | 'quiz' | 'uml' | 'workshop';
   duration?: string;
   status?: 'completed' | 'in-progress' | 'not-started';
+  isMiniproyecto?: boolean;
+  actividadId?: number;
 }
 
 export default function App() {
@@ -187,8 +191,20 @@ export default function App() {
 
   const handleContentSelect = (content: Content, temaId?: string) => {
     setSelectedContent(content);
-    if (temaId) {
+    if (content.isMiniproyecto) {
+      setSelectedTemaId(null);
+    } else if (temaId) {
       setSelectedTemaId(temaId);
+    }
+
+    const isMiniproyectoAI = Boolean(content.isMiniproyecto && (content.actividadId === 11 || content.actividadId === 13));
+    if (isMiniproyectoAI) {
+      setCurrentScreen('ai-workshop');
+      return;
+    }
+    if (content.isMiniproyecto) {
+      setCurrentScreen('programming-miniproyecto');
+      return;
     }
     
     // Determine which view to show based on subject and content type
@@ -355,6 +371,16 @@ export default function App() {
         </>
       )}
 
+      {currentScreen === 'programming-miniproyecto' && selectedContent && (
+        <>
+          <ProgrammingMiniproyectoView
+            content={selectedContent}
+            onBack={handleBackToSubject}
+          />
+          <ChatbotButton />
+        </>
+      )}
+
       {currentScreen === 'theory-content' && selectedContent && selectedSubject && userSession && (
         <>
           <TheoryContentView
@@ -395,6 +421,7 @@ export default function App() {
             subjectName={selectedSubject.name}
             workshop={selectedContent}
             onBack={handleBackToSubject}
+            estudianteId={userSession?.id}
           />
           {/* Note: ChatbotButton is integrated into AIWorkshopView */}
         </>
