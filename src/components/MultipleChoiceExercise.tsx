@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { resolveExercise } from '../utils/resolveExercise';
 import { submitExercise } from '../utils/submitExercise';
 
@@ -10,6 +10,11 @@ interface MultipleChoiceExerciseProps {
 }
 
 export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la opción correcta', opciones = ['Opción 1', 'Opción 2', 'Opción 3', 'Opción 4'], onBack }: MultipleChoiceExerciseProps) {
+  // Aleatorizar opciones manteniendo el texto original
+  const opcionesAleatorias = useMemo(() => {
+    return [...opciones].sort(() => Math.random() - 0.5);
+  }, [JSON.stringify(opciones)]);
+
   const [selected, setSelected] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aprobado, setAprobado] = useState(false);
@@ -18,7 +23,7 @@ export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la op
 
   const handlePreview = async () => {
     if (selected === null) return;
-    const opcionSeleccionada = opciones[selected];
+    const opcionSeleccionada = opcionesAleatorias[selected];
     const result = await resolveExercise(activity.id, { respuesta: { opcion: opcionSeleccionada } });
     if (result.status === 400 || result.status === 200) {
       const data: any = result.data || {};
@@ -34,7 +39,7 @@ export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la op
     if (selected === null) return;
     setIsSubmitting(true);
     const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
-    const opcionSeleccionada = opciones[selected];
+    const opcionSeleccionada = opcionesAleatorias[selected];
     const res = await submitExercise(activity.id, { opcion: opcionSeleccionada }, estudianteId || undefined);
     if (res.status === 429) {
       alert(`⏳ ${res.message || 'Otro envío en proceso; intenta de nuevo'}`);
@@ -67,7 +72,7 @@ export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la op
       </div>
       <p className="text-gray-700 mb-4">{enunciado}</p>
       <div className="space-y-3">
-        {opciones.map((op, idx) => (
+        {opcionesAleatorias.map((op, idx) => (
           <button
             key={idx}
             onClick={() => setSelected(idx)}

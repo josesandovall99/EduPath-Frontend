@@ -394,7 +394,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
       const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/enviar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estudiante_id: estudianteId, respuesta: { diagrama: json } })
+        body: JSON.stringify({ estudiante_id: estudianteId, respuesta: { diagram: json } })
       });
 
       const data: any = await response.json().catch(() => ({}));

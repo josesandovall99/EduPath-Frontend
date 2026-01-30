@@ -147,7 +147,7 @@ interface Ejercicio {
   contenido_id: number;
   puntos: number;
   resultado_ejercicio: string;
-  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción multiple' | 'Ordenar' | 'Relacionar';
+  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar';
   configuracion?: any;
   actividad?: {
     id: number;
@@ -454,8 +454,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         // Detectar el subtipo real desde la configuración para ejercicios de tipo "Preguntas"
         let ejercicioConTipoReal = { ...ejercicio };
         if (ejercicio.tipo_ejercicio === 'Preguntas' && ejercicio.configuracion?.tipo) {
-          if (ejercicio.configuracion.tipo === 'opcion-multiple') {
-            ejercicioConTipoReal.tipo_ejercicio = 'Opción multiple';
+          if (ejercicio.configuracion.tipo === 'opcion-unica') {
+            ejercicioConTipoReal.tipo_ejercicio = 'Opción única';
           } else if (ejercicio.configuracion.tipo === 'ordenar') {
             ejercicioConTipoReal.tipo_ejercicio = 'Ordenar';
           } else if (ejercicio.configuracion.tipo === 'relacionar') {
@@ -842,8 +842,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                               // Detectar el subtipo real desde la configuración para ejercicios de tipo "Preguntas"
                               let ejercicioConTipoReal = { ...item.ejercicioData };
                               if (item.ejercicioData.tipo_ejercicio === 'Preguntas' && item.ejercicioData.configuracion?.tipo) {
-                                if (item.ejercicioData.configuracion.tipo === 'opcion-multiple') {
-                                  ejercicioConTipoReal.tipo_ejercicio = 'Opción multiple';
+                                if (item.ejercicioData.configuracion.tipo === 'opcion-unica') {
+                                  ejercicioConTipoReal.tipo_ejercicio = 'Opción única';
                                 } else if (item.ejercicioData.configuracion.tipo === 'ordenar') {
                                   ejercicioConTipoReal.tipo_ejercicio = 'Ordenar';
                                 } else if (item.ejercicioData.configuracion.tipo === 'relacionar') {
@@ -857,9 +857,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                               // Es un contenido normal
                               setSelectedContentId(item.id);
                               setSelectedContentData(item);
+                              setEjercicioAsociado(null); // Limpiar ejercicio asociado
                               onContentChange?.(item.id);
-                              // Cargar ejercicio asociado si existe
-                              cargarEjercicioAsociado(item.id);
                             }
                           }}
                           className={`w-full text-left p-3 border rounded-lg hover:bg-gray-50 flex items-center gap-3 text-sm transition-all group ${
@@ -998,7 +997,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                   />
                 )}
 
-                {ejercicioAsociado.tipo_ejercicio === 'Opción multiple' && (
+                {ejercicioAsociado.tipo_ejercicio === 'Opción única' && (
                   <MultipleChoiceExercise
                     activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
                     enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Selecciona la opción correcta'}
@@ -1161,85 +1160,6 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     </div>
                   </div>
                 )}
-
-                {/* Ejercicio Asociado - Mostrar DESPUÉS del contenido */}
-                {loadingEjercicio ? (
-                  <div className="flex justify-center items-center p-12 bg-white rounded-xl shadow-md mb-6">
-                    <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
-                    <span className="ml-3 text-gray-600">Cargando ejercicio...</span>
-                  </div>
-                ) : ejercicioAsociado ? (
-                  <div className="mb-6">
-                    {/* Separador visual */}
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-                      <span className="text-sm font-medium text-[#3A4A5B] px-3 py-1 bg-gradient-to-r from-[#4A90E2] to-[#7ED6A7] text-white rounded-full shadow-md">
-                        📝 Ejercicio Práctico
-                      </span>
-                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-                    </div>
-
-                    {/* Mostrar componente según tipo de ejercicio */}
-                    {ejercicioAsociado.tipo_ejercicio === 'Compilador' && (
-                      <ProgrammingContentView
-                        content={{
-                          id: selectedContentData.id,
-                          title: ejercicioAsociado.actividad?.titulo || selectedContentData.title,
-                          type: 'activity'
-                        }}
-                        onBack={onBack}
-                      />
-                    )}
-
-                    {ejercicioAsociado.tipo_ejercicio === 'Diagramas UML' && (
-                      <UMLDiagramView
-                        activity={{
-                          id: ejercicioAsociado.id.toString(),
-                          title: ejercicioAsociado.actividad?.titulo || selectedContentData.title
-                        }}
-                        onBack={onBack}
-                      />
-                    )}
-
-                    {ejercicioAsociado.tipo_ejercicio === 'Preguntas' && (
-                      <QuizActivityView
-                        subjectName={subjectName}
-                        activity={{
-                          id: ejercicioAsociado.id.toString(),
-                          title: ejercicioAsociado.actividad?.titulo || selectedContentData.title
-                        }}
-                        onBack={onBack}
-                      />
-                    )}
-
-                    {ejercicioAsociado.tipo_ejercicio === 'Opción multiple' && (
-                      <MultipleChoiceExercise
-                        activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || selectedContentData.title }}
-                        enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Selecciona la opción correcta'}
-                        opciones={Array.isArray(ejercicioAsociado.configuracion?.opciones) ? ejercicioAsociado.configuracion?.opciones : undefined}
-                        onBack={onBack}
-                      />
-                    )}
-
-                    {ejercicioAsociado.tipo_ejercicio === 'Ordenar' && (
-                      <OrderingExercise
-                        activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || selectedContentData.title }}
-                        enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Ordena los elementos correctamente'}
-                        items={Array.isArray(ejercicioAsociado.configuracion?.items) ? ejercicioAsociado.configuracion?.items : undefined}
-                        onBack={onBack}
-                      />
-                    )}
-
-                    {ejercicioAsociado.tipo_ejercicio === 'Relacionar' && (
-                      <MatchingExercise
-                        activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || selectedContentData.title }}
-                        enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Relaciona conceptos con definiciones'}
-                        pares={Array.isArray(ejercicioAsociado.configuracion?.pares) ? ejercicioAsociado.configuracion?.pares : undefined}
-                        onBack={onBack}
-                      />
-                    )}
-                  </div>
-                ) : null}
 
                 {/* Additional Resources */}
                 <div className="rounded-2xl border border-gray-200 bg-white p-6 mb-6 shadow-md">

@@ -18,7 +18,7 @@ interface EjercicioItem {
   contenido_id: number;
   puntos: number;
   resultado_ejercicio: string;
-  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción multiple' | 'Ordenar' | 'Relacionar';
+  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar';
   configuracion?: any;
   actividad?: {
     id: number;
@@ -37,7 +37,7 @@ interface EjercicioItem {
 interface Pregunta {
   id: string;
   enunciado: string;
-  tipo: 'opcion-multiple' | 'abierta';
+  tipo: 'opcion-unica' | 'abierta';
   opciones?: string[];
   respuesta_correcta: string | number;
 }
@@ -53,7 +53,7 @@ interface ExerciseFormData {
     contenido_id: number | '';
     puntos: number | '';
     resultado_ejercicio: string;
-    tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción multiple' | 'Ordenar' | 'Relacionar';
+    tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar';
     configuracion: any;
   };
 }
@@ -94,20 +94,26 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
   );
 }
 
-// Configuración: Opción múltiple
+// Configuración: Opción única
 function MultipleChoiceConfig({ formData, setFormData }: { formData: ExerciseFormData; setFormData: React.Dispatch<React.SetStateAction<ExerciseFormData>> }) {
-  const cfg = formData.ejercicio.configuracion || { enunciado: '', opciones: ['', '', '', ''], correctaIndex: 0 };
+  const cfg = formData.ejercicio.configuracion || { enunciado: '', opciones: ['', '', '', ''], respuestaCorrecta: '' };
 
   const setCfg = (update: any) => {
+    const newCfg = { ...cfg, ...update };
+    // Sincronizar resultado_ejercicio con respuestaCorrecta
+    let resultado = formData.ejercicio.resultado_ejercicio;
+    if ('respuestaCorrecta' in update) {
+      resultado = update.respuestaCorrecta || '';
+    }
     setFormData(prev => ({
       ...prev,
-      ejercicio: { ...prev.ejercicio, configuracion: { ...cfg, ...update } }
+      ejercicio: { ...prev.ejercicio, configuracion: newCfg, resultado_ejercicio: resultado }
     }));
   };
 
   return (
     <div className="space-y-4 p-4 bg-green-50 rounded-lg border border-green-200">
-      <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración: Opción múltiple</h3>
+      <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración: Opción única</h3>
       <div>
         <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Enunciado *</label>
         <input
@@ -125,8 +131,8 @@ function MultipleChoiceConfig({ formData, setFormData }: { formData: ExerciseFor
             <input
               type="radio"
               name="mc-correcta"
-              checked={cfg.correctaIndex === idx}
-              onChange={() => setCfg({ correctaIndex: idx })}
+              checked={cfg.respuestaCorrecta === op}
+              onChange={() => setCfg({ respuestaCorrecta: op })}
               className="w-4 h-4 text-[#4A90E2] border-gray-300 focus:ring-[#4A90E2]"
             />
             <input
@@ -134,8 +140,14 @@ function MultipleChoiceConfig({ formData, setFormData }: { formData: ExerciseFor
               value={op}
               onChange={(e) => {
                 const opciones = [...(cfg.opciones || [])];
+                const oldValue = opciones[idx];
                 opciones[idx] = e.target.value;
-                setCfg({ opciones });
+                // Si esta era la correcta, actualizar respuestaCorrecta
+                const updates: any = { opciones };
+                if (cfg.respuestaCorrecta === oldValue) {
+                  updates.respuestaCorrecta = e.target.value;
+                }
+                setCfg(updates);
               }}
               placeholder={`Opción ${idx + 1}`}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
@@ -368,7 +380,7 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
     const nuevaPregunta: Pregunta = {
       id: `pregunta-${Date.now()}`,
       enunciado: '',
-      tipo: 'opcion-multiple',
+      tipo: 'opcion-unica',
       opciones: ['', '', '', ''],
       respuesta_correcta: 0
     };
@@ -482,9 +494,9 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
                   <select
                     value={pregunta.tipo}
                     onChange={(e) => {
-                      const nuevoTipo = e.target.value as 'opcion-multiple' | 'abierta';
+                      const nuevoTipo = e.target.value as 'opcion-unica' | 'abierta';
                       const cambios: Partial<Pregunta> = { tipo: nuevoTipo };
-                      if (nuevoTipo === 'opcion-multiple') {
+                      if (nuevoTipo === 'opcion-unica') {
                         cambios.opciones = ['', '', '', ''];
                         cambios.respuesta_correcta = 0;
                       } else {
@@ -497,7 +509,7 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
                   >
-                    <option value="opcion-multiple">Opción Múltiple</option>
+                    <option value="opcion-unica">Opción Única</option>
                     <option value="abierta">Abierta</option>
                   </select>
                 </div>
@@ -517,7 +529,7 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
                 )}
               </div>
 
-              {pregunta.tipo === 'opcion-multiple' && pregunta.opciones && (
+              {pregunta.tipo === 'opcion-unica' && pregunta.opciones && (
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-[#3A4A5B]">Opciones *</label>
                   {pregunta.opciones.map((opcion, opcionIdx) => (
@@ -665,7 +677,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     // Detectar el subtipo real desde la configuración para ejercicios de tipo "Preguntas"
     let tipoReal = item.tipo_ejercicio;
     if (item.tipo_ejercicio === 'Preguntas' && configuracion.tipo) {
-      if (configuracion.tipo === 'opcion-multiple') tipoReal = 'Opción multiple';
+      if (configuracion.tipo === 'opcion-unica') tipoReal = 'Opción única';
       else if (configuracion.tipo === 'ordenar') tipoReal = 'Ordenar';
       else if (configuracion.tipo === 'relacionar') tipoReal = 'Relacionar';
       else if (configuracion.tipo === 'cuestionario') tipoReal = 'Preguntas';
@@ -686,12 +698,12 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         tipo: 'cuestionario',
         preguntas: configuracion.preguntas || []
       };
-    } else if (tipoReal === 'Opción multiple') {
+    } else if (tipoReal === 'Opción única') {
       configuracion = {
-        tipo: 'opcion-multiple',
+        tipo: 'opcion-unica',
         enunciado: configuracion.enunciado || '',
         opciones: configuracion.opciones || ['', '', '', ''],
-        correctaIndex: typeof configuracion.correctaIndex === 'number' ? configuracion.correctaIndex : 0,
+        respuestaCorrecta: configuracion.respuestaCorrecta || '',
       };
     } else if (tipoReal === 'Ordenar') {
       configuracion = {
@@ -761,8 +773,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
           nuevaConfiguracion = { opciones: {} };
         } else if (value === 'Preguntas') {
           nuevaConfiguracion = { tipo: 'cuestionario', preguntas: [] };
-        } else if (value === 'Opción multiple') {
-          nuevaConfiguracion = { tipo: 'opcion-multiple', enunciado: '', opciones: ['', '', '', ''], correctaIndex: 0 };
+        } else if (value === 'Opción única') {
+          nuevaConfiguracion = { tipo: 'opcion-unica', enunciado: '', opciones: ['', '', '', ''], respuestaCorrecta: '' };
         } else if (value === 'Ordenar') {
           nuevaConfiguracion = { tipo: 'ordenar', enunciado: '', items: ['Item 1', 'Item 2', 'Item 3'] };
         } else if (value === 'Relacionar') {
@@ -810,10 +822,10 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         toast.error('Respuesta requerida', { description: 'Define la respuesta esperada.' });
         return;
       }
-    } else if (formData.ejercicio.tipo_ejercicio === 'Opción multiple') {
+    } else if (formData.ejercicio.tipo_ejercicio === 'Opción única') {
       const cfg = formData.ejercicio.configuracion;
-      if (!cfg?.enunciado || !Array.isArray(cfg.opciones) || cfg.opciones.some((o: string) => !o)) {
-        toast.error('Opción múltiple incompleta', { description: 'Define enunciado y todas las opciones.' });
+      if (!cfg?.enunciado || !Array.isArray(cfg.opciones) || cfg.opciones.some((o: string) => !o) || !cfg?.respuestaCorrecta) {
+        toast.error('Opción única incompleta', { description: 'Define enunciado, todas las opciones y marca la correcta.' });
         return;
       }
     } else if (formData.ejercicio.tipo_ejercicio === 'Ordenar') {
@@ -839,6 +851,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
 
       // Preparar configuración según tipo
       let configuracionFinal = formData.ejercicio.configuracion;
+      let resultadoFinal = formData.ejercicio.resultado_ejercicio;
       
       // Para Compilador, sincronizar esperado con resultado_ejercicio
       if (formData.ejercicio.tipo_ejercicio === 'Compilador') {
@@ -847,14 +860,15 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
           esperado: formData.ejercicio.resultado_ejercicio || configuracionFinal.esperado
         };
       }
+      
+      // Para Opción única, asegurar que resultado_ejercicio sea la respuesta correcta
+      if (formData.ejercicio.tipo_ejercicio === 'Opción única') {
+        resultadoFinal = configuracionFinal.respuestaCorrecta || '';
+      }
 
       // Mapear tipo_ejercicio para el backend
-      // El backend solo acepta: "Compilador", "Diagramas UML", "Preguntas"
-      // Opción multiple, Ordenar, Relacionar son subtipos de Preguntas
+      // El backend acepta: "Compilador", "Diagramas UML", "Preguntas", "Opción única", "Ordenar", "Relacionar"
       let tipoEjercicioBackend = formData.ejercicio.tipo_ejercicio;
-      if (['Opción multiple', 'Ordenar', 'Relacionar'].includes(formData.ejercicio.tipo_ejercicio)) {
-        tipoEjercicioBackend = 'Preguntas';
-      }
 
       const body = JSON.stringify({
         actividad: {
@@ -866,7 +880,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         ejercicio: {
           contenido_id: formData.ejercicio.contenido_id,
           puntos: formData.ejercicio.puntos,
-          resultado_ejercicio: formData.ejercicio.resultado_ejercicio,
+          resultado_ejercicio: resultadoFinal,
           tipo_ejercicio: tipoEjercicioBackend,
           configuracion: configuracionFinal
         }
@@ -1126,7 +1140,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                   <option value="Compilador">Compilador</option>
                   <option value="Diagramas UML">Diagramas UML</option>
                   <option value="Preguntas">Preguntas</option>
-                  <option value="Opción multiple">Opción múltiple</option>
+                  <option value="Opción única">Opción única</option>
                   <option value="Ordenar">Ordenar</option>
                   <option value="Relacionar">Relacionar</option>
                 </select>
@@ -1134,7 +1148,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                   {formData.ejercicio.tipo_ejercicio === 'Compilador' && 'Ejercicio de programación con ejecución de código'}
                   {formData.ejercicio.tipo_ejercicio === 'Diagramas UML' && 'Ejercicio de creación de diagramas UML'}
                   {formData.ejercicio.tipo_ejercicio === 'Preguntas' && 'Cuestionario con preguntas y respuestas'}
-                  {formData.ejercicio.tipo_ejercicio === 'Opción multiple' && 'Pregunta de opción múltiple (una correcta)'}
+                  {formData.ejercicio.tipo_ejercicio === 'Opción única' && 'Pregunta de opción única (una correcta)'}
                   {formData.ejercicio.tipo_ejercicio === 'Ordenar' && 'Ordenar ítems para formar la secuencia correcta'}
                   {formData.ejercicio.tipo_ejercicio === 'Relacionar' && 'Relacionar conceptos con definiciones'}
                 </p>
@@ -1199,7 +1213,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                 <PreguntasConfig formData={formData} setFormData={setFormData} />
               )}
 
-              {formData.ejercicio.tipo_ejercicio === 'Opción multiple' && (
+              {formData.ejercicio.tipo_ejercicio === 'Opción única' && (
                 <MultipleChoiceConfig formData={formData} setFormData={setFormData} />
               )}
 

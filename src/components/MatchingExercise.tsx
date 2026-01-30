@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { resolveExercise } from '../utils/resolveExercise';
 import { submitExercise } from '../utils/submitExercise';
 
@@ -13,7 +13,11 @@ interface MatchingExerciseProps {
 
 export function MatchingExercise({ activity, enunciado = 'Relaciona cada concepto con su definición', pares = [{ concepto: 'Concepto A', definicion: 'Definición A' }, { concepto: 'Concepto B', definicion: 'Definición B' }], onBack }: MatchingExerciseProps) {
   const [left] = useState<Pair[]>(pares);
-  const [right, setRight] = useState<Pair[]>([...pares].sort(() => Math.random() - 0.5));
+  // Aleatorizar definiciones pero mantener orden de conceptos
+  const rightAleatorio = useMemo(() => {
+    return [...pares].sort(() => Math.random() - 0.5);
+  }, [JSON.stringify(pares)]);
+  const [right] = useState<Pair[]>(rightAleatorio);
   const [selectedLeft, setSelectedLeft] = useState<number | null>(null);
   const [matches, setMatches] = useState<Record<number, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,14 +33,15 @@ export function MatchingExercise({ activity, enunciado = 'Relaciona cada concept
 
   const buildParejas = () => {
     const entries = Object.entries(matches);
-    return entries.map(([l, r]) => ({ 
-      concepto: left[Number(l)].concepto, 
-      definicion: right[Number(r)].definicion 
-    }));
+    const matchesObj: Record<string, string> = {};
+    entries.forEach(([l, r]) => {
+      matchesObj[left[Number(l)].concepto] = right[Number(r)].definicion;
+    });
+    return matchesObj;
   };
 
   const handlePreview = async () => {
-    const result = await resolveExercise(activity.id, { respuesta: { parejas: buildParejas() } });
+    const result = await resolveExercise(activity.id, { respuesta: { matches: buildParejas() } });
     if (result.status === 400 || result.status === 200) {
       const data: any = result.data || {};
       setFeedback(data?.retroalimentacion || '');
@@ -50,7 +55,7 @@ export function MatchingExercise({ activity, enunciado = 'Relaciona cada concept
   const handleSubmit = async () => {
     setIsSubmitting(true);
     const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
-    const res = await submitExercise(activity.id, { parejas: buildParejas() }, estudianteId || undefined);
+    const res = await submitExercise(activity.id, { matches: buildParejas() }, estudianteId || undefined);
     if (res.status === 429) {
       alert(`⏳ ${res.message || 'Otro envío en proceso; intenta de nuevo'}`);
     } else if (res.status === 409) {

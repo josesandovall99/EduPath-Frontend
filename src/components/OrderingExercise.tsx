@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { resolveExercise } from '../utils/resolveExercise';
 import { submitExercise } from '../utils/submitExercise';
 
@@ -10,7 +10,11 @@ interface OrderingExerciseProps {
 }
 
 export function OrderingExercise({ activity, enunciado = 'Ordena los elementos correctamente', items = ['Paso 1', 'Paso 2', 'Paso 3'], onBack }: OrderingExerciseProps) {
-  const [list, setList] = useState<string[]>(items);
+  // Aleatorizar items inicialmente
+  const itemsAleatorios = useMemo(() => {
+    return [...items].sort(() => Math.random() - 0.5);
+  }, [JSON.stringify(items)]);
+  const [list, setList] = useState<string[]>(itemsAleatorios);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aprobado, setAprobado] = useState(false);
   const [feedback, setFeedback] = useState<string>('');
