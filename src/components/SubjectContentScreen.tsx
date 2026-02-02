@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Clock, FileText, PlayCircle, Edit, Share2, Users } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, FileText, PlayCircle, Edit, Share2, Users, Lock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
@@ -22,6 +22,10 @@ interface Content {
   status: 'completed' | 'in-progress' | 'not-started';
   isMiniproyecto?: boolean;
   actividadId?: number;
+  // Campos opcionales para el sistema de desbloqueo progresivo
+  desbloqueado?: boolean;
+  completo?: boolean;
+  porcentaje?: number;
 }
 
 interface Tema {
@@ -140,6 +144,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
   const [error, setError] = useState<string | null>(null);
   const [currentProgress, setCurrentProgress] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(false);
+  const [temasConEstadoProgreso, setTemasConEstadoProgreso] = useState<Map<string, any>>(new Map()); // Estado de desbloqueo opcional
   const colors = getSubjectColor(subject.id);
   const totalTemas = contentList.length;
 
@@ -176,9 +181,69 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     }
   };
 
+  // Calcular progreso de cada tema individualmente
+  const calcularProgresoTemas = async (temas: Tema[]) => {
+    if (!estudianteId) return new Map<string, { porcentaje: number }>();
+    
+    const progresoMap = new Map<string, { porcentaje: number }>();
+    
+    for (const tema of temas) {
+      try {
+        const response = await fetch(
+          `http://localhost:4000/progresos/por-tema?tema_id=${tema.id}&estudiante_id=${estudianteId}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          const porcentaje = data.resumen?.porcentajeTotalTema || 0;
+          progresoMap.set(tema.id.toString(), { porcentaje });
+        } else {
+          progresoMap.set(tema.id.toString(), { porcentaje: 0 });
+        }
+      } catch (err) {
+        progresoMap.set(tema.id.toString(), { porcentaje: 0 });
+      }
+    }
+    
+    return progresoMap;
+  };
+
+  // Intentar cargar estado de desbloqueo de temas (opcional, no afecta funcionalidad si falla)
+  const intentarCargarEstadoDesbloqueo = async () => {
+    if (!estudianteId || !subject.id) return;
+    
+    try {
+      const response = await fetch(
+        `http://localhost:4000/api/progreso/estado-temas-area?estudiante_id=${estudianteId}&area_id=${subject.id}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const estadoMap = new Map<string, any>();
+        
+        if (data.temas && Array.isArray(data.temas)) {
+          data.temas.forEach((tema: any) => {
+            estadoMap.set(tema.id.toString(), {
+              desbloqueado: tema.desbloqueado,
+              completo: tema.completo,
+              porcentaje: tema.porcentaje || 0
+            });
+          });
+          setTemasConEstadoProgreso(estadoMap);
+          console.log('✅ Estado de desbloqueo cargado:', estadoMap);
+        }
+      } else {
+        console.log('ℹ️ Endpoint de desbloqueo no disponible, usando comportamiento estándar');
+      }
+    } catch (err) {
+      console.log('ℹ️ Sistema de desbloqueo no disponible, usando comportamiento estándar');
+    }
+  };
+
   // Cargar progreso dinámico del estudiante
   useEffect(() => {
     obtenerProgresoArea();
+    intentarCargarEstadoDesbloqueo();
   }, [subject.id, estudianteId]);
 
   useEffect(() => {
@@ -208,14 +273,46 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         // Ordenar temas por la columna 'orden' antes de transformar
         const temasOrdenados = temas.sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0));
 
-        // Transformar temas a formato Content
-        const transformedContent = temasOrdenados.map((tema) => ({
-          id: tema.id.toString(),
-          title: tema.nombre,
-          type: 'document' as const,
-          duration: undefined,
-          status: 'not-started' as const
-        }));
+        // Calcular progreso de cada tema
+        const progresoTemas = await calcularProgresoTemas(temasOrdenados);
+
+        // Transformar temas a formato Content con lógica de desbloqueo
+        const transformedContent = temasOrdenados.map((tema, index) => {
+          const temaId = tema.id.toString();
+          const estadoProgreso = temasConEstadoProgreso.get(temaId);
+          const progresoTema = progresoTemas.get(temaId);
+          const porcentaje = progresoTema?.porcentaje ?? 0;
+          
+          // Determinar si está desbloqueado
+          let desbloqueado: boolean;
+          if (estadoProgreso?.desbloqueado !== undefined) {
+            // Si el backend provee datos, usarlos
+            desbloqueado = estadoProgreso.desbloqueado;
+          } else {
+            // Calcular localmente: primer tema siempre desbloqueado, los demás solo si el anterior está completo al 100%
+            if (index === 0) {
+              desbloqueado = true;
+            } else {
+              const temaAnterior = temasOrdenados[index - 1];
+              const progresoAnterior = progresoTemas.get(temaAnterior.id.toString());
+              desbloqueado = (progresoAnterior?.porcentaje ?? 0) >= 100;
+            }
+          }
+          
+          // Determinar si está completo
+          const completo = estadoProgreso?.completo ?? (porcentaje >= 100);
+          
+          return {
+            id: temaId,
+            title: tema.nombre,
+            type: 'document' as const,
+            duration: undefined,
+            status: 'not-started' as const,
+            desbloqueado,
+            completo,
+            porcentaje
+          };
+        });
 
         // Obtener miniproyectos del área y agregarlos al final como tema fijo
         let miniproyectosContent: Content[] = [];
@@ -377,11 +474,21 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           ) : (
           contentList.map((content) => {
             const Icon = getTypeIcon(content.type);
+            const isLocked = content.desbloqueado === false;
+            
             return (
               <button
                 key={`${content.id}-${content.isMiniproyecto ? 'miniproyecto' : 'tema'}`}
-                className="w-full bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 p-5 text-left group"
+                className={`w-full bg-white rounded-xl shadow-md transition-all duration-300 p-5 text-left group ${
+                  isLocked 
+                    ? 'opacity-60 cursor-not-allowed' 
+                    : 'hover:shadow-lg'
+                }`}
                 onClick={() => {
+                  if (isLocked) {
+                    alert('Este contenido está bloqueado. Complete el contenido anterior para desbloquearlo.');
+                    return;
+                  }
                   if (content.isMiniproyecto) {
                     onContentSelect && onContentSelect(content);
                     return;
@@ -396,16 +503,27 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                     className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
                     style={{ backgroundColor: `${colors.primary}15` }}
                   >
-                    <Icon className="w-7 h-7" style={{ color: colors.primary }} />
+                    {isLocked ? (
+                      <Lock className="w-7 h-7 text-gray-400" />
+                    ) : (
+                      <Icon className="w-7 h-7" style={{ color: colors.primary }} />
+                    )}
                   </div>
 
                   {/* Content Info */}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <h4 className="text-[#3A4A5B] group-hover:text-[#4A90E2] transition-colors">
+                      <h4 className={`transition-colors ${
+                        isLocked 
+                          ? 'text-gray-400' 
+                          : 'text-[#3A4A5B] group-hover:text-[#4A90E2]'
+                      }`}>
                         {content.title}
                       </h4>
-                      {content.status === 'completed' && (
+                      {content.completo && (
+                        <CheckCircle2 className="w-5 h-5 text-green-500" />
+                      )}
+                      {!content.completo && content.status === 'completed' && (
                         <CheckCircle2 className="w-5 h-5 text-[#7ED6A7]" />
                       )}
                     </div>

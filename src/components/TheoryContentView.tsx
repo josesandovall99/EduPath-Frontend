@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Play, FileText, CheckCircle2, SkipBack, SkipForward, BookOpen, ChevronDown, ChevronRight, Loader } from 'lucide-react';
+import { ArrowLeft, Play, FileText, CheckCircle2, SkipBack, SkipForward, BookOpen, ChevronDown, ChevronRight, Loader, Lock } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ProgrammingContentView } from './ProgrammingContentView';
 import { UMLDiagramView } from './UMLDiagramView';
@@ -117,6 +117,8 @@ interface Module {
   items: ModuleItem[];
   expanded?: boolean;
   loadingItems?: boolean;
+  desbloqueado?: boolean;
+  completo?: boolean;
 }
 
 interface ModuleItem {
@@ -130,6 +132,8 @@ interface ModuleItem {
   url?: string;
   recommended?: boolean;
   ejercicioData?: Ejercicio; // Datos del ejercicio si este ítem es un ejercicio
+  desbloqueado?: boolean;
+  completo?: boolean;
 }
 
 interface Contenido {
@@ -289,6 +293,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [ejercicioAsociado, setEjercicioAsociado] = useState<Ejercicio | null>(null);
   const [loadingEjercicio, setLoadingEjercicio] = useState(false);
+  const [subtemasConEstadoProgreso, setSubtemasConEstadoProgreso] = useState<Map<string, any>>(new Map());
+  const [contenidosConEstadoProgreso, setContenidosConEstadoProgreso] = useState<Map<string, any>>(new Map());
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
 
   // Inyectar estilos en el documento
@@ -425,6 +431,70 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     }
   };
 
+  // Intentar cargar estado de desbloqueo (OPCIONAL - no rompe si endpoint no existe)
+  const intentarCargarEstadoDesbloqueo = async () => {
+    if (!estudianteId || !temaId) return;
+
+    try {
+      // Intentar cargar estado de subtemas
+      const urlSubtemas = `http://localhost:4000/api/progreso/estado-subtemas-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
+      console.log('🔄 [OPCIONAL] Intentando cargar estado de subtemas desde:', urlSubtemas);
+      
+      const responseSubtemas = await fetch(urlSubtemas);
+      if (responseSubtemas.ok) {
+        const dataSubtemas = await responseSubtemas.json();
+        console.log('✅ Estado de subtemas cargado:', dataSubtemas);
+        const mapSubtemas = new Map<string, any>(dataSubtemas.map((item: any) => [String(item.subtema_id), item]));
+        setSubtemasConEstadoProgreso(mapSubtemas);
+      } else {
+        console.log('ℹ️ Endpoint de subtemas no disponible (404) - usando comportamiento actual');
+      }
+
+      // Intentar cargar estado de contenidos
+      const urlContenidos = `http://localhost:4000/api/progreso/estado-contenidos-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
+      console.log('🔄 [OPCIONAL] Intentando cargar estado de contenidos desde:', urlContenidos);
+      
+      const responseContenidos = await fetch(urlContenidos);
+      if (responseContenidos.ok) {
+        const dataContenidos = await responseContenidos.json();
+        console.log('✅ Estado de contenidos cargado:', dataContenidos);
+        const mapContenidos = new Map<string, any>(dataContenidos.map((item: any) => [String(item.contenido_id), item]));
+        setContenidosConEstadoProgreso(mapContenidos);
+      } else {
+        console.log('ℹ️ Endpoint de contenidos no disponible (404) - usando comportamiento actual');
+      }
+    } catch (err) {
+      console.log('ℹ️ Endpoints de desbloqueo no disponibles - manteniendo lógica actual:', err);
+    }
+  };
+
+  // Calcular progreso de cada subtema
+  const calcularProgresoSubtemas = async (subtemas: any[]) => {
+    if (!estudianteId || !temaId) return new Map<string, { porcentaje: number }>();
+    
+    const progresoMap = new Map<string, { porcentaje: number }>();
+    
+    for (const subtema of subtemas) {
+      try {
+        const response = await fetch(
+          `http://localhost:4000/progresos/por-subtema?subtema_id=${subtema.id}&estudiante_id=${estudianteId}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          const porcentaje = data.resumen?.porcentajeTotalSubtema || 0;
+          progresoMap.set(String(subtema.id), { porcentaje });
+        } else {
+          progresoMap.set(String(subtema.id), { porcentaje: 0 });
+        }
+      } catch (err) {
+        progresoMap.set(String(subtema.id), { porcentaje: 0 });
+      }
+    }
+    
+    return progresoMap;
+  };
+
   // Cargar ejercicio asociado a un contenido
   const cargarEjercicioAsociado = async (contenidoId: string) => {
     setLoadingEjercicio(true);
@@ -506,6 +576,12 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         let subtemas = await response.json();
         console.log('✅ Subtemas fetched (sin ordenar):', subtemas);
 
+        // Intentar cargar estado de desbloqueo (OPCIONAL)
+        await intentarCargarEstadoDesbloqueo();
+
+        // Calcular progreso de cada subtema
+        const progresoSubtemas = await calcularProgresoSubtemas(subtemas);
+
         // Cargar secuencias de subtemas para ordenarlos
         try {
           const seqResponse = await fetch(`${API_BASE_URL}/secuencias-subtema`);
@@ -521,15 +597,40 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
           console.warn('⚠️ Error cargando secuencias, usando orden original:', err);
         }
 
-        // Transform subtemas to modules format
+        // Transform subtemas to modules format - incluir estado de desbloqueo
         const transformedModules: Module[] = Array.isArray(subtemas)
-          ? subtemas.map((subtema: any, idx: number) => ({
-              id: subtema.id || `subtema-${idx}`,
-              title: subtema.nombre || `Subtema ${idx + 1}`,
-              items: [],
-              expanded: idx === 0, // Expand first one by default
-              loadingItems: idx === 0, // Load items for first one
-            }))
+          ? subtemas.map((subtema: any, idx: number) => {
+              const estadoProgreso = subtemasConEstadoProgreso.get(String(subtema.id));
+              const progresoSubtema = progresoSubtemas.get(String(subtema.id));
+              const porcentaje = progresoSubtema?.porcentaje ?? 0;
+              
+              // Determinar si está desbloqueado
+              let desbloqueado: boolean;
+              if (estadoProgreso?.desbloqueado !== undefined) {
+                desbloqueado = estadoProgreso.desbloqueado;
+              } else {
+                // Calcular localmente: primer subtema siempre desbloqueado
+                if (idx === 0) {
+                  desbloqueado = true;
+                } else {
+                  const subtemaAnterior = subtemas[idx - 1];
+                  const progresoAnterior = progresoSubtemas.get(String(subtemaAnterior.id));
+                  desbloqueado = (progresoAnterior?.porcentaje ?? 0) >= 100;
+                }
+              }
+              
+              const completo = estadoProgreso?.completo ?? (porcentaje >= 100);
+              
+              return {
+                id: subtema.id || `subtema-${idx}`,
+                title: subtema.nombre || `Subtema ${idx + 1}`,
+                items: [],
+                expanded: idx === 0, // Expand first one by default
+                loadingItems: idx === 0, // Load items for first one
+                desbloqueado,
+                completo,
+              };
+            })
           : [];
 
         setModules(transformedModules.length > 0 ? transformedModules : FALLBACK_MODULES);
@@ -607,6 +708,25 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         contenidosSecuenciados.map(async (contenido: Contenido, idx: number) => {
           // Cargar estado de visualización para cada contenido
           const visualizado = await obtenerEstadoVisualizacion(contenido.id.toString());
+          const estadoProgreso = contenidosConEstadoProgreso.get(String(contenido.id));
+          
+          // Determinar si está desbloqueado
+          let desbloqueado: boolean;
+          if (estadoProgreso?.desbloqueado !== undefined) {
+            desbloqueado = estadoProgreso.desbloqueado;
+          } else {
+            // Calcular localmente: primer contenido siempre desbloqueado
+            if (idx === 0) {
+              desbloqueado = true;
+            } else {
+              // El siguiente se desbloquea si el anterior fue visualizado
+              const contenidoAnterior = contenidosSecuenciados[idx - 1];
+              const visualizadoAnterior = await obtenerEstadoVisualizacion(contenidoAnterior.id.toString());
+              desbloqueado = visualizadoAnterior;
+            }
+          }
+          
+          const completo = estadoProgreso?.completo ?? visualizado;
           
           return {
             id: contenido.id.toString(),
@@ -617,7 +737,9 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
             visualizado: visualizado,
             descripcion: contenido.descripcion,
             url: contenido.url,
-            recommended: idx === 0
+            recommended: idx === 0,
+            desbloqueado,
+            completo,
           };
         })
       );
@@ -632,7 +754,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
           console.log('📦 Todos los ejercicios del backend:', todosEjercicios);
           
           // IDs de contenidos de este subtema
-          const contenidoIdsDeEsteSubtema = contenidosSecuenciados.map(c => c.id);
+          const contenidoIdsDeEsteSubtema = contenidosSecuenciados.map(c => String(c.id));
           console.log('📋 IDs de contenidos en este subtema:', contenidoIdsDeEsteSubtema);
           
           // Mostrar contenido_id de cada ejercicio para debug
@@ -792,27 +914,45 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
 
         {/* Modules List */}
         <div className="p-3">
-          {modules.map((module, idx) => (
+          {modules.map((module, idx) => {
+            const isModuleLocked = module.desbloqueado === false;
+            
+            return (
             <div key={module.id} className="mb-3">
               {/* Module Header */}
               <button
-                onClick={() => toggleModule(module.id)}
-                className="w-full text-left p-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between transition-all shadow-sm hover:shadow-md"
+                onClick={() => {
+                  if (isModuleLocked) {
+                    alert('Este subtema está bloqueado. Complete el subtema anterior para desbloquearlo.');
+                    return;
+                  }
+                  toggleModule(module.id);
+                }}
+                className={`w-full text-left p-3 bg-white border border-gray-200 rounded-xl flex items-center justify-between transition-all shadow-sm ${
+                  isModuleLocked 
+                    ? 'opacity-60 cursor-not-allowed' 
+                    : 'hover:bg-gray-50 hover:shadow-md'
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <div 
                     className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs shadow-sm"
-                    style={{ backgroundColor: subjectColor }}
+                    style={{ backgroundColor: isModuleLocked ? '#9CA3AF' : subjectColor }}
                   >
-                    {idx + 1}
+                    {isModuleLocked ? <Lock className="w-4 h-4" /> : (idx + 1)}
                   </div>
-                  <span className="text-sm text-[#3A4A5B]">{module.title}</span>
+                  <span className={`text-sm ${isModuleLocked ? 'text-gray-400' : 'text-[#3A4A5B]'}`}>
+                    {module.title}
+                  </span>
+                  {module.completo && (
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  )}
                 </div>
-                {module.expanded ? (
+                {!isModuleLocked && (module.expanded ? (
                   <ChevronDown className="w-4 h-4 text-gray-400" />
                 ) : (
                   <ChevronRight className="w-4 h-4 text-gray-400" />
-                )}
+                ))}
               </button>
 
               {/* Module Items */}
@@ -831,10 +971,17 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     module.items.map((item) => {
                       const ItemIcon = getItemIcon(item.type);
                       const isSelected = selectedContentId === item.id;
+                      const isItemLocked = item.desbloqueado === false;
+                      
                       return (
                         <button
                           key={item.id}
                           onClick={() => {
+                            if (isItemLocked) {
+                              alert('Este contenido está bloqueado. Complete el contenido anterior para desbloquearlo.');
+                              return;
+                            }
+                            
                             // Si es un ejercicio, manejarlo de forma especial
                             if (item.ejercicioData) {
                               console.log('📝 Seleccionando ejercicio:', item.ejercicioData);
@@ -863,17 +1010,34 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                               onContentChange?.(item.id);
                             }
                           }}
-                          className={`w-full text-left p-3 border rounded-lg hover:bg-gray-50 flex items-center gap-3 text-sm transition-all group ${
-                            isSelected 
-                              ? 'border-blue-400 bg-blue-50' 
-                              : 'border-gray-200'
+                          className={`w-full text-left p-3 border rounded-lg flex items-center gap-3 text-sm transition-all group ${
+                            isItemLocked
+                              ? 'opacity-60 cursor-not-allowed border-gray-200'
+                              : isSelected 
+                                ? 'border-blue-400 bg-blue-50' 
+                                : 'border-gray-200 hover:bg-gray-50'
                           }`}
                         >
-                          <div className="w-5 h-5 border-2 rounded flex items-center justify-center flex-shrink-0" style={{ borderColor: item.completed || item.visualizado ? subjectColor : isSelected ? subjectColor : '#E5E7EB' }}>
-                            {(item.completed || item.visualizado) && <CheckCircle2 className="w-4 h-4" style={{ color: subjectColor }} />}
-                          </div>
+                          {isItemLocked ? (
+                            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                              <Lock className="w-4 h-4 text-gray-400" />
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 border-2 rounded flex items-center justify-center flex-shrink-0" style={{ borderColor: item.completed || item.visualizado ? subjectColor : isSelected ? subjectColor : '#E5E7EB' }}>
+                              {(item.completed || item.visualizado) && <CheckCircle2 className="w-4 h-4" style={{ color: subjectColor }} />}
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
-                            <div className={`${isSelected ? 'text-blue-600 font-semibold' : 'text-[#3A4A5B]'} group-hover:text-[#4A90E2] transition-colors truncate`}>{item.title}</div>
+                            <div className={`transition-colors truncate ${
+                              isItemLocked 
+                                ? 'text-gray-400' 
+                                : isSelected 
+                                  ? 'text-blue-600 font-semibold' 
+                                  : 'text-[#3A4A5B] group-hover:text-[#4A90E2]'
+                            }`}>
+                              {item.title}
+                              {item.completo && <CheckCircle2 className="w-4 h-4 ml-2 inline text-green-500" />}
+                            </div>
                             <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
                               <ItemIcon className="w-3 h-3" />
                               <span>{item.type.charAt(0).toUpperCase() + item.type.slice(1)}</span>
@@ -886,7 +1050,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
