@@ -64,10 +64,14 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [studentResponse, setStudentResponse] = useState('');
-  const [stakeholdersResponse, setStakeholdersResponse] = useState('');
-  const [functionalResponse, setFunctionalResponse] = useState('');
-  const [nonFunctionalResponse, setNonFunctionalResponse] = useState('');
-  const [scopeResponse, setScopeResponse] = useState('');
+  const [stakeholdersList, setStakeholdersList] = useState<string[]>([]);
+  const [functionalList, setFunctionalList] = useState<string[]>([]);
+  const [nonFunctionalList, setNonFunctionalList] = useState<string[]>([]);
+  const [stakeholderInput, setStakeholderInput] = useState('');
+  const [functionalInput, setFunctionalInput] = useState('');
+  const [nonFunctionalInput, setNonFunctionalInput] = useState('');
+  const [scopeList, setScopeList] = useState<string[]>([]);
+  const [scopeInput, setScopeInput] = useState('');
   const [scheduleRows, setScheduleRows] = useState<Array<{ activity: string; start: string; end: string }>>([
     { activity: '', start: '', end: '' }
   ]);
@@ -89,13 +93,12 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
   const isManagementWorkshop = workshop.actividadId === 13 || subjectName === 'Alcance, Tiempo y Costo';
   const workshopConfig = isManagementWorkshop ? workshopConfigs.management : workshopConfigs.analysis;
 
-  const formatScheduleRows = (rows: Array<{ activity: string; start: string; end: string }>) =>
+  const buildScheduleList = (rows: Array<{ activity: string; start: string; end: string }>) =>
     rows
       .filter((row) => row.activity || row.start || row.end)
       .map((row, index) =>
         `Actividad ${index + 1}: ${row.activity || '-'} | Inicio: ${row.start || '-'} | Fin: ${row.end || '-'}`
-      )
-      .join('\n');
+      );
 
   const parseNumber = (value: string) => {
     const normalized = value.replace(/[^0-9.,]/g, '').replace(',', '.');
@@ -111,7 +114,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
   const totalCost = costRows.reduce((sum, row) => sum + calculateRowTotal(row), 0);
 
-  const formatCostRows = (
+  const buildCostList = (
     rows: Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }>
   ) =>
     rows
@@ -119,8 +122,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
       .map((row, index) =>
         `Costo ${index + 1}: ${row.concept || '-'} | Tipo: ${row.type} | Cantidad: ${row.quantity || '-'} | Costo unitario: ${row.unitCost || '-'} | Subtotal: ${formatCurrency(calculateRowTotal(row))}`
       )
-      .concat([`Total general: ${formatCurrency(totalCost)}`])
-      .join('\n');
+      .concat([`Total general: ${formatCurrency(totalCost)}`]);
 
   useEffect(() => {
     const fetchExpectedCounts = async () => {
@@ -167,14 +169,14 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
     const respuestaEstudiante = isManagementWorkshop
       ? {
-          alcance: scopeResponse,
-          cronograma: formatScheduleRows(scheduleRows),
-          costos: formatCostRows(costRows)
+          alcance: scopeList,
+          cronograma: buildScheduleList(scheduleRows),
+          costos: buildCostList(costRows)
         }
       : {
-          stakeholders: stakeholdersResponse,
-          requisitosFuncionales: functionalResponse,
-          requisitosNoFuncionales: nonFunctionalResponse
+          stakeholders: stakeholdersList,
+          requisitosFuncionales: functionalList,
+          requisitosNoFuncionales: nonFunctionalList
         };
 
     const respuesta = JSON.stringify({
@@ -378,41 +380,90 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
               />
             </div>
 
-            <div className="bg-white rounded-2xl shadow-md p-6 space-y-4">
-              <label className="text-sm text-gray-600">Respuesta del estudiante</label>
-              <p className="text-xs text-gray-500">
-                A partir del chat con la IA, responde las tareas solicitadas.
-              </p>
+            <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 space-y-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <label className="text-sm text-gray-700 font-semibold">Respuesta del estudiante</label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    A partir del chat con la IA, responde las tareas solicitadas.
+                  </p>
+                </div>
+                <span
+                  className="text-[11px] px-4 py-1 rounded-full border"
+                  style={{ color: subjectColor, borderColor: `${subjectColor}40`, backgroundColor: `${subjectColor}10` }}
+                >
+                  Evaluación automática
+                </span>
+              </div>
+
+              <div className="my-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600">
+                <p className="font-semibold text-gray-700">¿Cómo se evalúa?</p>
+                <ul className="mt-2 list-disc pl-4 space-y-1">
+                  <li>Se comparan tus respuestas con criterios esperados por palabras clave.</li>
+                  <li>Incluye conceptos del cliente, fechas y términos específicos.</li>
+                  <li>Mientras más completos y concretos sean los ítems, mejor puntuación.</li>
+                </ul>
+              </div>
               {isManagementWorkshop ? (
                 <div className="space-y-4">
-                  <div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <label className="text-xs text-gray-500">Alcance del proyecto</label>
-                    <textarea
-                      value={scopeResponse}
-                      onChange={(event) => setScopeResponse(event.target.value)}
-                      rows={3}
-                      placeholder="Describe el alcance del proyecto..."
-                      className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                    />
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={scopeInput}
+                        onChange={(event) => setScopeInput(event.target.value)}
+                        placeholder="Agregar alcance"
+                        className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const trimmed = scopeInput.trim();
+                          if (!trimmed) return;
+                          setScopeList((prev) => [...prev, trimmed]);
+                          setScopeInput('');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-[#4A90E2] text-white text-xs"
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {scopeList.map((item, index) => (
+                        <span
+                          key={`${item}-${index}`}
+                          className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs"
+                        >
+                          {item}
+                          <button
+                            type="button"
+                            onClick={() => setScopeList((prev) => prev.filter((_, i) => i !== index))}
+                            className="text-blue-600"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <label className="text-xs text-gray-500">Cronograma del proyecto</label>
                     <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
                       <div
                         className="bg-gray-50 text-[11px] text-gray-500"
-                        style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr auto' }}
+                        style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr 80px' }}
                       >
                         <div className="px-3 py-2">Actividad</div>
                         <div className="px-3 py-2">Inicio</div>
                         <div className="px-3 py-2">Fin</div>
-                        <div className="px-3 py-2"></div>
+                        <div className="px-3 py-2 text-right">Acción</div>
                       </div>
                       <div className="divide-y divide-gray-100">
                         {scheduleRows.map((row, index) => (
                           <div
                             key={index}
                             className="px-3 py-2"
-                            style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr auto', gap: '8px', alignItems: 'center' }}
+                            style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr 80px', gap: '8px', alignItems: 'center' }}
                           >
                             <input
                               value={row.activity}
@@ -455,7 +506,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                                 }
                                 setScheduleRows(scheduleRows.filter((_, rowIndex) => rowIndex !== index));
                               }}
-                              className="text-xs text-red-500 hover:text-red-600"
+                              className="text-xs text-red-500 hover:text-red-600 justify-self-end"
                             >
                               Quitar
                             </button>
@@ -473,25 +524,25 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                       </button>
                     </div>
                   </div>
-                  <div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <label className="text-xs text-gray-500">Estimación de costos y recursos</label>
                     <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
                       <div
                         className="bg-gray-50 text-[11px] text-gray-500"
-                        style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr 1.2fr auto' }}
+                        style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr 1.2fr 80px' }}
                       >
                         <div className="px-3 py-2">Concepto</div>
                         <div className="px-3 py-2">Tipo</div>
                         <div className="px-3 py-2">Cantidad</div>
                         <div className="px-3 py-2">Costo unitario</div>
-                        <div className="px-3 py-2"></div>
+                        <div className="px-3 py-2 text-right">Acción</div>
                       </div>
                       <div className="divide-y divide-gray-100">
                         {costRows.map((row, index) => (
                           <div
                             key={index}
                             className="px-3 py-2"
-                            style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr 1.2fr auto', gap: '8px', alignItems: 'center' }}
+                            style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr 1.2fr 80px', gap: '8px', alignItems: 'center' }}
                           >
                             <input
                               value={row.concept}
@@ -554,7 +605,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                                 }
                                 setCostRows(costRows.filter((_, rowIndex) => rowIndex !== index));
                               }}
-                              className="text-xs text-red-500 hover:text-red-600"
+                              className="text-xs text-red-500 hover:text-red-600 justify-self-end"
                             >
                               Quitar
                             </button>
@@ -584,44 +635,134 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <label className="text-xs text-gray-500">Stakeholders</label>
                     <p className="text-[11px] text-gray-400 mt-1">
                       Pista: se esperan {expectedCounts?.stakeholders ?? 4} stakeholders.
                     </p>
-                    <textarea
-                      value={stakeholdersResponse}
-                      onChange={(event) => setStakeholdersResponse(event.target.value)}
-                      rows={3}
-                      placeholder="Describe los stakeholders identificados..."
-                      className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                    />
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={stakeholderInput}
+                        onChange={(event) => setStakeholderInput(event.target.value)}
+                        placeholder="Agregar stakeholder"
+                        className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const trimmed = stakeholderInput.trim();
+                          if (!trimmed) return;
+                          setStakeholdersList((prev) => [...prev, trimmed]);
+                          setStakeholderInput('');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-[#4A90E2] text-white text-xs"
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {stakeholdersList.map((item, index) => (
+                        <span
+                          key={`${item}-${index}`}
+                          className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs"
+                        >
+                          {item}
+                          <button
+                            type="button"
+                            onClick={() => setStakeholdersList((prev) => prev.filter((_, i) => i !== index))}
+                            className="text-blue-600"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <label className="text-xs text-gray-500">Requisitos funcionales</label>
                     <p className="text-[11px] text-gray-400 mt-1">
                       Pista: se esperan {expectedCounts?.functional ?? 6} requisitos funcionales.
                     </p>
-                    <textarea
-                      value={functionalResponse}
-                      onChange={(event) => setFunctionalResponse(event.target.value)}
-                      rows={3}
-                      placeholder="Enumera los requisitos funcionales..."
-                      className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                    />
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={functionalInput}
+                        onChange={(event) => setFunctionalInput(event.target.value)}
+                        placeholder="Agregar requisito funcional"
+                        className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const trimmed = functionalInput.trim();
+                          if (!trimmed) return;
+                          setFunctionalList((prev) => [...prev, trimmed]);
+                          setFunctionalInput('');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-[#4A90E2] text-white text-xs"
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {functionalList.map((item, index) => (
+                        <span
+                          key={`${item}-${index}`}
+                          className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs"
+                        >
+                          {item}
+                          <button
+                            type="button"
+                            onClick={() => setFunctionalList((prev) => prev.filter((_, i) => i !== index))}
+                            className="text-green-600"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <label className="text-xs text-gray-500">Requisitos no funcionales</label>
                     <p className="text-[11px] text-gray-400 mt-1">
                       Pista: se esperan {expectedCounts?.nonFunctional ?? 5} requisitos no funcionales.
                     </p>
-                    <textarea
-                      value={nonFunctionalResponse}
-                      onChange={(event) => setNonFunctionalResponse(event.target.value)}
-                      rows={3}
-                      placeholder="Enumera los requisitos no funcionales..."
-                      className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                    />
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={nonFunctionalInput}
+                        onChange={(event) => setNonFunctionalInput(event.target.value)}
+                        placeholder="Agregar requisito no funcional"
+                        className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const trimmed = nonFunctionalInput.trim();
+                          if (!trimmed) return;
+                          setNonFunctionalList((prev) => [...prev, trimmed]);
+                          setNonFunctionalInput('');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-[#4A90E2] text-white text-xs"
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {nonFunctionalList.map((item, index) => (
+                        <span
+                          key={`${item}-${index}`}
+                          className="inline-flex items-center gap-2 bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs"
+                        >
+                          {item}
+                          <button
+                            type="button"
+                            onClick={() => setNonFunctionalList((prev) => prev.filter((_, i) => i !== index))}
+                            className="text-orange-600"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
