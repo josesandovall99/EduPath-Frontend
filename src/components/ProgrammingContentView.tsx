@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Play, SkipForward, SkipBack, Lightbulb, Trash2 } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
-// 1. IMPORTANTE: Verifica que la ruta al hook sea correcta
 import { useCompiler } from '../Hooks/useCompiler'; 
 import { submitExercise } from '../utils/submitExercise';
 
@@ -18,11 +17,53 @@ interface ProgrammingContentViewProps {
   onBack: () => void;
 }
 
+interface Ejercicio {
+  id: number;
+  contenido_id: number;
+  puntos: number;
+  resultado_ejercicio: string;
+  tipo_ejercicio: string;
+  configuracion?: {
+    tipo?: string;
+    esperado?: string;
+    lenguajesPermitidos?: number[];
+    sintaxis?: string[];
+  };
+  actividad?: {
+    titulo: string;
+    descripcion?: string;
+    nivel_dificultad?: string;
+  };
+}
+
 export function ProgrammingContentView({ content, onBack }: ProgrammingContentViewProps) {
   const [code, setCode] = useState('# Escribe tu código aquí\nprint("Hola Mundo")');
   const subjectColor = '#4A90E2';
+  
+  // Función para cambiar lenguaje y actualizar código de ejemplo
+  const cambiarLenguaje = (nuevoLenguajeId: number) => {
+    setLenguajeSeleccionado(nuevoLenguajeId);
+    const lenguaje = lenguajesDisponibles.find(l => l.id === nuevoLenguajeId);
+    if (lenguaje) {
+      setCode(lenguaje.ejemplo);
+    }
+  };
+  const [ejercicio, setEjercicio] = useState<Ejercicio | null>(null);
+  const [lenguajeSeleccionado, setLenguajeSeleccionado] = useState<number>(71); // Python por defecto
 
-  // 2. Inicializamos el hook
+  // Lenguajes disponibles
+  const lenguajesDisponibles = [
+    { id: 62, nombre: 'Java', extension: '.java', ejemplo: 'public class Main {\n  public static void main(String[] args) {\n    System.out.println("Hola Mundo");\n  }\n}' },
+    { id: 71, nombre: 'Python', extension: '.py', ejemplo: '# Escribe tu código aquí\nprint("Hola Mundo")' },
+    { id: 63, nombre: 'JavaScript', extension: '.js', ejemplo: '// Escribe tu código aquí\nconsole.log("Hola Mundo");' },
+    { id: 50, nombre: 'C', extension: '.c', ejemplo: '#include <stdio.h>\n\nint main() {\n  printf("Hola Mundo\\n");\n  return 0;\n}' },
+    { id: 54, nombre: 'C++', extension: '.cpp', ejemplo: '#include <iostream>\nusing namespace std;\n\nint main() {\n  cout << "Hola Mundo" << endl;\n  return 0;\n}' },
+    { id: 51, nombre: 'C#', extension: '.cs', ejemplo: 'using System;\n\nclass Program {\n  static void Main() {\n    Console.WriteLine("Hola Mundo");\n  }\n}' }
+  ];
+
+  const lenguajeActual = lenguajesDisponibles.find(l => l.id === lenguajeSeleccionado) || lenguajesDisponibles[1];
+
+  // Inicializamos el hook
   const { runCode, output, isLoading, setOutput } = useCompiler();
 
   // Estados para envío/calificación según nueva lógica
@@ -31,16 +72,47 @@ export function ProgrammingContentView({ content, onBack }: ProgrammingContentVi
   const [feedback, setFeedback] = useState<string>('');
   const [puntos, setPuntos] = useState<number | null>(null);
 
-  // 3. Función de ejecución con Logs de diagnóstico
+  // Cargar el ejercicio desde el backend
+  useEffect(() => {
+    const cargarEjercicio = async () => {
+      try {
+        console.log('🔍 Buscando ejercicio con contenido_id:', content.id);
+        const response = await fetch(`http://localhost:4000/ejercicios?contenido_id=${content.id}`);
+        const data = await response.json();
+        console.log('📦 Ejercicios encontrados:', data);
+        if (data.length > 0) {
+          // Ordenar por ID descendente para obtener el más reciente
+          const ejerciciosOrdenados = data.sort((a: any, b: any) => parseInt(b.id) - parseInt(a.id));
+          const ejercicioMasReciente = ejerciciosOrdenados[0];
+          
+          setEjercicio(ejercicioMasReciente);
+          console.log('✅ Ejercicio seleccionado (más reciente):', ejercicioMasReciente);
+          console.log('📋 Configuración:', ejercicioMasReciente.configuracion);
+          console.log('📝 Esperado:', ejercicioMasReciente.configuracion?.esperado);
+        } else {
+          console.log('⚠️ No se encontraron ejercicios para este contenido');
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar ejercicio:', error);
+      }
+    };
+
+    cargarEjercicio();
+  }, [content.id]);
+
+  // Función de ejecución
   const handleExecute = async () => {
-    console.log("🟢 Botón presionado. Código actual:", code);
+    if (!ejercicio) {
+      setOutput('❌ No se ha cargado el ejercicio');
+      return;
+    }
+
+    const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId') || '1';
     
     try {
-      // Ajusta los IDs (estudiante, ejercicio) según tu base de datos
-      await runCode(code, 71, 1, 1); 
-      console.log("✅ Llamada a runCode finalizada");
+      await runCode(code, lenguajeSeleccionado, parseInt(estudianteId), ejercicio.id);
     } catch (error) {
-      console.error("❌ Error al llamar a runCode:", error);
+      console.error("❌ Error al ejecutar:", error);
     }
   };
 
@@ -164,9 +236,20 @@ export function ProgrammingContentView({ content, onBack }: ProgrammingContentVi
         {/* Panel Derecho: Editor y Consola */}
         <div className="w-1/2 bg-white flex flex-col">
           <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <select
+                value={lenguajeSeleccionado}
+                onChange={(e) => cambiarLenguaje(parseInt(e.target.value))}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-[#3A4A5B] focus:outline-none focus:ring-2 focus:ring-[#4A90E2] cursor-pointer"
+              >
+                {lenguajesDisponibles.map(lenguaje => (
+                  <option key={lenguaje.id} value={lenguaje.id}>
+                    {lenguaje.nombre}
+                  </option>
+                ))}
+              </select>
               <div className="px-4 py-2 rounded-lg shadow-sm font-mono text-sm" style={{ backgroundColor: `${subjectColor}15`, color: subjectColor }}>
-                script.py
+                script{lenguajeActual.extension}
               </div>
             </div>
             <div className="flex gap-3">

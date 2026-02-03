@@ -75,20 +75,59 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
     }));
   };
 
+  const handleSintaxisChange = (sintaxis: string) => {
+    const currentSintaxis = formData.ejercicio.configuracion?.sintaxis || [];
+    const newSintaxis = currentSintaxis.includes(sintaxis)
+      ? currentSintaxis.filter((s: string) => s !== sintaxis)
+      : [...currentSintaxis, sintaxis];
+    
+    setFormData(prev => ({
+      ...prev,
+      ejercicio: {
+        ...prev.ejercicio,
+        configuracion: {
+          ...prev.ejercicio.configuracion,
+          sintaxis: newSintaxis
+        }
+      }
+    }));
+  };
+
+  const sintaxisDisponibles = ['while', 'for', 'if', 'switch'];
+  const sintaxisSeleccionadas = formData.ejercicio.configuracion?.sintaxis || [];
+
   return (
     <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
       <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración de Compilador</h3>
       
       <div>
-        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Código Esperado / Respuesta Correcta *</label>
+        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Sintaxis Requerida *</label>
+        <div className="grid grid-cols-2 gap-3">
+          {sintaxisDisponibles.map(sintaxis => (
+            <label key={sintaxis} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sintaxisSeleccionadas.includes(sintaxis)}
+                onChange={() => handleSintaxisChange(sintaxis)}
+                className="w-4 h-4 text-[#4A90E2] border-gray-300 rounded focus:ring-[#4A90E2]"
+              />
+              <span className="text-sm text-[#3A4A5B] font-mono">{sintaxis}</span>
+            </label>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-2">Seleccione las estructuras de control que el estudiante debe usar</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Salida Esperada del Programa *</label>
         <textarea
           value={formData.ejercicio.resultado_ejercicio}
           onChange={handleEsperadoChange}
-          placeholder="Ejemplo: print('Hola Mundo')"
+          placeholder="Ejemplo: 1 2 3&#10;o&#10;Hola Mundo"
           className="w-full min-h-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono text-sm"
           required
         />
-        <p className="text-xs text-gray-500 mt-1">Este código se usará para validar la respuesta del estudiante</p>
+        <p className="text-xs text-gray-500 mt-1">Ingrese la salida exacta que debe producir el programa del estudiante (output/resultado)</p>
       </div>
     </div>
   );

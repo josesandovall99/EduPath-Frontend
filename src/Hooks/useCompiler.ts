@@ -8,52 +8,57 @@ export function useCompiler() {
 
   const runCode = async (code: string, languageId: number, studentId: number, exerciseId: number) => {
     setIsLoading(true);
-    setOutput('Conectando con el compilador (Puerto 4000)...');
+    setOutput('Ejecutando código...');
     
-    // URL actualizada al puerto 4000 del Backend
-    const BASE_URL = 'http://localhost:4000/respuestasEstudianteEjercicio';
+    const payload = {
+      estudiante_id: studentId,
+      ejercicio_id: exerciseId,
+      lenguaje_id: languageId,
+      codigo: code,
+    };
+    
+    console.log('📤 Enviando al backend:', payload);
     
     try {
-      // 1. Envío de código
-      const response = await axios.post(BASE_URL, {
-        respuesta: code,
-        estudiante_id: studentId,
-        ejercicio_id: exerciseId,
-        lenguaje_id: languageId,
-      });
+      const response = await axios.post('http://localhost:4000/evaluaciones/compilador', payload);
 
-      const token = response.data.token;
-      setOutput('Procesando ejecución...');
-
-      // 2. Consulta de estado (Polling)
-      const checkStatus = async () => {
-        try {
-          const res = await axios.get(`${BASE_URL}/resultado/${token}`);
-          
-          if (res.data.status?.id <= 2) {
-            setTimeout(checkStatus, 2000);
-          } else {
-            const finalOutput = 
-              res.data.stdout || 
-              res.data.stderr || 
-              res.data.compile_output || 
-              'Ejecución finalizada.';
-              
-            setOutput(finalOutput);
-            setResultData(res.data);
-            setIsLoading(false);
-          }
-        } catch (err) {
-          setOutput('Error al recuperar resultado del puerto 4000.');
-          setIsLoading(false);
-        }
-      };
-
-      await checkStatus();
+      console.log('📥 Respuesta del backend:', response.data);
+      const resultado = response.data;
+      
+      let finalOutput = '';
+      if (resultado.esCorrecta) {
+        finalOutput = `✅ EJERCICIO APROBADO!\n\nSalida del programa:\n${resultado.stdout || resultado.obtenido || ''}\n\nPuntos obtenidos: ${resultado.puntosObtenidos || 0}`;
+      } else {
+        finalOutput = `❌ Ejercicio NO aprobado\n\nTu salida:\n${resultado.stdout || resultado.obtenido || ''}\n\nSalida esperada:\n${resultado.esperado || ''}\n\nRevisa tu código e intenta de nuevo`;
+      }
+      
+      setOutput(finalOutput);
+      setResultData(resultado);
+      setIsLoading(false);
 
     } catch (error: any) {
-      console.error("Fallo de conexión:", error);
-      setOutput("Error: Asegúrate de que el Backend esté corriendo en el puerto 4000.");
+      console.error("❌ Error completo:", error);
+      console.error("📋 Respuesta del servidor:", error.response?.data);
+      
+      // Si el backend responde con 400 y tiene información del ejercicio
+      if (error.response?.status === 400 && error.response?.data) {
+        const resultado = error.response.data;
+        let finalOutput = '';
+        
+        if (resultado.esCorrecta === false) {
+          finalOutput = `❌ Ejercicio NO aprobado\n\nTu salida:\n${resultado.stdout || resultado.obtenido || ''}\n\nSalida esperada:\n${resultado.esperado || ''}\n\nRevisa tu código e intenta de nuevo`;
+        } else {
+          const errorMsg = resultado.error || resultado.message || "Error desconocido";
+          finalOutput = `❌ Error: ${errorMsg}`;
+        }
+        
+        setOutput(finalOutput);
+        setResultData(resultado);
+      } else {
+        const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error desconocido";
+        setOutput(`❌ Error: ${errorMsg}`);
+      }
+      
       setIsLoading(false);
     }
   };
