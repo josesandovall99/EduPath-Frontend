@@ -186,7 +186,26 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
               end: (entry.end ?? entry.fin ?? '').toString()
             };
           }
-          return { activity: entry?.toString?.() ?? '', start: '', end: '' };
+
+          const text = entry?.toString?.() ?? '';
+          const activityMatch = text.match(/Actividad\s*\d*:?\s*([^|]+)\|/i);
+          const startMatch = text.match(/Inicio\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/[0-9]{2}\/[0-9]{4})/i);
+          const endMatch = text.match(/Fin\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/[0-9]{2}\/[0-9]{4})/i);
+          const normalizeDate = (value?: string) => {
+            if (!value) return '';
+            if (/\d{4}-\d{2}-\d{2}/.test(value)) return value;
+            if (/\d{2}\/\d{2}\/\d{4}/.test(value)) {
+              const [day, month, year] = value.split('/');
+              return `${year}-${month}-${day}`;
+            }
+            return value;
+          };
+
+          return {
+            activity: activityMatch ? activityMatch[1].trim() : text,
+            start: normalizeDate(startMatch?.[1]),
+            end: normalizeDate(endMatch?.[1])
+          };
         });
 
         const costosRaw = Array.isArray(parsed?.costos) ? parsed.costos : [];
@@ -199,7 +218,19 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
               unitCost: (entry.unitCost ?? entry.costoUnitario ?? '').toString()
             };
           }
-          return { concept: entry?.toString?.() ?? '', type: 'Humano', quantity: '', unitCost: '' };
+
+          const text = entry?.toString?.() ?? '';
+          const conceptMatch = text.match(/Costo\s*\d*:?\s*([^|]+)\|/i);
+          const typeMatch = text.match(/Tipo\s*:?\s*(Humano|Material)/i);
+          const qtyMatch = text.match(/Cantidad\s*:?\s*([0-9.,]+)/i);
+          const unitMatch = text.match(/Costo\s*unitario\s*:?\s*([0-9.,]+)/i);
+
+          return {
+            concept: conceptMatch ? conceptMatch[1].trim() : text,
+            type: typeMatch && typeMatch[1]?.toLowerCase() === 'material' ? 'Material' : 'Humano',
+            quantity: qtyMatch?.[1] ?? '',
+            unitCost: unitMatch?.[1] ?? ''
+          };
         });
       } catch (err) {
         parsedStakeholders = [];

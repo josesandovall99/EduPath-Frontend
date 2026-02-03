@@ -81,6 +81,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
     { concept: '', type: 'Humano', quantity: '', unitCost: '' }
   ]);
   const [expectedCounts, setExpectedCounts] = useState<{ stakeholders: number; functional: number; nonFunctional: number } | null>(null);
+  const [expectedManagementCounts, setExpectedManagementCounts] = useState<{ scope: number; schedule: number; costs: number } | null>(null);
   const [evaluation, setEvaluation] = useState<{
     puntaje: number;
     criterios?: Array<{ criterio: string; cumplido: boolean }>;
@@ -126,7 +127,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
   useEffect(() => {
     const fetchExpectedCounts = async () => {
-      if (!workshop.isMiniproyecto || isManagementWorkshop) return;
+      if (!workshop.isMiniproyecto) return;
       const miniId = parseInt(workshop.id, 10);
       if (isNaN(miniId)) return;
 
@@ -138,11 +139,20 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
         if (!expectedRaw) return;
 
         const parsed = typeof expectedRaw === 'string' ? JSON.parse(expectedRaw) : expectedRaw;
-        const stakeholders = Array.isArray(parsed?.stakeholders) ? parsed.stakeholders.length : 0;
-        const functional = Array.isArray(parsed?.requisitosFuncionales) ? parsed.requisitosFuncionales.length : 0;
-        const nonFunctional = Array.isArray(parsed?.requisitosNoFuncionales) ? parsed.requisitosNoFuncionales.length : 0;
-        if (stakeholders || functional || nonFunctional) {
-          setExpectedCounts({ stakeholders, functional, nonFunctional });
+        if (isManagementWorkshop) {
+          const scope = Array.isArray(parsed?.alcance) ? parsed.alcance.length : 0;
+          const schedule = Array.isArray(parsed?.cronograma) ? parsed.cronograma.length : 0;
+          const costs = Array.isArray(parsed?.costos) ? parsed.costos.length : 0;
+          if (scope || schedule || costs) {
+            setExpectedManagementCounts({ scope, schedule, costs });
+          }
+        } else {
+          const stakeholders = Array.isArray(parsed?.stakeholders) ? parsed.stakeholders.length : 0;
+          const functional = Array.isArray(parsed?.requisitosFuncionales) ? parsed.requisitosFuncionales.length : 0;
+          const nonFunctional = Array.isArray(parsed?.requisitosNoFuncionales) ? parsed.requisitosNoFuncionales.length : 0;
+          if (stakeholders || functional || nonFunctional) {
+            setExpectedCounts({ stakeholders, functional, nonFunctional });
+          }
         }
       } catch (error) {
         console.warn('No se pudieron cargar las pistas del miniproyecto:', error);
@@ -151,6 +161,30 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
     fetchExpectedCounts();
   }, [workshop.id, workshop.isMiniproyecto, isManagementWorkshop]);
+
+  useEffect(() => {
+    if (!isManagementWorkshop || !workshop.isMiniproyecto) return;
+    if (scopeList.length || scheduleRows.some((row) => row.activity || row.start || row.end) || costRows.some((row) => row.concept || row.quantity || row.unitCost)) {
+      return;
+    }
+
+    setScopeList([
+      'Implementar módulo de matrícula en línea',
+      'Notificaciones por correo y SMS',
+      'Panel de administración para reportes'
+    ]);
+    setScheduleRows([
+      { activity: 'Levantamiento requisitos', start: '2026-02-02', end: '2026-02-14' },
+      { activity: 'Diseño UI/UX', start: '2026-02-15', end: '2026-02-20' },
+      { activity: 'Desarrollo', start: '2026-02-21', end: '2026-03-10' },
+      { activity: 'Pruebas', start: '2026-03-11', end: '2026-03-15' }
+    ]);
+    setCostRows([
+      { concept: 'Analista', type: 'Humano', quantity: '1', unitCost: '3500000' },
+      { concept: 'Desarrollador', type: 'Humano', quantity: '2', unitCost: '3000000' },
+      { concept: 'Licencia SMS', type: 'Material', quantity: '1', unitCost: '800000' }
+    ]);
+  }, [isManagementWorkshop, workshop.isMiniproyecto, scopeList.length, scheduleRows, costRows]);
 
   const resolveEstudianteId = () => {
     if (estudianteId) return estudianteId;
@@ -320,6 +354,62 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
               </div>
             </div>
           </div>
+
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-[#3A4A5B] text-sm">Criterio de evaluación</h4>
+              <span
+                className="text-[10px] px-2 py-1 rounded-full border"
+                style={{ color: subjectColor, borderColor: `${subjectColor}40`, backgroundColor: `${subjectColor}10` }}
+              >
+                Requiere 70%
+              </span>
+            </div>
+            {isManagementWorkshop ? (
+              <div className="space-y-3 text-xs text-gray-700">
+                <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
+                  Tu respuesta se evalúa por ítems. Debes cumplir al menos el 70% en cada sección.
+                </div>
+                <div className="grid gap-2">
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
+                    <strong>Alcance:</strong> funcionalidades clave y términos concretos del cliente.
+                  </div>
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
+                    <strong>Cronograma:</strong> actividad + fechas coherentes. La fecha se considera correcta si está dentro de
+                    ±3 días respecto a la esperada (por ejemplo, si el inicio esperado es 10/02, se acepta del 07/02 al 13/02).
+                  </div>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
+                    <strong>Costos:</strong> se valida concepto y costo unitario. El costo unitario debe estar dentro de ±20%.
+                    Si hay 2 conceptos errados o 2 costos unitarios fuera del rango, no aprueba.
+                    Además, el total debe estar dentro de ±30% (si no, falla toda la sección).
+                  </div>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-[11px] text-gray-600">
+                  Mientras más completos y específicos sean tus ítems, mayor será la calificación.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 text-xs text-gray-700">
+                <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
+                  Tu respuesta se evalúa por ítems. Debes cumplir al menos el 70% en cada sección.
+                </div>
+                <div className="grid gap-2">
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
+                    <strong>Stakeholders:</strong> roles reales del proyecto (usuario final, admin, cliente).
+                  </div>
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
+                    <strong>Requisitos funcionales:</strong> acciones o funcionalidades concretas.
+                  </div>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
+                    <strong>Requisitos no funcionales:</strong> rendimiento, seguridad, disponibilidad, etc.
+                  </div>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-[11px] text-gray-600">
+                  Usa términos específicos y evita respuestas genéricas para obtener mejor puntaje.
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -408,6 +498,9 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                 <div className="space-y-4">
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <label className="text-xs text-gray-500">Alcance del proyecto</label>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Pista: se esperan {expectedManagementCounts?.scope ?? 3} ítems de alcance.
+                    </p>
                     <div className="mt-2 flex gap-2">
                       <input
                         value={scopeInput}
@@ -448,6 +541,9 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                   </div>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <label className="text-xs text-gray-500">Cronograma del proyecto</label>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Pista: se esperan {expectedManagementCounts?.schedule ?? 3} actividades en el cronograma.
+                    </p>
                     <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
                       <div
                         className="bg-gray-50 text-[11px] text-gray-500"
@@ -526,6 +622,9 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                   </div>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <label className="text-xs text-gray-500">Estimación de costos y recursos</label>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Pista: se esperan {expectedManagementCounts?.costs ?? 3} ítems de costos.
+                    </p>
                     <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
                       <div
                         className="bg-gray-50 text-[11px] text-gray-500"
