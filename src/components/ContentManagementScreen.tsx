@@ -31,6 +31,23 @@ interface CreateContentFormData {
   subtema_id: string;
 }
 
+interface Area {
+  id: number;
+  nombre: string;
+}
+
+interface Tema {
+  id: number;
+  nombre: string;
+  area_id: number;
+}
+
+interface Subtema {
+  id: number;
+  nombre: string;
+  tema_id: number;
+}
+
 export function ContentManagementScreen({ onBack }: ContentManagementScreenProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
@@ -52,10 +69,77 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // Cargar contenidos al montar el componente
+  // Estados para áreas, temas y subtemas
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [temas, setTemas] = useState<Tema[]>([]);
+  const [subtemas, setSubtemas] = useState<Subtema[]>([]);
+  const [selectedAreaId, setSelectedAreaId] = useState<string>('');
+
+  // Funciones para cargar datos
+  const loadAreas = async () => {
+    try {
+      const response = await fetch('http://localhost:4000/areas');
+      if (response.ok) {
+        const data = await response.json();
+        setAreas(data);
+      }
+    } catch (err) {
+      console.error('Error cargando áreas:', err);
+    }
+  };
+
+  const loadTemasByArea = async (areaId: string) => {
+    try {
+      const response = await fetch('http://localhost:4000/temas/por-area/' + areaId);
+      if (response.ok) {
+        const data = await response.json();
+        setTemas(data);
+      }
+    } catch (err) {
+      console.error('Error cargando temas:', err);
+      setTemas([]);
+    }
+  };
+
+  const loadSubtemasByTema = async (temaId: string) => {
+    try {
+      const response = await fetch('http://localhost:4000/subtemas/por-tema/' + temaId);
+      if (response.ok) {
+        const data = await response.json();
+        setSubtemas(data);
+      }
+    } catch (err) {
+      console.error('Error cargando subtemas:', err);
+      setSubtemas([]);
+    }
+  };
+
+  // Cargar contenidos y áreas al montar el componente
   useEffect(() => {
     loadContenidos();
+    loadAreas();
   }, []);
+
+  // Cargar temas cuando cambia el área seleccionada
+  useEffect(() => {
+    if (selectedAreaId) {
+      loadTemasByArea(selectedAreaId);
+      setFormData(prev => ({ ...prev, tema_id: '', subtema_id: '' }));
+    } else {
+      setTemas([]);
+      setSubtemas([]);
+    }
+  }, [selectedAreaId]);
+
+  // Cargar subtemas cuando cambia el tema seleccionado
+  useEffect(() => {
+    if (formData.tema_id) {
+      loadSubtemasByTema(formData.tema_id);
+      setFormData(prev => ({ ...prev, subtema_id: '' }));
+    } else {
+      setSubtemas([]);
+    }
+  }, [formData.tema_id]);
 
   // Función para cargar todos los contenidos
   const loadContenidos = async () => {
@@ -74,20 +158,67 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
 
       const data = await response.json();
       
-      // Mapear los datos del backend a la estructura local
-      const contenidosMapeados: ContentItem[] = data.map((item: any) => ({
-        id: item.id?.toString() || '',
-        title: item.titulo,
-        type: item.tipo,
-        linkedTo: 'subtheme',
-        linkedName: `Tema ${item.tema_id} - Subtema ${item.subtema_id}`,
-        subject: 'Sin clasificar',
-        status: 'draft',
-        tema_id: item.tema_id,
-        subtema_id: item.subtema_id,
-        descripcion: item.descripcion,
-        url: item.url
-      }));
+      // Para cada contenido, obtener los nombres de área, tema y subtema
+      const contenidosMapeados: ContentItem[] = await Promise.all(
+        data.map(async (item: any) => {
+          let areaNombre = 'Sin clasificar';
+          let temaNombre = '';
+          let subtemaNombre = '';
+
+          // Obtener información del tema
+          if (item.tema_id) {
+            try {
+              const temaResponse = await fetch(`http://localhost:4000/temas/${item.tema_id}`);
+              if (temaResponse.ok) {
+                const tema = await temaResponse.json();
+                temaNombre = tema.nombre;
+
+                // Obtener información del área
+                if (tema.area_id) {
+                  try {
+                    const areaResponse = await fetch(`http://localhost:4000/areas/${tema.area_id}`);
+                    if (areaResponse.ok) {
+                      const area = await areaResponse.json();
+                      areaNombre = area.nombre;
+                    }
+                  } catch (err) {
+                    console.error('Error cargando área:', err);
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('Error cargando tema:', err);
+            }
+          }
+
+          // Obtener información del subtema
+          if (item.subtema_id) {
+            try {
+              const subtemaResponse = await fetch(`http://localhost:4000/subtemas/${item.subtema_id}`);
+              if (subtemaResponse.ok) {
+                const subtema = await subtemaResponse.json();
+                subtemaNombre = subtema.nombre;
+              }
+            } catch (err) {
+              console.error('Error cargando subtema:', err);
+            }
+          }
+
+          return {
+            id: item.id?.toString() || '',
+            title: item.titulo,
+            type: item.tipo,
+            linkedTo: 'subtheme',
+            linkedName: temaNombre && subtemaNombre ? `${temaNombre} - ${subtemaNombre}` : 'Sin vincular',
+            subject: areaNombre,
+            status: 'draft',
+            tema_id: item.tema_id,
+            subtema_id: item.subtema_id,
+            descripcion: item.descripcion,
+            url: item.url
+          };
+        })
+      );
 
       setContents(contenidosMapeados);
     } catch (err) {
@@ -189,6 +320,7 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
         tema_id: '',
         subtema_id: ''
       });
+      setSelectedAreaId('');
       if (quillRef.current) {
         quillRef.current.root.innerHTML = '';
       }
@@ -210,7 +342,7 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
   };
 
   // Función para actualizar contenido (abrir modal en modo edición)
-  const handleEditContent = (content: ContentItem) => {
+  const handleEditContent = async (content: ContentItem) => {
     setIsEditMode(true);
     setSelectedContent(content);
     setFormData({
@@ -221,6 +353,20 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
       tema_id: content.tema_id?.toString() || '',
       subtema_id: content.subtema_id?.toString() || ''
     });
+
+    // Si hay tema_id, cargar el tema para obtener el área
+    if (content.tema_id) {
+      try {
+        const response = await fetch('http://localhost:4000/temas/' + content.tema_id);
+        if (response.ok) {
+          const tema = await response.json();
+          setSelectedAreaId(tema.area_id.toString());
+        }
+      } catch (err) {
+        console.error('Error cargando tema:', err);
+      }
+    }
+
     setShowCreateModal(true);
   };
 
@@ -529,8 +675,6 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Tipo</th>
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Materia</th>
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Vinculado a</th>
-                  <th className="px-6 py-4 text-left text-[#3A4A5B]">Duración</th>
-                  <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Acciones</th>
                 </tr>
               </thead>
@@ -559,18 +703,6 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                       </td>
                       <td className="px-6 py-4 text-gray-600 text-sm">{content.subject}</td>
                       <td className="px-6 py-4 text-gray-600 text-sm">{content.linkedName}</td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">{content.duration || '-'}</td>
-                      <td className="px-6 py-4">
-                        {content.status === 'published' ? (
-                          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                            Publicado
-                          </span>
-                        ) : (
-                          <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
-                            Borrador
-                          </span>
-                        )}
-                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <button
@@ -705,36 +837,74 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                 </select>
               </div>
 
-              {/* Tema ID */}
+              {/* Área */}
               <div>
                 <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                  ID del Tema *
+                  Área *
                 </label>
-                <input
-                  type="number"
+                <select
+                  value={selectedAreaId}
+                  onChange={(e) => setSelectedAreaId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                  required
+                >
+                  <option value="">Seleccione un área</option>
+                  {areas.map((area) => (
+                    <option key={area.id} value={area.id}>
+                      {area.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tema */}
+              <div>
+                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
+                  Tema *
+                </label>
+                <select
                   name="tema_id"
                   value={formData.tema_id}
                   onChange={handleInputChange}
-                  placeholder="Ingrese el ID del tema"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                   required
-                />
+                  disabled={!selectedAreaId || temas.length === 0}
+                >
+                  <option value="">Seleccione un tema</option>
+                  {temas.map((tema) => (
+                    <option key={tema.id} value={tema.id}>
+                      {tema.nombre}
+                    </option>
+                  ))}
+                </select>
+                {selectedAreaId && temas.length === 0 && (
+                  <p className="text-sm text-gray-500 mt-1">No hay temas disponibles para esta área</p>
+                )}
               </div>
 
-              {/* Subtema ID */}
+              {/* Subtema */}
               <div>
                 <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                  ID del Subtema *
+                  Subtema *
                 </label>
-                <input
-                  type="number"
+                <select
                   name="subtema_id"
                   value={formData.subtema_id}
                   onChange={handleInputChange}
-                  placeholder="Ingrese el ID del subtema"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                   required
-                />
+                  disabled={!formData.tema_id || subtemas.length === 0}
+                >
+                  <option value="">Seleccione un subtema</option>
+                  {subtemas.map((subtema) => (
+                    <option key={subtema.id} value={subtema.id}>
+                      {subtema.nombre}
+                    </option>
+                  ))}
+                </select>
+                {formData.tema_id && subtemas.length === 0 && (
+                  <p className="text-sm text-gray-500 mt-1">No hay subtemas disponibles para este tema</p>
+                )}
               </div>
 
               {/* Botones de Acción */}
