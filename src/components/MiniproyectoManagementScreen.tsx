@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ClipboardList, RefreshCw, Save, Search, Play, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, ClipboardList, RefreshCw, Save, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
-import { useCompiler } from '../Hooks/useCompiler';
 
 interface MiniproyectoManagementScreenProps {
   onBack: () => void;
@@ -58,6 +57,8 @@ type ExpectedSnapshot =
     };
 
 export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementScreenProps) {
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const quillRef = useRef<any>(null);
   const [miniproyectos, setMiniproyectos] = useState<MiniproyectoItem[]>([]);
   const [selected, setSelected] = useState<MiniproyectoItem | null>(null);
   const [formData, setFormData] = useState<EditFormData>({
@@ -71,10 +72,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [code, setCode] = useState('# Escribe tu código aquí\nprint("Hola Mundo")');
-  const [lastRunOutput, setLastRunOutput] = useState('');
-  const [hasRun, setHasRun] = useState(false);
-  const [lastRunHasError, setLastRunHasError] = useState(false);
+  const [expectedOutput, setExpectedOutput] = useState('');
+  const [sintaxisRequerida, setSintaxisRequerida] = useState<string[]>([]);
+  const [lenguajesPermitidos, setLenguajesPermitidos] = useState<number[]>([]);
   const [stakeholdersList, setStakeholdersList] = useState<string[]>([]);
   const [functionalList, setFunctionalList] = useState<string[]>([]);
   const [nonFunctionalList, setNonFunctionalList] = useState<string[]>([]);
@@ -92,10 +92,71 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const [showExpectedModal, setShowExpectedModal] = useState(false);
   const [expectedSnapshot, setExpectedSnapshot] = useState<ExpectedSnapshot | null>(null);
 
-  const { runCode, output, isLoading: isRunning, setOutput } = useCompiler();
   const actividadId = selected?.actividad_id ? Number(selected.actividad_id) : null;
   const isProgrammingMiniproyecto = actividadId === 12;
   const isManagementMiniproyecto = actividadId === 13;
+
+  useEffect(() => {
+    if (!isProgrammingMiniproyecto) return;
+
+    const ensureQuill = () => {
+      if (!editorRef.current) return;
+      if (!(window as any).Quill) return;
+      if (!quillRef.current) {
+        try {
+          const SizeStyle = (window as any).Quill.import('attributors/style/size');
+          SizeStyle.whitelist = ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'];
+          (window as any).Quill.register(SizeStyle, true);
+
+          const FontStyle = (window as any).Quill.import('attributors/style/font');
+          FontStyle.whitelist = ['Arial', 'Monospace', 'Algerian'];
+          (window as any).Quill.register(FontStyle, true);
+        } catch (err) {
+          console.warn('Quill format registration failed', err);
+        }
+
+        editorRef.current.innerHTML = '';
+        quillRef.current = new (window as any).Quill(editorRef.current, {
+          theme: 'snow',
+          placeholder: 'Ingrese la descripcion del miniproyecto',
+          modules: {
+            toolbar: [
+              [{ font: ['Arial', 'Monospace', 'Algerian'] }],
+              [{ size: ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'] }],
+              ['bold', 'italic', 'underline', 'strike'],
+              [{ color: [] }, { background: [] }],
+              [{ list: 'ordered' }, { list: 'bullet' }],
+              [{ align: [] }],
+              ['link', 'image', 'video'],
+              ['clean']
+            ]
+          }
+        });
+
+        quillRef.current.format('size', '14px');
+        quillRef.current.on('text-change', () => {
+          setFormData((prev) => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
+        });
+      }
+    };
+
+    ensureQuill();
+
+    if (quillRef.current) {
+      quillRef.current.root.innerHTML = formData.descripcion || '';
+    }
+  }, [selected, formData.descripcion, isProgrammingMiniproyecto]);
+
+  const lenguajesDisponibles = [
+    { id: 62, nombre: 'Java', extension: '.java', ejemplo: 'public class Main {\n  public static void main(String[] args) {\n    System.out.println("Hola Mundo");\n  }\n}' },
+    { id: 71, nombre: 'Python', extension: '.py', ejemplo: '# Escribe tu código aquí\nprint("Hola Mundo")' },
+    { id: 63, nombre: 'JavaScript', extension: '.js', ejemplo: '// Escribe tu código aquí\nconsole.log("Hola Mundo");' },
+    { id: 50, nombre: 'C', extension: '.c', ejemplo: '#include <stdio.h>\n\nint main() {\n  printf("Hola Mundo\\n");\n  return 0;\n}' },
+    { id: 54, nombre: 'C++', extension: '.cpp', ejemplo: '#include <iostream>\nusing namespace std;\n\nint main() {\n  cout << "Hola Mundo" << endl;\n  return 0;\n}' },
+    { id: 51, nombre: 'C#', extension: '.cs', ejemplo: 'using System;\n\nclass Program {\n  static void Main() {\n    Console.WriteLine("Hola Mundo");\n  }\n}' }
+  ];
+
+  const sintaxisDisponibles = ['while', 'for', 'if', 'switch'];
 
   useEffect(() => {
     loadMiniproyectos();
@@ -169,6 +230,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     let parsedScope: string[] = [];
     let parsedSchedule: Array<{ activity: string; start: string; end: string }> = [];
     let parsedCosts: Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }> = [];
+    let parsedEsperado = '';
+    let parsedSintaxis: string[] = [];
+    let parsedLenguajes: number[] = [];
 
     if (item.respuesta_miniproyecto) {
       try {
@@ -177,6 +241,11 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
         parsedFunctional = Array.isArray(parsed?.requisitosFuncionales) ? parsed.requisitosFuncionales : [];
         parsedNonFunctional = Array.isArray(parsed?.requisitosNoFuncionales) ? parsed.requisitosNoFuncionales : [];
         parsedScope = Array.isArray(parsed?.alcance) ? parsed.alcance : [];
+        if (parsed?.tipo === 'programacion') {
+          parsedEsperado = parsed?.esperado || '';
+          parsedSintaxis = Array.isArray(parsed?.sintaxis) ? parsed.sintaxis : [];
+          parsedLenguajes = Array.isArray(parsed?.lenguajesPermitidos) ? parsed.lenguajesPermitidos : [];
+        }
         const cronogramaRaw = Array.isArray(parsed?.cronograma) ? parsed.cronograma : [];
         parsedSchedule = cronogramaRaw.map((entry: any) => {
           if (entry && typeof entry === 'object') {
@@ -259,11 +328,16 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setScheduleRows(parsedSchedule.length > 0 ? parsedSchedule : [{ activity: '', start: '', end: '' }]);
     setCostRows(parsedCosts.length > 0 ? parsedCosts : [{ concept: '', type: 'Humano', quantity: '', unitCost: '' }]);
     setScopeInput('');
-    setCode('# Escribe tu código aquí\nprint("Hola Mundo")');
-    setLastRunOutput('');
-    setHasRun(false);
-    setLastRunHasError(false);
-    setOutput('');
+    const isProgrammingItem = Number(item.actividad_id) === 12;
+    if (isProgrammingItem) {
+      setExpectedOutput(parsedEsperado || item.respuesta_miniproyecto || '');
+      setSintaxisRequerida(parsedSintaxis);
+      setLenguajesPermitidos(parsedLenguajes);
+    } else {
+      setExpectedOutput('');
+      setSintaxisRequerida([]);
+      setLenguajesPermitidos([]);
+    }
   };
 
   const addListItem = (value: string, setter: React.Dispatch<React.SetStateAction<string[]>>, reset: () => void) => {
@@ -281,32 +355,16 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  useEffect(() => {
-    if (!isRunning && output) {
-      setLastRunOutput(output);
-      const outputHasError = output.toLowerCase().includes('error');
-      setLastRunHasError(outputHasError);
-      setHasRun(true);
-      setFormData((prev) => ({ ...prev, respuesta_miniproyecto: output }));
-    }
-  }, [isRunning, output, setOutput]);
-
-  const handleExecute = async () => {
-    setError(null);
-    try {
-      await runCode(code, 71, 1, 1);
-    } catch (err) {
-      console.error('Error al ejecutar código:', err);
-      setError('Error al ejecutar el código.');
-    }
+  const toggleSintaxis = (sintaxis: string) => {
+    setSintaxisRequerida((prev) =>
+      prev.includes(sintaxis) ? prev.filter((s) => s !== sintaxis) : [...prev, sintaxis]
+    );
   };
 
-  const handleClear = () => {
-    setCode('');
-    setOutput('');
-    setLastRunOutput('');
-    setHasRun(false);
-    setLastRunHasError(false);
+  const toggleLenguajePermitido = (lenguajeId: number) => {
+    setLenguajesPermitidos((prev) =>
+      prev.includes(lenguajeId) ? prev.filter((id) => id !== lenguajeId) : [...prev, lenguajeId]
+    );
   };
 
   const handleSave = async (event: React.FormEvent) => {
@@ -314,12 +372,8 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     if (!selected) return;
 
     if (isProgrammingMiniproyecto) {
-      if (!hasRun) {
-        setError('Ejecuta el código antes de guardar el miniproyecto.');
-        return;
-      }
-      if (lastRunHasError) {
-        setError('Corrige los errores del compilador antes de guardar.');
+      if (!expectedOutput.trim()) {
+        setError('Define la salida esperada antes de guardar.');
         return;
       }
     }
@@ -340,7 +394,12 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
           nivel_dificultad: formData.nivel_dificultad,
           entregable: formData.entregable,
           respuesta_miniproyecto: isProgrammingMiniproyecto
-            ? lastRunOutput
+            ? JSON.stringify({
+                tipo: 'programacion',
+                esperado: expectedOutput.trim(),
+                sintaxis: sintaxisRequerida,
+                lenguajesPermitidos
+              })
             : isManagementMiniproyecto
               ? JSON.stringify({
                   alcance: scopeList,
@@ -367,7 +426,12 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
             ...item,
             entregable: formData.entregable,
             respuesta_miniproyecto: isProgrammingMiniproyecto
-              ? lastRunOutput
+              ? JSON.stringify({
+                  tipo: 'programacion',
+                  esperado: expectedOutput.trim(),
+                  sintaxis: sintaxisRequerida,
+                  lenguajesPermitidos
+                })
               : isManagementMiniproyecto
                 ? JSON.stringify({
                     alcance: scopeList,
@@ -556,12 +620,22 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 </div>
                 <div>
                   <label className="text-sm text-gray-600">Descripción</label>
-                  <textarea
-                    value={formData.descripcion}
-                    onChange={(event) => handleChange('descripcion', event.target.value)}
-                    rows={3}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                  />
+                  {isProgrammingMiniproyecto ? (
+                    <div className="quill-editor-container mt-1">
+                      <div
+                        ref={editorRef}
+                        className="w-full"
+                        data-placeholder="Ingrese la descripcion del miniproyecto"
+                      />
+                    </div>
+                  ) : (
+                    <textarea
+                      value={formData.descripcion}
+                      onChange={(event) => handleChange('descripcion', event.target.value)}
+                      rows={3}
+                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="text-sm text-gray-600">Nivel de dificultad</label>
@@ -581,56 +655,53 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 </div>
                 {isProgrammingMiniproyecto ? (
                   <div className="space-y-4">
-                    <div>
-                      <label className="text-sm text-gray-600">Código del miniproyecto</label>
-                      <div className="mt-1 border border-gray-200 rounded-lg overflow-hidden">
-                        <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center justify-between">
-                          <span className="text-xs text-gray-500">script.py</span>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={handleClear}
-                              className="text-xs px-3 py-1 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100"
-                            >
-                              <Trash2 className="inline w-3 h-3 mr-1" />
-                              Limpiar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleExecute}
-                              disabled={isRunning}
-                              className="text-xs px-3 py-1 rounded-md text-white"
-                              style={{ backgroundColor: isRunning ? '#94a3b8' : '#4A90E2' }}
-                            >
-                              <Play className={`inline w-3 h-3 mr-1 ${isRunning ? 'animate-spin' : ''}`} />
-                              {isRunning ? 'Ejecutando...' : 'Ejecutar'}
-                            </button>
-                          </div>
+                    <div className="space-y-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+                      <div>
+                        <label className="text-sm text-gray-600">Sintaxis requerida</label>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          {sintaxisDisponibles.map((sintaxis) => (
+                            <label key={sintaxis} className="flex items-center gap-2 text-xs text-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={sintaxisRequerida.includes(sintaxis)}
+                                onChange={() => toggleSintaxis(sintaxis)}
+                                className="h-4 w-4"
+                              />
+                              <span className="font-mono">{sintaxis}</span>
+                            </label>
+                          ))}
                         </div>
+                        <p className="text-xs text-gray-500 mt-2">Define estructuras obligatorias para validar el codigo.</p>
+                      </div>
+
+                      <div>
+                        <label className="text-sm text-gray-600">Lenguajes permitidos</label>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          {lenguajesDisponibles.map((lenguaje) => (
+                            <label key={lenguaje.id} className="flex items-center gap-2 text-xs text-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={lenguajesPermitidos.includes(lenguaje.id)}
+                                onChange={() => toggleLenguajePermitido(lenguaje.id)}
+                                className="h-4 w-4"
+                              />
+                              <span>{lenguaje.nombre}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">Si no seleccionas ninguno, se permiten todos.</p>
+                      </div>
+
+                      <div>
+                        <label className="text-sm text-gray-600">Salida esperada</label>
                         <textarea
-                          value={code}
-                          onChange={(event) => setCode(event.target.value)}
-                          rows={8}
-                          className="w-full p-3 font-mono text-sm bg-[#1E1E1E] text-gray-100 outline-none"
-                          spellCheck={false}
+                          value={expectedOutput}
+                          onChange={(event) => setExpectedOutput(event.target.value)}
+                          rows={4}
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                          placeholder="Ejemplo: 1 2 3"
                         />
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="text-sm text-gray-600">Salida del compilador (se guarda como respuesta)</label>
-                      <textarea
-                        value={lastRunOutput}
-                        readOnly
-                        rows={4}
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-gray-50 text-gray-700"
-                      />
-                      {!hasRun && (
-                        <p className="text-xs text-gray-500 mt-1">Ejecuta el código para generar la respuesta.</p>
-                      )}
-                      {lastRunHasError && (
-                        <p className="text-xs text-red-600 mt-1">El compilador reportó errores. Corrige y vuelve a ejecutar.</p>
-                      )}
                     </div>
                   </div>
                 ) : (
@@ -945,7 +1016,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
 
                 <button
                   type="submit"
-                  disabled={isSaving || (isProgrammingMiniproyecto && (isRunning || !hasRun || lastRunHasError))}
+                  disabled={isSaving}
                   className="w-full flex items-center justify-center gap-2 bg-[#4A90E2] text-white py-2 rounded-lg hover:bg-[#357ABD] transition-all disabled:opacity-70"
                 >
                   <Save className="w-4 h-4" />

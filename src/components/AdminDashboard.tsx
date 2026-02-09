@@ -95,14 +95,6 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       gradient: 'from-[#F5A97F] to-[#F7B98F]'
     },
     {
-      id: 'students',
-      title: 'Seguimiento de Estudiantes',
-      description: 'Monitorea el progreso individual de cada estudiante, visualiza estadísticas y actividad reciente.',
-      icon: Users,
-      color: '#A78BFA',
-      gradient: 'from-[#A78BFA] to-[#B79BFA]'
-    },
-    {
       id: 'upload',
       title: 'Carga Masiva de Estudiantes',
       description: 'Importa múltiples estudiantes desde un archivo Excel. Crea usuarios automáticamente y envía credenciales.',
