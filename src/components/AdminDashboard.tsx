@@ -10,7 +10,8 @@ import { SubThemeManagementScreen } from './SubThemeManagementScreen';
 import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
 import { ExerciseManagementScreen } from './ExerciseManagementScreen';
 import { Upload } from "lucide-react";
-
+import { ChatbotManagementScreen } from './ChatbotManagementScreen';
+import { Bot } from 'lucide-react';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -18,7 +19,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes' | 'miniproyectos' | 'ejercicios'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes' | 'miniproyectos' | 'ejercicios' | 'chatbot'>('dashboard');
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [selectedAreaName, setSelectedAreaName] = useState<string>('');
   const [selectedTemaId, setSelectedTemaId] = useState<number | null>(null);
@@ -101,6 +102,15 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: Upload,
       color: '#F472B6',
       gradient: 'from-[#F472B6] to-[#FB87C6]'
+    },
+    {
+      id: 'chatbot',
+      title: 'Gestión del Chatbot',
+      description: 'Administra los documentos del chatbot. Sube PDFs, recarga la base de conocimiento y prueba las respuestas.',
+      icon: Bot,
+      color: '#6366F1',
+      gradient: 'from-[#6366F1] to-[#818CF8]',
+      onClick: () => setCurrentScreen('chatbot')
     }
   ];
 
@@ -168,6 +178,14 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'ejercicios') {
     return (
       <ExerciseManagementScreen
+        onBack={() => setCurrentScreen('dashboard')}
+      />
+    );
+  }
+
+  if (currentScreen === 'chatbot') {
+    return (
+      <ChatbotManagementScreen
         onBack={() => setCurrentScreen('dashboard')}
       />
     );

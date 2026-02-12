@@ -10,8 +10,7 @@ export function ChatbotButton() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Generamos un ID de sesión único que persistirá mientras no se recargue la página
-  const [sessionId] = useState(`session-${Math.random().toString(36).substr(2, 9)}`);
+  const API_BASE = 'http://localhost:4000';
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -22,47 +21,50 @@ export function ChatbotButton() {
     }
   }, [messages]);
 
- const handleSend = async () => {
-  if (!inputValue.trim() || isLoading) return;
+  const handleSend = async () => {
+    if (!inputValue.trim() || isLoading) return;
 
-  const userMessage = inputValue.trim();
-  setMessages(prev => [...prev, { text: userMessage, isBot: false }]);
-  setInputValue('');
-  setIsLoading(true);
+    const userMessage = inputValue.trim();
+    setMessages(prev => [...prev, { text: userMessage, isBot: false }]);
+    setInputValue('');
+    setIsLoading(true);
 
-  try {
-    // REEMPLAZA ESTA URL con la que te da el nodo "When chat message received"
-    // Normalmente es algo como http://localhost:5678/webhook/tu-id-largo
-    const response = await fetch('http://localhost:5678/webhook/TU_ID_DEL_CHAT_TRIGGER', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: "sendMessage", // Obligatorio para el Chat Trigger
-        chatInput: userMessage,
-        sessionId: sessionId    // Usa el ID que ya tienes en el estado
-      }),
-    });
+    try {
+      const response = await fetch(`${API_BASE}/chatbot/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: userMessage,
+          topK: 3
+        })
+      });
 
-    if (!response.ok) throw new Error('Error en la comunicación');
+      if (!response.ok) throw new Error('Error en la comunicación');
 
-    const data = await response.json();
-    
-    // El Chat Trigger responde directamente con un objeto que tiene "output"
-    setMessages(prev => [...prev, {
-      text: data.output || "No pude obtener respuesta.",
-      isBot: true
-    }]);
+      const data = await response.json();
+      
+      if (data.success) {
+        setMessages(prev => [...prev, {
+          text: data.answer || "No pude obtener respuesta.",
+          isBot: true
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          text: "No pude procesar tu pregunta.",
+          isBot: true
+        }]);
+      }
 
-  } catch (error) {
-    console.error("Fallo total:", error);
-    setMessages(prev => [...prev, {
-      text: "Error de conexión. Revisa que n8n esté activo.",
-      isBot: true
-    }]);
-  } finally {
-    setIsLoading(false);
-  }
-};
+    } catch (error) {
+      console.error("Error:", error);
+      setMessages(prev => [...prev, {
+        text: "Error de conexión con el chatbot. Verifica que el servidor esté activo.",
+        isBot: true
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!isOpen) {
     return (
@@ -94,7 +96,7 @@ export function ChatbotButton() {
     >
       {/* Header */}
       <div style={{ backgroundColor: "#7ED6A7", color: "white", padding: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "600" }}>Asistente RUT</h3>
+        <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "600" }}>Asistente EduPath</h3>
         <div style={{ display: "flex", gap: "8px" }}>
           <button onClick={() => setIsMinimized(!isMinimized)} style={{ background: "none", border: "none", color: "white", cursor: "pointer" }}><Minimize2 size={18} /></button>
           <button onClick={() => setIsOpen(false)} style={{ background: "none", border: "none", color: "white", cursor: "pointer" }}><X size={18} /></button>
