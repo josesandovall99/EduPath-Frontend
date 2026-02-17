@@ -5,13 +5,14 @@ import logoImage from '../assets/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
 interface LoginScreenProps {
   onLoginSuccess: (data: any) => void; // Cambiado
+  onDocenteLoginSuccess: (data: any) => void;
   onLogin?: () => void;
   onAdminLogin: () => void;
   onShowRegister: () => void;
   onShowChangePassword?: () => void;
 }
 
-export function LoginScreen({ onLoginSuccess, onLogin, onAdminLogin, onShowRegister, onShowChangePassword }: LoginScreenProps) {
+export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, onAdminLogin, onShowRegister, onShowChangePassword }: LoginScreenProps) {
   const [codigoEstudiantil, setCodigoEstudiantil] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -55,7 +56,31 @@ const handleStudentLogin = async () => {
         // continuamos con intento de estudiante
       }
 
-      // 2) Intentar login como estudiante (manteniendo compatibilidad con distintas cargas)
+      // 2) Intentar login como docente
+      try {
+        const docenteRes = await fetch('http://localhost:4000/docente/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ codigoAcceso: codigoEstudiantil, contraseña: password })
+        });
+
+        const docenteParsed = await parseResponse(docenteRes);
+        if (docenteParsed.ok) {
+          onDocenteLoginSuccess(docenteParsed.body);
+          setLoading(false);
+          return;
+        }
+
+        if (docenteParsed.status && docenteParsed.status >= 500) {
+          setError(`Servidor: ${docenteParsed.status} - ${docenteParsed.body?.mensaje || 'Error interno'}`);
+          setLoading(false);
+          return;
+        }
+      } catch (netErr) {
+        console.warn('No se pudo comprobar docente:', netErr);
+      }
+
+      // 3) Intentar login como estudiante (manteniendo compatibilidad con distintas cargas)
       const postPayload = async (payload: Record<string, any>) => {
         try {
           const res = await fetch('http://localhost:4000/estudiante/login', {

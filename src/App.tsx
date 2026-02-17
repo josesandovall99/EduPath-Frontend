@@ -20,6 +20,8 @@ import { ChangePasswordScreen } from './components/changePassword';
 import { StudentUploadScreen } from './components/StudentUploadScreen';
 import { SequenceManagementScreen } from './components/SequenceManagementScreen';
 import { SubtemaSequenceManagementScreen } from './components/SubtemaSequenceManagementScreen';
+import { DocenteDashboard } from './components/DocenteDashboard';
+import { DocenteAreaManagementScreen } from './components/DocenteAreaManagementScreen';
 
 type Screen = 
   | 'login' 
@@ -40,7 +42,9 @@ type Screen =
   | 'admin-upload'
   | 'admin-sequences'
   | 'admin-subtema-sequences'
-  | 'ai-workshop';
+  | 'ai-workshop'
+  | 'docente-dashboard'
+  | 'docente-area-management';
 
 
 
@@ -50,6 +54,16 @@ interface UserSession {
   personaId: number;
   nombre: string;
   codigo: string;
+}
+
+interface DocenteSession {
+  id: number;
+  personaId: number;
+  nombre: string;
+  email: string;
+  especialidad: string;
+  areaId?: number;
+  areaNombre?: string;
 }
 
 interface Subject {
@@ -76,6 +90,7 @@ export default function App() {
   const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
   const [userData, setUserData] = useState<{id: number, personaId: number, nombre: string} | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
+  const [docenteSession, setDocenteSession] = useState<DocenteSession | null>(null);
   
 
   // Función que se llama cuando el login es exitoso
@@ -108,6 +123,26 @@ export default function App() {
     } else {
       setCurrentScreen('dashboard');
     }
+  };
+
+  const handleDocenteLoginSuccess = (apiResponse: any) => {
+    const docente = apiResponse.docente;
+    if (!docente) {
+      return;
+    }
+
+    const session: DocenteSession = {
+      id: docente.id,
+      personaId: docente.personaId,
+      nombre: docente.nombre,
+      email: docente.email,
+      especialidad: docente.especialidad,
+      areaId: docente.area?.id,
+      areaNombre: docente.area?.nombre
+    };
+
+    setDocenteSession(session);
+    setCurrentScreen('docente-dashboard');
   };
 
   /*const handleLogout = () => {
@@ -149,6 +184,7 @@ export default function App() {
     localStorage.removeItem('nombreEstudiante');
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('semestreEstudiante');
+    setDocenteSession(null);
   };
 
   const handleLogout = () => {
@@ -162,6 +198,7 @@ export default function App() {
     localStorage.removeItem('nombreEstudiante');
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('semestreEstudiante');
+    setDocenteSession(null);
   };
 
   const handleSubjectSelect = (subject: Subject) => {
@@ -255,6 +292,7 @@ export default function App() {
       {currentScreen === 'login' && (
         <LoginScreen 
           onLoginSuccess={handleLoginSuccess} // Conectamos la función
+          onDocenteLoginSuccess={handleDocenteLoginSuccess}
           onLogin={handleLogin}
           onAdminLogin={() => setCurrentScreen('admin-dashboard')} 
           onShowRegister={() => setCurrentScreen('admin-register')} 
@@ -278,6 +316,23 @@ export default function App() {
                 estudianteId={userSession.id}
               />
             )}
+
+      {currentScreen === 'docente-dashboard' && (
+        <DocenteDashboard
+          docente={docenteSession}
+          onLogout={handleLogout}
+          onManageArea={() => setCurrentScreen('docente-area-management')}
+        />
+      )}
+
+      {currentScreen === 'docente-area-management' && docenteSession?.areaId && (
+        <DocenteAreaManagementScreen
+          docenteId={docenteSession.id}
+          areaId={docenteSession.areaId}
+          areaNombre={docenteSession.areaNombre}
+          onBack={() => setCurrentScreen('docente-dashboard')}
+        />
+      )}
 
       {/* DASHBOARD ADMIN */}
       {currentScreen === 'admin-dashboard' && (

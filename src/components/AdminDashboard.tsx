@@ -12,6 +12,7 @@ import { ExerciseManagementScreen } from './ExerciseManagementScreen';
 import { Upload } from "lucide-react";
 import { ChatbotManagementScreen } from './ChatbotManagementScreen';
 import { Bot } from 'lucide-react';
+import { DocenteManagementScreen } from './DocenteManagementScreen';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -19,7 +20,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes' | 'miniproyectos' | 'ejercicios' | 'chatbot'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes' | 'miniproyectos' | 'ejercicios' | 'chatbot' | 'docentes'>('dashboard');
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [selectedAreaName, setSelectedAreaName] = useState<string>('');
   const [selectedTemaId, setSelectedTemaId] = useState<number | null>(null);
@@ -94,6 +95,15 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: BarChart3,
       color: '#F5A97F',
       gradient: 'from-[#F5A97F] to-[#F7B98F]'
+    },
+    {
+      id: 'docentes',
+      title: 'Gestión de Docentes',
+      description: 'Crear, editar y eliminar docentes del sistema. Administra su especialidad y área asignada.',
+      icon: Users,
+      color: '#14B8A6',
+      gradient: 'from-[#14B8A6] to-[#2DD4BF]',
+      onClick: () => setCurrentScreen('docentes')
     },
     {
       id: 'upload',
@@ -186,6 +196,14 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'chatbot') {
     return (
       <ChatbotManagementScreen
+        onBack={() => setCurrentScreen('dashboard')}
+      />
+    );
+  }
+
+  if (currentScreen === 'docentes') {
+    return (
+      <DocenteManagementScreen
         onBack={() => setCurrentScreen('dashboard')}
       />
     );
