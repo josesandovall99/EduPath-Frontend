@@ -101,6 +101,34 @@ export default function App() {
   const changePasswordNextScreen: Screen = userSession ? 'dashboard' : 'docente-dashboard';
   const changePasswordRole = userSession ? 'estudiante' : 'docente';
 
+  const extractAuthToken = (apiResponse: any): string | null => {
+    const candidates = [
+      apiResponse?.token,
+      apiResponse?.accessToken,
+      apiResponse?.access_token,
+      apiResponse?.jwt,
+      apiResponse?.data?.token,
+      apiResponse?.data?.accessToken,
+      apiResponse?.data?.access_token,
+      apiResponse?.estudiante?.token,
+      apiResponse?.estudiante?.accessToken,
+      apiResponse?.docente?.token,
+      apiResponse?.docente?.accessToken,
+      apiResponse?.usuario?.token,
+      apiResponse?.usuario?.accessToken,
+    ];
+
+    const token = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
+    return token ? String(token) : null;
+  };
+
+  const persistAuthToken = (apiResponse: any) => {
+    const token = extractAuthToken(apiResponse);
+    if (token) {
+      localStorage.setItem('authToken', String(token));
+    }
+  };
+
   useEffect(() => {
     setupAuthFetch();
     applyAuthHeaders();
@@ -140,6 +168,8 @@ export default function App() {
       localStorage.setItem('semestreEstudiante', apiResponse.estudiante.semestre.toString());
     }
 
+    persistAuthToken(apiResponse);
+
     applyAuthHeaders();
 
     // Decidimos a dónde ir basado en el flag 'primerIngreso'
@@ -167,6 +197,7 @@ export default function App() {
     };
 
     localStorage.setItem('personaId', docente.personaId.toString());
+    persistAuthToken(apiResponse);
     applyAuthHeaders();
 
     setDocenteSession(session);
@@ -216,6 +247,7 @@ export default function App() {
     localStorage.removeItem('nombreEstudiante');
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem('authToken');
     setDocenteSession(null);
     applyAuthHeaders();
   };
@@ -238,6 +270,7 @@ export default function App() {
     localStorage.removeItem('nombreEstudiante');
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem('authToken');
     setDocenteSession(null);
     applyAuthHeaders();
   };

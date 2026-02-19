@@ -399,11 +399,17 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       return;
     }
 
+    const personaId = localStorage.getItem('personaId');
+    const authToken = localStorage.getItem('authToken');
+
     try {
       const response = await fetch(`http://localhost:4000/contenidos/marcar-visualizado`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(personaId ? { 'x-persona-id': String(personaId) } : {}),
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
         },
         body: JSON.stringify({
           contenido_id: parseInt(contenidoId),
@@ -412,7 +418,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
       // Actualizar el estado del módulo para mostrar que fue visualizado
