@@ -17,6 +17,8 @@ import { UMLDiagramView } from './components/UMLDiagramView';
 import { AIWorkshopView } from './components/AIWorkshopView';
 import { ChatbotButton } from './components/ChatbotButton';
 import { ChangePasswordScreen } from './components/changePassword';
+import { ForgotPasswordScreen } from './components/ForgotPasswordScreen';
+import { ResetPasswordScreen } from './components/ResetPasswordScreen';
 import { StudentUploadScreen } from './components/StudentUploadScreen';
 import { SequenceManagementScreen } from './components/SequenceManagementScreen';
 import { SubtemaSequenceManagementScreen } from './components/SubtemaSequenceManagementScreen';
@@ -29,6 +31,8 @@ type Screen =
   | 'admin-register'
   | 'dashboard' 
   | 'change-password'
+  | 'forgot-password'
+  | 'reset-password'
   | 'admin-dashboard'
   | 'admin-themes'
   | 'admin-contents'
@@ -92,10 +96,20 @@ export default function App() {
   const [userData, setUserData] = useState<{id: number, personaId: number, nombre: string} | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [docenteSession, setDocenteSession] = useState<DocenteSession | null>(null);
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   useEffect(() => {
     setupAuthFetch();
     applyAuthHeaders();
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      setResetToken(token);
+      setCurrentScreen('reset-password');
+    }
   }, []);
   
 
@@ -197,6 +211,13 @@ export default function App() {
     localStorage.removeItem('semestreEstudiante');
     setDocenteSession(null);
     applyAuthHeaders();
+  };
+
+  const clearResetTokenFromUrl = () => {
+    setResetToken(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('token');
+    window.history.replaceState({}, document.title, url.toString());
   };
 
   const handleLogout = () => {
@@ -309,6 +330,27 @@ export default function App() {
           onLogin={handleLogin}
           onAdminLogin={() => setCurrentScreen('admin-dashboard')} 
           onShowRegister={() => setCurrentScreen('admin-register')} 
+          onShowForgotPassword={() => setCurrentScreen('forgot-password')}
+        />
+      )}
+
+      {currentScreen === 'forgot-password' && (
+        <ForgotPasswordScreen
+          onBack={() => setCurrentScreen('login')}
+        />
+      )}
+
+      {currentScreen === 'reset-password' && (
+        <ResetPasswordScreen
+          token={resetToken}
+          onBack={() => {
+            clearResetTokenFromUrl();
+            setCurrentScreen('login');
+          }}
+          onComplete={() => {
+            clearResetTokenFromUrl();
+            setCurrentScreen('login');
+          }}
         />
       )}
 
