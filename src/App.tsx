@@ -97,6 +97,9 @@ export default function App() {
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [docenteSession, setDocenteSession] = useState<DocenteSession | null>(null);
   const [resetToken, setResetToken] = useState<string | null>(null);
+  const changePasswordPersonaId = userSession?.personaId ?? docenteSession?.personaId ?? null;
+  const changePasswordNextScreen: Screen = userSession ? 'dashboard' : 'docente-dashboard';
+  const changePasswordRole = userSession ? 'estudiante' : 'docente';
 
   useEffect(() => {
     setupAuthFetch();
@@ -167,7 +170,11 @@ export default function App() {
     applyAuthHeaders();
 
     setDocenteSession(session);
-    setCurrentScreen('docente-dashboard');
+    if (apiResponse.primerIngreso) {
+      setCurrentScreen('change-password');
+    } else {
+      setCurrentScreen('docente-dashboard');
+    }
   };
 
   /*const handleLogout = () => {
@@ -355,11 +362,12 @@ export default function App() {
       )}
 
       {/* Pantalla de Cambio de Contraseña */}
-      {currentScreen === 'change-password' && userSession && (
+      {currentScreen === 'change-password' && changePasswordPersonaId && (
         <ChangePasswordScreen 
-          personaId={userSession.personaId} // Pasamos el ID necesario
-          onComplete={() => setCurrentScreen('dashboard')} // Al terminar, va al dashboard
+          personaId={changePasswordPersonaId} // Pasamos el ID necesario
+          onComplete={() => setCurrentScreen(changePasswordNextScreen)} // Al terminar, va al dashboard
           isFirstLogin={true}
+          userRole={changePasswordRole}
         />
       )}
 

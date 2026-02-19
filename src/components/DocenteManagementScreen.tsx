@@ -29,7 +29,6 @@ interface DocenteFormData {
   nombre: string;
   email: string;
   codigoAcceso: string;
-  contrasena: string;
   especialidad: string;
   areaId: string;
 }
@@ -40,7 +39,6 @@ const emptyForm: DocenteFormData = {
   nombre: '',
   email: '',
   codigoAcceso: '',
-  contrasena: '',
   especialidad: '',
   areaId: ''
 };
@@ -51,6 +49,10 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showConfirmCreate, setShowConfirmCreate] = useState(false);
+  const [resultModal, setResultModal] = useState<{ open: boolean; success: boolean; message: string }>(
+    { open: false, success: true, message: '' }
+  );
   const [editingDocente, setEditingDocente] = useState<Docente | null>(null);
   const [formData, setFormData] = useState<DocenteFormData>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
@@ -108,7 +110,6 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
       nombre: docente.persona?.nombre || '',
       email: docente.persona?.email || '',
       codigoAcceso: docente.codigoAcceso || '',
-      contrasena: '',
       especialidad: docente.especialidad || '',
       areaId: String(docente.area?.id ?? docente.areaId ?? '')
     });
@@ -118,6 +119,15 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
   const handleCloseModal = () => {
     setShowModal(false);
     resetForm();
+  };
+
+  const handleCloseConfirm = () => {
+    if (submitting) return;
+    setShowConfirmCreate(false);
+  };
+
+  const handleCloseResult = () => {
+    setResultModal({ open: false, success: true, message: '' });
   };
 
   const handleDelete = async (docente: Docente) => {
@@ -153,16 +163,16 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
     if (!baseValid) {
       return false;
     }
-
-    if (!editingDocente && !formData.contrasena.trim()) {
-      return false;
-    }
-
     return true;
   }, [editingDocente, formData]);
 
   const handleSave = async () => {
     if (!isFormValid) {
+      return;
+    }
+
+    if (!editingDocente && !showConfirmCreate) {
+      setShowConfirmCreate(true);
       return;
     }
 
@@ -177,10 +187,6 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
         especialidad: formData.especialidad.trim(),
         areaId: Number(formData.areaId)
       };
-
-      if (formData.contrasena.trim()) {
-        payload['contraseña'] = formData.contrasena.trim();
-      }
 
       const response = await fetch(
         `${API_BASE_URL}/docente${editingDocente ? `/${editingDocente.id}` : ''}`,
@@ -199,11 +205,27 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
 
       await loadDocentes();
       handleCloseModal();
+      if (!editingDocente) {
+        setResultModal({
+          open: true,
+          success: true,
+          message: 'Correo enviado con las credenciales del docente.'
+        });
+      }
     } catch (err) {
       console.error('Error saving docente:', err);
-      setError(err instanceof Error ? err.message : 'Error al guardar docente');
+      const message = err instanceof Error ? err.message : 'Error al guardar docente';
+      setError(message);
+      if (!editingDocente) {
+        setResultModal({
+          open: true,
+          success: false,
+          message: `No se pudo enviar el correo o crear el docente. ${message}`
+        });
+      }
     } finally {
       setSubmitting(false);
+      setShowConfirmCreate(false);
     }
   };
 
@@ -330,6 +352,11 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
             </div>
 
             <div className="p-6 space-y-5">
+              {!editingDocente && (
+                <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
+                  Se enviaran automaticamente las credenciales al correo del docente.
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
@@ -365,19 +392,6 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
                     placeholder="DOC123"
                     required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contrasena {editingDocente ? '(opcional)' : '*'}
-                  </label>
-                  <input
-                    type="password"
-                    value={formData.contrasena}
-                    onChange={(event) => setFormData({ ...formData, contrasena: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
-                    placeholder={editingDocente ? 'Dejar en blanco para mantener' : '123456'}
-                    required={!editingDocente}
                   />
                 </div>
               </div>
@@ -435,6 +449,73 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                 ) : (
                   <span>{editingDocente ? 'Actualizar Docente' : 'Crear Docente'}</span>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConfirmCreate && !editingDocente && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-[#3A4A5B]">Confirmar creacion</h3>
+              <button
+                onClick={handleCloseConfirm}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-3 text-sm text-gray-600">
+              <p>Verifica que los datos del docente sean correctos.</p>
+              <p>Se enviaran las credenciales al correo proporcionado.</p>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex gap-3 justify-end bg-gray-50 rounded-b-2xl">
+              <button
+                onClick={handleCloseConfirm}
+                disabled={submitting}
+                className="px-5 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={submitting}
+                className="px-5 py-2.5 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: '#14B8A6' }}
+              >
+                Confirmar y crear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resultModal.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-[#3A4A5B]">
+                {resultModal.success ? 'Correo enviado' : 'Fallo al enviar'}
+              </h3>
+              <button
+                onClick={handleCloseResult}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 text-sm text-gray-600">
+              {resultModal.message}
+            </div>
+            <div className="p-6 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-2xl">
+              <button
+                onClick={handleCloseResult}
+                className="px-5 py-2.5 text-white rounded-lg hover:shadow-lg transition-all"
+                style={{ backgroundColor: resultModal.success ? '#14B8A6' : '#EF4444' }}
+              >
+                Entendido
               </button>
             </div>
           </div>

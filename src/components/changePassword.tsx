@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 
-export function ChangePasswordScreen({ onComplete, isFirstLogin = false, personaId }) {
+export function ChangePasswordScreen({ onComplete, isFirstLogin = false, personaId, userRole = 'estudiante' }) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNew, setShowNew] = useState(false);
@@ -30,7 +30,7 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
     setLoading(true);
     try {
       // Nota: Asegúrate de que el puerto sea el correcto (4000 para backend)
-      const response = await fetch('http://localhost:4000/estudiante/cambiar-password-inicial', {
+      const response = await fetch('http://localhost:4000/persona/cambiar-password-inicial', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,7 +75,9 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
           </h1>
           <p className="text-white/90">
             {isFirstLogin
-              ? 'Por seguridad, configura tu nueva clave de acceso.'
+              ? userRole === 'docente'
+                ? 'Por seguridad, configura tu nueva clave para acceder como docente.'
+                : 'Por seguridad, configura tu nueva clave de acceso.'
               : 'Mantén tu cuenta segura.'}
           </p>
         </div>
