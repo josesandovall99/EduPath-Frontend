@@ -11,9 +11,10 @@ interface LoginScreenProps {
   onAdminLogin: () => void;
   onShowRegister: () => void;
   onShowChangePassword?: () => void;
+  onShowForgotPassword?: () => void;
 }
 
-export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, onAdminLogin, onShowRegister, onShowChangePassword }: LoginScreenProps) {
+export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, onAdminLogin, onShowRegister, onShowChangePassword, onShowForgotPassword }: LoginScreenProps) {
   const [codigoEstudiantil, setCodigoEstudiantil] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -219,7 +220,10 @@ return (
 
             {/* Forgot Password Link */}
             <div className="mt-4 text-center">
-              <button className="text-[#4A90E2] hover:text-[#3A7BC8] transition-colors">
+              <button
+                onClick={() => onShowForgotPassword && onShowForgotPassword()}
+                className="text-[#4A90E2] hover:text-[#3A7BC8] transition-colors"
+              >
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
