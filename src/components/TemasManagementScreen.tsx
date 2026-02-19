@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Loader } from 'lucide-react';
+import { ArrowLeft, Edit2, Loader } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { ThemeManagementScreen } from './ThemeManagementScreen';
 
 interface Tema {
   id: number;
   nombre: string;
   descripcion?: string;
   area_id: number;
+  estado?: boolean;
 }
 
 interface TemasManagementScreenProps {
@@ -20,6 +22,8 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }
   const [temas, setTemas] = useState<Tema[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showThemeManager, setShowThemeManager] = useState(false);
+  const [editingTema, setEditingTema] = useState<Tema | null>(null);
 
   useEffect(() => {
     loadTemas();
@@ -43,13 +47,52 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }
 
   // Colores de gradiente para las tarjetas
   const colors = [
-    { bg: 'from-[#4A90E2] to-[#5B9FED]', text: 'text-blue-600' },
-    { bg: 'from-[#7ED6A7] to-[#90E0B7]', text: 'text-green-600' },
-    { bg: 'from-[#F5A97F] to-[#F7B98F]', text: 'text-orange-600' },
-    { bg: 'from-[#A78BFA] to-[#B79BFA]', text: 'text-purple-600' },
-    { bg: 'from-[#8B5CF6] to-[#A78BFA]', text: 'text-indigo-600' },
-    { bg: 'from-[#F472B6] to-[#FB87C6]', text: 'text-pink-600' },
+    { bg: '#4A90E2', text: 'text-blue-600' },
+    { bg: '#7ED6A7', text: 'text-green-600' },
+    { bg: '#F5A97F', text: 'text-orange-600' },
+    { bg: '#A78BFA', text: 'text-purple-600' },
+    { bg: '#8B5CF6', text: 'text-indigo-600' },
+    { bg: '#F472B6', text: 'text-pink-600' },
   ];
+
+  const handleOpenThemeManager = async (tema?: Tema) => {
+    if (!tema) {
+      setEditingTema(null);
+      setShowThemeManager(true);
+      return;
+    }
+
+    let temaToEdit = tema;
+    if (tema.estado === undefined) {
+      try {
+        const response = await fetch(`http://localhost:4000/temas/${tema.id}`);
+        if (response.ok) {
+          temaToEdit = await response.json();
+        }
+      } catch (err) {
+        console.error('Error cargando tema para editar:', err);
+      }
+    }
+
+    setEditingTema(temaToEdit);
+    setShowThemeManager(true);
+  };
+
+  const handleCloseThemeManager = () => {
+    setShowThemeManager(false);
+    setEditingTema(null);
+  };
+
+  if (showThemeManager) {
+    return (
+      <ThemeManagementScreen
+        onBack={handleCloseThemeManager}
+        initialAreaId={editingTema?.area_id ?? areaId}
+        initialEditTema={editingTema ?? undefined}
+        backLabel="Volver a Temas"
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
@@ -80,12 +123,22 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-8 py-8">
         {/* Informational Message */}
-        <div className="mb-8 p-6 bg-gradient-to-r from-[#4A90E2] to-[#357abd] text-white rounded-xl shadow-lg">
+        <div className="mb-8 p-6 bg-[#4A90E2] text-white rounded-xl shadow-md">
           <h2 className="text-lg font-bold mb-2">Selecciona un Tema</h2>
           <p className="text-sm opacity-95">
             Elige un tema para gestionar sus subtemas y contenidos asociados. 
             Aquí podrás organizar la estructura de aprendizaje para este área.
           </p>
+        </div>
+
+        <div className="mb-6 flex justify-end">
+          <button
+            onClick={() => handleOpenThemeManager()}
+            className="px-5 py-2.5 rounded-lg text-white shadow-md hover:shadow-lg transition-all"
+            style={{ backgroundColor: '#4A90E2' }}
+          >
+            Gestionar Temas
+          </button>
         </div>
 
         {loading ? (
@@ -129,26 +182,50 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }
             {temas.map((tema, index) => {
               const colorStyle = colors[index % colors.length];
               return (
-                <button
+                <div
                   key={tema.id}
                   onClick={() => onSelectTema(tema.id, tema.nombre)}
-                  className={`bg-gradient-to-br ${colorStyle.bg} rounded-xl p-8 text-white shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-left`}
+                  className="rounded-xl p-8 text-white shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-left cursor-pointer"
+                  style={{ backgroundColor: colorStyle.bg }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onSelectTema(tema.id, tema.nombre);
+                    }
+                  }}
                 >
-                  <div className="flex flex-col h-full">
-                    <h3 className="text-xl font-bold mb-2">{tema.nombre}</h3>
-                    {tema.descripcion && (
-                      <p className="text-sm opacity-90 flex-grow">{tema.descripcion}</p>
-                    )}
-                    <div className="text-xs opacity-75 mt-4">
-                      Haz clic para seleccionar este tema
+                  <div className="flex items-start gap-6">
+                    <div className="flex flex-col h-full flex-1">
+                      <h3 className="text-xl font-bold mb-2">{tema.nombre}</h3>
+                      {tema.descripcion && (
+                        <p className="text-sm opacity-90 flex-grow">{tema.descripcion}</p>
+                      )}
+                      <div className="text-xs opacity-75 mt-4">
+                        Haz clic para seleccionar este tema
+                      </div>
                     </div>
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleOpenThemeManager(tema);
+                      }}
+                      className="flex-shrink-0 px-3 py-2 rounded-full bg-white text-[#3A4A5B] shadow-lg hover:shadow-xl hover:scale-[1.03] hover:bg-white/90 transition-all flex items-center gap-2 cursor-pointer"
+                      title="Editar tema"
+                      aria-label="Editar tema"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      <span className="text-sm font-semibold">Editar</span>
+                    </button>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
         )}
       </main>
+
     </div>
   );
 }

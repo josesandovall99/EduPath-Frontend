@@ -46,32 +46,6 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       onClick: () => setCurrentScreen('areas')
     },
     {
-      id: 'themes',
-      title: 'Gestión de Temas',
-      description: 'Habilitar o deshabilitar temas y subtemas por materia. Controla qué contenidos están disponibles para los estudiantes.',
-      icon: BookOpen,
-      color: '#4A90E2',
-      gradient: 'from-[#4A90E2] to-[#5B9FED]'
-    },
-    {
-      id: 'subthemes',
-      title: 'Gestión de Subtemas',
-      description: 'Crear, editar y eliminar subtemas por tema. Administra la estructura de contenidos de cada materia.',
-      icon: FileEdit,
-      color: '#10B981',
-      gradient: 'from-[#10B981] to-[#34D399]',
-      onClick: () => setCurrentScreen('subthemes')
-    },
-    {
-      id: 'contents',
-      title: 'Gestión de Contenidos',
-      description: 'Crear, editar y eliminar contenidos teóricos. Administra videos, documentos y recursos por tema.',
-      icon: FileEdit,
-      color: '#7ED6A7',
-      gradient: 'from-[#7ED6A7] to-[#90E0B7]',
-      onClick: () => setCurrentScreen('contents')
-    },
-    {
       id: 'ejercicios',
       title: 'Gestión de Ejercicios',
       description: 'Crear y editar ejercicios asociados a contenidos específicos.',
@@ -327,7 +301,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div 
-                    className={`p-4 rounded-xl bg-gradient-to-br ${action.gradient} shadow-md`}
+                      className={`p-4 rounded-xl bg-gradient-to-br ${action.gradient} shadow-md`}
+                      style={{ backgroundColor: action.color }}
                   >
                     <Icon className="w-8 h-8 text-white" />
                   </div>

@@ -3,8 +3,47 @@ import { ArrowLeft, Code, Database, BarChart3, ChevronDown, ChevronRight, Toggle
 import axios from 'axios';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
+const api = axios.create({
+  baseURL: '/api',
+  withCredentials: true
+});
+
+api.interceptors.request.use((config) => {
+  const personaId = localStorage.getItem('personaId');
+  const authToken = localStorage.getItem('authToken');
+  const adminId = localStorage.getItem('adminId');
+
+  if (personaId) {
+    config.headers = { ...config.headers, 'x-persona-id': personaId };
+  }
+
+  if (adminId) {
+    config.headers = {
+      ...config.headers,
+      'x-admin-id': adminId,
+      'x-administrador-id': adminId
+    };
+  }
+
+  if (authToken) {
+    config.headers = { ...config.headers, Authorization: `Bearer ${authToken}` };
+  }
+
+  return config;
+});
+
 interface ThemeManagementScreenProps {
   onBack: () => void;
+  initialAreaId?: string | number;
+  initialEditTema?: {
+    id: string | number;
+    nombre: string;
+    descripcion?: string;
+    estado?: boolean;
+    area_id: string | number;
+  };
+  embedded?: boolean;
+  backLabel?: string;
 }
 
 interface Area {
@@ -48,7 +87,7 @@ const subjectColors: Record<string, { primary: string; light: string; icon: any 
   'alcance': { primary: '#F5A97F', light: '#FFF3E0', icon: BarChart3 }
 };
 
-export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
+export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, embedded = false, backLabel }: ThemeManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
   const [subtemas, setSubtemas] = useState<Record<string, Subtema[]>>({});
@@ -69,6 +108,7 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const initialAreaIdValue = initialAreaId !== undefined && initialAreaId !== null ? String(initialAreaId) : '';
 
   // Cargar áreas del backend
   useEffect(() => {
@@ -77,7 +117,7 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
         setLoading(true);
         setError(null);
         
-        const response = await axios.get('http://localhost:4000/areas', {
+        const response = await api.get('/areas', {
           timeout: 5000,
           headers: {
             'Accept': 'application/json',
@@ -92,8 +132,14 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
         
         setAreas(data);
         
-        // Establecer la primera área como seleccionada por defecto
-        if (data.length > 0) {
+        // Establecer área inicial (si llega desde el overlay) o la primera disponible
+        const preferredAreaId = initialEditTema
+          ? String(initialEditTema.area_id)
+          : initialAreaIdValue;
+        const matchedArea = data.find(area => area.id === preferredAreaId);
+        if (matchedArea) {
+          setSelectedSubject(matchedArea.id);
+        } else if (data.length > 0) {
           setSelectedSubject(data[0].id);
         }
       } catch (err) {
@@ -123,6 +169,26 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
     fetchAreas();
   }, []);
 
+  useEffect(() => {
+    if (!initialEditTema) return;
+    const normalizedTema: Tema = {
+      id: String(initialEditTema.id),
+      nombre: initialEditTema.nombre,
+      descripcion: initialEditTema.descripcion || '',
+      estado: initialEditTema.estado ?? true,
+      area_id: String(initialEditTema.area_id)
+    };
+    setSelectedSubject(String(initialEditTema.area_id));
+    setEditingTema(normalizedTema);
+    setFormData({
+      nombre: normalizedTema.nombre,
+      descripcion: normalizedTema.descripcion,
+      estado: normalizedTema.estado,
+      area_id: normalizedTema.area_id
+    });
+    setShowModal(true);
+  }, [initialEditTema]);
+
   // Cargar temas cuando cambia el área seleccionada
   useEffect(() => {
     if (!selectedSubject) return;
@@ -134,7 +200,7 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
         
         // Admin necesita ver TODOS los temas (habilitados y deshabilitados)
         // Por eso usamos /temas en lugar de /temas/por-area que filtra por estado
-        const response = await axios.get('http://localhost:4000/temas', {
+        const response = await api.get('/temas', {
           timeout: 5000,
           headers: {
             'Accept': 'application/json',
@@ -191,7 +257,7 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
     try {
       setSubtemasLoading(prev => ({ ...prev, [temaId]: true }));
       
-      const response = await axios.get(`http://localhost:4000/subtemas/por-tema/${temaId}`, {
+      const response = await api.get(`/subtemas/por-tema/${temaId}`, {
         timeout: 5000,
         headers: {
           'Accept': 'application/json',
@@ -267,7 +333,7 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
       
       if (editingTema) {
         // Actualizar tema existente
-        await axios.put(`http://localhost:4000/temas/${editingTema.id}`, formData);
+        await api.put(`/temas/${editingTema.id}`, formData);
         setSuccessMessage('Tema actualizado exitosamente');
         
         // Actualizar en el estado local
@@ -276,7 +342,7 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
         );
       } else {
         // Crear nuevo tema
-        const response = await axios.post('http://localhost:4000/temas', formData);
+        const response = await api.post('/temas', formData);
         setSuccessMessage('Tema creado exitosamente');
         
         // Agregar al inicio del estado local (porque orden=0)
@@ -308,7 +374,7 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
     if (!confirmDelete) return;
     
     try {
-      await axios.delete(`http://localhost:4000/temas/${tema.id}`);
+      await api.delete(`/temas/${tema.id}`);
       setSuccessMessage('Tema eliminado exitosamente');
       
       // Eliminar del estado local
@@ -330,13 +396,13 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
   const toggleTema = async (tema: Tema) => {
     try {
       const updatedEstado = !tema.estado;
-      await axios.put(`http://localhost:4000/temas/${tema.id}`, {
+      await api.put(`/temas/${tema.id}`, {
         ...tema,
         estado: updatedEstado
       });
       
       // Recargar todos los temas para que coincidan con el orden de la BD
-      const response = await axios.get('http://localhost:4000/temas', {
+      const response = await api.get('/temas', {
         headers: {
           'Accept': 'application/json',
         }
@@ -368,7 +434,7 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
   const saveOrden = async (newTemas: Tema[]) => {
     try {
       const orden = newTemas.map(tema => tema.id);
-      await axios.put('http://localhost:4000/temas/reordenar', { orden });
+      await api.put('/temas/reordenar', { orden });
     } catch (err) {
       console.error('Error saving orden:', err);
       alert('Error al guardar el orden de los temas');
@@ -438,32 +504,36 @@ export function ThemeManagementScreen({ onBack }: ThemeManagementScreenProps) {
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
-              <div>
-                <h1 className="text-[#3A4A5B]">Gestión de Temas</h1>
-                <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+      {!embedded && (
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                </div>
+                <div>
+                  <h1 className="text-[#3A4A5B]">Gestión de Temas</h1>
+                  <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-8 py-8">
         {/* Back Button */}
-        <button 
-          onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Volver al Panel</span>
-        </button>
+        {!embedded && (
+          <button 
+            onClick={onBack}
+            className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>{backLabel || 'Volver al Panel'}</span>
+          </button>
+        )}
 
         {/* Subject Selector */}
         <div className="bg-white rounded-2xl shadow-md p-6 mb-8">

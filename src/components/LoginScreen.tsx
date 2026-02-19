@@ -33,26 +33,64 @@ const handleStudentLogin = async () => {
     try {
       // 1) Intentar login como administrador primero
       try {
-        const adminRes = await fetch('http://localhost:4000/administrador/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ codigoAcceso: codigoEstudiantil, contraseña: password }),
-        });
+        const adminEndpoints = [
+          '/api/administrador/login',
+          '/api/administradores/login',
+          '/api/admin/login'
+        ];
 
-        const adminParsed = await parseResponse(adminRes);
-        if (adminParsed.ok) {
-          const adminPersonaId = adminParsed.body?.administrador?.personaId;
+        let adminParsed: { ok: boolean; status: number; body?: any } | null = null;
+
+        for (const endpoint of adminEndpoints) {
+          const adminRes = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ codigoAcceso: codigoEstudiantil, contraseña: password }),
+          });
+
+          adminParsed = await parseResponse(adminRes);
+
+          if (adminParsed.ok || adminParsed.status !== 404) {
+            break;
+          }
+        }
+
+        if (adminParsed?.ok) {
+          const adminPersonaId =
+            adminParsed.body?.administrador?.personaId ||
+            adminParsed.body?.personaId ||
+            adminParsed.body?.persona?.id;
+          const adminId =
+            adminParsed.body?.administrador?.id ||
+            adminParsed.body?.adminId ||
+            adminParsed.body?.administradorId;
           if (adminPersonaId) {
             localStorage.setItem('personaId', String(adminPersonaId));
-            applyAuthHeaders();
           }
+          if (adminId) {
+            localStorage.setItem('adminId', String(adminId));
+          }
+          const adminTokenCandidates = [
+            adminParsed.body?.token,
+            adminParsed.body?.accessToken,
+            adminParsed.body?.access_token,
+            adminParsed.body?.administrador?.token,
+            adminParsed.body?.administrador?.accessToken,
+            adminParsed.body?.administrador?.access_token
+          ];
+          const adminToken = adminTokenCandidates.find((value) => typeof value === 'string' && value.trim().length > 0);
+          if (adminToken) {
+            localStorage.setItem('authToken', String(adminToken));
+          }
+          applyAuthHeaders();
           // Si es admin y credenciales correctas, redirigimos al dashboard admin
           onAdminLogin && onAdminLogin();
           setLoading(false);
           return;
         }
 
-        if (adminParsed.status && adminParsed.status >= 500) {
+        if (adminParsed?.status && adminParsed.status >= 500) {
           setError(`Servidor: ${adminParsed.status} - ${adminParsed.body?.mensaje || 'Error interno'}`);
           setLoading(false);
           return;
@@ -68,6 +106,7 @@ const handleStudentLogin = async () => {
         const docenteRes = await fetch('http://localhost:4000/docente/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ codigoAcceso: codigoEstudiantil, contraseña: password })
         });
 
@@ -93,6 +132,7 @@ const handleStudentLogin = async () => {
           const res = await fetch('http://localhost:4000/estudiante/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify(payload),
           });
           return await parseResponse(res);
@@ -209,13 +249,14 @@ return (
               <div className="flex-1 border-t border-gray-300"></div>
             </div>
 
-            {/* Botón Google (Solo Admin) */}
+            {/* Acceso Administrativo */}
             <button 
-              onClick={onAdminLogin}
-              className="w-full bg-white border border-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-50 transition-all flex items-center justify-center gap-2 shadow-sm"
+              onClick={handleStudentLogin}
+              disabled={loading}
+              className={`w-full bg-white border border-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-50 transition-all flex items-center justify-center gap-2 shadow-sm ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
               <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-              <span>Acceso Administrativo</span>
+              <span>{loading ? 'Verificando...' : 'Acceso Administrativo'}</span>
             </button>
 
             {/* Forgot Password Link */}

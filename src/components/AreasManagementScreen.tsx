@@ -140,7 +140,7 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
         </button>
 
         {/* Informational Message */}
-        <div className="mb-8 p-6 bg-gradient-to-r from-[#4A90E2] to-[#357abd] text-white rounded-xl shadow-lg">
+        <div className="mb-8 p-6 bg-[#4A90E2] text-white rounded-xl shadow-md">
           <h2 className="text-lg font-bold mb-2">Gestión de Contenido Educativo</h2>
           <p className="text-sm opacity-95">
             Selecciona un área para gestionar sus subtemas y contenidos. Desde aquí podrás organizar la estructura completa 
@@ -260,10 +260,10 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
       </main>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-              <h3 className="text-2xl font-semibold text-[#3A4A5B]">Crear Nueva Area</h3>
+        <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-md w-full max-h-[85vh] overflow-y-auto">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
+              <h3 className="text-lg font-semibold text-[#3A4A5B]">Crear Nueva Area</h3>
               <button
                 onClick={handleCloseModal}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -272,7 +272,7 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
+            <div className="p-4 space-y-4">
               {formError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                   {formError}
@@ -285,7 +285,7 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
                   type="text"
                   value={formData.nombre}
                   onChange={(event) => setFormData({ ...formData, nombre: event.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
                   placeholder="Ej: Programacion"
                   required
                 />
@@ -296,25 +296,25 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
                 <textarea
                   value={formData.descripcion}
                   onChange={(event) => setFormData({ ...formData, descripcion: event.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all resize-none"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all resize-none"
                   placeholder="Descripcion breve del area"
-                  rows={4}
+                  rows={3}
                 />
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex gap-4 justify-end bg-gray-50 rounded-b-2xl">
+            <div className="p-4 border-t border-gray-200 flex gap-3 justify-end bg-gray-50 rounded-b-2xl">
               <button
                 onClick={handleCloseModal}
                 disabled={submitting}
-                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreateArea}
                 disabled={submitting || !formData.nombre.trim()}
-                className="px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2.5 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 style={{ backgroundColor: '#4A90E2' }}
               >
                 {submitting ? (
