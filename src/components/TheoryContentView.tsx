@@ -816,7 +816,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         // No es crítico, continuar sin ejercicios
       }
 
-      // Update the module with the loaded items (only sequenced)
+      // Update the module with the loaded items
       setModules(prevModules => 
         prevModules.map(m => 
           m.id === subtemaId 
