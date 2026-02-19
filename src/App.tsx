@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Toaster } from './components/ui/sonner';
 import { LoginScreen } from './components/LoginScreen';
 import { AdminRegisterScreen } from './components/AdminRegisterScreen';
@@ -22,6 +22,7 @@ import { SequenceManagementScreen } from './components/SequenceManagementScreen'
 import { SubtemaSequenceManagementScreen } from './components/SubtemaSequenceManagementScreen';
 import { DocenteDashboard } from './components/DocenteDashboard';
 import { DocenteAreaManagementScreen } from './components/DocenteAreaManagementScreen';
+import { applyAuthHeaders, setupAuthFetch } from './utils/authHeaders';
 
 type Screen = 
   | 'login' 
@@ -91,6 +92,11 @@ export default function App() {
   const [userData, setUserData] = useState<{id: number, personaId: number, nombre: string} | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [docenteSession, setDocenteSession] = useState<DocenteSession | null>(null);
+
+  useEffect(() => {
+    setupAuthFetch();
+    applyAuthHeaders();
+  }, []);
   
 
   // Función que se llama cuando el login es exitoso
@@ -117,6 +123,8 @@ export default function App() {
       localStorage.setItem('semestreEstudiante', apiResponse.estudiante.semestre.toString());
     }
 
+    applyAuthHeaders();
+
     // Decidimos a dónde ir basado en el flag 'primerIngreso'
     if (apiResponse.primerIngreso) {
       setCurrentScreen('change-password');
@@ -140,6 +148,9 @@ export default function App() {
       areaId: docente.area?.id,
       areaNombre: docente.area?.nombre
     };
+
+    localStorage.setItem('personaId', docente.personaId.toString());
+    applyAuthHeaders();
 
     setDocenteSession(session);
     setCurrentScreen('docente-dashboard');
@@ -185,6 +196,7 @@ export default function App() {
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('semestreEstudiante');
     setDocenteSession(null);
+    applyAuthHeaders();
   };
 
   const handleLogout = () => {
@@ -199,6 +211,7 @@ export default function App() {
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('semestreEstudiante');
     setDocenteSession(null);
+    applyAuthHeaders();
   };
 
   const handleSubjectSelect = (subject: Subject) => {

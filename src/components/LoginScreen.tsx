@@ -1,6 +1,7 @@
 import { Mail, Lock, ArrowRight, KeyRound } from 'lucide-react';
 import { useState } from 'react';
 import logoImage from '../assets/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { applyAuthHeaders } from '../utils/authHeaders';
 
 
 interface LoginScreenProps {
@@ -39,6 +40,11 @@ const handleStudentLogin = async () => {
 
         const adminParsed = await parseResponse(adminRes);
         if (adminParsed.ok) {
+          const adminPersonaId = adminParsed.body?.administrador?.personaId;
+          if (adminPersonaId) {
+            localStorage.setItem('personaId', String(adminPersonaId));
+            applyAuthHeaders();
+          }
           // Si es admin y credenciales correctas, redirigimos al dashboard admin
           onAdminLogin && onAdminLogin();
           setLoading(false);

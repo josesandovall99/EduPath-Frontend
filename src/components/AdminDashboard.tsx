@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBranch, ClipboardList } from 'lucide-react';
+import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBranch, ClipboardList, Shield } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ContentManagementScreen } from './ContentManagementScreen';
 import { SequenceManagementScreen } from './SequenceManagementScreen';
@@ -13,6 +13,7 @@ import { Upload } from "lucide-react";
 import { ChatbotManagementScreen } from './ChatbotManagementScreen';
 import { Bot } from 'lucide-react';
 import { DocenteManagementScreen } from './DocenteManagementScreen';
+import { AdminManagementScreen } from './AdminManagementScreen';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -20,7 +21,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes' | 'miniproyectos' | 'ejercicios' | 'chatbot' | 'docentes'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes' | 'miniproyectos' | 'ejercicios' | 'chatbot' | 'docentes' | 'administradores'>('dashboard');
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [selectedAreaName, setSelectedAreaName] = useState<string>('');
   const [selectedTemaId, setSelectedTemaId] = useState<number | null>(null);
@@ -35,6 +36,15 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   ];
 
   const actions = [
+    {
+      id: 'areas',
+      title: 'Gestión de Áreas',
+      description: 'Crear, editar y eliminar áreas académicas. Define el nombre y la descripción del área.',
+      icon: BookOpen,
+      color: '#4A90E2',
+      gradient: 'from-[#4A90E2] to-[#5B9FED]',
+      onClick: () => setCurrentScreen('areas')
+    },
     {
       id: 'themes',
       title: 'Gestión de Temas',
@@ -104,6 +114,15 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       color: '#14B8A6',
       gradient: 'from-[#14B8A6] to-[#2DD4BF]',
       onClick: () => setCurrentScreen('docentes')
+    },
+    {
+      id: 'administradores',
+      title: 'Gestión de Administradores',
+      description: 'Crear administradores con cargo y nivel de acceso. Controla credenciales del sistema.',
+      icon: Shield,
+      color: '#2563EB',
+      gradient: 'from-[#2563EB] to-[#3B82F6]',
+      onClick: () => setCurrentScreen('administradores')
     },
     {
       id: 'upload',
@@ -204,6 +223,14 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'docentes') {
     return (
       <DocenteManagementScreen
+        onBack={() => setCurrentScreen('dashboard')}
+      />
+    );
+  }
+
+  if (currentScreen === 'administradores') {
+    return (
+      <AdminManagementScreen
         onBack={() => setCurrentScreen('dashboard')}
       />
     );
