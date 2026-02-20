@@ -1,0 +1,112 @@
+.app-shell {
+  min-height: 100vh;
+  background: var(--background);
+}
+
+.app-header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(58, 74, 91, 0.08);
+}
+
+.app-main {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.app-panel {
+  background: var(--card);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(58, 74, 91, 0.08);
+  box-shadow: 0 8px 24px rgba(58, 74, 91, 0.08);
+}
+
+.app-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted-foreground);
+  transition: color .2s ease;
+}
+
+.app-back-button:hover {
+  color: var(--foreground);
+}
+
+.app-shell button {
+  border-radius: 0.625rem;
+  font-weight: 600;
+  transition: all .2s ease;
+}
+
+.app-shell button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.22);
+}
+
+.app-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+}
+
+.app-primary-btn {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 14px rgba(74, 144, 226, 0.22);
+  transition: all .2s ease;
+}
+
+.app-primary-btn:hover {
+  filter: brightness(0.97);
+  box-shadow: 0 8px 20px rgba(74, 144, 226, 0.3);
+}
+
+.app-btn-success {
+  background: linear-gradient(90deg, #7ED6A7 0%, #90E0B7 100%);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(126, 214, 167, 0.28);
+}
+
+.app-btn-success:hover {
+  filter: brightness(0.98);
+  box-shadow: 0 10px 20px rgba(126, 214, 167, 0.34);
+}
+
+.app-btn-secondary {
+  background: #fff;
+  color: var(--foreground);
+  border: 1px solid rgba(58, 74, 91, 0.2);
+}
+
+.app-btn-secondary:hover {
+  background: #f8fafc;
+  border-color: rgba(58, 74, 91, 0.28);
+}
+
+.app-btn-ghost {
+  background: rgba(74, 144, 226, 0.08);
+  color: var(--primary);
+  border: 1px solid rgba(74, 144, 226, 0.22);
+}
+
+.app-btn-ghost:hover {
+  background: rgba(74, 144, 226, 0.12);
+}
+
+.app-btn-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+}
+
+.app-info-banner {
+  background: linear-gradient(90deg, #4A90E2 0%, #5B9FED 100%);
+  color: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 24px rgba(74, 144, 226, 0.2);
+}

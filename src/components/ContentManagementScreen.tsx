@@ -5,6 +5,7 @@ import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png'
 
 interface ContentManagementScreenProps {
   onBack: () => void;
+  onHome?: () => void;
 }
 
 interface ContentItem {
@@ -48,7 +49,7 @@ interface Subtema {
   tema_id: number;
 }
 
-export function ContentManagementScreen({ onBack }: ContentManagementScreenProps) {
+export function ContentManagementScreen({ onBack, onHome }: ContentManagementScreenProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
@@ -513,15 +514,20 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
+    <div className="app-shell">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+              <button
+                type="button"
+                onClick={onHome}
+                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                title="Ir al panel principal"
+              >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
+              </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Contenidos</h1>
                 <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
@@ -529,7 +535,7 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] text-white rounded-lg hover:shadow-lg transition-all duration-300"
+              className="app-btn app-btn-success px-6 py-3"
             >
               <Plus className="w-5 h-5" />
               <span>Crear Nuevo Contenido</span>
@@ -539,11 +545,11 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="app-main">
         {/* Back Button */}
         <button 
           onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
+          className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
@@ -606,8 +612,8 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                 onClick={() => setFilterType('all')}
                 className={`px-4 py-2 rounded-lg transition-all ${
                   filterType === 'all'
-                    ? 'bg-[#4A90E2] text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'app-primary-btn text-white shadow-md'
+                    : 'app-btn-secondary text-gray-700'
                 }`}
               >
                 Todos
@@ -616,8 +622,8 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                 onClick={() => setFilterType('video')}
                 className={`px-4 py-2 rounded-lg transition-all ${
                   filterType === 'video'
-                    ? 'bg-[#4A90E2] text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'app-primary-btn text-white shadow-md'
+                    : 'app-btn-secondary text-gray-700'
                 }`}
               >
                 Videos
@@ -626,8 +632,8 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                 onClick={() => setFilterType('document')}
                 className={`px-4 py-2 rounded-lg transition-all ${
                   filterType === 'document'
-                    ? 'bg-[#7ED6A7] text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'app-btn-success text-white shadow-md'
+                    : 'app-btn-secondary text-gray-700'
                 }`}
               >
                 Documentos
@@ -637,7 +643,7 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
                 className={`px-4 py-2 rounded-lg transition-all ${
                   filterType === 'activity'
                     ? 'bg-[#F5A97F] text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'app-btn-secondary text-gray-700'
                 }`}
               >
                 Actividades
@@ -732,15 +738,6 @@ export function ContentManagementScreen({ onBack }: ContentManagementScreenProps
           </>
         )}
 
-        {/* Action Buttons */}
-        <div className="mt-8 flex gap-4 justify-end">
-          <button
-            onClick={onBack}
-            className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
-          >
-            Volver
-          </button>
-        </div>
       </main>
 
       {/* Modal de Crear/Editar Contenido */}

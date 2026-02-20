@@ -41,6 +41,8 @@ interface Sequence {
 
 interface SequenceManagementScreenProps {
   onBack: () => void;
+  onHome?: () => void;
+  onGoToContentManagement?: () => void;
   subtemaId?: number;
   temaId?: number;
   areaId?: number;
@@ -49,7 +51,7 @@ interface SequenceManagementScreenProps {
   subtemaNombre?: string;
 }
 
-export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, areaName, temaName, subtemaNombre }: SequenceManagementScreenProps) {
+export function SequenceManagementScreen({ onBack, onHome, onGoToContentManagement, subtemaId, temaId, areaId, areaName, temaName, subtemaNombre }: SequenceManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
   const [subtemas, setSubtemas] = useState<Subtema[]>([]);
@@ -216,6 +218,69 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
     return used;
   };
 
+  const getModalSubtemaId = () => {
+    if (modalSelectedSubtema) return Number(modalSelectedSubtema);
+    if (subtemaId !== undefined) return Number(subtemaId);
+    if (selectedSubtema) return Number(selectedSubtema);
+    return null;
+  };
+
+  const getModalChainContext = () => {
+    const subtemaScopeId = getModalSubtemaId();
+    if (!subtemaScopeId) {
+      return {
+        lockedOriginId: null,
+        connectedContentIds: new Set<number>()
+      };
+    }
+
+    const contenidoIdsSubtema = new Set(
+      contents
+        .filter((contenido) => Number(contenido.subtema_id) === Number(subtemaScopeId))
+        .map((contenido) => Number(contenido.id))
+    );
+
+    const secuenciasSubtema = sequences.filter((sequence) =>
+      contenidoIdsSubtema.has(Number(sequence.contenido_origen_id)) &&
+      contenidoIdsSubtema.has(Number(sequence.contenido_destino_id))
+    );
+
+    if (secuenciasSubtema.length === 0 || isEditMode) {
+      return {
+        lockedOriginId: null,
+        connectedContentIds: new Set<number>()
+      };
+    }
+
+    const origenes = new Set(secuenciasSubtema.map((sequence) => Number(sequence.contenido_origen_id)));
+    const destinos = new Set(secuenciasSubtema.map((sequence) => Number(sequence.contenido_destino_id)));
+    const conectados = new Set<number>([...origenes, ...destinos]);
+    const cola = [...destinos].find((destinoId) => !origenes.has(destinoId)) ?? null;
+
+    return {
+      lockedOriginId: cola,
+      connectedContentIds: conectados
+    };
+  };
+
+  const hasExistingRelationBetween = (firstContentId: number, secondContentId: number, ignoreSequenceId?: number) => {
+    return sequences.some((sequence) => {
+      if (ignoreSequenceId && sequence.id === ignoreSequenceId) {
+        return false;
+      }
+
+      const isDirectRelation =
+        Number(sequence.contenido_origen_id) === Number(firstContentId) &&
+        Number(sequence.contenido_destino_id) === Number(secondContentId);
+
+      const isInverseRelation =
+        Number(sequence.contenido_origen_id) === Number(secondContentId) &&
+        Number(sequence.contenido_destino_id) === Number(firstContentId);
+
+      return isDirectRelation || isInverseRelation;
+    });
+  };
+
   // --- Modal-specific helpers to filtrar contenidos dentro del modal Crear Secuencia ---
   const getFilteredModalContents = () => {
     // Si viene de un subtema específico, solo mostrar contenidos de ese subtema
@@ -238,6 +303,12 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
   const getAvailableOriginModalContents = () => {
     const filtered = getFilteredModalContents();
     const used = getUsedContents();
+    const { lockedOriginId } = getModalChainContext();
+
+    if (lockedOriginId && !isEditMode) {
+      return filtered.filter((content) => Number(content.id) === Number(lockedOriginId));
+    }
+
     const currentDestinoId = formData.contenido_destino_id ? parseInt(formData.contenido_destino_id) : null;
     
     // En modo edición, permitir mantener el origen actual aunque esté usado en otra secuencia
@@ -245,25 +316,13 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
       ? selectedSequence.contenido_origen_id 
       : null;
     
+    const currentSequenceId = isEditMode && selectedSequence ? selectedSequence.id : undefined;
+
     const available = filtered.filter(c => {
-      // Excluir contenidos que son tanto origen como destino (excepto el actual en edición)
-      // Estos contenidos ya están completamente usados
-      if (used.both.has(c.id) && c.id !== currentOrigenId) {
-        return false;
-      }
-      
-      // Excluir contenidos que ya son origen en otras secuencias (excepto el actual en edición)
-      // Esto evita que un contenido aparezca como opción de origen si ya es origen en otra secuencia
-      if (used.origin.has(c.id) && c.id !== currentOrigenId) {
-        return false;
-      }
-      
-      // Excluir el contenido seleccionado actualmente como destino
-      // Para evitar seleccionar el mismo contenido como origen y destino
-      if (currentDestinoId && c.id === currentDestinoId) {
-        return false;
-      }
-      
+      if (used.both.has(c.id) && c.id !== currentOrigenId) return false;
+      if (used.origin.has(c.id) && c.id !== currentOrigenId) return false;
+      if (currentDestinoId && c.id === currentDestinoId) return false;
+      if (currentDestinoId && hasExistingRelationBetween(c.id, currentDestinoId, currentSequenceId)) return false;
       return true;
     });
     
@@ -273,37 +332,54 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
   const getAvailableDestinationModalContents = () => {
     const filtered = getFilteredModalContents();
     const used = getUsedContents();
+    const { lockedOriginId, connectedContentIds } = getModalChainContext();
     const currentOrigenId = formData.contenido_origen_id ? parseInt(formData.contenido_origen_id) : null;
+    const effectiveOrigenId = currentOrigenId || lockedOriginId;
     
     // En modo edición, permitir mantener el destino actual aunque esté usado en otra secuencia
     const currentDestinoId = isEditMode && selectedSequence 
       ? selectedSequence.contenido_destino_id 
       : null;
+
+    const currentSequenceId = isEditMode && selectedSequence ? selectedSequence.id : undefined;
+
+    if (
+      isEditMode &&
+      selectedSequence &&
+      currentOrigenId &&
+      Number(currentOrigenId) !== Number(selectedSequence.contenido_origen_id)
+    ) {
+      return filtered.filter((content) => Number(content.id) === Number(selectedSequence.contenido_destino_id));
+    }
     
     const available = filtered.filter(c => {
-      // Excluir contenidos que son tanto origen como destino (excepto el actual en edición)
-      // Estos contenidos ya están completamente usados
-      if (used.both.has(c.id) && c.id !== currentDestinoId) {
-        return false;
-      }
-      
-      // Excluir contenidos que ya son destino en otras secuencias (excepto el actual en edición)
-      // Esto evita que un contenido aparezca como opción de destino si ya es destino en otra secuencia
-      if (used.destination.has(c.id) && c.id !== currentDestinoId) {
-        return false;
-      }
-      
-      // Excluir el contenido seleccionado actualmente como origen
-      // Para evitar seleccionar el mismo contenido como origen y destino
-      if (currentOrigenId && c.id === currentOrigenId) {
-        return false;
-      }
-      
+      if (used.both.has(c.id) && c.id !== currentDestinoId) return false;
+      if (used.destination.has(c.id) && c.id !== currentDestinoId) return false;
+      if (effectiveOrigenId && c.id === effectiveOrigenId) return false;
+      if (!isEditMode && lockedOriginId && connectedContentIds.has(Number(c.id))) return false;
+      if (effectiveOrigenId && hasExistingRelationBetween(effectiveOrigenId, c.id, currentSequenceId)) return false;
       return true;
     });
     
     return available;
   };
+
+  useEffect(() => {
+    if (!showCreateModal || isEditMode) {
+      return;
+    }
+
+    const { lockedOriginId } = getModalChainContext();
+    if (!lockedOriginId) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      contenido_origen_id: String(lockedOriginId),
+      contenido_destino_id: prev.contenido_destino_id === String(lockedOriginId) ? '' : prev.contenido_destino_id
+    }));
+  }, [showCreateModal, isEditMode, modalSelectedSubtema, selectedSubtema, subtemaId, sequences, contents]);
 
   const handleModalFilterChange = async (filterType: string, value: string) => {
     if (filterType === 'area') {
@@ -519,6 +595,12 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
         return;
       }
 
+      if (hasExistingRelationBetween(origenId, destinoId)) {
+        setError('Estos contenidos ya están relacionados en una secuencia.');
+        setIsLoading(false);
+        return;
+      }
+
       // Si estamos insertando en el medio de una secuencia existente
       // Ejemplo: B->C, insertamos X entre B y C
       // Resultado: B->X (origen siempre es el anterior) y X->C (destino del intermedio es el destino original)
@@ -620,6 +702,12 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
       // Validar que origen y destino no sean el mismo
       if (origenId === destinoId) {
         setError('El contenido origen no puede ser el mismo que el destino');
+        setIsLoading(false);
+        return;
+      }
+
+      if (hasExistingRelationBetween(origenId, destinoId, selectedSequence.id)) {
+        setError('Estos contenidos ya están relacionados en una secuencia.');
         setIsLoading(false);
         return;
       }
@@ -1056,15 +1144,20 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
+    <div className="app-shell">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+              <button
+                type="button"
+                onClick={onHome}
+                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                title="Ir al panel principal"
+              >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
+              </button>
               <div>
                 <h1 className="text-[#3A4A5B]">
                   {subtemaId ? 'Gestión de Secuencias de Contenidos' : 'Gestión de Secuencias'}
@@ -1112,7 +1205,7 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
                 }
                 setShowCreateModal(true);
               }}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] text-white rounded-lg hover:shadow-lg transition-all duration-300"
+              className="app-btn app-btn-success px-6 py-3"
             >
               <Plus className="w-5 h-5" />
               <span>Crear Secuencia</span>
@@ -1122,18 +1215,30 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
-        {/* Back Button */}
-        <button 
-          onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>{subtemaId ? 'Volver a Secuencias de Subtemas' : 'Volver al Panel'}</span>
-        </button>
+      <main className="app-main">
+        {/* Navigation Actions */}
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <button 
+            onClick={onBack}
+            className="app-back-button"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>{subtemaId ? 'Volver a Secuencias de Subtemas' : 'Volver al Panel'}</span>
+          </button>
+
+          {onGoToContentManagement && (
+            <button
+              onClick={onGoToContentManagement}
+              className="app-btn app-btn-ghost px-4 py-2.5"
+            >
+              <span>Gestionar Contenidos</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
         {/* Informational Message */}
-        <div className="mb-8 p-6 bg-gradient-to-r from-[#4A90E2] to-[#357abd] text-white rounded-xl shadow-lg">
+        <div className="app-info-banner mb-8 p-6">
           <h2 className="text-lg font-bold mb-2">Gestión de Secuencias de Contenidos</h2>
           <p className="text-sm opacity-95">
             Define el orden en que los estudiantes deben completar cada contenido dentro de un subtema.
@@ -1326,12 +1431,11 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
                             }}
                             onDragEnd={() => {
                               if (draggedItem !== null && draggedOverIndex !== null && draggedItem !== draggedOverIndex) {
-                                // Reorganizar el array
                                 const newOrder = [...orderedSequence];
-                                const [removed] = newOrder.splice(draggedItem, 1);
-                                newOrder.splice(draggedOverIndex, 0, removed);
-                                
-                                // Guardar el nuevo orden
+                                const sourceItem = newOrder[draggedItem];
+                                const targetItem = newOrder[draggedOverIndex];
+                                newOrder[draggedItem] = targetItem;
+                                newOrder[draggedOverIndex] = sourceItem;
                                 handleSaveOrder(newOrder);
                               }
                               setDraggedItem(null);
@@ -1492,15 +1596,6 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
           </>
         )}
 
-        {/* Action Buttons */}
-        <div className="mt-8 flex gap-4 justify-end">
-          <button
-            onClick={onBack}
-            className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
-          >
-            Volver
-          </button>
-        </div>
       </main>
 
       {/* Modal Crear/Editar Secuencia */}
@@ -1614,11 +1709,16 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
                 <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
                   Contenido Origen *
                 </label>
+                {(() => {
+                  const { lockedOriginId } = getModalChainContext();
+                  const isOriginLocked = Boolean(lockedOriginId && !isEditMode);
+                  return (
                 <select
                   name="contenido_origen_id"
                   value={formData.contenido_origen_id}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                  disabled={isOriginLocked}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                   required
                 >
                   <option value="">Seleccionar contenido origen</option>
@@ -1628,6 +1728,13 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
                     </option>
                   ))}
                 </select>
+                  );
+                })()}
+                {!isEditMode && getModalChainContext().lockedOriginId && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Origen fijado al último destino de la cadena.
+                  </p>
+                )}
               </div>
 
               {/* Contenido Destino */}
@@ -1649,6 +1756,11 @@ export function SequenceManagementScreen({ onBack, subtemaId, temaId, areaId, ar
                     </option>
                   ))}
                 </select>
+                {isEditMode && selectedSequence && formData.contenido_origen_id && Number(formData.contenido_origen_id) !== Number(selectedSequence.contenido_origen_id) && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Destino fijado para mantener la cadena ordenada.
+                  </p>
+                )}
               </div>
 
               {/* Descripción */}

@@ -20,14 +20,44 @@ interface AdminDashboardProps {
   onNavigate: (section: 'themes' | 'contents' | 'reports' | 'students' | 'upload' | 'subtema-sequences' | 'subthemes') => void;
 }
 
+type AdminScreen = 'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'content-management' | 'subthemes' | 'miniproyectos' | 'ejercicios' | 'chatbot' | 'docentes' | 'administradores';
+
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'subthemes' | 'miniproyectos' | 'ejercicios' | 'chatbot' | 'docentes' | 'administradores'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<AdminScreen>('dashboard');
+  const [navigationHistory, setNavigationHistory] = useState<AdminScreen[]>([]);
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [selectedAreaName, setSelectedAreaName] = useState<string>('');
   const [selectedTemaId, setSelectedTemaId] = useState<number | null>(null);
   const [selectedTemaName, setSelectedTemaName] = useState<string>('');
   const [selectedSubtemaId, setSelectedSubtemaId] = useState<number | null>(null);
   const [selectedSubtemaNombre, setSelectedSubtemaNombre] = useState<string>('');
+
+  const navigateTo = (nextScreen: AdminScreen) => {
+    if (nextScreen === currentScreen) {
+      return;
+    }
+    setNavigationHistory((prev) => [...prev, currentScreen]);
+    setCurrentScreen(nextScreen);
+  };
+
+  const goBack = () => {
+    setNavigationHistory((prev) => {
+      if (prev.length === 0) {
+        setCurrentScreen('dashboard');
+        return prev;
+      }
+
+      const newHistory = [...prev];
+      const previousScreen = newHistory.pop()!;
+      setCurrentScreen(previousScreen);
+      return newHistory;
+    });
+  };
+
+  const goHome = () => {
+    setNavigationHistory([]);
+    setCurrentScreen('dashboard');
+  };
   const stats = [
     { label: 'Materias activas', value: '3', icon: BookOpen, color: '#4A90E2', trend: '+0%' },
     { label: 'Temas disponibles', value: '12', icon: FileEdit, color: '#7ED6A7', trend: '+2' },
@@ -43,7 +73,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: BookOpen,
       color: '#4A90E2',
       gradient: 'from-[#4A90E2] to-[#5B9FED]',
-      onClick: () => setCurrentScreen('areas')
+      onClick: () => navigateTo('areas')
     },
     {
       id: 'temas',
@@ -54,10 +84,10 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       gradient: 'from-[#7ED6A7] to-[#86E0AF]',
       onClick: () => {
         if (selectedAreaId) {
-          setCurrentScreen('temas');
+          navigateTo('temas');
           return;
         }
-        setCurrentScreen('areas');
+        navigateTo('areas');
       }
     },
     {
@@ -69,14 +99,14 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       gradient: 'from-[#8B5CF6] to-[#A78BFA]',
       onClick: () => {
         if (selectedTemaId) {
-          setCurrentScreen('subtema-sequences');
+          navigateTo('subthemes');
           return;
         }
         if (selectedAreaId) {
-          setCurrentScreen('temas');
+          navigateTo('temas');
           return;
         }
-        setCurrentScreen('areas');
+        navigateTo('areas');
       }
     },
     {
@@ -86,7 +116,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: TrendingUp,
       color: '#A78BFA',
       gradient: 'from-[#A78BFA] to-[#C4B5FD]',
-      onClick: () => setCurrentScreen('contents')
+      onClick: () => navigateTo('content-management')
     },
     {
       id: 'ejercicios',
@@ -95,7 +125,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: ClipboardList,
       color: '#0EA5E9',
       gradient: 'from-[#0EA5E9] to-[#38BDF8]',
-      onClick: () => setCurrentScreen('ejercicios')
+      onClick: () => navigateTo('ejercicios')
     },
     {
       id: 'miniproyectos',
@@ -104,7 +134,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: ClipboardList,
       color: '#0EA5E9',
       gradient: 'from-[#0EA5E9] to-[#38BDF8]',
-      onClick: () => setCurrentScreen('miniproyectos')
+      onClick: () => navigateTo('miniproyectos')
     },
     {
       id: 'reports',
@@ -121,7 +151,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: Users,
       color: '#14B8A6',
       gradient: 'from-[#14B8A6] to-[#2DD4BF]',
-      onClick: () => setCurrentScreen('docentes')
+      onClick: () => navigateTo('docentes')
     },
     {
       id: 'administradores',
@@ -130,7 +160,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: Shield,
       color: '#2563EB',
       gradient: 'from-[#2563EB] to-[#3B82F6]',
-      onClick: () => setCurrentScreen('administradores')
+      onClick: () => navigateTo('administradores')
     },
     {
       id: 'upload',
@@ -147,67 +177,21 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       icon: Bot,
       color: '#6366F1',
       gradient: 'from-[#6366F1] to-[#818CF8]',
-      onClick: () => setCurrentScreen('chatbot')
+      onClick: () => navigateTo('chatbot')
     }
   ];
 
   // Renderizar la pantalla actual
   if (currentScreen === 'subthemes') {
-    return <SubThemeManagementScreen 
-      onBack={() => setCurrentScreen('dashboard')}
-    />;
-  }
-
-  if (currentScreen === 'areas') {
-    return <AreasManagementScreen 
-      onBack={() => setCurrentScreen('dashboard')}
-      onSelectArea={(areaId, areaName) => {
-        setSelectedAreaId(areaId);
-        setSelectedAreaName(areaName);
-        setCurrentScreen('temas');
-      }}
-    />;
-  }
-
-  if (currentScreen === 'temas') {
     if (!selectedAreaId) {
       return (
         <AreasManagementScreen
-          onBack={() => setCurrentScreen('dashboard')}
+          onBack={goBack}
+          onHome={goHome}
           onSelectArea={(areaId, areaName) => {
             setSelectedAreaId(areaId);
             setSelectedAreaName(areaName);
-            setCurrentScreen('temas');
-          }}
-        />
-      );
-    }
-
-    return <TemasManagementScreen 
-      areaId={selectedAreaId!}
-      areaName={selectedAreaName}
-      onBack={() => {
-        setSelectedAreaId(null);
-        setSelectedAreaName('');
-        setCurrentScreen('areas');
-      }}
-      onSelectTema={(temaId, temaName) => {
-        setSelectedTemaId(temaId);
-        setSelectedTemaName(temaName);
-        setCurrentScreen('subtema-sequences');
-      }}
-    />;
-  }
-
-  if (currentScreen === 'subtema-sequences') {
-    if (!selectedAreaId) {
-      return (
-        <AreasManagementScreen
-          onBack={() => setCurrentScreen('dashboard')}
-          onSelectArea={(areaId, areaName) => {
-            setSelectedAreaId(areaId);
-            setSelectedAreaName(areaName);
-            setCurrentScreen('temas');
+            navigateTo('temas');
           }}
         />
       );
@@ -218,25 +202,112 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         <TemasManagementScreen
           areaId={selectedAreaId}
           areaName={selectedAreaName}
-          onBack={() => setCurrentScreen('areas')}
+          onBack={goBack}
+          onHome={goHome}
           onSelectTema={(temaId, temaName) => {
             setSelectedTemaId(temaId);
             setSelectedTemaName(temaName);
-            setCurrentScreen('subtema-sequences');
+            navigateTo('subthemes');
+          }}
+        />
+      );
+    }
+
+    return (
+      <SubThemeManagementScreen
+        onBack={goBack}
+        onHome={goHome}
+        initialAreaId={selectedAreaId}
+        initialTemaId={selectedTemaId}
+        onManageSequences={(nextAreaId, nextAreaName, nextTemaId, nextTemaName) => {
+          setSelectedAreaId(nextAreaId);
+          setSelectedAreaName(nextAreaName);
+          setSelectedTemaId(nextTemaId);
+          setSelectedTemaName(nextTemaName);
+          navigateTo('subtema-sequences');
+        }}
+      />
+    );
+  }
+
+  if (currentScreen === 'areas') {
+    return <AreasManagementScreen 
+      onBack={goBack}
+      onHome={goHome}
+      onSelectArea={(areaId, areaName) => {
+        setSelectedAreaId(areaId);
+        setSelectedAreaName(areaName);
+        navigateTo('temas');
+      }}
+    />;
+  }
+
+  if (currentScreen === 'temas') {
+    if (!selectedAreaId) {
+      return (
+        <AreasManagementScreen
+          onBack={goBack}
+          onHome={goHome}
+          onSelectArea={(areaId, areaName) => {
+            setSelectedAreaId(areaId);
+            setSelectedAreaName(areaName);
+            navigateTo('temas');
+          }}
+        />
+      );
+    }
+
+    return <TemasManagementScreen 
+      areaId={selectedAreaId!}
+      areaName={selectedAreaName}
+      onBack={goBack}
+      onHome={goHome}
+      onSelectTema={(temaId, temaName) => {
+        setSelectedTemaId(temaId);
+        setSelectedTemaName(temaName);
+        navigateTo('subthemes');
+      }}
+    />;
+  }
+
+  if (currentScreen === 'subtema-sequences') {
+    if (!selectedAreaId) {
+      return (
+        <AreasManagementScreen
+          onBack={goBack}
+          onHome={goHome}
+          onSelectArea={(areaId, areaName) => {
+            setSelectedAreaId(areaId);
+            setSelectedAreaName(areaName);
+            navigateTo('temas');
+          }}
+        />
+      );
+    }
+
+    if (!selectedTemaId) {
+      return (
+        <TemasManagementScreen
+          areaId={selectedAreaId}
+          areaName={selectedAreaName}
+          onBack={goBack}
+          onHome={goHome}
+          onSelectTema={(temaId, temaName) => {
+            setSelectedTemaId(temaId);
+            setSelectedTemaName(temaName);
+            navigateTo('subthemes');
           }}
         />
       );
     }
 
     return <SubtemaSequenceManagementScreen 
-      onBack={() => {
-        // Volver a temas (jerarquía: Subtema → Tema)
-        setCurrentScreen('temas');
-      }}
+      onBack={goBack}
+      onHome={goHome}
       onSelectSubtema={(subtemaId, temaId, subtemaNombre) => {
         setSelectedSubtemaId(subtemaId);
         setSelectedSubtemaNombre(subtemaNombre);
-        setCurrentScreen('contents');
+        navigateTo('contents');
       }}
       areaId={selectedAreaId || undefined}
       areaName={selectedAreaName}
@@ -248,7 +319,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'miniproyectos') {
     return (
       <MiniproyectoManagementScreen
-        onBack={() => setCurrentScreen('dashboard')}
+        onBack={goBack}
       />
     );
   }
@@ -256,7 +327,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'ejercicios') {
     return (
       <ExerciseManagementScreen
-        onBack={() => setCurrentScreen('dashboard')}
+        onBack={goBack}
       />
     );
   }
@@ -264,7 +335,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'chatbot') {
     return (
       <ChatbotManagementScreen
-        onBack={() => setCurrentScreen('dashboard')}
+        onBack={goBack}
       />
     );
   }
@@ -272,7 +343,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'docentes') {
     return (
       <DocenteManagementScreen
-        onBack={() => setCurrentScreen('dashboard')}
+        onBack={goBack}
       />
     );
   }
@@ -280,7 +351,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'administradores') {
     return (
       <AdminManagementScreen
-        onBack={() => setCurrentScreen('dashboard')}
+        onBack={goBack}
       />
     );
   }
@@ -292,7 +363,11 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         onBack={() => {
           setSelectedSubtemaId(null);
           setSelectedSubtemaNombre('');
-          setCurrentScreen('subtema-sequences');
+          goBack();
+        }}
+        onHome={goHome}
+        onGoToContentManagement={() => {
+          navigateTo('content-management');
         }}
         subtemaId={selectedSubtemaId}
         temaId={selectedTemaId}
@@ -302,14 +377,18 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         subtemaNombre={selectedSubtemaNombre}
       />;
     }
-    // Si no, mostrar ContentManagementScreen (para otros usos)
-    return <ContentManagementScreen onBack={() => setCurrentScreen('dashboard')} />;
+    // Fallback: si no hay subtema seleccionado, ir a gestión de contenidos
+    return <ContentManagementScreen onBack={goBack} onHome={goHome} />;
+  }
+
+  if (currentScreen === 'content-management') {
+    return <ContentManagementScreen onBack={goBack} onHome={goHome} />;
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
+    <div className="app-shell">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -342,7 +421,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="app-main">
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => {

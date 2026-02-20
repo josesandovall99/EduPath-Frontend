@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, X } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
 interface Area {
   id: number;
   nombre: string;
+  descripcion?: string;
 }
 
 interface AreasManagementScreenProps {
   onBack: () => void;
+  onHome?: () => void;
   onSelectArea: (areaId: number, areaName: string) => void;
 }
 
-export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementScreenProps) {
+export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +22,7 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [editingAreaId, setEditingAreaId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: ''
@@ -61,7 +64,19 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
   const handleOpenCreate = () => {
     setFormError(null);
     setSuccessMessage(null);
+    setEditingAreaId(null);
     setFormData({ nombre: '', descripcion: '' });
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (area: Area) => {
+    setFormError(null);
+    setSuccessMessage(null);
+    setEditingAreaId(area.id);
+    setFormData({
+      nombre: area.nombre,
+      descripcion: area.descripcion || ''
+    });
     setShowModal(true);
   };
 
@@ -71,7 +86,7 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
     setFormError(null);
   };
 
-  const handleCreateArea = async () => {
+  const handleSaveArea = async () => {
     if (!formData.nombre.trim()) {
       setFormError('El nombre es obligatorio.');
       return;
@@ -81,8 +96,13 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
     setFormError(null);
 
     try {
-      const response = await fetch('http://localhost:4000/areas', {
-        method: 'POST',
+      const isEditMode = editingAreaId !== null;
+      const endpoint = isEditMode
+        ? `http://localhost:4000/areas/${editingAreaId}`
+        : 'http://localhost:4000/areas';
+
+      const response = await fetch(endpoint, {
+        method: isEditMode ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
@@ -95,30 +115,43 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.message || 'Error al crear el area');
+        throw new Error(errorData?.message || (isEditMode ? 'Error al actualizar el area' : 'Error al crear el area'));
       }
 
-      const createdArea = await response.json();
-      setAreas((prev) => [createdArea, ...prev]);
+      const savedArea = await response.json();
+
+      if (isEditMode) {
+        setAreas((prev) => prev.map((area) => (area.id === savedArea.id ? savedArea : area)));
+        setSuccessMessage('Area actualizada correctamente.');
+      } else {
+        setAreas((prev) => [savedArea, ...prev]);
+        setSuccessMessage('Area creada correctamente.');
+      }
+
       setShowModal(false);
-      setSuccessMessage('Area creada correctamente.');
+      setEditingAreaId(null);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Error al crear el area');
+      setFormError(err instanceof Error ? err.message : (editingAreaId !== null ? 'Error al actualizar el area' : 'Error al crear el area'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
+    <div className="app-shell">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+              <button
+                type="button"
+                onClick={onHome}
+                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                title="Ir al panel principal"
+              >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
+              </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Áreas - Subtemas - Contenidos</h1>
                 <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
@@ -129,18 +162,18 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="app-main">
         {/* Back Button */}
         <button
           onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
+          className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
         </button>
 
         {/* Informational Message */}
-        <div className="mb-8 p-6 bg-[#4A90E2] text-white rounded-xl shadow-md">
+        <div className="app-info-banner mb-8 p-6">
           <h2 className="text-lg font-bold mb-2">Gestión de Contenido Educativo</h2>
           <p className="text-sm opacity-95">
             Selecciona un área para gestionar sus subtemas y contenidos. Desde aquí podrás organizar la estructura completa 
@@ -155,8 +188,7 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
           </div>
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white shadow-md hover:shadow-lg transition-all"
-            style={{ backgroundColor: '#4A90E2' }}
+            className="app-btn app-primary-btn px-5 py-2.5"
           >
             <Plus className="w-4 h-4" />
             <span>Nueva area</span>
@@ -204,9 +236,17 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
               {areas.map((area, index) => {
                 const gradient = getColorForArea(index);
                 return (
-                  <button
+                  <div
                     key={area.id}
                     onClick={() => onSelectArea(area.id, area.nombre)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onSelectArea(area.id, area.nombre);
+                      }
+                    }}
                     className={`bg-gradient-to-br ${gradient} rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-8 text-left group hover:scale-[1.05] cursor-pointer`}
                   >
                     <div className="flex items-start justify-between">
@@ -218,52 +258,32 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
                           Click para gestionar subtemas y contenidos
                         </p>
                       </div>
-                      <div className="text-white text-opacity-80 group-hover:text-opacity-100 transition-opacity mt-2">
-                        <svg
-                          className="w-6 h-6"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenEdit(area);
+                        }}
+                        className="app-btn mt-1 bg-white/20 px-3 py-1.5 text-white hover:bg-white/30"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        <span className="text-sm font-medium">Editar</span>
+                      </button>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
           </>
         )}
 
-        {/* Action Buttons */}
-        <div className="mt-8 flex gap-4 justify-end">
-          <button
-            onClick={handleOpenCreate}
-            className="px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all"
-            style={{ backgroundColor: '#4A90E2' }}
-          >
-            Crear area
-          </button>
-          <button
-            onClick={onBack}
-            className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
-          >
-            Volver
-          </button>
-        </div>
       </main>
 
       {showModal && (
         <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-md w-full max-h-[85vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-              <h3 className="text-lg font-semibold text-[#3A4A5B]">Crear Nueva Area</h3>
+              <h3 className="text-lg font-semibold text-[#3A4A5B]">{editingAreaId !== null ? 'Editar Area' : 'Crear Nueva Area'}</h3>
               <button
                 onClick={handleCloseModal}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -312,18 +332,17 @@ export function AreasManagementScreen({ onBack, onSelectArea }: AreasManagementS
                 Cancelar
               </button>
               <button
-                onClick={handleCreateArea}
+                onClick={handleSaveArea}
                 disabled={submitting || !formData.nombre.trim()}
-                className="px-4 py-2.5 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                style={{ backgroundColor: '#4A90E2' }}
+                className="app-btn app-primary-btn px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Guardando...</span>
+                    <span>{editingAreaId !== null ? 'Actualizando...' : 'Guardando...'}</span>
                   </>
                 ) : (
-                  <span>Crear area</span>
+                  <span>{editingAreaId !== null ? 'Actualizar area' : 'Crear area'}</span>
                 )}
               </button>
             </div>

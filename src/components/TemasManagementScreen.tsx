@@ -15,10 +15,11 @@ interface TemasManagementScreenProps {
   areaId: number;
   areaName: string;
   onBack: () => void;
+  onHome?: () => void;
   onSelectTema: (temaId: number, temaName: string) => void;
 }
 
-export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }: TemasManagementScreenProps) {
+export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSelectTema }: TemasManagementScreenProps) {
   const [temas, setTemas] = useState<Tema[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,35 +96,41 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
+    <div className="app-shell">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+              <button
+                type="button"
+                onClick={onHome}
+                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                title="Ir al panel principal"
+              >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
+              </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Seleccionar Tema</h1>
                 <p className="text-gray-500 text-sm">Área: {areaName}</p>
               </div>
             </div>
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-300"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Volver</span>
-            </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="app-main">
+        <button
+          onClick={onBack}
+          className="app-back-button mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Volver</span>
+        </button>
+
         {/* Informational Message */}
-        <div className="mb-8 p-6 bg-[#4A90E2] text-white rounded-xl shadow-md">
+        <div className="app-info-banner mb-8 p-6">
           <h2 className="text-lg font-bold mb-2">Selecciona un Tema</h2>
           <p className="text-sm opacity-95">
             Elige un tema para gestionar sus subtemas y contenidos asociados. 
@@ -134,8 +141,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }
         <div className="mb-6 flex justify-end">
           <button
             onClick={() => handleOpenThemeManager()}
-            className="px-5 py-2.5 rounded-lg text-white shadow-md hover:shadow-lg transition-all"
-            style={{ backgroundColor: '#4A90E2' }}
+            className="app-btn app-primary-btn px-5 py-2.5"
           >
             Gestionar Temas
           </button>
@@ -170,12 +176,6 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }
             <p className="text-sm text-gray-500 mb-4">
               📚 Los temas son las categorías principales de aprendizaje dentro de cada área.
             </p>
-            <button
-              onClick={onBack}
-              className="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition-colors"
-            >
-              Volver a Áreas
-            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -211,7 +211,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onSelectTema }
                         event.stopPropagation();
                         handleOpenThemeManager(tema);
                       }}
-                      className="flex-shrink-0 px-3 py-2 rounded-full bg-white text-[#3A4A5B] shadow-lg hover:shadow-xl hover:scale-[1.03] hover:bg-white/90 transition-all flex items-center gap-2 cursor-pointer"
+                      className="app-btn flex-shrink-0 px-3 py-2 rounded-lg bg-white/20 text-white hover:bg-white/30 cursor-pointer"
                       title="Editar tema"
                       aria-label="Editar tema"
                     >

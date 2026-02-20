@@ -5,6 +5,10 @@ import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png'
 
 interface SubThemeManagementScreenProps {
   onBack: () => void;
+  onHome?: () => void;
+  initialAreaId?: number;
+  initialTemaId?: number;
+  onManageSequences?: (areaId: number, areaName: string, temaId: number, temaName: string) => void;
 }
 
 interface Area {
@@ -35,7 +39,13 @@ const subjectColors: Record<string, { primary: string; light: string; icon: any 
   'alcance': { primary: '#F5A97F', light: '#FFF3E0', icon: BarChart3 }
 };
 
-export function SubThemeManagementScreen({ onBack }: SubThemeManagementScreenProps) {
+export function SubThemeManagementScreen({
+  onBack,
+  onHome,
+  initialAreaId,
+  initialTemaId,
+  onManageSequences
+}: SubThemeManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
   const [subtemas, setSubtemas] = useState<Subtema[]>([]);
@@ -79,9 +89,10 @@ export function SubThemeManagementScreen({ onBack }: SubThemeManagementScreenPro
         
         setAreas(data);
         
-        // Establecer la primera área como seleccionada por defecto
+        // Establecer área inicial (si viene del flujo Área -> Tema) o la primera disponible
         if (data.length > 0) {
-          setSelectedArea(data[0].id);
+          const initialArea = initialAreaId ? data.find((area) => Number(area.id) === Number(initialAreaId)) : null;
+          setSelectedArea(initialArea ? initialArea.id : data[0].id);
         }
       } catch (err) {
         let errorMessage = 'Error desconocido al cargar las áreas';
@@ -141,9 +152,12 @@ export function SubThemeManagementScreen({ onBack }: SubThemeManagementScreenPro
         const temasOrdenados = temasPorArea.sort((a, b) => (a.orden || 0) - (b.orden || 0));
         setTemas(temasOrdenados);
         
-        // Seleccionar el primer tema por defecto
+        // Seleccionar tema inicial (si aplica) o el primero disponible
         if (temasOrdenados.length > 0) {
-          setSelectedTema(temasOrdenados[0].id);
+          const initialTema = initialTemaId
+            ? temasOrdenados.find((tema) => Number(tema.id) === Number(initialTemaId))
+            : null;
+          setSelectedTema(initialTema ? initialTema.id : temasOrdenados[0].id);
         }
       } catch (err) {
         let errorMessage = 'Error desconocido al cargar los temas';
@@ -340,11 +354,20 @@ export function SubThemeManagementScreen({ onBack }: SubThemeManagementScreenPro
   const currentArea = areas.find(a => a.id === selectedArea);
   const currentTemaObj = temas.find(t => t.id === selectedTema);
   const AreaIcon = currentColor.icon;
+  const hasMinimumSubtemasForSequence = subtemas.length >= 2;
+  const canManageSequences = Boolean(
+    onManageSequences &&
+    selectedArea &&
+    selectedTema &&
+    currentArea &&
+    currentTemaObj &&
+    hasMinimumSubtemasForSequence
+  );
 
   // Mostrar estado de carga
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
+      <div className="app-shell flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Cargando áreas...</p>
@@ -356,7 +379,7 @@ export function SubThemeManagementScreen({ onBack }: SubThemeManagementScreenPro
   // Mostrar error si ocurre
   if (error) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
+      <div className="app-shell flex items-center justify-center">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
           <p className="text-red-600 font-semibold mb-2">Error al cargar las áreas</p>
           <p className="text-red-500 text-sm">{error}</p>
@@ -366,15 +389,20 @@ export function SubThemeManagementScreen({ onBack }: SubThemeManagementScreenPro
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
+    <div className="app-shell">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+              <button
+                type="button"
+                onClick={onHome}
+                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                title="Ir al panel principal"
+              >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
+              </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Subtemas</h1>
                 <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
@@ -385,11 +413,11 @@ export function SubThemeManagementScreen({ onBack }: SubThemeManagementScreenPro
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="app-main">
         {/* Back Button */}
         <button 
           onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
+          className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
@@ -525,16 +553,39 @@ export function SubThemeManagementScreen({ onBack }: SubThemeManagementScreenPro
             )}
 
             {/* Botón para agregar nuevo subtema */}
-            <div className="mb-6">
+            <div className="mb-6 flex flex-wrap items-center gap-3">
               <button
                 onClick={handleCreateSubtema}
-                className="flex items-center gap-2 px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all font-medium"
-                style={{ backgroundColor: currentColor.primary }}
+                className="app-btn app-primary-btn px-6 py-3"
               >
                 <Plus className="w-5 h-5" />
                 <span>Agregar Nuevo Subtema</span>
               </button>
+
+              <button
+                onClick={() => {
+                  if (!canManageSequences || !onManageSequences || !currentArea || !currentTemaObj) {
+                    return;
+                  }
+                  onManageSequences(
+                    Number(selectedArea),
+                    currentArea.nombre,
+                    Number(selectedTema),
+                    currentTemaObj.nombre
+                  );
+                }}
+                disabled={!canManageSequences}
+                className="app-btn app-btn-secondary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>Gestionar Secuencia de Subtemas</span>
+              </button>
             </div>
+
+            {!hasMinimumSubtemasForSequence && selectedTema && (
+              <p className="mb-6 text-sm text-gray-600">
+                Se habilita con mínimo 2 subtemas creados.
+              </p>
+            )}
 
             {/* Lista de Subtemas */}
             {subtemasLoading ? (
@@ -675,15 +726,14 @@ export function SubThemeManagementScreen({ onBack }: SubThemeManagementScreenPro
               <button
                 onClick={handleCloseModal}
                 disabled={submitting}
-                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="app-btn app-btn-secondary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSaveSubtema}
                 disabled={submitting || !formData.nombre.trim()}
-                className="px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                style={{ backgroundColor: currentColor.primary }}
+                className="app-btn app-primary-btn px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <>
