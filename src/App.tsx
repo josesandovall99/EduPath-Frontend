@@ -147,6 +147,9 @@ export default function App() {
   // Función que se llama cuando el login es exitoso
   // 2. Función manejadora del Login Exitoso
   const handleLoginSuccess = (apiResponse: any) => {
+    setDocenteSession(null);
+    localStorage.removeItem('adminId');
+
     // Guardamos los datos importantes que vienen del backend
     const session = {
       id: apiResponse.estudiante.id,
@@ -185,6 +188,13 @@ export default function App() {
     if (!docente) {
       return;
     }
+
+    setUserSession(null);
+    localStorage.removeItem('estudianteId');
+    localStorage.removeItem('codigoEstudiante');
+    localStorage.removeItem('nombreEstudiante');
+    localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem('adminId');
 
     const session: DocenteSession = {
       id: docente.id,

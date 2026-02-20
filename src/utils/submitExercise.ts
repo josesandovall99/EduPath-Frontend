@@ -15,7 +15,20 @@ export async function submitExercise(
   estudianteId?: string | number
 ): Promise<SubmitResult> {
   try {
-    const body = { estudiante_id: estudianteId, respuesta };
+    const resolvedEstudianteId =
+      estudianteId ??
+      localStorage.getItem('estudianteId') ??
+      localStorage.getItem('userId');
+
+    if (!resolvedEstudianteId) {
+      return {
+        status: 0,
+        data: null,
+        message: 'No se encontró estudiante_id en sesión. Inicia sesión como estudiante.'
+      };
+    }
+
+    const body = { estudiante_id: resolvedEstudianteId, respuesta };
     console.log('📤 Enviando ejercicio:', ejercicioId, 'Body:', JSON.stringify(body, null, 2));
     const res = await fetch(`http://localhost:4000/ejercicios/${ejercicioId}/enviar`, {
       method: 'POST',

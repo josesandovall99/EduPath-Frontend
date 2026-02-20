@@ -20,9 +20,23 @@ export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, on
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const clearLocalAuthState = () => {
+    localStorage.removeItem('estudianteId');
+    localStorage.removeItem('codigoEstudiante');
+    localStorage.removeItem('nombreEstudiante');
+    localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem('adminId');
+    localStorage.removeItem('personaId');
+    localStorage.removeItem('authToken');
+    applyAuthHeaders();
+  };
+
 const handleStudentLogin = async () => {
     setError('');
     setLoading(true);
+
+    // Evitar mezclar token/persona de una sesión anterior con otro rol
+    clearLocalAuthState();
 
     const parseResponse = async (res: Response) => {
       const text = await res.text();

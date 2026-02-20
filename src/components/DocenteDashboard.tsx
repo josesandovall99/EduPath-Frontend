@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronRight, ClipboardList, LogOut, MapPinned } from 'lucide-react';
+import { ChevronRight, ClipboardList, GitBranch, LogOut, MapPinned } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ExerciseManagementScreen } from './ExerciseManagementScreen';
 import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
@@ -79,7 +79,7 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <button
               type="button"
               onClick={onManageArea}
@@ -115,6 +115,25 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
               </h3>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Crear y editar ejercicios asociados a contenidos específicos.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={onManageArea}
+              className="w-full bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-8 text-left group hover:transform hover:scale-[1.02] border border-gray-100"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-4 rounded-xl bg-gradient-to-br from-[#8B5CF6] to-[#A78BFA] shadow-md">
+                  <GitBranch className="w-8 h-8 text-white" />
+                </div>
+                <ChevronRight className="w-6 h-6 text-gray-400 group-hover:text-[#8B5CF6] transition-colors" />
+              </div>
+              <h3 className="text-[#3A4A5B] text-xl mb-2 group-hover:text-[#8B5CF6] transition-colors">
+                Gestión de Subtemas
+              </h3>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Accede al módulo para administrar subtemas y sus contenidos por tema.
               </p>
             </button>
 

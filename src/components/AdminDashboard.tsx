@@ -46,6 +46,49 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       onClick: () => setCurrentScreen('areas')
     },
     {
+      id: 'temas',
+      title: 'Gestión de Temas',
+      description: 'Administra los temas por área académica y organiza la estructura principal de aprendizaje.',
+      icon: FileEdit,
+      color: '#7ED6A7',
+      gradient: 'from-[#7ED6A7] to-[#86E0AF]',
+      onClick: () => {
+        if (selectedAreaId) {
+          setCurrentScreen('temas');
+          return;
+        }
+        setCurrentScreen('areas');
+      }
+    },
+    {
+      id: 'subtemas',
+      title: 'Gestión de Subtemas',
+      description: 'Gestiona subtemas y su secuencia dentro de cada tema para estructurar el recorrido formativo.',
+      icon: GitBranch,
+      color: '#8B5CF6',
+      gradient: 'from-[#8B5CF6] to-[#A78BFA]',
+      onClick: () => {
+        if (selectedTemaId) {
+          setCurrentScreen('subtema-sequences');
+          return;
+        }
+        if (selectedAreaId) {
+          setCurrentScreen('temas');
+          return;
+        }
+        setCurrentScreen('areas');
+      }
+    },
+    {
+      id: 'contents',
+      title: 'Gestión de Contenidos',
+      description: 'Crea, edita y administra contenidos educativos asociados a subtemas y secuencias.',
+      icon: TrendingUp,
+      color: '#A78BFA',
+      gradient: 'from-[#A78BFA] to-[#C4B5FD]',
+      onClick: () => setCurrentScreen('contents')
+    },
+    {
       id: 'ejercicios',
       title: 'Gestión de Ejercicios',
       description: 'Crear y editar ejercicios asociados a contenidos específicos.',
@@ -53,15 +96,6 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       color: '#0EA5E9',
       gradient: 'from-[#0EA5E9] to-[#38BDF8]',
       onClick: () => setCurrentScreen('ejercicios')
-    },
-    {
-      id: 'subtema-sequences',
-      title: 'Gestión de Secuencias de Subtemas',
-      description: 'Organiza el orden de los subtemas dentro de cada tema. Controla la secuencia de enseñanza por materia.',
-      icon: GitBranch,
-      color: '#8B5CF6',
-      gradient: 'from-[#8B5CF6] to-[#A78BFA]',
-      onClick: () => setCurrentScreen('areas')
     },
     {
       id: 'miniproyectos',
@@ -136,6 +170,19 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   }
 
   if (currentScreen === 'temas') {
+    if (!selectedAreaId) {
+      return (
+        <AreasManagementScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          onSelectArea={(areaId, areaName) => {
+            setSelectedAreaId(areaId);
+            setSelectedAreaName(areaName);
+            setCurrentScreen('temas');
+          }}
+        />
+      );
+    }
+
     return <TemasManagementScreen 
       areaId={selectedAreaId!}
       areaName={selectedAreaName}
@@ -153,6 +200,34 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   }
 
   if (currentScreen === 'subtema-sequences') {
+    if (!selectedAreaId) {
+      return (
+        <AreasManagementScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          onSelectArea={(areaId, areaName) => {
+            setSelectedAreaId(areaId);
+            setSelectedAreaName(areaName);
+            setCurrentScreen('temas');
+          }}
+        />
+      );
+    }
+
+    if (!selectedTemaId) {
+      return (
+        <TemasManagementScreen
+          areaId={selectedAreaId}
+          areaName={selectedAreaName}
+          onBack={() => setCurrentScreen('areas')}
+          onSelectTema={(temaId, temaName) => {
+            setSelectedTemaId(temaId);
+            setSelectedTemaName(temaName);
+            setCurrentScreen('subtema-sequences');
+          }}
+        />
+      );
+    }
+
     return <SubtemaSequenceManagementScreen 
       onBack={() => {
         // Volver a temas (jerarquía: Subtema → Tema)
