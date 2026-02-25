@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Download, FileSpreadsheet, Filter, X, User, Calendar, Activity, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, BarChart3, Award } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet, Filter, X, User, Calendar, Activity, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, BarChart3, Award, AlertTriangle } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
@@ -49,8 +49,61 @@ interface Filters {
   activityType: string;
 }
 
+interface FailuresTotals {
+  intentos: number;
+  fallos: number;
+  aciertos: number;
+}
+
+interface FailuresByType {
+  ejercicios: FailuresTotals;
+  miniproyectos: FailuresTotals;
+}
+
+interface FailuresByArea {
+  area_id: number | null;
+  area_name: string;
+  intentos: number;
+  fallos: number;
+  aciertos: number;
+  ejercicios: number;
+  miniproyectos: number;
+}
+
+interface FailuresByStudent {
+  estudiante_id: number;
+  nombre: string;
+  email: string;
+  intentos: number;
+  fallos: number;
+  aciertos: number;
+  ejercicios: number;
+  miniproyectos: number;
+}
+
+interface FailuresItem {
+  tipo: 'ejercicio' | 'miniproyecto';
+  actividad_id: number;
+  estudiante_id: number;
+  titulo: string;
+  area_id: number | null;
+  area_name: string;
+  intentos: number;
+  fallos: number;
+  aciertos: number;
+  aprobado: boolean;
+}
+
+interface FailuresReportData {
+  totals: FailuresTotals;
+  byType: FailuresByType;
+  byArea: FailuresByArea[];
+  byStudent: FailuresByStudent[];
+  items: FailuresItem[];
+}
+
 export function ReportsScreen({ onBack }: ReportsScreenProps) {
-  const [activeTab, setActiveTab] = useState<'student' | 'date' | 'activity'>('student');
+  const [activeTab, setActiveTab] = useState<'student' | 'date' | 'activity' | 'failures'>('student');
   const [showFilters, setShowFilters] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
@@ -82,6 +135,8 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   // Estado para estudiantes (se carga desde backend). Si falla, usamos fallbackMockStudents
   const [studentsData, setStudentsData] = useState<StudentProgress[]>([]);
   const [loadingStudents, setLoadingStudents] = useState<boolean>(true);
+  const [failuresData, setFailuresData] = useState<FailuresReportData | null>(null);
+  const [failuresLoading, setFailuresLoading] = useState(false);
 
   // Fallback con el mock original reducido (solo estructura necesaria)
   const fallbackMockStudents: StudentProgress[] = [
@@ -254,6 +309,32 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     loadStudentsAndProgress();
   }, []);
 
+  useEffect(() => {
+    const loadFailuresReport = async () => {
+      if (!hasAppliedFilters || activeTab !== 'failures') return;
+
+      try {
+        setFailuresLoading(true);
+        const params = new URLSearchParams();
+        if (appliedFilters.student !== 'all') {
+          params.append('estudiante_id', appliedFilters.student);
+        } else {
+          params.append('estudiante_id', 'all');
+        }
+
+        const response = await api.get(`/progresos/reporte-fallos?${params.toString()}`);
+        setFailuresData(response.data || null);
+      } catch (error) {
+        console.error('Error cargando reporte de fallos:', error);
+        setFailuresData(null);
+      } finally {
+        setFailuresLoading(false);
+      }
+    };
+
+    loadFailuresReport();
+  }, [activeTab, hasAppliedFilters, appliedFilters.student]);
+
   const clearFilters = () => {
     setStudentSearch('');
     setFilters({
@@ -296,7 +377,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     alert(`Exportando informe en formato ${format.toUpperCase()}...`);
   };
 
-  const downloadPdf = async (type: 'student' | 'date' | 'activity') => {
+  const downloadPdf = async (type: 'student' | 'date' | 'activity' | 'failures') => {
     if (!hasAppliedFilters) {
       alert('Aplica los filtros antes de descargar el informe.');
       return;
@@ -306,6 +387,9 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
       setPdfLoading(true);
       const params = new URLSearchParams({ type });
       if (type === 'student' && appliedFilters.student !== 'all') {
+        params.append('estudiante_id', appliedFilters.student);
+      }
+      if (type === 'failures' && appliedFilters.student !== 'all') {
         params.append('estudiante_id', appliedFilters.student);
       }
       if (appliedFilters.semester !== 'all') {
@@ -523,6 +607,38 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   const activityData = getActivityData(activityTabStudents);
   const subjectProgressData = getSubjectProgressData(activityTabStudents);
 
+  const failuresTotals = failuresData?.totals || { intentos: 0, fallos: 0, aciertos: 0 };
+  const failuresRate = failuresTotals.intentos > 0
+    ? Math.round((failuresTotals.fallos / failuresTotals.intentos) * 100)
+    : 0;
+  const successRate = failuresTotals.intentos > 0
+    ? Math.round((failuresTotals.aciertos / failuresTotals.intentos) * 100)
+    : 0;
+  const failuresByType = failuresData?.byType || {
+    ejercicios: { intentos: 0, fallos: 0, aciertos: 0 },
+    miniproyectos: { intentos: 0, fallos: 0, aciertos: 0 }
+  };
+  const failuresByArea = failuresData?.byArea || [];
+  const failuresByStudent = failuresData?.byStudent || [];
+  const failuresItems = failuresData?.items || [];
+  const failuresItemsSorted = [...failuresItems].sort((a, b) => {
+    if (b.fallos !== a.fallos) return b.fallos - a.fallos;
+    return b.intentos - a.intentos;
+  });
+  const failuresItemsDisplay = appliedFilters.student === 'all'
+    ? failuresItemsSorted.slice(0, 20)
+    : failuresItemsSorted;
+
+  const failuresAreaChartData = failuresByArea.map((area) => ({
+    name: area.area_name || 'Sin area',
+    fallos: area.fallos
+  }));
+
+  const failuresStudentsSorted = [...failuresByStudent].sort((a, b) => b.fallos - a.fallos);
+  const failuresStudentsDisplay = appliedFilters.student === 'all'
+    ? failuresStudentsSorted.slice(0, 20)
+    : failuresStudentsSorted;
+
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
       {/* Header */}
@@ -630,6 +746,17 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             >
               <Activity className="w-5 h-5" />
               <span>Desempeño por Actividad</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('failures')}
+              className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-all ${
+                activeTab === 'failures'
+                  ? 'bg-[#DC2626] text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <AlertTriangle className="w-5 h-5" />
+              <span>Fallos por Actividad</span>
             </button>
           </div>
         </div>
@@ -759,6 +886,14 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                     <option value="exercise">Ejercicios</option>
                     <option value="miniproject">Miniproyectos</option>
                   </select>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'failures' && (
+              <div className="grid grid-cols-1 gap-4 mb-4">
+                <div className="bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-lg p-3 text-sm text-[#3A4A5B]">
+                  Este informe usa el filtro de estudiante. Si seleccionas "Todos", se mostrara el top 20 de actividades con mas fallos.
                 </div>
               </div>
             )}
@@ -1447,6 +1582,291 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {hasAppliedFilters && activeTab === 'failures' && (
+          <div className="space-y-6">
+            {failuresLoading && (
+              <div className="bg-white rounded-xl shadow-md p-6">
+                <div className="flex items-center gap-3">
+                  <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm text-gray-600">Cargando reporte de fallos...</span>
+                </div>
+              </div>
+            )}
+
+            {!failuresLoading && !failuresData && (
+              <div className="bg-white rounded-xl shadow-md p-6 text-center text-gray-500">
+                No hay datos disponibles para el reporte de fallos.
+              </div>
+            )}
+
+            {!failuresLoading && failuresData && (
+              <>
+                <div className="grid grid-cols-4 gap-6">
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 bg-[#FEE2E2] rounded-lg flex items-center justify-center">
+                        <AlertTriangle className="w-6 h-6 text-[#B91C1C]" />
+                      </div>
+                      <div>
+                        <div className="text-2xl text-[#3A4A5B]">{failuresTotals.intentos}</div>
+                        <div className="text-sm text-gray-600">Intentos Totales</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">Ejercicios y miniproyectos</div>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 bg-[#FECACA] rounded-lg flex items-center justify-center">
+                        <CheckCircle2 className="w-6 h-6 text-[#991B1B]" />
+                      </div>
+                      <div>
+                        <div className="text-2xl text-[#3A4A5B]">{failuresTotals.aciertos}</div>
+                        <div className="text-sm text-gray-600">Aciertos Totales</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">Intentos aprobados</div>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 bg-[#FCA5A5] rounded-lg flex items-center justify-center">
+                        <XCircle className="w-6 h-6 text-[#991B1B]" />
+                      </div>
+                      <div>
+                        <div className="text-2xl text-[#3A4A5B]">{failuresTotals.fallos}</div>
+                        <div className="text-sm text-gray-600">Fallos Totales</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">Intentos no aprobados</div>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 bg-[#FEE2E2] rounded-lg flex items-center justify-center">
+                        <TrendingUp className="w-6 h-6 text-[#B91C1C]" />
+                      </div>
+                      <div>
+                        <div className="text-2xl text-[#3A4A5B]">{successRate}%</div>
+                        <div className="text-sm text-gray-600">Tasa de Acierto</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">Aciertos / Intentos</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-[#B91C1C]" />
+                      Aciertos vs Fallos
+                    </h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Aciertos', value: failuresTotals.aciertos },
+                            { name: 'Fallos', value: failuresTotals.fallos }
+                          ]}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={110}
+                          label={(entry) => `${entry.value}`}
+                        >
+                          <Cell fill="#FCA5A5" />
+                          <Cell fill="#B91C1C" />
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-[#DC2626]" />
+                      Fallos por Tipo
+                    </h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Ejercicios', value: failuresByType.ejercicios.fallos },
+                            { name: 'Miniproyectos', value: failuresByType.miniproyectos.fallos }
+                          ]}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={110}
+                          label={(entry) => `${entry.value}`}
+                        >
+                          <Cell fill="#DC2626" />
+                          <Cell fill="#F87171" />
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-[#DC2626]" />
+                      Fallos por Área
+                    </h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={failuresAreaChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip />
+                        <Bar dataKey="fallos" fill="#DC2626" radius={[8, 8, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                  <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-[#B91C1C] to-[#F87171]">
+                    <h3 className="text-[#1F2937] text-lg">Resumen de Fallos por Área</h3>
+                    <p className="text-[#374151] text-sm mt-1">Intentos y fallos acumulados</p>
+                  </div>
+                  <div className="p-6 overflow-x-auto">
+                    <table className="w-full text-[#111827]">
+                      <thead className="bg-gray-50 border-b border-gray-200 text-[#111827]">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Área</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Intentos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aciertos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Fallos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Ejercicios</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Miniproyectos</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {failuresByArea.length === 0 && (
+                          <tr>
+                            <td className="px-4 py-3 text-sm text-gray-500" colSpan={6}>Sin datos</td>
+                          </tr>
+                        )}
+                        {failuresByArea.map((area) => (
+                          <tr key={`${area.area_id ?? 'sin-area'}`} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3 text-[#3A4A5B] text-sm">{area.area_name || 'Sin area'}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{area.intentos}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{area.aciertos}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{area.fallos}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{area.ejercicios}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{area.miniproyectos}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                  <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-[#B91C1C] to-[#F87171]">
+                    <h3 className="text-[#1F2937] text-lg">Fallos por Estudiante</h3>
+                    <p className="text-[#374151] text-sm mt-1">
+                      {appliedFilters.student === 'all' ? 'Top 20 estudiantes con mas fallos' : 'Resumen del estudiante'}
+                    </p>
+                  </div>
+                  <div className="p-6 overflow-x-auto">
+                    <table className="w-full text-[#111827]">
+                      <thead className="bg-gray-50 border-b border-gray-200 text-[#111827]">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Correo</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Intentos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aciertos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Fallos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Ejercicios</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Miniproyectos</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {failuresStudentsDisplay.length === 0 && (
+                          <tr>
+                            <td className="px-4 py-3 text-sm text-gray-500" colSpan={7}>Sin datos</td>
+                          </tr>
+                        )}
+                        {failuresStudentsDisplay.map((student) => (
+                          <tr key={student.estudiante_id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3 text-[#3A4A5B] text-sm">{student.nombre || `Estudiante ${student.estudiante_id}`}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{student.email || '-'}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{student.intentos}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{student.aciertos}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{student.fallos}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{student.ejercicios}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{student.miniproyectos}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                  <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-[#B91C1C] to-[#F87171]">
+                    <h3 className="text-[#1F2937] text-lg">Detalle de Fallos por Actividad</h3>
+                    <p className="text-[#374151] text-sm mt-1">
+                      {appliedFilters.student === 'all' ? 'Top 20 de actividades con mas fallos' : 'Actividades del estudiante'}
+                    </p>
+                  </div>
+                  <div className="p-6 overflow-x-auto">
+                    <table className="w-full text-[#111827]">
+                      <thead className="bg-gray-50 border-b border-gray-200 text-[#111827]">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Tipo</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Actividad</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Área</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Intentos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aciertos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Fallos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aprobado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {failuresItemsDisplay.length === 0 && (
+                          <tr>
+                            <td className="px-4 py-3 text-sm text-gray-500" colSpan={7}>Sin datos</td>
+                          </tr>
+                        )}
+                        {failuresItemsDisplay.map((item) => (
+                          <tr key={`${item.tipo}-${item.actividad_id}-${item.estudiante_id}`} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3 text-[#3A4A5B] text-sm">{item.tipo}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{item.titulo}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{item.area_name || 'Sin area'}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{item.intentos}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{item.aciertos}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">{item.fallos}</td>
+                            <td className="px-4 py-3">
+                              {item.aprobado ? (
+                                <span className="inline-flex items-center gap-1 text-[#7ED6A7] text-sm">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  Si
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[#F97316] text-sm">
+                                  <XCircle className="w-4 h-4" />
+                                  No
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </main>

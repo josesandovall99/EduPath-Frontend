@@ -1,5 +1,5 @@
 import { ArrowLeft, CheckCircle2, Clock, FileText, PlayCircle, Edit, Share2, Users, Lock } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
 interface Subject {
@@ -22,6 +22,7 @@ interface Content {
   status: 'completed' | 'in-progress' | 'not-started';
   isMiniproyecto?: boolean;
   actividadId?: number;
+  miniproyectoAprobado?: boolean;
   // Campos opcionales para el sistema de desbloqueo progresivo
   desbloqueado?: boolean;
   completo?: boolean;
@@ -145,8 +146,18 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
   const [currentProgress, setCurrentProgress] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [temasConEstadoProgreso, setTemasConEstadoProgreso] = useState<Map<string, any>>(new Map()); // Estado de desbloqueo opcional
+  const [miniproyectoNotice, setMiniproyectoNotice] = useState<string | null>(null);
+  const noticeTimeoutRef = useRef<number | null>(null);
   const colors = getSubjectColor(subject.id);
   const totalTemas = contentList.length;
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimeoutRef.current) {
+        window.clearTimeout(noticeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Obtener progreso dinámico del estudiante en el área
   const obtenerProgresoArea = async () => {
@@ -320,15 +331,45 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           const minisResponse = await fetch(`${API_BASE_URL}/miniproyectos?area_id=${subject.id}`);
           if (minisResponse.ok) {
             const minis: MiniproyectoApiItem[] = await minisResponse.json();
-            miniproyectosContent = (Array.isArray(minis) ? minis : []).map((mini) => ({
-              id: mini.id.toString(),
-              title: mini.Actividad?.titulo || 'Miniproyecto',
-              type: [11, 13].includes(Number(mini.actividad_id)) ? 'workshop' : 'activity',
-              duration: undefined,
-              status: 'not-started' as const,
-              isMiniproyecto: true,
-              actividadId: Number(mini.actividad_id)
-            }));
+            const minisArray = Array.isArray(minis) ? minis : [];
+            let aprobadosMap = new Map<number, boolean>();
+
+            if (estudianteId && minisArray.length > 0) {
+              const aprobados = await Promise.all(
+                minisArray.map(async (mini) => {
+                  try {
+                    const response = await fetch(
+                      `${API_BASE_URL}/evaluaciones/by?estudiante_id=${estudianteId}&miniproyecto_id=${mini.id}`
+                    );
+                    if (!response.ok) return [mini.id, false] as const;
+                    const data = await response.json();
+                    const evaluaciones = Array.isArray(data) ? data : [];
+                    const aprobado = evaluaciones.some((item) => String(item?.estado || '').toUpperCase() === 'APROBADO');
+                    return [mini.id, aprobado] as const;
+                  } catch (checkError) {
+                    console.warn('⚠️ Error al verificar aprobación del miniproyecto:', checkError);
+                    return [mini.id, false] as const;
+                  }
+                })
+              );
+
+              aprobadosMap = new Map(aprobados);
+            }
+
+            miniproyectosContent = minisArray.map((mini) => {
+              const aprobado = aprobadosMap.get(mini.id) || false;
+              return {
+                id: mini.id.toString(),
+                title: mini.Actividad?.titulo || 'Miniproyecto',
+                type: [11, 13].includes(Number(mini.actividad_id)) ? 'workshop' : 'activity',
+                duration: undefined,
+                status: aprobado ? 'completed' : ('not-started' as const),
+                isMiniproyecto: true,
+                actividadId: Number(mini.actividad_id),
+                miniproyectoAprobado: aprobado,
+                completo: aprobado
+              };
+            });
           } else {
             console.warn('⚠️ No se pudieron cargar miniproyectos del área');
           }
@@ -364,7 +405,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     };
 
     fetchContent();
-  }, [subject.id]);
+  }, [subject.id, estudianteId]);
   
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
@@ -462,6 +503,18 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           </div>
         )}
 
+        {miniproyectoNotice && (
+          <div
+            className="fixed top-24 right-8 z-50 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl shadow-lg"
+            role="alert"
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5" />
+              <span>{miniproyectoNotice}</span>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
           {loading ? (
             <div className="text-center py-8">
@@ -474,7 +527,9 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           ) : (
           contentList.map((content) => {
             const Icon = getTypeIcon(content.type);
-            const isLocked = content.desbloqueado === false;
+            const isLockedByProgress = content.desbloqueado === false;
+            const isApprovedMiniproyecto = Boolean(content.isMiniproyecto && content.miniproyectoAprobado);
+            const isLocked = isLockedByProgress || isApprovedMiniproyecto;
             
             return (
               <button
@@ -485,8 +540,18 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                     : 'hover:shadow-lg'
                 }`}
                 onClick={() => {
-                  if (isLocked) {
+                  if (isLockedByProgress) {
                     alert('Este contenido está bloqueado. Complete el contenido anterior para desbloquearlo.');
+                    return;
+                  }
+                  if (isApprovedMiniproyecto) {
+                    setMiniproyectoNotice('Ya aprobaste este miniproyecto. El acceso está bloqueado.');
+                    if (noticeTimeoutRef.current) {
+                      window.clearTimeout(noticeTimeoutRef.current);
+                    }
+                    noticeTimeoutRef.current = window.setTimeout(() => {
+                      setMiniproyectoNotice(null);
+                    }, 4000);
                     return;
                   }
                   if (content.isMiniproyecto) {
@@ -503,8 +568,10 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                     className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
                     style={{ backgroundColor: `${colors.primary}15` }}
                   >
-                    {isLocked ? (
+                    {isLockedByProgress ? (
                       <Lock className="w-7 h-7 text-gray-400" />
+                    ) : isApprovedMiniproyecto ? (
+                      <CheckCircle2 className="w-7 h-7 text-green-500" />
                     ) : (
                       <Icon className="w-7 h-7" style={{ color: colors.primary }} />
                     )}
@@ -533,6 +600,12 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                         <>
                           <span>•</span>
                           <span>{content.duration}</span>
+                        </>
+                      )}
+                      {isApprovedMiniproyecto && (
+                        <>
+                          <span>•</span>
+                          <span className="text-green-600">Aprobado</span>
                         </>
                       )}
                     </div>
