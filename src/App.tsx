@@ -325,7 +325,7 @@ export default function App() {
       setSelectedTemaId(temaId);
     }
 
-    const isMiniproyectoAI = Boolean(content.isMiniproyecto && (content.actividadId === 11 || content.actividadId === 13));
+    const isMiniproyectoAI = Boolean(content.isMiniproyecto && (content.actividadId === 2 || content.actividadId === 3));
     if (isMiniproyectoAI) {
       setCurrentScreen('ai-workshop');
       return;
