@@ -100,6 +100,7 @@ export default function App() {
   const [userData, setUserData] = useState<{id: number, personaId: number, nombre: string} | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [docenteSession, setDocenteSession] = useState<DocenteSession | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [isHydratingState, setIsHydratingState] = useState(true);
   const changePasswordPersonaId = userSession?.personaId ?? docenteSession?.personaId ?? null;
@@ -416,7 +417,7 @@ export default function App() {
     window.history.replaceState({}, document.title, url.toString());
   };
 
-  const handleLogout = () => {
+  const executeLogout = () => {
     setCurrentScreen('login');
     setSelectedSubject(null);
     setSelectedContent(null);
@@ -433,6 +434,11 @@ export default function App() {
     clearPersistedNavigation();
     setDocenteSession(null);
     applyAuthHeaders();
+    setShowLogoutConfirm(false);
+  };
+
+  const handleLogout = () => {
+    setShowLogoutConfirm(true);
   };
 
   const handleSubjectSelect = (subject: Subject) => {
@@ -746,6 +752,33 @@ export default function App() {
           />
           {/* Note: ChatbotButton is integrated into AIWorkshopView */}
         </>
+      )}
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-[#3A4A5B]">Confirmar cierre de sesión</h3>
+              <p className="text-sm text-gray-500 mt-1">¿Deseas cerrar sesión?</p>
+            </div>
+            <div className="px-6 py-4 flex items-center justify-end gap-3 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={executeLogout}
+                className="px-4 py-2 bg-[#4A90E2] text-white rounded-lg hover:bg-[#3B82F6] transition-all"
+              >
+                Sí, cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
