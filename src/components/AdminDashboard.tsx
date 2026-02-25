@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBranch, ClipboardList, Shield } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ContentManagementScreen } from './ContentManagementScreen';
@@ -23,6 +23,8 @@ interface AdminDashboardProps {
 type AdminScreen = 'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'content-management' | 'subthemes' | 'miniproyectos' | 'ejercicios' | 'chatbot' | 'docentes' | 'administradores';
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
+  const ADMIN_DASHBOARD_STATE_KEY = 'adminDashboardState';
+
   const [currentScreen, setCurrentScreen] = useState<AdminScreen>('dashboard');
   const [navigationHistory, setNavigationHistory] = useState<AdminScreen[]>([]);
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
@@ -31,6 +33,59 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   const [selectedTemaName, setSelectedTemaName] = useState<string>('');
   const [selectedSubtemaId, setSelectedSubtemaId] = useState<number | null>(null);
   const [selectedSubtemaNombre, setSelectedSubtemaNombre] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      const rawState = localStorage.getItem(ADMIN_DASHBOARD_STATE_KEY);
+      if (!rawState) {
+        return;
+      }
+
+      const parsedState = JSON.parse(rawState) as {
+        currentScreen?: AdminScreen;
+        navigationHistory?: AdminScreen[];
+        selectedAreaId?: number | null;
+        selectedAreaName?: string;
+        selectedTemaId?: number | null;
+        selectedTemaName?: string;
+        selectedSubtemaId?: number | null;
+        selectedSubtemaNombre?: string;
+      };
+
+      if (parsedState.currentScreen) setCurrentScreen(parsedState.currentScreen);
+      if (Array.isArray(parsedState.navigationHistory)) setNavigationHistory(parsedState.navigationHistory);
+      if (parsedState.selectedAreaId !== undefined) setSelectedAreaId(parsedState.selectedAreaId);
+      if (parsedState.selectedAreaName !== undefined) setSelectedAreaName(parsedState.selectedAreaName);
+      if (parsedState.selectedTemaId !== undefined) setSelectedTemaId(parsedState.selectedTemaId);
+      if (parsedState.selectedTemaName !== undefined) setSelectedTemaName(parsedState.selectedTemaName);
+      if (parsedState.selectedSubtemaId !== undefined) setSelectedSubtemaId(parsedState.selectedSubtemaId);
+      if (parsedState.selectedSubtemaNombre !== undefined) setSelectedSubtemaNombre(parsedState.selectedSubtemaNombre);
+    } catch (error) {
+      console.error('No se pudo restaurar el estado del panel admin:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(ADMIN_DASHBOARD_STATE_KEY, JSON.stringify({
+      currentScreen,
+      navigationHistory,
+      selectedAreaId,
+      selectedAreaName,
+      selectedTemaId,
+      selectedTemaName,
+      selectedSubtemaId,
+      selectedSubtemaNombre
+    }));
+  }, [
+    currentScreen,
+    navigationHistory,
+    selectedAreaId,
+    selectedAreaName,
+    selectedTemaId,
+    selectedTemaName,
+    selectedSubtemaId,
+    selectedSubtemaNombre
+  ]);
 
   const navigateTo = (nextScreen: AdminScreen) => {
     if (nextScreen === currentScreen) {
@@ -74,40 +129,6 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       color: '#4A90E2',
       gradient: 'from-[#4A90E2] to-[#5B9FED]',
       onClick: () => navigateTo('areas')
-    },
-    {
-      id: 'temas',
-      title: 'Gestión de Temas',
-      description: 'Administra los temas por área académica y organiza la estructura principal de aprendizaje.',
-      icon: FileEdit,
-      color: '#7ED6A7',
-      gradient: 'from-[#7ED6A7] to-[#86E0AF]',
-      onClick: () => {
-        if (selectedAreaId) {
-          navigateTo('temas');
-          return;
-        }
-        navigateTo('areas');
-      }
-    },
-    {
-      id: 'subtemas',
-      title: 'Gestión de Subtemas',
-      description: 'Gestiona subtemas y su secuencia dentro de cada tema para estructurar el recorrido formativo.',
-      icon: GitBranch,
-      color: '#8B5CF6',
-      gradient: 'from-[#8B5CF6] to-[#A78BFA]',
-      onClick: () => {
-        if (selectedTemaId) {
-          navigateTo('subthemes');
-          return;
-        }
-        if (selectedAreaId) {
-          navigateTo('temas');
-          return;
-        }
-        navigateTo('areas');
-      }
     },
     {
       id: 'contents',

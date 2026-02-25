@@ -484,18 +484,46 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const totalMiniproyectos = miniproyectos.length;
   const resultadosMostrados = filteredMiniproyectos.length;
 
+  const kpiCards = [
+    {
+      label: 'Miniproyectos totales',
+      value: String(totalMiniproyectos),
+      bg: '#4A90E2'
+    },
+    {
+      label: 'Resultados visibles',
+      value: String(resultadosMostrados),
+      bg: '#14B8A6'
+    },
+    {
+      label: 'Seleccionado',
+      value: selected?.Actividad?.titulo || 'Sin selección',
+      bg: '#8B5CF6'
+    }
+  ];
+
+  const getMiniproyectoTone = (index: number) => {
+    const tones = [
+      { bg: '#EAF3FF', border: '#4A90E2' },
+      { bg: '#EAFBF7', border: '#14B8A6' },
+      { bg: '#FFF6EA', border: '#F59E0B' },
+      { bg: '#F3EEFF', border: '#8B5CF6' }
+    ];
+    return tones[index % tones.length];
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F6F8FB] via-[#F2F2F2] to-[#EEF2F6]">
-      <header className="bg-white/90 backdrop-blur border-b border-gray-200">
+    <div className="app-shell">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center p-2.5 shadow-lg">
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-[#1F2A37] text-xl font-semibold">Gestión de Miniproyectos</h1>
-                <p className="text-gray-500 text-sm">Administra y edita los miniproyectos activos</p>
+                <h1 className="text-[#3A4A5B]">Gestión de Miniproyectos</h1>
+                <p className="text-gray-500 text-sm">Panel de Docente - EduPath</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -505,7 +533,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
               </div>
               <button
                 onClick={loadMiniproyectos}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:text-[#4A90E2] hover:border-[#4A90E2] transition-all bg-white shadow-sm"
+                className="app-btn app-btn-secondary px-4 py-2 text-gray-600 hover:text-[#4A90E2]"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span className="text-sm">Actualizar</span>
@@ -515,46 +543,42 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="app-main">
         <button
           onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
+          className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
         </button>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
-            <p className="text-xs text-gray-500">Miniproyectos totales</p>
-            <p className="text-2xl font-semibold text-[#1F2A37]">{totalMiniproyectos}</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
-            <p className="text-xs text-gray-500">Resultados visibles</p>
-            <p className="text-2xl font-semibold text-[#1F2A37]">{resultadosMostrados}</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
-            <p className="text-xs text-gray-500">Seleccionado</p>
-            <p className="text-sm font-semibold text-[#1F2A37]">
-              {selected?.Actividad?.titulo || 'Sin selección'}
-            </p>
-          </div>
+          {kpiCards.map((card) => (
+            <div
+              key={card.label}
+              className="rounded-xl shadow-md p-4 text-white"
+              style={{ backgroundColor: card.bg }}
+            >
+              <p className="text-xs text-white/90">{card.label}</p>
+              <p className="text-2xl font-semibold text-white truncate">{card.value}</p>
+            </div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
-          <section className="bg-white rounded-2xl shadow-md p-6 border border-gray-100">
+        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-8">
+          <section className="bg-white rounded-2xl shadow-md p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div>
-                <h2 className="text-[#1F2A37] text-lg font-semibold">Listado de Miniproyectos</h2>
+                <h2 className="text-[#3A4A5B] text-lg font-semibold">Listado de Miniproyectos</h2>
                 <p className="text-sm text-gray-500">Selecciona un miniproyecto para editarlo.</p>
               </div>
-              <div className="relative">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+              <div className="relative w-full sm:w-auto">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Buscar por título, área o nivel"
-                  className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30 bg-[#F9FAFB]"
+                  className="w-full sm:w-80 h-11 pl-10 pr-4 border border-gray-300 rounded-lg text-sm leading-5 focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
                 />
               </div>
             </div>
@@ -569,21 +593,32 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredMiniproyectos.map((item) => (
+                {filteredMiniproyectos.map((item, index) => (
                   <button
                     key={item.id}
                     onClick={() => handleSelect(item)}
-                    className={`w-full text-left border rounded-2xl p-5 transition-all hover:shadow-md ${
-                      selected?.id === item.id ? 'border-[#4A90E2] bg-blue-50 shadow-sm' : 'border-gray-200 bg-white'
+                    className={`w-full text-left border rounded-2xl p-5 transition-all hover:shadow-lg ${
+                      selected?.id === item.id ? 'shadow-md' : ''
                     }`}
+                    style={
+                      selected?.id === item.id
+                        ? {
+                            backgroundColor: '#EAF3FF',
+                            borderColor: '#4A90E2'
+                          }
+                        : {
+                            backgroundColor: getMiniproyectoTone(index).bg,
+                            borderColor: getMiniproyectoTone(index).border
+                          }
+                    }
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h3 className="text-[#1F2A37] text-lg font-semibold">
+                        <h3 className="text-lg font-semibold text-[#3A4A5B]">
                           {item.Actividad?.titulo || 'Sin título'}
                         </h3>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          <span className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
+                          <span className="text-xs px-2.5 py-1 rounded-full bg-white/80 text-gray-700">
                             Área: {item.Area?.nombre || 'Sin área'}
                           </span>
                           <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
@@ -602,26 +637,26 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
             )}
           </section>
 
-          <section className="bg-white rounded-2xl shadow-md p-6 border border-gray-100">
-            <h2 className="text-[#1F2A37] text-lg font-semibold mb-4">Editar Miniproyecto</h2>
+          <section className="bg-white rounded-2xl shadow-md p-6">
+            <h2 className="text-[#3A4A5B] text-lg font-semibold mb-4">Editar Miniproyecto</h2>
             {!selected ? (
               <div className="py-12 text-center text-gray-500">
                 Selecciona un miniproyecto para editar sus datos.
               </div>
             ) : (
-              <form onSubmit={handleSave} className="space-y-4">
+              <form onSubmit={handleSave} className="space-y-6">
                 <div>
-                  <label className="text-sm text-gray-600">Título</label>
+                  <label className="block text-sm text-gray-600 mb-1.5">Título</label>
                   <input
                     value={formData.titulo}
                     onChange={(event) => handleChange('titulo', event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">Descripción</label>
+                  <label className="block text-sm text-gray-600 mb-1.5">Descripción</label>
                   {isProgrammingMiniproyecto ? (
-                    <div className="quill-editor-container mt-1">
+                    <div className="quill-editor-container">
                       <div
                         ref={editorRef}
                         className="w-full"
@@ -633,24 +668,24 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                       value={formData.descripcion}
                       onChange={(event) => handleChange('descripcion', event.target.value)}
                       rows={3}
-                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                     />
                   )}
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">Nivel de dificultad</label>
+                  <label className="block text-sm text-gray-600 mb-1.5">Nivel de dificultad</label>
                   <input
                     value={formData.nivel_dificultad}
                     onChange={(event) => handleChange('nivel_dificultad', event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">Entregable</label>
+                  <label className="block text-sm text-gray-600 mb-1.5">Entregable</label>
                   <input
                     value={formData.entregable}
                     onChange={(event) => handleChange('entregable', event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                   />
                 </div>
                 {isProgrammingMiniproyecto ? (

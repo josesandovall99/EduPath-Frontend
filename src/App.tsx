@@ -87,6 +87,10 @@ interface Content {
 }
 
 export default function App() {
+  const APP_NAV_STATE_KEY = 'appNavigationState';
+  const APP_ROLE_KEY = 'appActiveRole';
+  const DOCENTE_SESSION_KEY = 'docenteSession';
+
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
@@ -97,6 +101,7 @@ export default function App() {
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [docenteSession, setDocenteSession] = useState<DocenteSession | null>(null);
   const [resetToken, setResetToken] = useState<string | null>(null);
+  const [isHydratingState, setIsHydratingState] = useState(true);
   const changePasswordPersonaId = userSession?.personaId ?? docenteSession?.personaId ?? null;
   const changePasswordNextScreen: Screen = userSession ? 'dashboard' : 'docente-dashboard';
   const changePasswordRole = userSession ? 'estudiante' : 'docente';
@@ -129,6 +134,19 @@ export default function App() {
     }
   };
 
+  const isPublicScreen = (screen: Screen) => (
+    screen === 'login' ||
+    screen === 'forgot-password' ||
+    screen === 'reset-password' ||
+    screen === 'admin-register'
+  );
+
+  const clearPersistedNavigation = () => {
+    localStorage.removeItem(APP_NAV_STATE_KEY);
+    localStorage.removeItem(APP_ROLE_KEY);
+    localStorage.removeItem('adminDashboardState');
+  };
+
   useEffect(() => {
     setupAuthFetch();
     applyAuthHeaders();
@@ -140,8 +158,130 @@ export default function App() {
     if (token) {
       setResetToken(token);
       setCurrentScreen('reset-password');
+      setIsHydratingState(false);
+      return;
+    }
+
+    try {
+      const personaIdRaw = localStorage.getItem('personaId');
+      const estudianteIdRaw = localStorage.getItem('estudianteId');
+      const nombreEstudiante = localStorage.getItem('nombreEstudiante');
+      const codigoEstudiante = localStorage.getItem('codigoEstudiante');
+      const adminIdRaw = localStorage.getItem('adminId');
+      const role = localStorage.getItem(APP_ROLE_KEY);
+      const storedDocenteSession = localStorage.getItem(DOCENTE_SESSION_KEY);
+
+      if (personaIdRaw && estudianteIdRaw && nombreEstudiante && codigoEstudiante) {
+        const restoredStudent: UserSession = {
+          id: Number(estudianteIdRaw),
+          personaId: Number(personaIdRaw),
+          nombre: nombreEstudiante,
+          codigo: codigoEstudiante
+        };
+        setUserSession(restoredStudent);
+        setDocenteSession(null);
+      } else if (storedDocenteSession && role === 'docente') {
+        const parsedDocente = JSON.parse(storedDocenteSession) as DocenteSession;
+        setDocenteSession(parsedDocente);
+        setUserSession(null);
+      }
+
+      const navRaw = localStorage.getItem(APP_NAV_STATE_KEY);
+      if (navRaw) {
+        const nav = JSON.parse(navRaw) as {
+          currentScreen?: Screen;
+          selectedSubject?: Subject | null;
+          selectedContent?: Content | null;
+          selectedTemaId?: string | null;
+          selectedSubtemaId?: number | null;
+          previousScreen?: Screen | null;
+        };
+
+        if (nav.selectedSubject) setSelectedSubject(nav.selectedSubject);
+        if (nav.selectedContent) setSelectedContent(nav.selectedContent);
+        if (nav.selectedTemaId !== undefined) setSelectedTemaId(nav.selectedTemaId);
+        if (nav.selectedSubtemaId !== undefined) setSelectedSubtemaId(nav.selectedSubtemaId);
+        if (nav.previousScreen !== undefined) setPreviousScreen(nav.previousScreen);
+
+        const hasStudentSession = Boolean(estudianteIdRaw);
+        const hasDocenteSession = Boolean(storedDocenteSession);
+        const hasAdminSession = Boolean(adminIdRaw && personaIdRaw);
+
+        const canRestoreScreen = (screen: Screen) => {
+          if (isPublicScreen(screen)) return false;
+          if (screen === 'dashboard') return hasStudentSession;
+          if (screen === 'subject-content') return hasStudentSession && Boolean(nav.selectedSubject);
+          if (
+            screen === 'programming-content' ||
+            screen === 'programming-miniproyecto' ||
+            screen === 'theory-content' ||
+            screen === 'quiz-activity' ||
+            screen === 'uml-diagram' ||
+            screen === 'ai-workshop'
+          ) {
+            return hasStudentSession && Boolean(nav.selectedContent);
+          }
+          if (screen === 'docente-dashboard' || screen === 'docente-area-management') return hasDocenteSession;
+          if (
+            screen === 'admin-dashboard' ||
+            screen === 'admin-themes' ||
+            screen === 'admin-contents' ||
+            screen === 'admin-reports' ||
+            screen === 'admin-students' ||
+            screen === 'admin-upload' ||
+            screen === 'admin-sequences' ||
+            screen === 'admin-subtema-sequences'
+          ) {
+            return hasAdminSession;
+          }
+          return false;
+        };
+
+        if (nav.currentScreen && canRestoreScreen(nav.currentScreen)) {
+          setCurrentScreen(nav.currentScreen);
+        } else if (role === 'estudiante' && estudianteIdRaw) {
+          setCurrentScreen('dashboard');
+        } else if (role === 'docente' && storedDocenteSession) {
+          setCurrentScreen('docente-dashboard');
+        } else if (role === 'admin' && adminIdRaw && personaIdRaw) {
+          setCurrentScreen('admin-dashboard');
+        }
+      } else if (role === 'estudiante' && estudianteIdRaw) {
+        setCurrentScreen('dashboard');
+      } else if (role === 'docente' && storedDocenteSession) {
+        setCurrentScreen('docente-dashboard');
+      } else if (role === 'admin' && adminIdRaw && personaIdRaw) {
+        setCurrentScreen('admin-dashboard');
+      }
+    } catch (restoreError) {
+      console.error('No se pudo restaurar el estado de navegación:', restoreError);
+    } finally {
+      setIsHydratingState(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (isHydratingState || isPublicScreen(currentScreen)) {
+      return;
+    }
+
+    localStorage.setItem(APP_NAV_STATE_KEY, JSON.stringify({
+      currentScreen,
+      selectedSubject,
+      selectedContent,
+      selectedTemaId,
+      selectedSubtemaId,
+      previousScreen
+    }));
+  }, [
+    isHydratingState,
+    currentScreen,
+    selectedSubject,
+    selectedContent,
+    selectedTemaId,
+    selectedSubtemaId,
+    previousScreen
+  ]);
   
 
   // Función que se llama cuando el login es exitoso
@@ -159,6 +299,8 @@ export default function App() {
     };
     
     setUserSession(session);
+    localStorage.setItem(APP_ROLE_KEY, 'estudiante');
+    localStorage.removeItem(DOCENTE_SESSION_KEY);
     
     // Guardar en localStorage para que esté disponible en otros componentes
     localStorage.setItem('estudianteId', apiResponse.estudiante.id.toString());
@@ -207,10 +349,12 @@ export default function App() {
     };
 
     localStorage.setItem('personaId', docente.personaId.toString());
+    localStorage.setItem(APP_ROLE_KEY, 'docente');
     persistAuthToken(apiResponse);
     applyAuthHeaders();
 
     setDocenteSession(session);
+    localStorage.setItem(DOCENTE_SESSION_KEY, JSON.stringify(session));
     if (apiResponse.primerIngreso) {
       setCurrentScreen('change-password');
     } else {
@@ -257,7 +401,10 @@ export default function App() {
     localStorage.removeItem('nombreEstudiante');
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem('adminId');
     localStorage.removeItem('authToken');
+    localStorage.removeItem(DOCENTE_SESSION_KEY);
+    clearPersistedNavigation();
     setDocenteSession(null);
     applyAuthHeaders();
   };
@@ -280,7 +427,10 @@ export default function App() {
     localStorage.removeItem('nombreEstudiante');
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem('adminId');
     localStorage.removeItem('authToken');
+    localStorage.removeItem(DOCENTE_SESSION_KEY);
+    clearPersistedNavigation();
     setDocenteSession(null);
     applyAuthHeaders();
   };
@@ -378,7 +528,10 @@ export default function App() {
           onLoginSuccess={handleLoginSuccess} // Conectamos la función
           onDocenteLoginSuccess={handleDocenteLoginSuccess}
           onLogin={handleLogin}
-          onAdminLogin={() => setCurrentScreen('admin-dashboard')} 
+          onAdminLogin={() => {
+            localStorage.setItem(APP_ROLE_KEY, 'admin');
+            setCurrentScreen('admin-dashboard');
+          }} 
           onShowRegister={() => setCurrentScreen('admin-register')} 
           onShowForgotPassword={() => setCurrentScreen('forgot-password')}
         />

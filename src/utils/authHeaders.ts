@@ -44,6 +44,7 @@ export const setupAuthFetch = () => {
       requestUrl.startsWith('http://localhost:4000') ||
       requestUrl.startsWith('http://127.0.0.1:4000') ||
       requestUrl.startsWith('/api');
+    const requestMethod = (init.method || 'GET').toUpperCase();
 
     if (personaId && !headers.has('x-persona-id')) {
       headers.set('x-persona-id', personaId);
@@ -56,6 +57,7 @@ export const setupAuthFetch = () => {
     return originalFetch(input, {
       ...init,
       headers,
+      cache: isBackendRequest && requestMethod === 'GET' ? 'no-store' : init.cache,
       credentials: init.credentials ?? (isBackendRequest ? 'include' : undefined)
     });
   };

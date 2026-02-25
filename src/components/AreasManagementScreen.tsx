@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Pencil, Plus, X } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, Search, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
 interface Area {
@@ -23,6 +23,7 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [editingAreaId, setEditingAreaId] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: ''
@@ -30,6 +31,16 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
 
   useEffect(() => {
     loadAreas();
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      loadAreas();
+    }, 20000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   const loadAreas = async () => {
@@ -137,6 +148,10 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
     }
   };
 
+  const filteredAreas = areas.filter((area) =>
+    area.nombre.toLowerCase().includes(searchTerm.toLowerCase().trim())
+  );
+
   return (
     <div className="app-shell">
       {/* Header */}
@@ -195,6 +210,22 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
           </button>
         </div>
 
+        <div className="bg-white rounded-xl shadow-md p-4 mb-6">
+          <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
+            Filtrar por nombre de área
+          </label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Escribe el nombre del área..."
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+            />
+          </div>
+        </div>
+
         {successMessage && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-center justify-between">
             <p className="text-green-700 font-medium">{successMessage}</p>
@@ -229,11 +260,18 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
               🎓 Las áreas son las categorías principales de aprendizaje en la plataforma educativa.
             </p>
           </div>
+        ) : filteredAreas.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Sin resultados</h3>
+            <p className="text-gray-600">
+              No se encontraron áreas con el nombre ingresado.
+            </p>
+          </div>
         ) : (
           <>
             {/* Areas Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {areas.map((area, index) => {
+              {filteredAreas.map((area, index) => {
                 const gradient = getColorForArea(index);
                 return (
                   <div

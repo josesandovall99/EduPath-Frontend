@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { ArrowLeft, ChevronDown, ChevronUp, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Plus, Pencil, Search, Trash2, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
 interface DocenteAreaManagementScreenProps {
@@ -7,6 +7,11 @@ interface DocenteAreaManagementScreenProps {
   docenteId: number;
   areaId: number;
   areaNombre?: string;
+}
+
+interface AreaOption {
+  id: number;
+  nombre: string;
 }
 
 interface Tema {
@@ -44,10 +49,13 @@ interface ContenidoForm {
 const API_BASE_URL = '/api';
 
 export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNombre }: DocenteAreaManagementScreenProps) {
+  const [availableAreas, setAvailableAreas] = useState<AreaOption[]>([]);
+  const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [temas, setTemas] = useState<Tema[]>([]);
   const [subtemas, setSubtemas] = useState<Record<number, Subtema[]>>({});
   const [expandedTemas, setExpandedTemas] = useState<Record<number, boolean>>({});
   const [loadingTemas, setLoadingTemas] = useState(true);
+  const [searchTemaTerm, setSearchTemaTerm] = useState('');
   const [loadingSubtemas, setLoadingSubtemas] = useState<Record<number, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -86,9 +94,10 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       'x-docente-id': String(docenteId),
+      ...(selectedAreaId ? { 'x-area-id': String(selectedAreaId) } : {}),
       ...(personaId ? { 'x-persona-id': String(personaId) } : {})
     };
-  }, [docenteId]);
+  }, [docenteId, selectedAreaId]);
 
   const parseResponse = async (response: Response) => {
     const text = await response.text();
@@ -103,11 +112,49 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
     return { ok: response.ok, status: response.status, body };
   };
 
+  const loadAvailableAreas = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/areas/mis-areas`, { headers });
+      const parsed = await parseResponse(response);
+      if (!parsed.ok) {
+        throw new Error(parsed.body?.mensaje || 'Error al cargar áreas');
+      }
+
+      const areasResponse = Array.isArray(parsed.body) ? parsed.body : [];
+      const normalizedAreas = areasResponse
+        .map((area: any) => ({
+          id: Number(area?.id),
+          nombre: String(area?.nombre ?? '')
+        }))
+        .filter((area: AreaOption) => Number.isFinite(area.id) && area.nombre.trim().length > 0);
+
+      if (normalizedAreas.length > 0) {
+        setAvailableAreas(normalizedAreas);
+        setSelectedAreaId((currentSelected) => {
+          const exists = normalizedAreas.some((area) => area.id === currentSelected);
+          return exists ? currentSelected : null;
+        });
+        return;
+      }
+    } catch {
+      // fallback handled below
+    }
+
+    setAvailableAreas([{ id: areaId, nombre: areaNombre || `Área ${areaId}` }]);
+    setSelectedAreaId(null);
+  };
+
   const loadTemas = async () => {
+    if (!selectedAreaId) {
+      setTemas([]);
+      setLoadingTemas(false);
+      return;
+    }
+
     setLoadingTemas(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/temas/por-area/${areaId}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/temas/por-area/${selectedAreaId}`, { headers });
       const parsed = await parseResponse(response);
       if (!parsed.ok) {
         throw new Error(parsed.body?.mensaje || 'Error al cargar temas');
@@ -138,8 +185,17 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
   };
 
   useEffect(() => {
+    loadAvailableAreas();
+  }, [docenteId]);
+
+  useEffect(() => {
+    setExpandedTemas({});
+    setExpandedSubtemas({});
+    setSubtemas({});
+    setContenidos({});
+    setSearchTemaTerm('');
     loadTemas();
-  }, [areaId]);
+  }, [selectedAreaId]);
 
   const handleToggleTema = (temaId: number) => {
     setExpandedTemas((prev) => {
@@ -181,7 +237,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
         nombre: temaForm.nombre.trim(),
         descripcion: temaForm.descripcion.trim(),
         estado: temaForm.estado,
-        area_id: areaId
+        area_id: selectedAreaId
       };
 
       const response = await fetch(
@@ -481,81 +537,73 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
       });
       const parsed = await parseResponse(response);
       if (!parsed.ok) {
-        throw new Error(parsed.body?.mensaje || 'No se pudo eliminar el contenido');
+        throw new Error(parsed.body?.mensaje || parsed.body?.message || 'No se pudo eliminar el contenido');
       }
+
       if (activeSubtemaId) {
         await loadContenidos(activeSubtemaId);
       }
+
       setSuccess('Contenido eliminado');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al eliminar contenido');
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
+  const getTypeIcon = (tipo: Contenido['tipo']) => {
+    switch (tipo) {
       case 'video':
         return '🎥';
       case 'document':
         return '📄';
       case 'activity':
-        return '📝';
+        return '🧠';
       default:
-        return '📌';
+        return '📦';
     }
   };
 
-  // Initialize Quill when modal opens
   useEffect(() => {
-    if (showContenidoModal && editorRef.current && (window as any).Quill) {
-      try {
-        const Quill = (window as any).Quill;
-        // Register size as STYLE attributor (applies font-size in px, not classes)
-        const SizeStyle = Quill.import('attributors/style/size');
-        SizeStyle.whitelist = ['10px','12px','14px','16px','18px','20px','24px','32px'];
-        Quill.register(SizeStyle, true);
+    if (showContenidoModal && editorRef.current && !quillRef.current && (window as any).Quill) {
+      const Quill = (window as any).Quill;
 
-        // Register fonts as STYLE attributor 
+      try {
         const FontStyle = Quill.import('attributors/style/font');
-        FontStyle.whitelist = ['Arial','Monospace','Algerian'];
+        FontStyle.whitelist = ['Arial', 'Monospace', 'Algerian'];
         Quill.register(FontStyle, true);
       } catch (err) {
         console.warn('Quill format registration failed', err);
       }
 
-      // Ensure container is empty before creating Quill
       editorRef.current.innerHTML = '';
-      quillRef.current = new (window as any).Quill(editorRef.current, {
+      quillRef.current = new Quill(editorRef.current, {
         theme: 'snow',
         placeholder: 'Ingrese la descripción del contenido',
         modules: {
           toolbar: [
-            [{ 'font': ['Arial','Monospace','Algerian'] }],
-            [{ 'size': ['10px','12px','14px','16px','18px','20px','24px','32px'] }],
+            [{ font: ['Arial', 'Monospace', 'Algerian'] }],
+            [{ size: ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'] }],
             ['bold', 'italic', 'underline', 'strike'],
-            [{ 'color': [] }, { 'background': [] }],
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-            [{ 'align': [] }],
+            [{ color: [] }, { background: [] }],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ align: [] }],
             ['link', 'image', 'video'],
             ['clean']
           ]
         }
       });
 
-      // Set default size to 14px
       quillRef.current.format('size', '14px');
 
-      // Determine initial content (edit mode takes precedence)
       const initialHtml = editingContenido ? (editingContenido.descripcion || '') : (contenidoForm.descripcion || '');
       quillRef.current.root.innerHTML = initialHtml;
-      setContenidoForm(prev => ({ ...prev, descripcion: initialHtml }));
+      setContenidoForm((prev) => ({ ...prev, descripcion: initialHtml }));
 
       quillRef.current.on('text-change', () => {
-        setContenidoForm(prev => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
+        setContenidoForm((prev) => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
       });
     }
 
-    // Cleanup: when modal closes, remove Quill's DOM and clear ref
     return () => {
       if (!showContenidoModal && quillRef.current) {
         if (editorRef.current) editorRef.current.innerHTML = '';
@@ -566,43 +614,54 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
 
   const temaFormValid = temaForm.nombre.trim().length > 0;
   const subtemaFormValid = subtemaForm.nombre.trim().length > 0;
+  const filteredTemas = temas.filter((tema) =>
+    tema.nombre.toLowerCase().includes(searchTemaTerm.toLowerCase().trim())
+  );
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
-      <header className="bg-white shadow-sm border-b border-gray-200">
+    <div className="app-shell">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#14B8A6] to-[#2DD4BF] rounded-xl flex items-center justify-center p-2 shadow-md">
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-[#3A4A5B]">Gestion de area</h1>
-                <p className="text-gray-500 text-sm">Administra temas y subtemas de tu area</p>
+                <h1 className="text-[#3A4A5B]">Gestión de Áreas - Subtemas - Contenidos</h1>
+                <p className="text-gray-500 text-sm">Panel de Docente - EduPath</p>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-8 py-8">
+      <main className="app-main">
         <button
           onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
+          className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver al panel</span>
+          <span>Volver al Panel</span>
         </button>
 
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-6 flex items-center justify-between">
+        <div className="app-info-banner mb-8 p-6">
+          <h2 className="text-lg font-bold mb-2">Gestión de Contenido Educativo</h2>
+          <p className="text-sm opacity-95">
+            Selecciona un tema para gestionar sus subtemas y contenidos. Desde aquí podrás organizar la estructura completa
+            de aprendizaje, definir el orden de los subtemas y asignar materiales educativos a cada tema.
+          </p>
+        </div>
+
+        <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl text-[#3A4A5B]">Area asignada</h2>
-            <p className="text-gray-500 text-sm">{areaNombre || `Area ${areaId}`}</p>
+            <h2 className="text-[#3A4A5B] text-xl">Temas académicos</h2>
+            <p className="text-gray-500 text-sm">Selecciona un área para ver y gestionar sus temas.</p>
           </div>
           <button
             onClick={handleOpenTemaCreate}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white shadow-md hover:shadow-lg transition-all"
-            style={{ backgroundColor: '#14B8A6' }}
+            className="app-btn app-primary-btn px-5 py-2.5"
+            disabled={!selectedAreaId}
           >
             <Plus className="w-4 h-4" />
             <span>Nuevo tema</span>
@@ -621,7 +680,50 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
           </div>
         )}
 
-        {loadingTemas ? (
+        <div className="bg-white rounded-xl shadow-md p-4 mb-6">
+          <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
+            Seleccionar área
+          </label>
+          <select
+            value={selectedAreaId ?? ''}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSelectedAreaId(value ? Number(value) : null);
+            }}
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+          >
+            <option value="">Selecciona un área</option>
+            {availableAreas.map((area) => (
+              <option key={area.id} value={area.id}>
+                {area.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedAreaId && (
+          <div className="bg-white rounded-xl shadow-md p-4 mb-6">
+            <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
+              Filtrar temas por nombre
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchTemaTerm}
+                onChange={(event) => setSearchTemaTerm(event.target.value)}
+                placeholder="Escribe el nombre del tema..."
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+              />
+            </div>
+          </div>
+        )}
+
+        {!selectedAreaId ? (
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <p className="text-gray-600">Selecciona un área para ver los temas y habilitar el filtro por nombre.</p>
+          </div>
+        ) : loadingTemas ? (
           <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
             <p className="text-gray-600">Cargando temas...</p>
           </div>
@@ -629,38 +731,42 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
           <div className="bg-white rounded-xl shadow-md p-12 text-center">
             <p className="text-gray-600">No hay temas creados para esta area.</p>
           </div>
+        ) : filteredTemas.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <p className="text-gray-600">No se encontraron temas con ese nombre.</p>
+          </div>
         ) : (
           <div className="space-y-4">
-            {temas.map((tema) => {
+            {filteredTemas.map((tema) => {
               const isExpanded = expandedTemas[tema.id];
               const temaSubtemas = subtemas[tema.id] || [];
               const subtemaLoading = loadingSubtemas[tema.id];
 
               return (
-                <div key={tema.id} className="bg-white rounded-2xl shadow-md">
-                  <div className="flex items-center justify-between p-6">
+                <div key={tema.id} className="bg-white rounded-2xl shadow-md overflow-hidden">
+                  <div className="flex items-center justify-between p-6 bg-gradient-to-r from-[#4A90E2] to-[#5B9FED]">
                     <div>
-                      <h3 className="text-lg font-semibold text-[#3A4A5B]">{tema.nombre}</h3>
-                      <p className="text-gray-500 text-sm">{tema.descripcion || 'Sin descripcion'}</p>
+                      <h3 className="text-xl font-semibold text-white">{tema.nombre}</h3>
+                      <p className="text-white/90 text-sm">{tema.descripcion || 'Sin descripción'}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => handleOpenTemaEdit(tema)}
-                        className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                        className="app-btn mt-1 bg-white/20 px-3 py-1.5 text-white hover:bg-white/30"
                       >
                         <Pencil className="w-4 h-4" />
                         <span>Editar</span>
                       </button>
                       <button
                         onClick={() => handleDeleteTema(tema)}
-                        className="flex items-center gap-1 text-red-600 hover:text-red-700"
+                        className="app-btn mt-1 bg-white/20 px-3 py-1.5 text-white hover:bg-white/30"
                       >
                         <Trash2 className="w-4 h-4" />
                         <span>Eliminar</span>
                       </button>
                       <button
                         onClick={() => handleToggleTema(tema.id)}
-                        className="flex items-center gap-1 text-gray-600 hover:text-gray-800"
+                        className="app-btn mt-1 bg-white/20 px-3 py-1.5 text-white hover:bg-white/30"
                       >
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         <span>{isExpanded ? 'Ocultar' : 'Subtemas'}</span>
@@ -674,7 +780,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                         <h4 className="text-sm font-semibold text-gray-700">Subtemas</h4>
                         <button
                           onClick={() => handleOpenSubtemaCreate(tema.id)}
-                          className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 text-sm"
+                          className="flex items-center gap-2 text-[#4A90E2] hover:text-[#357ABD] text-sm"
                         >
                           <Plus className="w-4 h-4" />
                           <span>Agregar subtema</span>
@@ -725,7 +831,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                                     <h5 className="text-xs font-semibold text-gray-700">Contenidos</h5>
                                     <button
                                       onClick={() => handleOpenContenidoCreate(subtema.id)}
-                                      className="flex items-center gap-1 text-emerald-600 hover:text-emerald-700 text-xs"
+                                      className="flex items-center gap-1 text-[#4A90E2] hover:text-[#357ABD] text-xs"
                                     >
                                       <Plus className="w-3 h-3" />
                                       <span>Agregar contenido</span>
@@ -739,7 +845,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                                   ) : (
                                     <div className="space-y-2">
                                       {(contenidos[subtema.id] || []).map((contenido) => (
-                                        <div key={contenido.id} className="flex items-start justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+                                        <div key={contenido.id} className="flex items-start justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
                                           <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
                                               <span className="text-lg">{getTypeIcon(contenido.tipo)}</span>
@@ -826,7 +932,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                 </div>
                 <button
                   onClick={() => setTemaForm({ ...temaForm, estado: !temaForm.estado })}
-                  className="text-sm text-emerald-600"
+                  className="text-sm text-[#4A90E2]"
                 >
                   {temaForm.estado ? 'Habilitado' : 'Deshabilitado'}
                 </button>
@@ -844,8 +950,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
               <button
                 onClick={handleSaveTema}
                 disabled={submitting || !temaFormValid}
-                className="px-5 py-2 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: '#14B8A6' }}
+                className="app-btn app-primary-btn px-5 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Guardando...' : editingTema ? 'Actualizar' : 'Crear'}
               </button>
@@ -901,8 +1006,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
               <button
                 onClick={handleSaveSubtema}
                 disabled={submitting || !subtemaFormValid}
-                className="px-5 py-2 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: '#14B8A6' }}
+                className="app-btn app-primary-btn px-5 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Guardando...' : editingSubtema ? 'Actualizar' : 'Crear'}
               </button>
@@ -1014,7 +1118,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                   type="button"
                   onClick={handleSaveContenido}
                   disabled={submitting || !contenidoForm.titulo.trim()}
-                  className="px-6 py-2 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2 bg-gradient-to-r from-[#4A90E2] to-[#5B9FED] text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
                 >
                   {submitting ? (
                     <>

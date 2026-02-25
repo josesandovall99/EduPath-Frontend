@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Code, Database, BarChart3, ChevronUp, ChevronDown, ToggleLeft, ToggleRight, Plus, Edit2, X } from 'lucide-react';
+import { ArrowLeft, Code, Database, BarChart3, ChevronUp, ChevronDown, ToggleLeft, ToggleRight, Plus, Edit2, Search, X } from 'lucide-react';
 import axios from 'axios';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
@@ -64,6 +64,8 @@ export function SubThemeManagementScreen({
     descripcion: '',
     tema_id: ''
   });
+  const [searchSubtemaTerm, setSearchSubtemaTerm] = useState('');
+  const [searchAreaTerm, setSearchAreaTerm] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -238,6 +240,55 @@ export function SubThemeManagementScreen({
     fetchSubtemas();
   }, [selectedTema]);
 
+  useEffect(() => {
+    const intervalId = window.setInterval(async () => {
+      try {
+        if (!selectedArea) {
+          return;
+        }
+
+        const temasResponse = await axios.get('http://localhost:4000/temas', {
+          timeout: 5000,
+          headers: { Accept: 'application/json' }
+        });
+
+        const temasData = Array.isArray(temasResponse.data)
+          ? temasResponse.data.filter((tema) => tema.area_id === selectedArea)
+          : [];
+
+        const temasOrdenados = temasData.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+        setTemas(temasOrdenados);
+
+        const temaActualVigente = temasOrdenados.some((tema) => tema.id === selectedTema);
+        const temaObjetivo = temaActualVigente ? selectedTema : (temasOrdenados[0]?.id || '');
+
+        if (!temaActualVigente && temaObjetivo) {
+          setSelectedTema(temaObjetivo);
+        }
+
+        if (!temaObjetivo) {
+          setSubtemas([]);
+          return;
+        }
+
+        const subtemasResponse = await axios.get(`http://localhost:4000/subtemas/por-tema/${temaObjetivo}`, {
+          timeout: 5000,
+          headers: { Accept: 'application/json' }
+        });
+
+        if (Array.isArray(subtemasResponse.data)) {
+          setSubtemas(subtemasResponse.data);
+        }
+      } catch (refreshError) {
+        console.warn('Auto-actualización de subtemas omitida temporalmente:', refreshError);
+      }
+    }, 20000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [selectedArea, selectedTema]);
+
   // Abrir modal para crear nuevo subtema
   const handleCreateSubtema = () => {
     setEditingSubtema(null);
@@ -364,6 +415,14 @@ export function SubThemeManagementScreen({
     hasMinimumSubtemasForSequence
   );
 
+  const filteredSubtemas = subtemas.filter((subtema) =>
+    subtema.nombre.toLowerCase().includes(searchSubtemaTerm.toLowerCase().trim())
+  );
+
+  const filteredAreas = areas.filter((area) =>
+    area.nombre.toLowerCase().includes(searchAreaTerm.toLowerCase().trim())
+  );
+
   // Mostrar estado de carga
   if (loading) {
     return (
@@ -426,11 +485,30 @@ export function SubThemeManagementScreen({
         {/* Area Selector */}
         <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
           <h3 className="text-[#3A4A5B] mb-4">Seleccionar Área</h3>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
+              Filtrar áreas por nombre
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchAreaTerm}
+                onChange={(event) => setSearchAreaTerm(event.target.value)}
+                placeholder="Escribe el nombre del área..."
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+              />
+            </div>
+          </div>
+
           {areas.length === 0 ? (
             <p className="text-gray-500 text-center">No hay áreas disponibles</p>
+          ) : filteredAreas.length === 0 ? (
+            <p className="text-gray-500 text-center">No se encontraron áreas con ese nombre</p>
           ) : (
-            <div className={`grid gap-4 ${areas.length >= 3 ? 'grid-cols-3' : `grid-cols-${areas.length}`}`}>
-              {areas.map((area, index) => {
+            <div className={`grid gap-4 ${filteredAreas.length >= 3 ? 'grid-cols-3' : `grid-cols-${filteredAreas.length}`}`}>
+              {filteredAreas.map((area, index) => {
                 const colorKey = getColorByIndex(index);
                 const Icon = subjectColors[colorKey].icon;
                 const color = subjectColors[colorKey].primary;
@@ -587,6 +665,22 @@ export function SubThemeManagementScreen({
               </p>
             )}
 
+            <div className="bg-white rounded-xl shadow-md p-4 mb-6">
+              <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
+                Filtrar por nombre de subtema
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchSubtemaTerm}
+                  onChange={(event) => setSearchSubtemaTerm(event.target.value)}
+                  placeholder="Escribe el nombre del subtema..."
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                />
+              </div>
+            </div>
+
             {/* Lista de Subtemas */}
             {subtemasLoading ? (
               <div className="flex justify-center items-center py-12">
@@ -603,9 +697,13 @@ export function SubThemeManagementScreen({
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
                 <p className="text-gray-600">No hay subtemas disponibles para este tema</p>
               </div>
+            ) : filteredSubtemas.length === 0 ? (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                <p className="text-gray-600">No se encontraron subtemas con el nombre ingresado.</p>
+              </div>
             ) : (
               <div className="space-y-4">
-                {subtemas.map((subtema) => (
+                {filteredSubtemas.map((subtema) => (
                   <div
                     key={subtema.id}
                     className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg"
