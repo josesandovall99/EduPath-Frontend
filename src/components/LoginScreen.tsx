@@ -1,6 +1,5 @@
-import { Mail, Lock, ArrowRight, KeyRound } from 'lucide-react';
+import { Mail, Lock, ArrowRight, KeyRound, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
-import logoImage from '../assets/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { applyAuthHeaders } from '../utils/authHeaders';
 
 
@@ -19,6 +18,8 @@ export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, on
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const invalidCredentialsMessage = 'Credenciales inválidas. Verifica tu código y contraseña e inténtalo de nuevo.';
+  const hasAuthError = Boolean(error);
 
   const clearLocalAuthState = () => {
     localStorage.removeItem('estudianteId');
@@ -105,7 +106,7 @@ const handleStudentLogin = async () => {
         }
 
         if (adminParsed?.status && adminParsed.status >= 500) {
-          setError(`Servidor: ${adminParsed.status} - ${adminParsed.body?.mensaje || 'Error interno'}`);
+          setError(invalidCredentialsMessage);
           setLoading(false);
           return;
         }
@@ -132,7 +133,7 @@ const handleStudentLogin = async () => {
         }
 
         if (docenteParsed.status && docenteParsed.status >= 500) {
-          setError(`Servidor: ${docenteParsed.status} - ${docenteParsed.body?.mensaje || 'Error interno'}`);
+          setError(invalidCredentialsMessage);
           setLoading(false);
           return;
         }
@@ -175,18 +176,26 @@ const handleStudentLogin = async () => {
         }
 
         if (result.status && result.status >= 500) {
-          setError(`Servidor: ${result.status} - ${result.body?.mensaje || result.body?.message || 'Error interno'}`);
+          setError(invalidCredentialsMessage);
           setLoading(false);
           return;
         }
       }
 
-      const summary = attempts.map(a => `payload=${Object.keys(a.payload).join(',')} status=${a.status} msg=${a.body?.mensaje || a.body?.message || JSON.stringify(a.body)}`).join(' | ');
-      setError(`Autenticación fallida. Intentos: ${summary}`);
+      const hasInvalidCredentials = attempts.some((attempt) => [400, 401, 403].includes(attempt.status));
+      const hasConnectionIssues = attempts.every((attempt) => attempt.status === 0);
+
+      if (hasInvalidCredentials) {
+        setError(invalidCredentialsMessage);
+      } else if (hasConnectionIssues) {
+        setError('No se pudo conectar con el servidor. Intenta nuevamente en unos segundos.');
+      } else {
+        setError(invalidCredentialsMessage);
+      }
 
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err?.message || String(err) || 'Error de conexión');
+      setError(invalidCredentialsMessage);
     } finally {
       setLoading(false);
     }
@@ -210,8 +219,14 @@ return (
           <h2 className="text-[#3A4A5B] mb-6 text-center text-2xl">Iniciar Sesión</h2>
           
           {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center">
-              {error}
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm shadow-sm"
+              style={{ borderColor: '#fca5a5', backgroundColor: '#fef2f2', color: '#991b1b' }}
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: '#b91c1c' }} />
+              <p className="text-left font-semibold leading-relaxed" style={{ color: '#991b1b' }}>{error}</p>
             </div>
           )}
 
@@ -225,7 +240,8 @@ return (
                   type="text"
                   value={codigoEstudiantil}
                   onChange={(e) => setCodigoEstudiantil(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-3 pl-11 bg-white focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent transition-all"
+                  className={`w-full rounded-lg p-3 pl-11 bg-white focus:outline-none focus:ring-2 focus:border-transparent transition-all ${hasAuthError ? 'border border-red-300 focus:ring-red-300' : 'border border-gray-300 focus:ring-[#4A90E2]'}`}
+                  style={hasAuthError ? { borderColor: '#f87171', color: '#991b1b' } : undefined}
                   placeholder="Ej: 1151234"
                 />
               </div>
@@ -240,7 +256,8 @@ return (
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-3 pl-11 bg-white focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent transition-all"
+                  className={`w-full rounded-lg p-3 pl-11 bg-white focus:outline-none focus:ring-2 focus:border-transparent transition-all ${hasAuthError ? 'border border-red-300 focus:ring-red-300' : 'border border-gray-300 focus:ring-[#4A90E2]'}`}
+                  style={hasAuthError ? { borderColor: '#f87171', color: '#991b1b' } : undefined}
                   placeholder="••••••••"
                 />
               </div>
