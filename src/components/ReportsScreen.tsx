@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Download, FileSpreadsheet, Filter, X, User, Calendar, Activity, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, BarChart3, Award, AlertTriangle } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 
 import axios from 'axios';
+
+const logoImage = new URL('../assets/898bd8e2c46596e40b55d8328f5f754f003aa92a.png', import.meta.url).href;
 
 const api = axios.create({
   baseURL: 'http://localhost:4000',
@@ -32,7 +33,7 @@ interface StudentProgress {
     topics: {
       name: string;
       progress: number;
-      subtopics: { name: string; progress: number; }[];
+      subtopics: { name: string; progress: number; hasContent?: boolean; }[];
     }[];
   }[];
 }
@@ -440,15 +441,25 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     }
   };
 
-  const formatPercent = (value: number) => {
-    if (!Number.isFinite(value)) return '0';
-    const rounded = Math.round(value * 10) / 10;
+  const parsePercentValue = (value: number | string | null | undefined) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().replace('%', '').replace(',', '.');
+      const parsed = Number.parseFloat(normalized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
+
+  const formatPercent = (value: number | string | null | undefined) => {
+    const numericValue = parsePercentValue(value);
+    const rounded = Math.round(numericValue * 10) / 10;
     return Number.isInteger(rounded) ? `${rounded}` : `${rounded.toFixed(1)}`;
   };
 
-  const normalizePercent = (value: number) => {
-    if (!Number.isFinite(value)) return 0;
-    return Math.min(100, Math.max(0, value));
+  const normalizePercent = (value: number | string | null | undefined) => {
+    const numericValue = parsePercentValue(value);
+    return Math.min(100, Math.max(0, numericValue));
   };
 
   const formatGrade = (value: number) => {
@@ -749,9 +760,10 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             </button>
             <button
               onClick={() => setActiveTab('failures')}
+              style={activeTab === 'failures' ? { backgroundColor: '#DC2626', color: '#FFFFFF' } : undefined}
               className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-all ${
                 activeTab === 'failures'
-                  ? 'bg-[#DC2626] text-white'
+                  ? 'text-white'
                   : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -893,7 +905,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             {activeTab === 'failures' && (
               <div className="grid grid-cols-1 gap-4 mb-4">
                 <div className="bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-lg p-3 text-sm text-[#3A4A5B]">
-                  Este informe usa el filtro de estudiante. Si seleccionas "Todos", se mostrara el top 20 de actividades con mas fallos.
+                  Este informe usa el filtro de estudiante. Si seleccionas "Todos", se mostrara el top 20 de actividades con mas fallos. Si necesitas ver los intentos, aciertos o fallos de ejercicios y miniproyectos de un estudiante en especifico, seleccionalo en el filtro "Estudiante" y aplica los filtros.
                 </div>
               </div>
             )}
@@ -1085,36 +1097,39 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                     {/* Detalle de temas y subtemas */}
                     <div className="bg-gray-50 rounded-lg p-4">
                       <h5 className="text-[#3A4A5B] text-sm mb-3">Detalle por Tema y Subtema</h5>
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {student.subjects.map((subject) => (
                           <div key={subject.name}>
-                            {subject.topics.map((topic) => (
-                              <div key={topic.name} className="mb-3 last:mb-0">
+                            {subject.topics.map((topic) => {
+                              return (
+                              <div key={topic.name} className="mb-4 last:mb-0">
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="text-sm text-[#3A4A5B]">{topic.name}</span>
-                                  <span className="text-sm text-gray-600">{formatPercent(topic.progress)}%</span>
+                                  <span className="text-sm text-[#3A4A5B]">{formatPercent(topic.progress)}%</span>
                                 </div>
-                                <div className="pl-4 space-y-1">
+                                <div className="pl-3 space-y-2">
                                   {topic.subtopics.map((subtopic) => (
-                                    <div key={subtopic.name} className="flex items-center justify-between text-xs">
-                                      <span className="text-gray-600">• {subtopic.name}</span>
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                    <div key={subtopic.name} className="grid items-center gap-3 text-xs" style={{ gridTemplateColumns: '1fr 180px 40px' }}>
+                                      <span className="text-gray-600">
+                                        • {subtopic.name}
+                                        {subtopic.hasContent === false ? <span className="text-red-600"> (no tiene contenido)</span> : null}
+                                      </span>
+                                      <div style={{ width: '180px', height: '8px', backgroundColor: '#D1D5DB', borderRadius: '9999px', overflow: 'hidden' }}>
                                           <div 
-                                            className="h-full rounded-full"
                                             style={{ 
                                               width: `${normalizePercent(subtopic.progress)}%`,
-                                              backgroundColor: subject.color
+                                              height: '100%',
+                                              borderRadius: '9999px',
+                                              backgroundColor: subject.color || '#4A90E2'
                                             }}
                                           />
-                                        </div>
-                                        <span className="text-gray-500 w-8">{formatPercent(subtopic.progress)}%</span>
                                       </div>
+                                      <span className="text-gray-500 text-right">{formatPercent(subtopic.progress)}%</span>
                                     </div>
                                   ))}
                                 </div>
                               </div>
-                            ))}
+                            )})}
                           </div>
                         ))}
                       </div>
