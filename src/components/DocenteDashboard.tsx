@@ -3,20 +3,24 @@ import { BookOpen, ChevronRight, ClipboardList, Clock, GitBranch, LogOut, MapPin
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ExerciseManagementScreen } from './ExerciseManagementScreen';
 import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
+import { ReportsScreen } from './ReportsScreen';
 
 interface DocenteDashboardProps {
   onLogout: () => void;
   onManageArea: () => void;
   docente?: {
+    id?: number;
+    personaId?: number;
     nombre?: string;
     email?: string;
     especialidad?: string;
+    areaId?: number;
     areaNombre?: string;
   } | null;
 }
 
 export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'ejercicios' | 'miniproyectos'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'ejercicios' | 'miniproyectos' | 'reports'>('dashboard');
 
   const stats = [
     {
@@ -76,6 +80,15 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
       color: '#0EA5E9',
       gradient: 'from-[#0EA5E9] to-[#38BDF8]',
       onClick: () => setCurrentScreen('miniproyectos')
+    },
+    {
+      id: 'reports',
+      title: 'Informes de Materia',
+      description: 'Consulta progreso por estudiante y reporte de fallos de tu materia asignada.',
+      icon: ClipboardList,
+      color: '#F5A97F',
+      gradient: 'from-[#F5A97F] to-[#F7B98F]',
+      onClick: () => setCurrentScreen('reports')
     }
   ];
 
@@ -91,6 +104,18 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
     return (
       <MiniproyectoManagementScreen
         onBack={() => setCurrentScreen('dashboard')}
+      />
+    );
+  }
+
+  if (currentScreen === 'reports') {
+    return (
+      <ReportsScreen
+        onBack={() => setCurrentScreen('dashboard')}
+        mode="docente"
+        docenteId={docente?.id}
+        docentePersonaId={docente?.personaId}
+        docenteAreaId={docente?.areaId}
       />
     );
   }

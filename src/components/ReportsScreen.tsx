@@ -13,6 +13,10 @@ const api = axios.create({
 
 interface ReportsScreenProps {
   onBack: () => void;
+  mode?: 'admin' | 'docente';
+  docenteId?: number;
+  docentePersonaId?: number;
+  docenteAreaId?: number;
 }
 
 // Tipos de datos
@@ -103,7 +107,142 @@ interface FailuresReportData {
   items: FailuresItem[];
 }
 
-export function ReportsScreen({ onBack }: ReportsScreenProps) {
+interface BasicArea {
+  id: number;
+  nombre: string;
+}
+
+const buildFailuresFromItems = (items: FailuresItem[]): FailuresReportData => {
+  const totals = items.reduce(
+    (acc, item) => {
+      acc.intentos += item.intentos || 0;
+      acc.fallos += item.fallos || 0;
+      acc.aciertos += item.aciertos || 0;
+      return acc;
+    },
+    { intentos: 0, fallos: 0, aciertos: 0 }
+  );
+
+  const byType: FailuresByType = {
+    ejercicios: { intentos: 0, fallos: 0, aciertos: 0 },
+    miniproyectos: { intentos: 0, fallos: 0, aciertos: 0 }
+  };
+
+  const byAreaMap = new Map<string, FailuresByArea>();
+  const byStudentMap = new Map<string, FailuresByStudent>();
+
+  items.forEach((item) => {
+    const isEjercicio = item.tipo === 'ejercicio';
+    const typeTarget = isEjercicio ? byType.ejercicios : byType.miniproyectos;
+    typeTarget.intentos += item.intentos || 0;
+    typeTarget.fallos += item.fallos || 0;
+    typeTarget.aciertos += item.aciertos || 0;
+
+    const areaKey = item.area_id === null ? 'sin-area' : String(item.area_id);
+    const currentArea = byAreaMap.get(areaKey) || {
+      area_id: item.area_id ?? null,
+      area_name: item.area_name || 'Sin area',
+      intentos: 0,
+      fallos: 0,
+      aciertos: 0,
+      ejercicios: 0,
+      miniproyectos: 0
+    };
+    currentArea.intentos += item.intentos || 0;
+    currentArea.fallos += item.fallos || 0;
+    currentArea.aciertos += item.aciertos || 0;
+    if (isEjercicio) currentArea.ejercicios += 1;
+    else currentArea.miniproyectos += 1;
+    byAreaMap.set(areaKey, currentArea);
+
+    const studentKey = String(item.estudiante_id);
+    const currentStudent = byStudentMap.get(studentKey) || {
+      estudiante_id: item.estudiante_id,
+      nombre: `Estudiante ${item.estudiante_id}`,
+      email: '',
+      intentos: 0,
+      fallos: 0,
+      aciertos: 0,
+      ejercicios: 0,
+      miniproyectos: 0
+    };
+    currentStudent.intentos += item.intentos || 0;
+    currentStudent.fallos += item.fallos || 0;
+    currentStudent.aciertos += item.aciertos || 0;
+    if (isEjercicio) currentStudent.ejercicios += 1;
+    else currentStudent.miniproyectos += 1;
+    byStudentMap.set(studentKey, currentStudent);
+  });
+
+  return {
+    totals,
+    byType,
+    byArea: Array.from(byAreaMap.values()).sort((a, b) => b.fallos - a.fallos),
+    byStudent: Array.from(byStudentMap.values()).sort((a, b) => b.fallos - a.fallos),
+    items
+  };
+};
+
+const scopeFailuresDataByArea = (data: any, areaId?: number): FailuresReportData => {
+  const sourceItems = Array.isArray(data?.items) ? data.items : [];
+  if (!areaId) {
+    return buildFailuresFromItems(sourceItems);
+  }
+
+  const scopedItems = sourceItems.filter((item: FailuresItem) => Number(item.area_id) === Number(areaId));
+  return buildFailuresFromItems(scopedItems);
+};
+
+const mergeFailuresWithAreas = (data: FailuresReportData, areas: BasicArea[], scopeAreaId?: number): FailuresReportData => {
+  const byAreaMap = new Map<string, FailuresByArea>();
+
+  (Array.isArray(data.byArea) ? data.byArea : []).forEach((entry) => {
+    if (entry?.area_id === null || entry?.area_id === undefined) return;
+    byAreaMap.set(String(entry.area_id), {
+      area_id: entry.area_id,
+      area_name: entry.area_name,
+      intentos: entry.intentos || 0,
+      fallos: entry.fallos || 0,
+      aciertos: entry.aciertos || 0,
+      ejercicios: entry.ejercicios || 0,
+      miniproyectos: entry.miniproyectos || 0
+    });
+  });
+
+  const scopedAreas = scopeAreaId
+    ? areas.filter((area) => Number(area.id) === Number(scopeAreaId))
+    : areas;
+
+  const completedByArea = scopedAreas.map((area) => {
+    const existing = byAreaMap.get(String(area.id));
+    if (existing) {
+      return {
+        ...existing,
+        area_name: existing.area_name || area.nombre
+      };
+    }
+
+    return {
+      area_id: area.id,
+      area_name: area.nombre,
+      intentos: 0,
+      fallos: 0,
+      aciertos: 0,
+      ejercicios: 0,
+      miniproyectos: 0
+    };
+  });
+
+  const sortedByArea = completedByArea.sort((a, b) => b.fallos - a.fallos);
+
+  return {
+    ...data,
+    byArea: sortedByArea
+  };
+};
+
+export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePersonaId, docenteAreaId }: ReportsScreenProps) {
+  const isDocenteMode = mode === 'docente';
   const [activeTab, setActiveTab] = useState<'student' | 'date' | 'activity' | 'failures'>('student');
   const [showFilters, setShowFilters] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -139,6 +278,22 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   const [failuresData, setFailuresData] = useState<FailuresReportData | null>(null);
   const [failuresLoading, setFailuresLoading] = useState(false);
 
+  const getDocenteRequestConfig = () => {
+    if (!isDocenteMode) return undefined;
+
+    const personaId = docentePersonaId || localStorage.getItem('personaId');
+    const headers: Record<string, string> = {};
+
+    if (personaId) {
+      headers['x-persona-id'] = String(personaId);
+    }
+    if (docenteId) {
+      headers['x-docente-id'] = String(docenteId);
+    }
+
+    return Object.keys(headers).length > 0 ? { headers } : undefined;
+  };
+
   // Fallback con el mock original reducido (solo estructura necesaria)
   const fallbackMockStudents: StudentProgress[] = [
     { id: '1', name: 'Juan Pérez', email: 'juan.perez@universidad.edu', createdDate: '2025-09-15', semester: '1', subjects: [] },
@@ -152,7 +307,10 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
 
         // Nuevo endpoint agregado: resumen general con un solo llamado
         try {
-          const resumenRes = await api.get('/progresos/resumen-general');
+          const resumenEndpoint = isDocenteMode
+            ? '/docente/reportes/progreso-estudiantes'
+            : '/progresos/resumen-general';
+          const resumenRes = await api.get(resumenEndpoint, getDocenteRequestConfig());
           const resumenData = resumenRes.data || {};
           if (Array.isArray(resumenData.students)) {
             const palette = ['#4A90E2', '#7ED6A7', '#F5A97F'];
@@ -180,6 +338,44 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
           }
         } catch (e) {
           // Si falla, continuar con el flujo anterior
+        }
+
+        if (isDocenteMode) {
+          try {
+            const fallbackRes = await api.get('/progresos/resumen-general');
+            const fallbackData = fallbackRes.data || {};
+            if (Array.isArray(fallbackData.students)) {
+              const areaId = docenteAreaId ? String(docenteAreaId) : null;
+              const palette = ['#4A90E2', '#7ED6A7', '#F5A97F'];
+
+              const normalizedStudents: StudentProgress[] = fallbackData.students
+                .map((student: any) => {
+                  const subjects = (student.subjects || [])
+                    .filter((subject: any) => {
+                      if (!areaId) return true;
+                      return String(subject.areaId ?? '') === areaId;
+                    })
+                    .map((subject: any, idx: number) => ({
+                      ...subject,
+                      color: subject.color || palette[idx % palette.length]
+                    }));
+
+                  return {
+                    ...student,
+                    subjects
+                  } as StudentProgress;
+                })
+                .filter((student: StudentProgress) => student.subjects.length > 0);
+
+              setStudentsData(normalizedStudents);
+              return;
+            }
+          } catch {
+            // fallback final abajo
+          }
+
+          setStudentsData(fallbackMockStudents);
+          return;
         }
 
         // 1) obtener áreas para luego pedir progreso por área por estudiante
@@ -308,7 +504,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     };
 
     loadStudentsAndProgress();
-  }, []);
+  }, [isDocenteMode, docenteId, docentePersonaId, docenteAreaId]);
 
   useEffect(() => {
     const loadFailuresReport = async () => {
@@ -316,6 +512,17 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
 
       try {
         setFailuresLoading(true);
+        let areasCatalog: BasicArea[] = [];
+        try {
+          const areasResponse = await api.get('/areas');
+          const areas = Array.isArray(areasResponse.data) ? areasResponse.data : [];
+          areasCatalog = areas
+            .map((area: any) => ({ id: Number(area?.id), nombre: String(area?.nombre || '') }))
+            .filter((area: BasicArea) => Number.isFinite(area.id) && area.nombre.trim().length > 0);
+        } catch {
+          areasCatalog = [];
+        }
+
         const params = new URLSearchParams();
         if (appliedFilters.student !== 'all') {
           params.append('estudiante_id', appliedFilters.student);
@@ -323,8 +530,31 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
           params.append('estudiante_id', 'all');
         }
 
+        if (isDocenteMode) {
+          try {
+            const docenteResponse = await api.get(`/docente/reportes/fallos?${params.toString()}`, getDocenteRequestConfig());
+            const scoped = scopeFailuresDataByArea(docenteResponse.data || {}, docenteAreaId);
+            const merged = mergeFailuresWithAreas(scoped, areasCatalog, docenteAreaId);
+            setFailuresData(merged);
+            return;
+          } catch {
+            const fallbackResponse = await api.get(`/progresos/reporte-fallos?${params.toString()}`);
+            const scoped = scopeFailuresDataByArea(fallbackResponse.data || {}, docenteAreaId);
+            const merged = mergeFailuresWithAreas(scoped, areasCatalog, docenteAreaId);
+            setFailuresData(merged);
+            return;
+          }
+        }
+
         const response = await api.get(`/progresos/reporte-fallos?${params.toString()}`);
-        setFailuresData(response.data || null);
+        const rawData = (response.data || null) as FailuresReportData | null;
+        if (!rawData) {
+          setFailuresData(null);
+          return;
+        }
+
+        const merged = mergeFailuresWithAreas(rawData, areasCatalog);
+        setFailuresData(merged);
       } catch (error) {
         console.error('Error cargando reporte de fallos:', error);
         setFailuresData(null);
@@ -334,7 +564,13 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     };
 
     loadFailuresReport();
-  }, [activeTab, hasAppliedFilters, appliedFilters.student]);
+  }, [activeTab, hasAppliedFilters, appliedFilters.student, isDocenteMode, docenteId, docentePersonaId, docenteAreaId]);
+
+  useEffect(() => {
+    if (isDocenteMode && (activeTab === 'date' || activeTab === 'activity')) {
+      setActiveTab('student');
+    }
+  }, [isDocenteMode, activeTab]);
 
   const clearFilters = () => {
     setStudentSearch('');
@@ -381,6 +617,11 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   const downloadPdf = async (type: 'student' | 'date' | 'activity' | 'failures') => {
     if (!hasAppliedFilters) {
       alert('Aplica los filtros antes de descargar el informe.');
+      return;
+    }
+
+    if (isDocenteMode) {
+      alert('La exportación PDF para el módulo docente no está habilitada en esta versión.');
       return;
     }
 
@@ -632,11 +873,37 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
   const failuresByArea = failuresData?.byArea || [];
   const failuresByStudent = failuresData?.byStudent || [];
   const failuresItems = failuresData?.items || [];
-  const failuresItemsSorted = [...failuresItems].sort((a, b) => {
+  const isAllStudentsFailuresView = appliedFilters.student === 'all';
+
+  const failuresItemsForTable: FailuresItem[] = isAllStudentsFailuresView
+    ? Array.from(
+        failuresItems.reduce((map, item) => {
+          const key = `${item.tipo}-${item.actividad_id}-${item.area_id ?? 'sin-area'}`;
+          const existing = map.get(key);
+          if (!existing) {
+            map.set(key, {
+              ...item,
+              estudiante_id: 0,
+              aprobado: Boolean(item.aprobado)
+            });
+            return map;
+          }
+
+          existing.intentos += item.intentos || 0;
+          existing.fallos += item.fallos || 0;
+          existing.aciertos += item.aciertos || 0;
+          existing.aprobado = existing.aprobado && Boolean(item.aprobado);
+          map.set(key, existing);
+          return map;
+        }, new Map<string, FailuresItem>()).values()
+      )
+    : failuresItems;
+
+  const failuresItemsSorted = [...failuresItemsForTable].sort((a, b) => {
     if (b.fallos !== a.fallos) return b.fallos - a.fallos;
     return b.intentos - a.intentos;
   });
-  const failuresItemsDisplay = appliedFilters.student === 'all'
+  const failuresItemsDisplay = isAllStudentsFailuresView
     ? failuresItemsSorted.slice(0, 20)
     : failuresItemsSorted;
 
@@ -662,7 +929,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
               </div>
               <div>
                 <h1 className="text-[#3A4A5B]">Generación de Informes Académicos</h1>
-                <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                <p className="text-gray-500 text-sm">{isDocenteMode ? 'Panel de Docente - EduPath' : 'Panel de Administrador - EduPath'}</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -736,28 +1003,32 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
               <User className="w-5 h-5" />
               <span>Progreso por Estudiante</span>
             </button>
-            <button
-              onClick={() => setActiveTab('date')}
-              className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'date'
-                  ? 'bg-[#7ED6A7] text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <Calendar className="w-5 h-5" />
-              <span>Progreso por Fecha de Creación</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('activity')}
-              className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-all ${
-                activeTab === 'activity'
-                  ? 'bg-[#F5A97F] text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <Activity className="w-5 h-5" />
-              <span>Desempeño por Actividad</span>
-            </button>
+            {!isDocenteMode && (
+              <button
+                onClick={() => setActiveTab('date')}
+                className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-all ${
+                  activeTab === 'date'
+                    ? 'bg-[#7ED6A7] text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Calendar className="w-5 h-5" />
+                <span>Progreso por Fecha de Creación</span>
+              </button>
+            )}
+            {!isDocenteMode && (
+              <button
+                onClick={() => setActiveTab('activity')}
+                className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-all ${
+                  activeTab === 'activity'
+                    ? 'bg-[#F5A97F] text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Activity className="w-5 h-5" />
+                <span>Desempeño por Actividad</span>
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('failures')}
               style={activeTab === 'failures' ? { backgroundColor: '#DC2626', color: '#FFFFFF' } : undefined}
@@ -1772,7 +2043,16 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                         )}
                         {failuresByArea.map((area) => (
                           <tr key={`${area.area_id ?? 'sin-area'}`} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-3 text-[#3A4A5B] text-sm">{area.area_name || 'Sin area'}</td>
+                            <td className="px-4 py-3 text-[#3A4A5B] text-sm">
+                              <div className="flex items-center gap-2">
+                                <span>{area.area_name || 'Sin area'}</span>
+                                {Number(area.intentos || 0) === 0 && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">
+                                    Sin intentos de estudiantes
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td className="px-4 py-3 text-gray-600 text-sm">{area.intentos}</td>
                             <td className="px-4 py-3 text-gray-600 text-sm">{area.aciertos}</td>
                             <td className="px-4 py-3 text-gray-600 text-sm">{area.fallos}</td>
@@ -1862,7 +2142,9 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                             <td className="px-4 py-3 text-gray-600 text-sm">{item.aciertos}</td>
                             <td className="px-4 py-3 text-gray-600 text-sm">{item.fallos}</td>
                             <td className="px-4 py-3">
-                              {item.aprobado ? (
+                              {isAllStudentsFailuresView ? (
+                                <span className="inline-flex items-center gap-1 text-gray-500 text-sm">Mixto</span>
+                              ) : item.aprobado ? (
                                 <span className="inline-flex items-center gap-1 text-[#7ED6A7] text-sm">
                                   <CheckCircle2 className="w-4 h-4" />
                                   Si
