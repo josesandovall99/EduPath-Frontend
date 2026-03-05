@@ -159,6 +159,15 @@ export default function App() {
     if (token) {
       setResetToken(token);
       setCurrentScreen('reset-password');
+
+      // Remove token from URL after reading it to reduce sensitive data exposure.
+      try {
+        const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.hash || ''}`;
+        window.history.replaceState({}, document.title, cleanUrl);
+      } catch (error) {
+        console.warn('No se pudo limpiar el token de la URL:', error);
+      }
+
       setIsHydratingState(false);
       return;
     }

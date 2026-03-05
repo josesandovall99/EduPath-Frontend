@@ -252,6 +252,7 @@ const mergeFailuresWithAreas = (data: FailuresReportData, areas: BasicArea[], sc
 
 export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePersonaId, docenteAreaId }: ReportsScreenProps) {
   const isDocenteMode = mode === 'docente';
+  const subjectPalette = ['#4A90E2', '#7ED6A7', '#F5A97F'];
   const [activeTab, setActiveTab] = useState<'student' | 'date' | 'activity' | 'failures'>('student');
   const [showFilters, setShowFilters] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -283,9 +284,61 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   // Estado para estudiantes (se carga desde backend). Si falla, usamos fallbackMockStudents
   const [studentsData, setStudentsData] = useState<StudentProgress[]>([]);
+  const [areasCatalog, setAreasCatalog] = useState<BasicArea[]>([]);
   const [loadingStudents, setLoadingStudents] = useState<boolean>(true);
   const [failuresData, setFailuresData] = useState<FailuresReportData | null>(null);
   const [failuresLoading, setFailuresLoading] = useState(false);
+
+  const completeStudentSubjectsWithAreas = (rawSubjects: any[], areas: BasicArea[]) => {
+    const sourceSubjects = Array.isArray(rawSubjects) ? rawSubjects : [];
+    const normalizeSubject = (subject: any, idx: number, fallbackName?: string, fallbackAreaId?: string) => ({
+      areaId: String(subject?.areaId ?? subject?.area_id ?? fallbackAreaId ?? '') || undefined,
+      name: subject?.name || subject?.nombre || fallbackName || `Area ${idx + 1}`,
+      color: subject?.color || subjectPalette[idx % subjectPalette.length],
+      progress: Number(subject?.progress ?? 0) || 0,
+      contentViewed: Number(subject?.contentViewed ?? 0) || 0,
+      exercisesCompleted: Number(subject?.exercisesCompleted ?? 0) || 0,
+      miniprojectsSubmitted: Number(subject?.miniprojectsSubmitted ?? 0) || 0,
+      topics: Array.isArray(subject?.topics) ? subject.topics : []
+    });
+
+    if (areas.length === 0) {
+      return sourceSubjects.map((subject, idx) => normalizeSubject(subject, idx));
+    }
+
+    const completed = areas.map((area, idx) => {
+      const match = sourceSubjects.find((subject: any) => {
+        const subjectAreaId = String(subject?.areaId ?? subject?.area_id ?? '');
+        return subjectAreaId === String(area.id)
+          || String(subject?.name || subject?.nombre || '').trim().toLowerCase() === area.nombre.trim().toLowerCase();
+      });
+
+      if (match) {
+        return normalizeSubject(match, idx, area.nombre, String(area.id));
+      }
+
+      return {
+        areaId: String(area.id),
+        name: area.nombre,
+        color: subjectPalette[idx % subjectPalette.length],
+        progress: 0,
+        contentViewed: 0,
+        exercisesCompleted: 0,
+        miniprojectsSubmitted: 0,
+        topics: []
+      };
+    });
+
+    const includedAreaIds = new Set(completed.map((subject) => String(subject.areaId ?? '')));
+    const extras = sourceSubjects
+      .filter((subject: any) => {
+        const subjectAreaId = String(subject?.areaId ?? subject?.area_id ?? '');
+        return subjectAreaId && !includedAreaIds.has(subjectAreaId);
+      })
+      .map((subject: any, idx: number) => normalizeSubject(subject, idx + areas.length));
+
+    return [...completed, ...extras];
+  };
 
   const getDocenteRequestConfig = () => {
     if (!isDocenteMode) return undefined;
@@ -313,6 +366,22 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     const loadStudentsAndProgress = async () => {
       try {
         setLoadingStudents(true);
+        let currentAreasCatalog: BasicArea[] = [];
+
+        const normalizeAreasCatalog = (areasInput: any[]): BasicArea[] => areasInput
+          .map((area: any) => ({ id: Number(area?.id), nombre: String(area?.nombre || area?.name || '') }))
+          .filter((area: BasicArea) => Number.isFinite(area.id) && area.nombre.trim().length > 0);
+
+        try {
+          const areasResponse = await api.get('/areas', getDocenteRequestConfig());
+          const normalizedAreas = normalizeAreasCatalog(Array.isArray(areasResponse.data) ? areasResponse.data : []);
+          if (normalizedAreas.length > 0) {
+            currentAreasCatalog = normalizedAreas;
+            setAreasCatalog(normalizedAreas);
+          }
+        } catch {
+          // Si falla, intentaremos completar el catalogo usando otros endpoints
+        }
 
         // Nuevo endpoint agregado: resumen general con un solo llamado
         try {
@@ -322,24 +391,17 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
           const resumenRes = await api.get(resumenEndpoint, getDocenteRequestConfig());
           const resumenData = resumenRes.data || {};
           if (Array.isArray(resumenData.students)) {
-            const palette = ['#4A90E2', '#7ED6A7', '#F5A97F'];
             const areasList = Array.isArray(resumenData.areas) ? resumenData.areas : [];
-            const areaColorById = new Map(
-              areasList.map((area: any, idx: number) => [String(area.id), palette[idx % palette.length]])
-            );
-            const areaColorByName = new Map(
-              areasList.map((area: any, idx: number) => [area.nombre || area.name, palette[idx % palette.length]])
-            );
+            const normalizedAreas = normalizeAreasCatalog(areasList);
+            if (normalizedAreas.length > 0) {
+              currentAreasCatalog = normalizedAreas;
+              setAreasCatalog(normalizedAreas);
+            }
+            const effectiveAreasCatalog = normalizedAreas.length > 0 ? normalizedAreas : currentAreasCatalog;
 
             const normalizedStudents: StudentProgress[] = resumenData.students.map((student: any) => ({
               ...student,
-              subjects: (student.subjects || []).map((subject: any, idx: number) => ({
-                ...subject,
-                color: subject.color
-                  || areaColorById.get(String(subject.areaId ?? ''))
-                  || areaColorByName.get(subject.name)
-                  || palette[idx % palette.length]
-              }))
+              subjects: completeStudentSubjectsWithAreas(student.subjects || [], effectiveAreasCatalog)
             }));
 
             setStudentsData(normalizedStudents);
@@ -355,19 +417,20 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             const fallbackData = fallbackRes.data || {};
             if (Array.isArray(fallbackData.students)) {
               const areaId = docenteAreaId ? String(docenteAreaId) : null;
-              const palette = ['#4A90E2', '#7ED6A7', '#F5A97F'];
+              const normalizedAreas = normalizeAreasCatalog(Array.isArray(fallbackData.areas) ? fallbackData.areas : []);
+              if (normalizedAreas.length > 0) {
+                currentAreasCatalog = normalizedAreas;
+                setAreasCatalog(normalizedAreas);
+              }
+              const effectiveAreasCatalog = normalizedAreas.length > 0 ? normalizedAreas : currentAreasCatalog;
 
               const normalizedStudents: StudentProgress[] = fallbackData.students
                 .map((student: any) => {
-                  const subjects = (student.subjects || [])
+                  const subjects = completeStudentSubjectsWithAreas(student.subjects || [], effectiveAreasCatalog)
                     .filter((subject: any) => {
                       if (!areaId) return true;
                       return String(subject.areaId ?? '') === areaId;
-                    })
-                    .map((subject: any, idx: number) => ({
-                      ...subject,
-                      color: subject.color || palette[idx % palette.length]
-                    }));
+                    });
 
                   return {
                     ...student,
@@ -390,6 +453,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         // 1) obtener áreas para luego pedir progreso por área por estudiante
         const areasRes = await api.get('/areas');
         const areas = Array.isArray(areasRes.data) ? areasRes.data : [];
+        const normalizedAreas = normalizeAreasCatalog(areas);
+        currentAreasCatalog = normalizedAreas;
+        setAreasCatalog(normalizedAreas);
         console.log('[Reports] áreas recibidas:', areas.length, areas);
 
         // 2) obtener estudiantes — probar primero el endpoint singular '/estudiante' (el backend usa ese nombre)
@@ -483,6 +549,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             const miniproyectos = areaResumen?.progreso?.miniproyectos || { total: 0, completados: 0, porcentaje: 0 };
 
             return {
+              areaId: String(area.id),
               name: area.nombre || `Área ${area.id}`,
               color: ['#4A90E2', '#7ED6A7', '#F5A97F'][idx % 3],
               progress: areaResumen?.resumen?.porcentajeTotalArea ?? contenidos.porcentaje ?? 0,
@@ -718,6 +785,13 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     return Number.isInteger(rounded) ? `${rounded}` : `${rounded.toFixed(1)}`;
   };
 
+  const formatCohortDate = (dateValue: string) => {
+    if (!dateValue) return 'Sin fecha';
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return dateValue;
+    return parsed.toLocaleDateString('es-CO');
+  };
+
   // Calcular datos agrupados por fecha de creación
   const getDataByDate = (sourceStudents: StudentProgress[]) => {
     const grouped: { [key: string]: StudentProgress[] } = {};
@@ -728,7 +802,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
       grouped[student.createdDate].push(student);
     });
 
-    return Object.entries(grouped).map(([date, students]) => {
+    return Object.entries(grouped)
+      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+      .map(([date, students]) => {
       const sumAvg = students.reduce((sum, s) => {
         const totalProgress = s.subjects.reduce((acc, subj) => acc + subj.progress, 0);
         const avg = s.subjects.length ? totalProgress / s.subjects.length : 0;
@@ -739,6 +815,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       return {
         date,
+        cohortLabel: formatCohortDate(date),
         avgProgress,
         studentCount: students.length,
         students
@@ -766,33 +843,62 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   };
 
   // Datos para gráfica de progreso por materia
-  const getSubjectProgressData = (sourceStudents: StudentProgress[]) => {
-    const subjectMap = new Map<string, string>();
+  const getSubjectProgressData = (sourceStudents: StudentProgress[], areas: BasicArea[]) => {
+    const subjectMap = new Map<string, { name: string; color: string; areaId?: string }>();
     sourceStudents.forEach(student => {
       student.subjects.forEach(subject => {
-        if (!subjectMap.has(subject.name)) {
-          subjectMap.set(subject.name, subject.color || '#4A90E2');
+        const key = subject.areaId ? `id:${String(subject.areaId)}` : `name:${subject.name}`;
+        if (!subjectMap.has(key)) {
+          subjectMap.set(key, {
+            name: subject.name,
+            color: subject.color || '#4A90E2',
+            areaId: subject.areaId ? String(subject.areaId) : undefined
+          });
         }
       });
     });
 
-    return Array.from(subjectMap.entries()).map(([subjectName, color]) => {
-      let total = 0;
-      let count = 0;
-      sourceStudents.forEach(student => {
-        const subject = student.subjects.find(s => s.name === subjectName);
-        if (subject) {
-          total += subject.progress || 0;
-          count += 1;
-        }
-      });
-
-      const avgProgress = count ? total / count : 0;
+    const catalogSubjects = areas.map((area, idx) => {
+      const mapKey = `id:${String(area.id)}`;
+      const existing = subjectMap.get(mapKey);
 
       return {
-        name: subjectName,
+        key: mapKey,
+        name: existing?.name || area.nombre,
+        color: existing?.color || subjectPalette[idx % subjectPalette.length],
+        areaId: String(area.id)
+      };
+    });
+
+    const baseSubjects = catalogSubjects.length > 0
+      ? catalogSubjects
+      : Array.from(subjectMap.entries()).map(([key, value]) => ({
+          key,
+          name: value.name,
+          color: value.color,
+          areaId: value.areaId
+        }));
+
+    return baseSubjects.map((subject) => {
+      let total = 0;
+
+      sourceStudents.forEach(student => {
+        const matchByAreaId = subject.areaId
+          ? student.subjects.find((s) => String(s.areaId ?? '') === subject.areaId)
+          : undefined;
+        const matchByName = student.subjects.find((s) => s.name === subject.name);
+        const matchedSubject = matchByAreaId || matchByName;
+        total += matchedSubject?.progress || 0;
+      });
+
+      const avgProgress = sourceStudents.length ? total / sourceStudents.length : 0;
+
+      return {
+        name: subject.name,
+        shortName: subject.name.length > 22 ? `${subject.name.slice(0, 22)}...` : subject.name,
         progress: avgProgress,
-        color
+        color: subject.color,
+        areaId: subject.areaId
       };
     });
   };
@@ -865,8 +971,16 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   });
 
   const dateData = getDataByDate(dateTabStudents);
+  const MAX_COHORTS_VISIBLE = 8;
+  const sortedDateDataByProgress = [...dateData].sort((a, b) => {
+    if (b.avgProgress !== a.avgProgress) return b.avgProgress - a.avgProgress;
+    if (b.studentCount !== a.studentCount) return b.studentCount - a.studentCount;
+    return a.date.localeCompare(b.date);
+  });
+  const dateDataVisible = sortedDateDataByProgress.slice(0, MAX_COHORTS_VISIBLE);
+  const hiddenCohortsCount = Math.max(0, dateData.length - dateDataVisible.length);
   const activityData = getActivityData(activityTabStudents);
-  const subjectProgressData = getSubjectProgressData(activityTabStudents);
+  const subjectProgressData = getSubjectProgressData(activityTabStudents, areasCatalog);
 
   const failuresTotals = failuresData?.totals || { intentos: 0, fallos: 0, aciertos: 0 };
   const failuresRate = failuresTotals.intentos > 0
@@ -918,7 +1032,11 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   const failuresAreaChartData = failuresByArea.map((area) => ({
     name: area.area_name || 'Sin area',
-    fallos: area.fallos
+    shortName: (area.area_name || 'Sin area').length > 22
+      ? `${(area.area_name || 'Sin area').slice(0, 22)}...`
+      : (area.area_name || 'Sin area'),
+    fallos: area.fallos,
+    intentos: area.intentos
   }));
 
   const failuresStudentsSorted = [...failuresByStudent].sort((a, b) => b.fallos - a.fallos);
@@ -1423,19 +1541,42 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         {hasAppliedFilters && activeTab === 'date' && (
           <div className="space-y-6">
+            {hiddenCohortsCount > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                Mostrando {dateDataVisible.length} cohortes con mayor avance. Hay {hiddenCohortsCount} cohortes adicionales ocultas para mejorar legibilidad y rendimiento.
+              </div>
+            )}
+
             {/* Resumen por fecha */}
             <div className="grid grid-cols-2 gap-6">
               <div className="bg-white rounded-xl shadow-md p-6">
                 <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-[#7ED6A7]" />
-                  Progreso Promedio por Cohorte
+                  Avance Promedio por Cohorte
                 </h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Cohorte = grupo de estudiantes creado en la misma fecha. Esta barra muestra el promedio de avance de ese grupo.
+                </p>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={dateData}>
+                  <BarChart data={dateDataVisible}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip />
+                    <XAxis dataKey="cohortLabel" tick={{ fontSize: 12 }} />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      domain={[0, 100]}
+                      ticks={[0, 20, 40, 60, 80, 100]}
+                      tickFormatter={(value) => `${value}%`}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [`${formatPercent(value)}%`, 'Promedio de avance']}
+                      labelFormatter={(label, payload) => {
+                        if (Array.isArray(payload) && payload.length > 0) {
+                          const point = payload[0]?.payload;
+                          return `Cohorte ${point?.cohortLabel || label} (${point?.studentCount || 0} estudiantes)`;
+                        }
+                        return `Cohorte ${String(label)}`;
+                      }}
+                    />
                     <Bar dataKey="avgProgress" fill="#7ED6A7" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -1449,19 +1590,22 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={dateData}
+                      data={dateDataVisible}
                       dataKey="studentCount"
-                      nameKey="date"
+                      nameKey="cohortLabel"
                       cx="50%"
                       cy="50%"
                       outerRadius={100}
-                      label={(entry) => `${entry.date}: ${entry.studentCount}`}
+                      label={(entry) => `${entry.cohortLabel}: ${entry.studentCount}`}
                     >
-                      {dateData.map((entry, index) => (
+                      {dateDataVisible.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={['#7ED6A7', '#4A90E2', '#F5A97F'][index % 3]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip
+                      formatter={(value: number) => [value, 'Estudiantes']}
+                      labelFormatter={(label) => `Cohorte ${String(label)}`}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -1475,11 +1619,11 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
               </div>
               
               <div className="p-6">
-                {dateData.map((dateGroup) => (
+                {dateDataVisible.map((dateGroup) => (
                   <div key={dateGroup.date} className="mb-8 last:mb-0 border-b border-gray-200 last:border-0 pb-8 last:pb-0">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h4 className="text-[#3A4A5B] text-lg">Cohorte: {dateGroup.date}</h4>
+                        <h4 className="text-[#3A4A5B] text-lg">Cohorte: {dateGroup.cohortLabel}</h4>
                         <p className="text-gray-500 text-sm">{dateGroup.studentCount} estudiantes</p>
                       </div>
                       <div className="text-right">
@@ -1686,12 +1830,20 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                   Progreso por Materia
                 </h3>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={subjectProgressData}>
+                  <BarChart data={subjectProgressData} layout="vertical" margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Bar dataKey="progress" radius={[8, 8, 0, 0]}>
+                    <XAxis type="number" tick={{ fontSize: 11 }} domain={[0, 100]} />
+                    <YAxis type="category" dataKey="shortName" width={160} tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      formatter={(value: number) => [`${formatPercent(value)}%`, 'Progreso']}
+                      labelFormatter={(_, payload) => {
+                        if (Array.isArray(payload) && payload.length > 0) {
+                          return payload[0]?.payload?.name || 'Area';
+                        }
+                        return 'Area';
+                      }}
+                    />
+                    <Bar dataKey="progress" radius={[0, 8, 8, 0]}>
                       {subjectProgressData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
@@ -1712,26 +1864,34 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                 {subjectProgressData.map((subject) => {
                   const subjectName = subject.name;
                   const color = subject.color;
+                  const subjectAreaId = subject.areaId;
+
+                  const findMatchingSubject = (student: StudentProgress) => {
+                    const matchByAreaId = subjectAreaId
+                      ? student.subjects.find((subj) => String(subj.areaId ?? '') === String(subjectAreaId))
+                      : undefined;
+                    return matchByAreaId || student.subjects.find((subj) => subj.name === subjectName);
+                  };
 
                   const totalContent = activityTabStudents.reduce((sum, s) => {
-                    const subj = s.subjects.find(subj => subj.name === subjectName);
+                    const subj = findMatchingSubject(s);
                     return sum + (subj?.contentViewed || 0);
                   }, 0);
 
                   const totalExercises = activityTabStudents.reduce((sum, s) => {
-                    const subj = s.subjects.find(subj => subj.name === subjectName);
+                    const subj = findMatchingSubject(s);
                     return sum + (subj?.exercisesCompleted || 0);
                   }, 0);
 
                   const totalProjects = activityTabStudents.reduce((sum, s) => {
-                    const subj = s.subjects.find(subj => subj.name === subjectName);
+                    const subj = findMatchingSubject(s);
                     return sum + (subj?.miniprojectsSubmitted || 0);
                   }, 0);
 
                   let avgProgress = 0;
                   let count = 0;
                   activityTabStudents.forEach((s) => {
-                    const subj = s.subjects.find(subj => subj.name === subjectName);
+                    const subj = findMatchingSubject(s);
                     if (subj) {
                       avgProgress += subj.progress || 0;
                       count += 1;
@@ -2018,9 +2178,28 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                     <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={failuresAreaChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <XAxis
+                          dataKey="shortName"
+                          interval={0}
+                          height={70}
+                          angle={-18}
+                          textAnchor="end"
+                          tick={{ fontSize: 11 }}
+                        />
                         <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
+                        <Tooltip
+                          formatter={(value: number, dataKey: string) => {
+                            if (dataKey === 'fallos') return [value, 'Fallos'];
+                            if (dataKey === 'intentos') return [value, 'Intentos'];
+                            return [value, dataKey];
+                          }}
+                          labelFormatter={(_, payload) => {
+                            if (Array.isArray(payload) && payload.length > 0) {
+                              return payload[0]?.payload?.name || 'Area';
+                            }
+                            return 'Area';
+                          }}
+                        />
                         <Bar dataKey="fallos" fill="#DC2626" radius={[8, 8, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
