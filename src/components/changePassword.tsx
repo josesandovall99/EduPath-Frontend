@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 
-export function ChangePasswordScreen({ onComplete, isFirstLogin = false, personaId, userRole = 'estudiante' }) {
+interface ChangePasswordScreenProps {
+  onComplete: () => void;
+  isFirstLogin?: boolean;
+  personaId?: number | null;
+  userRole?: 'estudiante' | 'docente';
+}
+
+export function ChangePasswordScreen({ onComplete, isFirstLogin = false, personaId, userRole = 'estudiante' }: ChangePasswordScreenProps) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNew, setShowNew] = useState(false);
@@ -35,8 +42,8 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
-          personaId: personaId, 
           nuevaContraseña: newPassword
         }),
       });

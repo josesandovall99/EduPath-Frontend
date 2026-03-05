@@ -11,6 +11,15 @@ const api = axios.create({
   timeout: 15000
 });
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 interface ReportsScreenProps {
   onBack: () => void;
   mode?: 'admin' | 'docente';
@@ -281,11 +290,11 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   const getDocenteRequestConfig = () => {
     if (!isDocenteMode) return undefined;
 
-    const personaId = docentePersonaId || localStorage.getItem('personaId');
+    const token = localStorage.getItem('authToken');
     const headers: Record<string, string> = {};
 
-    if (personaId) {
-      headers['x-persona-id'] = String(personaId);
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
     if (docenteId) {
       headers['x-docente-id'] = String(docenteId);
