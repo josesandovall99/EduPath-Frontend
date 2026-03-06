@@ -27,7 +27,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
   const [inputValue, setInputValue] = useState('');
   const [isAsking, setIsAsking] = useState(false);
 
-  const API_BASE = 'http://localhost:4000';
+  const API_BASE = 'https://edupath-backend-xch1.onrender.com';
 
   useEffect(() => {
     loadStats();

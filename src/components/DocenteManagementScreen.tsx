@@ -33,7 +33,7 @@ interface DocenteFormData {
   areaId: string;
 }
 
-const API_BASE_URL = 'http://localhost:4000';
+const API_BASE_URL = 'https://edupath-backend-xch1.onrender.com';
 
 const emptyForm: DocenteFormData = {
   nombre: '',

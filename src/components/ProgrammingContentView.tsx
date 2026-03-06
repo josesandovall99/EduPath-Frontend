@@ -77,7 +77,7 @@ export function ProgrammingContentView({ content, onBack }: ProgrammingContentVi
     const cargarEjercicio = async () => {
       try {
         console.log('🔍 Buscando ejercicio con contenido_id:', content.id);
-        const response = await fetch(`http://localhost:4000/ejercicios?contenido_id=${content.id}`);
+        const response = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios?contenido_id=${content.id}`);
         const data = await response.json();
         console.log('📦 Ejercicios encontrados:', data);
         if (data.length > 0) {

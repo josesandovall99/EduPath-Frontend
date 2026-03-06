@@ -33,7 +33,7 @@ export const setupAuthFetch = () => {
           ? input.toString()
           : input.url;
     const isBackendRequest =
-      requestUrl.startsWith('http://localhost:4000') ||
+      requestUrl.startsWith('https://edupath-backend-xch1.onrender.com') ||
       requestUrl.startsWith('http://127.0.0.1:4000') ||
       requestUrl.startsWith('/api');
     const requestMethod = (init.method || 'GET').toUpperCase();

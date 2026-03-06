@@ -74,7 +74,7 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
 
     try {
       // 1. Petición al Backend (Puerto 4000)
-      const response = await fetch('http://localhost:4000/estudiante/importar-excel', {
+      const response = await fetch('https://edupath-backend-xch1.onrender.com/estudiante/importar-excel', {
         method: 'POST',
         body: formData, // No necesitas header Content-Type, fetch lo pone automático con FormData
       });

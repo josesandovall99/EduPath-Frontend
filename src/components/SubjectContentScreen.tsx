@@ -168,7 +168,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
 
     setLoadingProgress(true);
     try {
-      const url = `http://localhost:4000/progresos/por-area?area_id=${subject.id}&estudiante_id=${estudianteId}`;
+      const url = `https://edupath-backend-xch1.onrender.com/progresos/por-area?area_id=${subject.id}&estudiante_id=${estudianteId}`;
       console.log(`🔄 Obteniendo progreso desde: ${url}`);
       
       const response = await fetch(url);
@@ -201,7 +201,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     for (const tema of temas) {
       try {
         const response = await fetch(
-          `http://localhost:4000/progresos/por-tema?tema_id=${tema.id}&estudiante_id=${estudianteId}`
+          `https://edupath-backend-xch1.onrender.com/progresos/por-tema?tema_id=${tema.id}&estudiante_id=${estudianteId}`
         );
         
         if (response.ok) {
@@ -225,7 +225,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     
     try {
       const response = await fetch(
-        `http://localhost:4000/api/progreso/estado-temas-area?estudiante_id=${estudianteId}&area_id=${subject.id}`
+        `https://edupath-backend-xch1.onrender.com/api/progreso/estado-temas-area?estudiante_id=${estudianteId}&area_id=${subject.id}`
       );
       
       if (response.ok) {

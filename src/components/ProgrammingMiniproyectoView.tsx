@@ -59,7 +59,7 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
   useEffect(() => {
     const cargarMiniproyecto = async () => {
       try {
-        const response = await fetch(`http://localhost:4000/miniproyectos/${content.id}`);
+        const response = await fetch(`https://edupath-backend-xch1.onrender.com/miniproyectos/${content.id}`);
         if (!response.ok) return;
         const data: MiniproyectoApiResponse = await response.json();
         setDescripcion(data?.Actividad?.descripcion || '');

@@ -332,7 +332,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     console.log('📤 Validando diagrama (preview):', json);
     
     try {
-      const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/resolver`, {
+      const response = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios/${activity.id}/resolver`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ respuesta: { diagrama: json } })
@@ -391,7 +391,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     }
 
     try {
-      const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/enviar`, {
+      const response = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios/${activity.id}/enviar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ estudiante_id: estudianteId, respuesta: { diagram: json } })
@@ -473,7 +473,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
   // Ver retroalimentación del ejercicio
   const verRetroalimentacion = async () => {
     try {
-      const response = await fetch(`http://localhost:4000/ejercicios/${activity.id}/retroalimentacion`);
+      const response = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios/${activity.id}/retroalimentacion`);
       
       if (!response.ok) {
         alert('❌ No se pudo obtener la retroalimentación.');

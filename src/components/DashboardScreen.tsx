@@ -78,7 +78,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
     }
 
     try {
-      const url = `http://localhost:4000/progresos/por-area?area_id=${areaId}&estudiante_id=${estudianteId}`;
+      const url = `https://edupath-backend-xch1.onrender.com/progresos/por-area?area_id=${areaId}&estudiante_id=${estudianteId}`;
       const response = await fetch(url);
       
       if (!response.ok) {

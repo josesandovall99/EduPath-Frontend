@@ -642,7 +642,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const loadEjercicios = async () => {
     setIsLoadingData(true);
     try {
-      const res = await fetch('http://localhost:4000/ejercicios');
+      const res = await fetch('https://edupath-backend-xch1.onrender.com/ejercicios');
       if (!res.ok) throw new Error('No se pudieron cargar los ejercicios');
       const data = await res.json();
       setEjercicios(data as EjercicioItem[]);
@@ -657,7 +657,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const loadContenidos = async () => {
     setIsLoadingContenidos(true);
     try {
-      const res = await fetch('http://localhost:4000/contenidos');
+      const res = await fetch('https://edupath-backend-xch1.onrender.com/contenidos');
       if (!res.ok) throw new Error('No se pudieron cargar los contenidos');
       const data = await res.json();
       const mapped: ContenidoOption[] = (data || []).map((c: any) => ({ id: Number(c.id), titulo: c.titulo }));
@@ -673,7 +673,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const loadTiposActividad = async () => {
     setIsLoadingTipos(true);
     try {
-      const res = await fetch('http://localhost:4000/tipoactividad');
+      const res = await fetch('https://edupath-backend-xch1.onrender.com/tipoactividad');
       if (!res.ok) throw new Error('No se pudieron cargar los tipos de actividad');
       const data = await res.json();
       setTiposActividad(data || []);
@@ -885,8 +885,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     try {
       const method = isEditMode ? 'PUT' : 'POST';
       const url = isEditMode && selectedEjercicio
-        ? `http://localhost:4000/ejercicios/${selectedEjercicio.id}`
-        : 'http://localhost:4000/ejercicios';
+        ? 'https://edupath-backend-xch1.onrender.com/ejercicios/${selectedEjercicio.id}'
+        : 'https://edupath-backend-xch1.onrender.com/ejercicios';
 
       // Preparar configuración según tipo
       let configuracionFinal = formData.ejercicio.configuracion;

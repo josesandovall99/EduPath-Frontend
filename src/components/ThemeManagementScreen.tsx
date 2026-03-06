@@ -147,7 +147,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
         
         if (axios.isAxiosError(err)) {
           if (err.code === 'ECONNREFUSED') {
-            errorMessage = 'No se pudo conectar al servidor en http://localhost:4000. ¿Está corriendo?';
+            errorMessage = 'No se pudo conectar al servidor en https://edupath-backend-xch1.onrender.com. ¿Está corriendo?';
           } else if (err.response?.status === 404) {
             errorMessage = 'El endpoint /areas no existe en el servidor.';
           } else if (err.response?.status) {
@@ -224,7 +224,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
         
         if (axios.isAxiosError(err)) {
           if (err.code === 'ECONNREFUSED') {
-            errorMessage = 'No se pudo conectar al servidor en http://localhost:4000.';
+            errorMessage = 'No se pudo conectar al servidor en https://edupath-backend-xch1.onrender.com.';
           } else if (err.response?.status === 404) {
             errorMessage = 'No hay temas para esta área.';
           } else if (err.response?.status) {

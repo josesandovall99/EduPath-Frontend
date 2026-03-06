@@ -30,7 +30,7 @@ export async function submitExercise(
 
     const body = { estudiante_id: resolvedEstudianteId, respuesta };
     console.log('📤 Enviando ejercicio:', ejercicioId, 'Body:', JSON.stringify(body, null, 2));
-    const res = await fetch(`http://localhost:4000/ejercicios/${ejercicioId}/enviar`, {
+    const res = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios/${ejercicioId}/enviar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)

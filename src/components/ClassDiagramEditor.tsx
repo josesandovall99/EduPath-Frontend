@@ -65,7 +65,7 @@ export default function ClassDiagramEditor() {
 
   const exportDiagram = async () => {
     const json = graphRef.current?.toJSON();
-    const res = await fetch('http://localhost:4000/diagrams/validate', {
+    const res = await fetch('https://edupath-backend-xch1.onrender.com/diagrams/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ diagram: json })

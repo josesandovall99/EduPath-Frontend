@@ -20,7 +20,7 @@ export function useCompiler() {
     console.log('📤 Enviando al backend:', payload);
     
     try {
-      const response = await axios.post('http://localhost:4000/evaluaciones/compilador', payload);
+      const response = await axios.post('https://edupath-backend-xch1.onrender.com/evaluaciones/compilador', payload);
 
       console.log('📥 Respuesta del backend:', response.data);
       const resultado = response.data;

@@ -45,7 +45,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`http://localhost:4000/temas/por-area/${areaId}`);
+      const response = await fetch(`https://edupath-backend-xch1.onrender.com/temas/por-area/${areaId}`);
       if (!response.ok) throw new Error('Error cargando temas');
       const data = await response.json();
       setTemas(data);
@@ -77,7 +77,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
     let temaToEdit = tema;
     if (tema.estado === undefined) {
       try {
-        const response = await fetch(`http://localhost:4000/temas/${tema.id}`);
+        const response = await fetch(`https://edupath-backend-xch1.onrender.com/temas/${tema.id}`);
         if (response.ok) {
           temaToEdit = await response.json();
         }

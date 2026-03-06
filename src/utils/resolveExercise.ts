@@ -13,7 +13,7 @@ export async function resolveExercise(
   body: any
 ): Promise<ResolveResult> {
   try {
-    const res = await fetch(`http://localhost:4000/ejercicios/${ejercicioId}/resolver`, {
+    const res = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios/${ejercicioId}/resolver`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)

@@ -10,7 +10,7 @@ export function ChatbotButton() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const API_BASE = 'http://localhost:4000';
+  const API_BASE = 'https://edupath-backend-xch1.onrender.com';
 
   const scrollRef = useRef<HTMLDivElement>(null);
 

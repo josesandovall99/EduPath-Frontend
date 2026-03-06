@@ -129,7 +129,7 @@ try {
 ### Si backend en otro puerto
 **File:** `vite.config.ts`
 ```typescript
-target: 'http://localhost:4000', // cambiar aquí
+target: 'https://edupath-backend-xch1.onrender.com', // cambiar aquí
 ```
 
 ### Si quieres rutas absolutas

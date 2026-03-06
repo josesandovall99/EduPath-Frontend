@@ -118,7 +118,7 @@ const handleStudentLogin = async () => {
 
       // 2) Intentar login como docente
       try {
-        const docenteRes = await fetch('http://localhost:4000/docente/login', {
+        const docenteRes = await fetch('https://edupath-backend-xch1.onrender.com/docente/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           credentials: 'include',
@@ -144,7 +144,7 @@ const handleStudentLogin = async () => {
       // 3) Intentar login como estudiante (manteniendo compatibilidad con distintas cargas)
       const postPayload = async (payload: Record<string, any>) => {
         try {
-          const res = await fetch('http://localhost:4000/estudiante/login', {
+          const res = await fetch('https://edupath-backend-xch1.onrender.com/estudiante/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             credentials: 'include',

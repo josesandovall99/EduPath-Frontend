@@ -408,7 +408,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     
     try {
       const response = await fetch(
-        `http://localhost:4000/contenidos/verificar-visualizacion?contenido_id=${contenidoId}&estudiante_id=${estudianteId}`
+        `https://edupath-backend-xch1.onrender.com/contenidos/verificar-visualizacion?contenido_id=${contenidoId}&estudiante_id=${estudianteId}`
       );
       
       if (!response.ok) {
@@ -433,7 +433,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
 
     setLoadingProgress(true);
     try {
-      const url = `http://localhost:4000/progresos/por-area?area_id=${temaId}&estudiante_id=${estudianteId}`;
+      const url = `https://edupath-backend-xch1.onrender.com/progresos/por-area?area_id=${temaId}&estudiante_id=${estudianteId}`;
       console.log(`🔄 Obteniendo progreso desde: ${url}`);
       
       const response = await fetch(url);
@@ -468,7 +468,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     const authToken = localStorage.getItem('authToken');
 
     try {
-      const response = await fetch(`http://localhost:4000/contenidos/marcar-visualizado`, {
+      const response = await fetch(`https://edupath-backend-xch1.onrender.com/contenidos/marcar-visualizado`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -509,7 +509,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
 
     try {
       // Intentar cargar estado de subtemas
-      const urlSubtemas = `http://localhost:4000/api/progreso/estado-subtemas-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
+      const urlSubtemas = `https://edupath-backend-xch1.onrender.com/api/progreso/estado-subtemas-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
       console.log('🔄 [OPCIONAL] Intentando cargar estado de subtemas desde:', urlSubtemas);
       
       const responseSubtemas = await fetch(urlSubtemas);
@@ -523,7 +523,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       }
 
       // Intentar cargar estado de contenidos
-      const urlContenidos = `http://localhost:4000/api/progreso/estado-contenidos-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
+      const urlContenidos = `https://edupath-backend-xch1.onrender.com/api/progreso/estado-contenidos-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
       console.log('🔄 [OPCIONAL] Intentando cargar estado de contenidos desde:', urlContenidos);
       
       const responseContenidos = await fetch(urlContenidos);
@@ -549,7 +549,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     for (const subtema of subtemas) {
       try {
         const response = await fetch(
-          `http://localhost:4000/progresos/por-subtema?subtema_id=${subtema.id}&estudiante_id=${estudianteId}`
+          `https://edupath-backend-xch1.onrender.com/progresos/por-subtema?subtema_id=${subtema.id}&estudiante_id=${estudianteId}`
         );
         
         if (response.ok) {
@@ -574,7 +574,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     
     try {
       console.log(`🔄 Buscando ejercicio para contenido_id: ${contenidoId}`);
-      const response = await fetch(`http://localhost:4000/ejercicios`);
+      const response = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -819,7 +819,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       // Cargar ejercicios asociados y agregarlos como ítems separados
       try {
         console.log('🔄 Cargando ejercicios asociados para agregar al menú...');
-        const ejerciciosResponse = await fetch('http://localhost:4000/ejercicios');
+        const ejerciciosResponse = await fetch('https://edupath-backend-xch1.onrender.com/ejercicios');
         
         if (ejerciciosResponse.ok) {
           const todosEjercicios: Ejercicio[] = await ejerciciosResponse.json();

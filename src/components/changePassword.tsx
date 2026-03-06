@@ -37,7 +37,7 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
     setLoading(true);
     try {
       // Nota: Asegúrate de que el puerto sea el correcto (4000 para backend)
-      const response = await fetch('http://localhost:4000/persona/cambiar-password-inicial', {
+      const response = await fetch('https://edupath-backend-xch1.onrender.com/persona/cambiar-password-inicial', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

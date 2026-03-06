@@ -166,7 +166,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:4000/miniproyectos');
+      const response = await fetch('https://edupath-backend-xch1.onrender.com/miniproyectos');
       if (!response.ok) {
         throw new Error('No se pudieron cargar los miniproyectos');
       }
@@ -385,7 +385,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
       const scheduleList = buildScheduleList(scheduleRows);
       const costsList = buildCostList(costRows);
 
-      const response = await fetch(`http://localhost:4000/miniproyectos/${selected.id}`, {
+      const response = await fetch(`https://edupath-backend-xch1.onrender.com/miniproyectos/${selected.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

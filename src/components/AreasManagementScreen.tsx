@@ -46,7 +46,7 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
   const loadAreas = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:4000/areas');
+      const response = await fetch('https://edupath-backend-xch1.onrender.com/areas');
       if (!response.ok) {
         throw new Error('Error al cargar áreas');
       }
@@ -109,8 +109,8 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
     try {
       const isEditMode = editingAreaId !== null;
       const endpoint = isEditMode
-        ? `http://localhost:4000/areas/${editingAreaId}`
-        : 'http://localhost:4000/areas';
+        ? `https://edupath-backend-xch1.onrender.com/areas/${editingAreaId}`
+        : 'https://edupath-backend-xch1.onrender.com/areas';
 
       const response = await fetch(endpoint, {
         method: isEditMode ? 'PUT' : 'POST',

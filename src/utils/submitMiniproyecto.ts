@@ -21,7 +21,7 @@ export async function submitMiniproyecto(
       lenguaje_id: payload.lenguaje_id
     };
 
-    const res = await fetch(`http://localhost:4000/miniproyectos/${miniproyectoId}/enviar`, {
+    const res = await fetch(`https://edupath-backend-xch1.onrender.com/miniproyectos/${miniproyectoId}/enviar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
