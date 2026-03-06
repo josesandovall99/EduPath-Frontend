@@ -7,14 +7,7 @@ declare global {
 }
 
 export const applyAuthHeaders = () => {
-  const personaId = localStorage.getItem('personaId');
   const authToken = localStorage.getItem('authToken');
-
-  if (personaId) {
-    axios.defaults.headers.common['x-persona-id'] = personaId;
-  } else {
-    delete axios.defaults.headers.common['x-persona-id'];
-  }
 
   if (authToken) {
     axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
@@ -31,7 +24,6 @@ export const setupAuthFetch = () => {
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
-    const personaId = localStorage.getItem('personaId');
     const authToken = localStorage.getItem('authToken');
     const headers = new Headers(init.headers || {});
     const requestUrl =
@@ -45,10 +37,6 @@ export const setupAuthFetch = () => {
       requestUrl.startsWith('http://127.0.0.1:4000') ||
       requestUrl.startsWith('/api');
     const requestMethod = (init.method || 'GET').toUpperCase();
-
-    if (personaId && !headers.has('x-persona-id')) {
-      headers.set('x-persona-id', personaId);
-    }
 
     if (authToken && !headers.has('Authorization')) {
       headers.set('Authorization', `Bearer ${authToken}`);

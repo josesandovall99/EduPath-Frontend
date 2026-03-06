@@ -3,7 +3,26 @@
   import react from '@vitejs/plugin-react-swc';
   import path from 'path';
 
-  export default defineConfig({
+  export default defineConfig(({ mode }) => {
+    const isProductionLike = mode === 'production';
+
+    // Keep dev server compatible with HMR; enforce stricter policy in preview/build scans.
+    const devCsp = "default-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws: wss: http://localhost:4000 http://localhost:3000; font-src 'self' data:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; child-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    const strictCsp = "default-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com; connect-src 'self' http://localhost:4000; font-src 'self' data:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; child-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+
+    const devHeaders: Record<string, string> = {
+      'X-Frame-Options': 'DENY',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+    };
+
+    // During local development, skip CSP to avoid blocking embedded resources while iterating.
+    // CSP remains enforced in preview/build mode for security scans.
+    if (isProductionLike) {
+      devHeaders['Content-Security-Policy'] = strictCsp;
+    }
+
+    return {
     plugins: [react()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
@@ -58,12 +77,7 @@
     server: {
       port: 3000,
       open: true,
-      headers: {
-        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws: wss: http://localhost:4000 http://localhost:3000; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'",
-        'X-Frame-Options': 'DENY',
-        'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'strict-origin-when-cross-origin',
-      },
+      headers: devHeaders,
       proxy: {
         '/api': {
           target: 'http://localhost:4000',
@@ -74,10 +88,11 @@
     },
     preview: {
       headers: {
-        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws: wss: http://localhost:4000 http://localhost:3000; font-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'",
+        'Content-Security-Policy': strictCsp,
         'X-Frame-Options': 'DENY',
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
       },
     },
+  };
   });

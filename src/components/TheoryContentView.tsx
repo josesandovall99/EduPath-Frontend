@@ -208,6 +208,71 @@ const mapTipoToType = (tipo: string): ModuleItem['type'] => {
   return tipoMap[tipo.toLowerCase()] || 'document';
 };
 
+const getYouTubeEmbedUrl = (rawUrl?: string): string | null => {
+  if (!rawUrl) return null;
+
+  try {
+    let candidate = rawUrl.trim();
+
+    // Legacy records may store full iframe HTML; extract src value if present.
+    const iframeSrcMatch = candidate.match(/src=["']([^"']+)["']/i);
+    if (iframeSrcMatch?.[1]) {
+      candidate = iframeSrcMatch[1];
+    }
+
+    // Some records store HTML-encoded params (&amp;).
+    candidate = candidate.replace(/&amp;/g, '&');
+
+    // If a raw YouTube video ID was stored, convert directly.
+    if (/^[a-zA-Z0-9_-]{11}$/.test(candidate)) {
+      return `https://www.youtube.com/embed/${candidate}`;
+    }
+
+    const normalized = candidate.startsWith('http') ? candidate : `https://${candidate}`;
+    const url = new URL(normalized);
+    const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
+
+    const isYouTubeHost =
+      hostname === 'youtube.com' ||
+      hostname === 'm.youtube.com' ||
+      hostname === 'youtu.be' ||
+      hostname === 'youtube-nocookie.com';
+
+    if (!isYouTubeHost) return null;
+
+    let videoId = '';
+
+    if (hostname === 'youtu.be') {
+      videoId = url.pathname.split('/').filter(Boolean)[0] || '';
+    } else {
+      const pathParts = url.pathname.split('/').filter(Boolean);
+      if (pathParts[0] === 'watch') {
+        videoId = url.searchParams.get('v') || '';
+      } else if (pathParts[0] === 'embed') {
+        videoId = pathParts[1] || '';
+      } else if (pathParts[0] === 'shorts' || pathParts[0] === 'live') {
+        videoId = pathParts[1] || '';
+      } else if (pathParts.length > 0 && /^[a-zA-Z0-9_-]{11}$/.test(pathParts[pathParts.length - 1])) {
+        videoId = pathParts[pathParts.length - 1];
+      }
+    }
+
+    if (!videoId) return null;
+
+    const safeVideoId = videoId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeVideoId) return null;
+
+    return `https://www.youtube.com/embed/${safeVideoId}`;
+  } catch {
+    return null;
+  }
+};
+
+const isDirectVideoUrl = (rawUrl?: string): boolean => {
+  if (!rawUrl) return false;
+  return /\.(mp4|webm|ogg)(\?|#|$)/i.test(rawUrl);
+};
+
 
 // Función para ordenar subtemas basado en secuencias
 const orderSubtemasBySequence = (subtemas: any[], sequences: any[]): any[] => {
@@ -1208,22 +1273,19 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                   <div className="mb-6">
                     {selectedContentData.url ? (
                       <div className="w-full aspect-video rounded-2xl overflow-hidden shadow-lg bg-gray-900">
-                        {selectedContentData.url.includes('youtube.com') || selectedContentData.url.includes('youtu.be') ? (
+                        {getYouTubeEmbedUrl(selectedContentData.url) ? (
                           <iframe
                             width="100%"
                             height="100%"
-                            src={selectedContentData.url.includes('youtube.com') 
-                              ? selectedContentData.url.replace('watch?v=', 'embed/').split('&')[0]
-                              : `https://www.youtube.com/embed/${selectedContentData.url.split('/').pop()}`
-                            }
+                            src={getYouTubeEmbedUrl(selectedContentData.url) || undefined}
                             title={selectedContentData.title}
                             frameBorder="0"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
                           />
-                        ) : selectedContentData.url.includes('mp4') || selectedContentData.url.includes('webm') || selectedContentData.url.includes('ogg') ? (
+                        ) : isDirectVideoUrl(selectedContentData.url) ? (
                           <video width="100%" height="100%" controls className="w-full h-full object-cover">
-                            <source src={selectedContentData.url} type={`video/${selectedContentData.url.split('.').pop()}`} />
+                            <source src={selectedContentData.url} type={`video/${(selectedContentData.url.match(/\.(mp4|webm|ogg)(\?|#|$)/i)?.[1] || 'mp4').toLowerCase()}`} />
                             Tu navegador no soporta el elemento de video
                           </video>
                         ) : (
