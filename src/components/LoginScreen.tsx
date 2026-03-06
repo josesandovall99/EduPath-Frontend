@@ -14,6 +14,7 @@ interface LoginScreenProps {
 }
 
 export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, onAdminLogin, onShowRegister, onShowChangePassword, onShowForgotPassword }: LoginScreenProps) {
+  const API_BASE_URL = 'https://edupath-backend-xch1.onrender.com';
   const [codigoEstudiantil, setCodigoEstudiantil] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -49,9 +50,9 @@ const handleStudentLogin = async () => {
       // 1) Intentar login como administrador primero
       try {
         const adminEndpoints = [
-          '/api/administrador/login',
-          '/api/administradores/login',
-          '/api/admin/login'
+          `${API_BASE_URL}/administrador/login`,
+          `${API_BASE_URL}/administradores/login`,
+          `${API_BASE_URL}/admin/login`
         ];
 
         let adminParsed: { ok: boolean; status: number; body?: any } | null = null;
