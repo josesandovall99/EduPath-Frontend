@@ -22,10 +22,9 @@ interface DashboardScreenProps {
 
 const colorPalette = ['#4A90E2', '#7ED6A7', '#F5A97F', '#FFB84D', '#A78BFA', '#EC4899'];
 
-// Configurar URL del API
-// Con proxy en vite.config.ts: usa rutas relativas '/api'
-// Sin proxy: usa 'http://localhost:3000/api'
-const API_BASE_URL = '/api';
+// En desarrollo usa el proxy `/api`; en produccion usa VITE_API_BASE_URL.
+const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+const API_BASE_URL = rawApiBaseUrl ? rawApiBaseUrl.replace(/\/$/, '') : '/api';
 
 // Fallback data por si falla el fetch
 const FALLBACK_SUBJECTS = [
@@ -78,7 +77,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
     }
 
     try {
-      const url = `https://edupath-backend-xch1.onrender.com/progresos/por-area?area_id=${areaId}&estudiante_id=${estudianteId}`;
+      const url = `${API_BASE_URL}/progresos/por-area?area_id=${areaId}&estudiante_id=${estudianteId}`;
       const response = await fetch(url);
       
       if (!response.ok) {
