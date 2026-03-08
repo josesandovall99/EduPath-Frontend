@@ -29,6 +29,8 @@ interface MiniproyectoApiResponse {
 }
 
 export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMiniproyectoViewProps) {
+  const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  const API_BASE_URL = rawApiBaseUrl || '/api';
   const [code, setCode] = useState('# Escribe tu código aquí\nprint("Hola Mundo")');
   const subjectColor = '#4A90E2';
   const [output, setOutput] = useState('');
@@ -59,7 +61,7 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
   useEffect(() => {
     const cargarMiniproyecto = async () => {
       try {
-        const response = await fetch(`https://edupath-backend-xch1.onrender.com/miniproyectos/${content.id}`);
+        const response = await fetch(`${API_BASE_URL}/miniproyectos/${content.id}`);
         if (!response.ok) return;
         const data: MiniproyectoApiResponse = await response.json();
         setDescripcion(data?.Actividad?.descripcion || '');
@@ -84,7 +86,7 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
     };
 
     cargarMiniproyecto();
-  }, [content.id]);
+  }, [content.id, API_BASE_URL]);
 
   const cambiarLenguaje = (nuevoLenguajeId: number) => {
     setLenguajeSeleccionado(nuevoLenguajeId);

@@ -37,6 +37,8 @@ interface Ejercicio {
 }
 
 export function ProgrammingContentView({ content, onBack }: ProgrammingContentViewProps) {
+  const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  const API_BASE_URL = rawApiBaseUrl || '/api';
   const [code, setCode] = useState('# Escribe tu código aquí\nprint("Hola Mundo")');
   const subjectColor = '#4A90E2';
   
@@ -77,7 +79,7 @@ export function ProgrammingContentView({ content, onBack }: ProgrammingContentVi
     const cargarEjercicio = async () => {
       try {
         console.log('🔍 Buscando ejercicio con contenido_id:', content.id);
-        const response = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios?contenido_id=${content.id}`);
+        const response = await fetch(`${API_BASE_URL}/ejercicios?contenido_id=${content.id}`);
         const data = await response.json();
         console.log('📦 Ejercicios encontrados:', data);
         if (data.length > 0) {
@@ -98,7 +100,7 @@ export function ProgrammingContentView({ content, onBack }: ProgrammingContentVi
     };
 
     cargarEjercicio();
-  }, [content.id]);
+  }, [content.id, API_BASE_URL]);
 
   // Función de ejecución
   const handleExecute = async () => {

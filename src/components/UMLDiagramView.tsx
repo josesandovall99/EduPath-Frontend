@@ -54,6 +54,8 @@ interface MultiplicityDialog {
 }
 
 export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
+  const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  const API_BASE_URL = rawApiBaseUrl || '/api';
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<joint.dia.Graph | null>(null);
   const paperRef = useRef<joint.dia.Paper | null>(null);
@@ -332,7 +334,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     console.log('📤 Validando diagrama (preview):', json);
     
     try {
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios/${activity.id}/resolver`, {
+      const response = await fetch(`${API_BASE_URL}/ejercicios/${activity.id}/resolver`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ respuesta: { diagrama: json } })
@@ -391,7 +393,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     }
 
     try {
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios/${activity.id}/enviar`, {
+      const response = await fetch(`${API_BASE_URL}/ejercicios/${activity.id}/enviar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ estudiante_id: estudianteId, respuesta: { diagram: json } })
@@ -473,7 +475,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
   // Ver retroalimentación del ejercicio
   const verRetroalimentacion = async () => {
     try {
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios/${activity.id}/retroalimentacion`);
+      const response = await fetch(`${API_BASE_URL}/ejercicios/${activity.id}/retroalimentacion`);
       
       if (!response.ok) {
         alert('❌ No se pudo obtener la retroalimentación.');
