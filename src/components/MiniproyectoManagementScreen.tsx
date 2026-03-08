@@ -92,9 +92,10 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const [showExpectedModal, setShowExpectedModal] = useState(false);
   const [expectedSnapshot, setExpectedSnapshot] = useState<ExpectedSnapshot | null>(null);
 
-  const actividadId = selected?.actividad_id ? Number(selected.actividad_id) : null;
-  const isProgrammingMiniproyecto = actividadId === 12;
-  const isManagementMiniproyecto = actividadId === 13;
+  // El tipo de editor depende del area del miniproyecto, no del id de la actividad.
+  const selectedAreaId = selected?.Area?.id ? Number(selected.Area.id) : null;
+  const isProgrammingMiniproyecto = selectedAreaId === 2;
+  const isManagementMiniproyecto = selectedAreaId === 3;
 
   useEffect(() => {
     if (!isProgrammingMiniproyecto) return;
@@ -328,7 +329,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setScheduleRows(parsedSchedule.length > 0 ? parsedSchedule : [{ activity: '', start: '', end: '' }]);
     setCostRows(parsedCosts.length > 0 ? parsedCosts : [{ concept: '', type: 'Humano', quantity: '', unitCost: '' }]);
     setScopeInput('');
-    const isProgrammingItem = Number(item.actividad_id) === 12;
+    const isProgrammingItem = Number(item.Area?.id) === 2;
     if (isProgrammingItem) {
       setExpectedOutput(parsedEsperado || item.respuesta_miniproyecto || '');
       setSintaxisRequerida(parsedSintaxis);
