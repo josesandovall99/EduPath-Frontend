@@ -69,7 +69,8 @@ const getSubjectColor = (subjectId: string) => {
   return subjectColors[subjectId] || { primary: '#4A90E2', light: '#E3F2FD' };
 };
 
-const API_BASE_URL = '/api';
+const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+const API_BASE_URL = rawApiBaseUrl ? rawApiBaseUrl.replace(/\/$/, '') : '/api';
 
 const FALLBACK_CONTENT: Content[] = [
   { id: '1', title: 'Introducción al curso', type: 'video', duration: '15 min', status: 'completed' },
@@ -168,7 +169,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
 
     setLoadingProgress(true);
     try {
-      const url = `https://edupath-backend-xch1.onrender.com/progresos/por-area?area_id=${subject.id}&estudiante_id=${estudianteId}`;
+      const url = `${API_BASE_URL}/progresos/por-area?area_id=${subject.id}&estudiante_id=${estudianteId}`;
       console.log(`🔄 Obteniendo progreso desde: ${url}`);
       
       const response = await fetch(url);
@@ -201,7 +202,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     for (const tema of temas) {
       try {
         const response = await fetch(
-          `https://edupath-backend-xch1.onrender.com/progresos/por-tema?tema_id=${tema.id}&estudiante_id=${estudianteId}`
+          `${API_BASE_URL}/progresos/por-tema?tema_id=${tema.id}&estudiante_id=${estudianteId}`
         );
         
         if (response.ok) {
@@ -225,7 +226,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     
     try {
       const response = await fetch(
-        `https://edupath-backend-xch1.onrender.com/api/progreso/estado-temas-area?estudiante_id=${estudianteId}&area_id=${subject.id}`
+        `${API_BASE_URL}/progresos/estado-temas-area?estudiante_id=${estudianteId}&area_id=${subject.id}`
       );
       
       if (response.ok) {
