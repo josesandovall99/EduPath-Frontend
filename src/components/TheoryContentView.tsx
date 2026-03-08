@@ -465,7 +465,6 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       return;
     }
 
-    const personaId = localStorage.getItem('personaId');
     const authToken = localStorage.getItem('authToken');
 
     try {
@@ -474,7 +473,6 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          ...(personaId ? { 'x-persona-id': String(personaId) } : {}),
           ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
         },
         body: JSON.stringify({
