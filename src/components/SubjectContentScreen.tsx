@@ -69,8 +69,12 @@ const getSubjectColor = (subjectId: string) => {
   return subjectColors[subjectId] || { primary: '#4A90E2', light: '#E3F2FD' };
 };
 
+// Use proxy in dev (/api), full URL in production
+const isProduction = import.meta.env.PROD;
 const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-const API_BASE_URL = rawApiBaseUrl ? rawApiBaseUrl.replace(/\/$/, '') : '/api';
+const API_BASE_URL = rawApiBaseUrl 
+  ? rawApiBaseUrl.replace(/\/$/, '') 
+  : (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
 
 const FALLBACK_CONTENT: Content[] = [
   { id: '1', title: 'Introducción al curso', type: 'video', duration: '15 min', status: 'completed' },

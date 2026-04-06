@@ -54,8 +54,10 @@ interface MultiplicityDialog {
 }
 
 export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
+  // Use proxy in dev (/api), full URL in production
+  const isProduction = import.meta.env.PROD;
   const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-  const API_BASE_URL = rawApiBaseUrl || '/api';
+  const API_BASE_URL = rawApiBaseUrl || (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<joint.dia.Graph | null>(null);
   const paperRef = useRef<joint.dia.Paper | null>(null);

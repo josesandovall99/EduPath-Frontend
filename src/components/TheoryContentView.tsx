@@ -183,8 +183,12 @@ const subjectColors: Record<string, string> = {
   'Fundamentos de Programación': '#4A90E2'
 };
 
+// Use proxy in dev (/api), full URL in production
+const isProduction = import.meta.env.PROD;
 const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-const API_BASE_URL = rawApiBaseUrl ? rawApiBaseUrl.replace(/\/$/, '') : '/api';
+const API_BASE_URL = rawApiBaseUrl 
+  ? rawApiBaseUrl.replace(/\/$/, '') 
+  : (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
 
 // Fallback data for subtemas
 const FALLBACK_MODULES: Module[] = [

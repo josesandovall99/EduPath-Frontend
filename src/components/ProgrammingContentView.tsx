@@ -37,8 +37,10 @@ interface Ejercicio {
 }
 
 export function ProgrammingContentView({ content, onBack }: ProgrammingContentViewProps) {
+  // Use proxy in dev (/api), full URL in production
+  const isProduction = import.meta.env.PROD;
   const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-  const API_BASE_URL = rawApiBaseUrl || '/api';
+  const API_BASE_URL = rawApiBaseUrl || (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
   const [code, setCode] = useState('# Escribe tu código aquí\nprint("Hola Mundo")');
   const subjectColor = '#4A90E2';
   
