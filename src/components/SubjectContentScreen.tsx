@@ -344,7 +344,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 minisArray.map(async (mini) => {
                   try {
                     const response = await fetch(
-                      `${API_BASE_URL}/evaluaciones/by?estudiante_id=${estudianteId}&miniproyecto_id=${mini.id}`
+                      `${API_BASE_URL}/evaluaciones/by?miniproyecto_id=${mini.id}`
                     );
                     if (!response.ok) return [mini.id, false] as const;
                     const data = await response.json();
