@@ -84,7 +84,16 @@ interface Content {
   status?: 'completed' | 'in-progress' | 'not-started';
   isMiniproyecto?: boolean;
   actividadId?: number;
+  areaId?: number;
+  areaNombre?: string;
 }
+
+const normalizeLabel = (value?: string | null) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 
 export default function App() {
   const APP_NAV_STATE_KEY = 'appNavigationState';
@@ -490,13 +499,11 @@ export default function App() {
       setSelectedTemaId(temaId);
     }
 
-    const isMiniproyectoAI = Boolean(content.isMiniproyecto && (content.actividadId === 2 || content.actividadId === 3));
-    if (isMiniproyectoAI) {
-      setCurrentScreen('ai-workshop');
-      return;
-    }
     if (content.isMiniproyecto) {
-      setCurrentScreen('programming-miniproyecto');
+      const normalizedAreaName = normalizeLabel(content.areaNombre || selectedSubject?.name);
+      const isProgrammingMiniproyecto = normalizedAreaName.includes('programacion');
+
+      setCurrentScreen(isProgrammingMiniproyecto ? 'programming-miniproyecto' : 'ai-workshop');
       return;
     }
     

@@ -23,6 +23,8 @@ interface Content {
   status: 'completed' | 'in-progress' | 'not-started';
   isMiniproyecto?: boolean;
   actividadId?: number;
+  areaId?: number;
+  areaNombre?: string;
   miniproyectoAprobado?: boolean;
   // Campos opcionales para el sistema de desbloqueo progresivo
   desbloqueado?: boolean;
@@ -338,7 +340,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 minisArray.map(async (mini) => {
                   try {
                     const response = await fetch(
-                      `${API_BASE_URL}/evaluaciones/by?estudiante_id=${estudianteId}&miniproyecto_id=${mini.id}`
+                      `${API_BASE_URL}/evaluaciones/by?miniproyecto_id=${mini.id}`
                     );
                     if (!response.ok) return [mini.id, false] as const;
                     const data = await response.json();
@@ -365,6 +367,8 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 status: aprobado ? 'completed' : ('not-started' as const),
                 isMiniproyecto: true,
                 actividadId: Number(mini.actividad_id),
+                areaId: mini.Area?.id,
+                areaNombre: mini.Area?.nombre,
                 miniproyectoAprobado: aprobado,
                 completo: aprobado
               };

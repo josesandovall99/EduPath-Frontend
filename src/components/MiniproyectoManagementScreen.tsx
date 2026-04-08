@@ -57,6 +57,13 @@ type ExpectedSnapshot =
       costos: string[];
     };
 
+const normalizeAreaName = (value?: string | null) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
 export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementScreenProps) {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
@@ -94,9 +101,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const [expectedSnapshot, setExpectedSnapshot] = useState<ExpectedSnapshot | null>(null);
 
   // El tipo de editor depende del area del miniproyecto, no del id de la actividad.
-  const selectedAreaId = selected?.Area?.id ? Number(selected.Area.id) : null;
-  const isProgrammingMiniproyecto = selectedAreaId === 2;
-  const isManagementMiniproyecto = selectedAreaId === 3;
+  const selectedAreaName = normalizeAreaName(selected?.Area?.nombre);
+  const isProgrammingMiniproyecto = selectedAreaName.includes('programacion');
+  const isManagementMiniproyecto = selectedAreaName.includes('alcance') || selectedAreaName.includes('gestion');
 
   useEffect(() => {
     if (!isProgrammingMiniproyecto) return;
@@ -330,7 +337,8 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setScheduleRows(parsedSchedule.length > 0 ? parsedSchedule : [{ activity: '', start: '', end: '' }]);
     setCostRows(parsedCosts.length > 0 ? parsedCosts : [{ concept: '', type: 'Humano', quantity: '', unitCost: '' }]);
     setScopeInput('');
-    const isProgrammingItem = Number(item.Area?.id) === 2;
+    const normalizedItemAreaName = normalizeAreaName(item.Area?.nombre);
+    const isProgrammingItem = normalizedItemAreaName.includes('programacion');
     if (isProgrammingItem) {
       setExpectedOutput(parsedEsperado || item.respuesta_miniproyecto || '');
       setSintaxisRequerida(parsedSintaxis);
