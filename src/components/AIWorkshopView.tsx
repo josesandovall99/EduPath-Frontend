@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Lightbulb, FileText, Check, Save } from 'lucide-react';
+import { API_BASE_URL } from '../utils/constants';
 
 
 interface AIWorkshopViewProps {
@@ -56,13 +57,6 @@ const workshopConfigs = {
 };
 
 const taskColors = ['#4A90E2', '#7ED6A7', '#F5A97F', '#A78BFA', '#FBBF24', '#60A5FA'];
-
-// Use proxy in dev (/api), full URL in production
-const isProduction = import.meta.env.PROD;
-const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-const API_BASE_URL = rawApiBaseUrl 
-  ? rawApiBaseUrl.replace(/\/$/, '') 
-  : (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
 
 export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: AIWorkshopViewProps) {
   const [currentTask, setCurrentTask] = useState(1);

@@ -1,6 +1,7 @@
 import { Mail, Lock, ArrowRight, KeyRound, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { applyAuthHeaders } from '../utils/authHeaders';
+import { API_BASE_URL } from '../utils/constants';
 
 
 interface LoginScreenProps {
@@ -14,7 +15,6 @@ interface LoginScreenProps {
 }
 
 export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, onAdminLogin, onShowRegister, onShowChangePassword, onShowForgotPassword }: LoginScreenProps) {
-  const API_BASE_URL = 'https://edupath-backend-xch1.onrender.com';
   const [codigoEstudiantil, setCodigoEstudiantil] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -119,7 +119,7 @@ const handleStudentLogin = async () => {
 
       // 2) Intentar login como docente
       try {
-        const docenteRes = await fetch('https://edupath-backend-xch1.onrender.com/docente/login', {
+        const docenteRes = await fetch(`${API_BASE_URL}/docente/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           credentials: 'include',
@@ -145,7 +145,7 @@ const handleStudentLogin = async () => {
       // 3) Intentar login como estudiante (manteniendo compatibilidad con distintas cargas)
       const postPayload = async (payload: Record<string, any>) => {
         try {
-          const res = await fetch('https://edupath-backend-xch1.onrender.com/estudiante/login', {
+          const res = await fetch(`${API_BASE_URL}/estudiante/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             credentials: 'include',

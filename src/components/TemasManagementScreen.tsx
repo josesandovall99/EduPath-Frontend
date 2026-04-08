@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Edit2, Loader, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ThemeManagementScreen } from './ThemeManagementScreen';
+import { API_BASE_URL } from '../utils/constants';
 
 interface Tema {
   id: number;
@@ -45,7 +46,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/temas/por-area/${areaId}`);
+      const response = await fetch(`${API_BASE_URL}/temas/por-area/${areaId}`);
       if (!response.ok) throw new Error('Error cargando temas');
       const data = await response.json();
       setTemas(data);
@@ -77,7 +78,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
     let temaToEdit = tema;
     if (tema.estado === undefined) {
       try {
-        const response = await fetch(`https://edupath-backend-xch1.onrender.com/temas/${tema.id}`);
+        const response = await fetch(`${API_BASE_URL}/temas/${tema.id}`);
         if (response.ok) {
           temaToEdit = await response.json();
         }

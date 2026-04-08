@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { API_BASE_URL, API_PROXY_TARGET } from './constants';
 
 declare global {
   interface Window {
@@ -33,7 +34,8 @@ export const setupAuthFetch = () => {
           ? input.toString()
           : input.url;
     const isBackendRequest =
-      requestUrl.startsWith('https://edupath-backend-xch1.onrender.com') ||
+      requestUrl.startsWith(API_BASE_URL) ||
+      requestUrl.startsWith(API_PROXY_TARGET) ||
       requestUrl.startsWith('http://127.0.0.1:4000') ||
       requestUrl.startsWith('/api');
     const requestMethod = (init.method || 'GET').toUpperCase();

@@ -1,6 +1,7 @@
 import { ArrowLeft, CheckCircle2, Clock, FileText, PlayCircle, Edit, Share2, Users, Lock } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface Subject {
   id: string;
@@ -68,13 +69,6 @@ const subjectColors: Record<string, { primary: string; light: string; icon: any 
 const getSubjectColor = (subjectId: string) => {
   return subjectColors[subjectId] || { primary: '#4A90E2', light: '#E3F2FD' };
 };
-
-// Use proxy in dev (/api), full URL in production
-const isProduction = import.meta.env.PROD;
-const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-const API_BASE_URL = rawApiBaseUrl 
-  ? rawApiBaseUrl.replace(/\/$/, '') 
-  : (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
 
 const FALLBACK_CONTENT: Content[] = [
   { id: '1', title: 'Introducción al curso', type: 'video', duration: '15 min', status: 'completed' },

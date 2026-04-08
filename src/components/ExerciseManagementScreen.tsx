@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Plus, Edit, Loader, Trash2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface ExerciseManagementScreenProps {
   onBack: () => void;
@@ -642,7 +643,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const loadEjercicios = async () => {
     setIsLoadingData(true);
     try {
-      const res = await fetch('https://edupath-backend-xch1.onrender.com/ejercicios');
+      const res = await fetch(`${API_BASE_URL}/ejercicios`);
       if (!res.ok) throw new Error('No se pudieron cargar los ejercicios');
       const data = await res.json();
       setEjercicios(data as EjercicioItem[]);
@@ -657,7 +658,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const loadContenidos = async () => {
     setIsLoadingContenidos(true);
     try {
-      const res = await fetch('https://edupath-backend-xch1.onrender.com/contenidos');
+      const res = await fetch(`${API_BASE_URL}/contenidos`);
       if (!res.ok) throw new Error('No se pudieron cargar los contenidos');
       const data = await res.json();
       const mapped: ContenidoOption[] = (data || []).map((c: any) => ({ id: Number(c.id), titulo: c.titulo }));
@@ -673,7 +674,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const loadTiposActividad = async () => {
     setIsLoadingTipos(true);
     try {
-      const res = await fetch('https://edupath-backend-xch1.onrender.com/tipoactividad');
+      const res = await fetch(`${API_BASE_URL}/tipoactividad`);
       if (!res.ok) throw new Error('No se pudieron cargar los tipos de actividad');
       const data = await res.json();
       setTiposActividad(data || []);
@@ -885,8 +886,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     try {
       const method = isEditMode ? 'PUT' : 'POST';
       const url = isEditMode && selectedEjercicio
-        ? 'https://edupath-backend-xch1.onrender.com/ejercicios/${selectedEjercicio.id}'
-        : 'https://edupath-backend-xch1.onrender.com/ejercicios';
+        ? `${API_BASE_URL}/ejercicios/${selectedEjercicio.id}`
+        : `${API_BASE_URL}/ejercicios`;
 
       // Preparar configuración según tipo
       let configuracionFinal = formData.ejercicio.configuracion;

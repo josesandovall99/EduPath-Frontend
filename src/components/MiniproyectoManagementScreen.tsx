@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ClipboardList, RefreshCw, Save, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface MiniproyectoManagementScreenProps {
   onBack: () => void;
@@ -167,7 +168,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/miniproyectos');
+      const response = await fetch(`${API_BASE_URL}/miniproyectos`);
       if (!response.ok) {
         throw new Error('No se pudieron cargar los miniproyectos');
       }
@@ -386,7 +387,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
       const scheduleList = buildScheduleList(scheduleRows);
       const costsList = buildCostList(costRows);
 
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/miniproyectos/${selected.id}`, {
+      const response = await fetch(`${API_BASE_URL}/miniproyectos/${selected.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

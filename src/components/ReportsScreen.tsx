@@ -3,11 +3,12 @@ import { ArrowLeft, Download, FileSpreadsheet, Filter, X, User, Calendar, Activi
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 import axios from 'axios';
+import { API_BASE_URL } from '../utils/constants';
 
 const logoImage = new URL('../assets/898bd8e2c46596e40b55d8328f5f754f003aa92a.png', import.meta.url).href;
 
 const api = axios.create({
-  baseURL: 'https://edupath-backend-xch1.onrender.com',
+  baseURL: API_BASE_URL,
   timeout: 15000
 });
 

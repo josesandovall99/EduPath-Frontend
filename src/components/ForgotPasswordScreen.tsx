@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Mail, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
+import { API_BASE_URL } from '../utils/constants';
 
 interface ForgotPasswordScreenProps {
   onBack: () => void;
@@ -17,7 +18,7 @@ export function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenProps) {
     setLoading(true);
 
     try {
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/persona/forgot-password', {
+      const response = await fetch(`${API_BASE_URL}/persona/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })

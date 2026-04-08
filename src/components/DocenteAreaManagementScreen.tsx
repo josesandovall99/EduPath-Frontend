@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { ArrowLeft, ChevronDown, ChevronUp, Plus, Pencil, Search, Trash2, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface DocenteAreaManagementScreenProps {
   onBack: () => void;
@@ -45,8 +46,6 @@ interface ContenidoForm {
   descripcion: string;
   url: string;
 }
-
-const API_BASE_URL = '/api';
 
 export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNombre }: DocenteAreaManagementScreenProps) {
   const [availableAreas, setAvailableAreas] = useState<AreaOption[]>([]);

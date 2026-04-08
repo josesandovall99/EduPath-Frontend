@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './constants';
+
 export interface SubmitResult<T = any> {
   status: number;
   data: T | null;
@@ -30,7 +32,7 @@ export async function submitExercise(
 
     const body = { estudiante_id: resolvedEstudianteId, respuesta };
     console.log('📤 Enviando ejercicio:', ejercicioId, 'Body:', JSON.stringify(body, null, 2));
-    const res = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios/${ejercicioId}/enviar`, {
+    const res = await fetch(`${API_BASE_URL}/ejercicios/${ejercicioId}/enviar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)

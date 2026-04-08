@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Pencil, Plus, Search, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface Area {
   id: number;
@@ -46,7 +47,7 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
   const loadAreas = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/areas');
+      const response = await fetch(`${API_BASE_URL}/areas`);
       if (!response.ok) {
         throw new Error('Error al cargar áreas');
       }
@@ -109,8 +110,8 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
     try {
       const isEditMode = editingAreaId !== null;
       const endpoint = isEditMode
-        ? `https://edupath-backend-xch1.onrender.com/areas/${editingAreaId}`
-        : 'https://edupath-backend-xch1.onrender.com/areas';
+        ? `${API_BASE_URL}/areas/${editingAreaId}`
+        : `${API_BASE_URL}/areas`;
 
       const response = await fetch(endpoint, {
         method: isEditMode ? 'PUT' : 'POST',

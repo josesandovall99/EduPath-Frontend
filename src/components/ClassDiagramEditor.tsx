@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as joint from 'jointjs';
 import 'jointjs/dist/joint.css';
+import { API_BASE_URL } from '../utils/constants';
 
 export default function ClassDiagramEditor() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,7 +66,7 @@ export default function ClassDiagramEditor() {
 
   const exportDiagram = async () => {
     const json = graphRef.current?.toJSON();
-    const res = await fetch('https://edupath-backend-xch1.onrender.com/diagrams/validate', {
+    const res = await fetch(`${API_BASE_URL}/diagrams/validate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ diagram: json })

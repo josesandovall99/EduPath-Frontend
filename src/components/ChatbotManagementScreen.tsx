@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Upload, RefreshCw, Trash2, MessageCircle, FileText, Database, Send } from 'lucide-react';
+import { API_BASE_URL } from '../utils/constants';
 
 interface ChatbotManagementScreenProps {
   onBack: () => void;
@@ -27,15 +28,13 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
   const [inputValue, setInputValue] = useState('');
   const [isAsking, setIsAsking] = useState(false);
 
-  const API_BASE = 'https://edupath-backend-xch1.onrender.com';
-
   useEffect(() => {
     loadStats();
   }, []);
 
   const loadStats = async () => {
     try {
-      const response = await fetch(`${API_BASE}/chatbot/stats`);
+      const response = await fetch(`${API_BASE_URL}/chatbot/stats`);
       const data = await response.json();
       if (data.success) {
         setStats(data);
@@ -58,7 +57,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     formData.append('pdf', selectedFile);
 
     try {
-      const response = await fetch(`${API_BASE}/chatbot/upload`, {
+      const response = await fetch(`${API_BASE_URL}/chatbot/upload`, {
         method: 'POST',
         body: formData
       });
@@ -85,7 +84,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     setUploadStatus('Recargando PDFs...');
 
     try {
-      const response = await fetch(`${API_BASE}/chatbot/reload`, {
+      const response = await fetch(`${API_BASE_URL}/chatbot/reload`, {
         method: 'POST'
       });
 
@@ -114,7 +113,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     setUploadStatus('Limpiando base de datos...');
 
     try {
-      const response = await fetch(`${API_BASE}/chatbot/clear`, {
+      const response = await fetch(`${API_BASE_URL}/chatbot/clear`, {
         method: 'DELETE'
       });
 
@@ -144,7 +143,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     setIsAsking(true);
 
     try {
-      const response = await fetch(`${API_BASE}/chatbot/chat`, {
+      const response = await fetch(`${API_BASE_URL}/chatbot/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

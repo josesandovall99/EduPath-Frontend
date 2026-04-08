@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../utils/constants';
 
 export function useCompiler() {
   const [output, setOutput] = useState('');
@@ -20,7 +21,7 @@ export function useCompiler() {
     console.log('📤 Enviando al backend:', payload);
     
     try {
-      const response = await axios.post('https://edupath-backend-xch1.onrender.com/evaluaciones/compilador', payload);
+      const response = await axios.post(`${API_BASE_URL}/evaluaciones/compilador`, payload);
 
       console.log('📥 Respuesta del backend:', response.data);
       const resultado = response.data;
