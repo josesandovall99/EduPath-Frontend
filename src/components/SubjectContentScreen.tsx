@@ -22,6 +22,8 @@ interface Content {
   status: 'completed' | 'in-progress' | 'not-started';
   isMiniproyecto?: boolean;
   actividadId?: number;
+  areaId?: number;
+  areaNombre?: string;
   miniproyectoAprobado?: boolean;
   // Campos opcionales para el sistema de desbloqueo progresivo
   desbloqueado?: boolean;
@@ -371,6 +373,8 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 status: aprobado ? 'completed' : ('not-started' as const),
                 isMiniproyecto: true,
                 actividadId: Number(mini.actividad_id),
+                areaId: mini.Area?.id,
+                areaNombre: mini.Area?.nombre,
                 miniproyectoAprobado: aprobado,
                 completo: aprobado
               };

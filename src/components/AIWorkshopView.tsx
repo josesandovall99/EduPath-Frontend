@@ -9,10 +9,18 @@ interface AIWorkshopViewProps {
     title: string;
     isMiniproyecto?: boolean;
     actividadId?: number;
+    areaNombre?: string;
   };
   onBack: () => void;
   estudianteId?: number;
 }
+
+const normalizeAreaName = (value?: string | null) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 
 
 // Colores por materia
@@ -96,7 +104,8 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
   const [showResultModal, setShowResultModal] = useState(false);
   const totalTasks = 5;
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
-  const isManagementWorkshop = workshop.actividadId === 13 || subjectName === 'Alcance, Tiempo y Costo';
+  const normalizedAreaName = normalizeAreaName(workshop.areaNombre || subjectName);
+  const isManagementWorkshop = normalizedAreaName.includes('alcance') || normalizedAreaName.includes('gestion');
   const workshopConfig = isManagementWorkshop ? workshopConfigs.management : workshopConfigs.analysis;
 
   const buildScheduleList = (rows: Array<{ activity: string; start: string; end: string }>) =>
