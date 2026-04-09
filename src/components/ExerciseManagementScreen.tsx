@@ -18,6 +18,7 @@ interface EjercicioItem {
   contenido_id: number;
   puntos: number;
   resultado_ejercicio: string;
+  codigoEstructura?: string;
   tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar';
   configuracion?: any;
   actividad?: {
@@ -29,6 +30,10 @@ interface EjercicioItem {
     tipo_actividad_id?: number;
   };
   Contenido?: {
+    id: number;
+    titulo?: string;
+  };
+  contenido?: {
     id: number;
     titulo?: string;
   };
@@ -53,81 +58,204 @@ interface ExerciseFormData {
     contenido_id: number | '';
     puntos: number | '';
     resultado_ejercicio: string;
+    codigoEstructura: string;
     tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar';
     configuracion: any;
   };
 }
 
+type MetodoDerivado = {
+  nombre: string;
+  retorno: string;
+  parametros: Array<{ nombre: string; tipo: string }>;
+};
+
+const emptyCompilerCase = () => ({ inputs: '', output: '' });
+
+const createDefaultCompilerConfig = () => ({
+  tipo: 'programacion',
+  lenguajesPermitidos: [62],
+  sintaxis: [],
+  casos_prueba: [emptyCompilerCase(), emptyCompilerCase(), emptyCompilerCase()],
+  metodo: null,
+});
+
+function parseMethodTemplate(template: string): MetodoDerivado | null {
+  const match = template.match(/(?:public|private|protected)?\s*(?:static\s+)?([A-Za-z_][A-Za-z0-9_<>\[\],\s?]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/);
+  if (!match) return null;
+
+  const parametros = match[3].trim()
+    ? match[3].split(',').map((parametro) => parametro.trim()).filter(Boolean).map((parametro, index) => {
+        const partes = parametro.split(/\s+/).filter(Boolean);
+        if (partes.length < 2) {
+          return { tipo: partes[0] || 'String', nombre: `arg${index}` };
+        }
+        const nombre = partes.pop() || `arg${index}`;
+        return { tipo: partes.join(' '), nombre };
+      })
+    : [];
+
+  return {
+    retorno: match[1].trim(),
+    nombre: match[2].trim(),
+    parametros,
+  };
+}
+
 // Componente para configuración de Compilador
 function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormData; setFormData: React.Dispatch<React.SetStateAction<ExerciseFormData>> }) {
-  const handleEsperadoChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const valor = e.target.value;
-    setFormData(prev => ({
+  const compilerConfig = {
+    ...createDefaultCompilerConfig(),
+    ...(formData.ejercicio.configuracion || {}),
+  };
+  const casosPrueba = Array.isArray(compilerConfig.casos_prueba) && compilerConfig.casos_prueba.length === 3
+    ? compilerConfig.casos_prueba
+    : [emptyCompilerCase(), emptyCompilerCase(), emptyCompilerCase()];
+  const plantillaMetodo = formData.ejercicio.codigoEstructura || compilerConfig.metodo?.plantilla || '';
+  const metodoDerivado = parseMethodTemplate(plantillaMetodo);
+
+  const updateCompilerConfig = (updates: Record<string, any>, extraEjercicio: Partial<ExerciseFormData['ejercicio']> = {}) => {
+    setFormData((prev) => ({
       ...prev,
       ejercicio: {
         ...prev.ejercicio,
-        resultado_ejercicio: valor,
+        ...extraEjercicio,
         configuracion: {
+          ...createDefaultCompilerConfig(),
           ...prev.ejercicio.configuracion,
-          esperado: valor
+          ...updates,
         }
       }
     }));
+  };
+
+  const handleTemplateChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const plantilla = e.target.value;
+    const metodo = parseMethodTemplate(plantilla);
+
+    updateCompilerConfig({
+      metodo: metodo ? { ...metodo, plantilla } : null,
+      lenguajesPermitidos: [62],
+      casos_prueba: casosPrueba,
+    }, {
+      codigoEstructura: plantilla,
+    });
   };
 
   const handleSintaxisChange = (sintaxis: string) => {
-    const currentSintaxis = formData.ejercicio.configuracion?.sintaxis || [];
+    const currentSintaxis = compilerConfig?.sintaxis || [];
     const newSintaxis = currentSintaxis.includes(sintaxis)
       ? currentSintaxis.filter((s: string) => s !== sintaxis)
       : [...currentSintaxis, sintaxis];
-    
-    setFormData(prev => ({
-      ...prev,
-      ejercicio: {
-        ...prev.ejercicio,
-        configuracion: {
-          ...prev.ejercicio.configuracion,
-          sintaxis: newSintaxis
-        }
-      }
-    }));
+
+    updateCompilerConfig({ sintaxis: newSintaxis, casos_prueba: casosPrueba });
+  };
+
+  const handleCaseChange = (index: number, field: 'inputs' | 'output', value: string) => {
+    const nuevosCasos = casosPrueba.map((caso: any, caseIndex: number) =>
+      caseIndex === index ? { ...caso, [field]: value } : caso
+    );
+
+    updateCompilerConfig({
+      casos_prueba: nuevosCasos,
+      metodo: metodoDerivado ? { ...metodoDerivado, plantilla: plantillaMetodo } : compilerConfig.metodo,
+    }, {
+      resultado_ejercicio: nuevosCasos[0]?.output || 'Ejercicio con 3 casos de prueba'
+    });
   };
 
   const sintaxisDisponibles = ['while', 'for', 'if', 'switch'];
-  const sintaxisSeleccionadas = formData.ejercicio.configuracion?.sintaxis || [];
+  const sintaxisSeleccionadas = compilerConfig?.sintaxis || [];
 
   return (
-    <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+    <div className="space-y-4 p-4 lg:p-5 bg-blue-50 rounded-xl border border-blue-200">
       <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración de Compilador</h3>
-      
-      <div>
-        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Sintaxis Requerida *</label>
-        <div className="grid grid-cols-2 gap-3">
-          {sintaxisDisponibles.map(sintaxis => (
-            <label key={sintaxis} className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={sintaxisSeleccionadas.includes(sintaxis)}
-                onChange={() => handleSintaxisChange(sintaxis)}
-                className="w-4 h-4 text-[#4A90E2] border-gray-300 rounded focus:ring-[#4A90E2]"
-              />
-              <span className="text-sm text-[#3A4A5B] font-mono">{sintaxis}</span>
-            </label>
-          ))}
-        </div>
-        <p className="text-xs text-gray-500 mt-2">Seleccione las estructuras de control que el estudiante debe usar</p>
-      </div>
 
-      <div>
-        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Salida Esperada del Programa *</label>
-        <textarea
-          value={formData.ejercicio.resultado_ejercicio}
-          onChange={handleEsperadoChange}
-          placeholder="Ejemplo: 1 2 3&#10;o&#10;Hola Mundo"
-          className="w-full min-h-32 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono text-sm"
-          required
-        />
-        <p className="text-xs text-gray-500 mt-1">Ingrese la salida exacta que debe producir el programa del estudiante (output/resultado)</p>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-4 items-start">
+        <div className="space-y-4 min-w-0">
+          <div>
+            <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Plantilla del método *</label>
+            <textarea
+              value={plantillaMetodo}
+              onChange={handleTemplateChange}
+              placeholder={"public static int sumar(int a, int b) {\n    // TODO\n}"}
+              className="w-full min-h-32 lg:min-h-36 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono text-sm leading-6 bg-white"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-2">La plantilla del método es el campo principal. El backend encapsulará este método dentro de una clase Main y ejecutará los 3 casos automáticamente.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
+              <div className="text-xs text-gray-500 mb-1">Método derivado</div>
+              <div className="text-sm font-semibold text-[#3A4A5B]">{metodoDerivado?.nombre || 'Pendiente de derivar'}</div>
+            </div>
+            <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
+              <div className="text-xs text-gray-500 mb-1">Retorno</div>
+              <div className="text-sm font-semibold text-[#3A4A5B]">{metodoDerivado?.retorno || 'Pendiente de derivar'}</div>
+            </div>
+            <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
+              <div className="text-xs text-gray-500 mb-1">Parámetros</div>
+              <div className="text-sm font-semibold text-[#3A4A5B] break-words">
+                {metodoDerivado?.parametros?.length
+                  ? metodoDerivado.parametros.map((param) => `${param.tipo} ${param.nombre}`).join(', ')
+                  : 'Pendiente de derivar'}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
+            <label className="block text-sm font-medium text-[#3A4A5B] mb-3">Restricciones técnicas (opcionales)</label>
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+              {sintaxisDisponibles.map(sintaxis => (
+                <label key={sintaxis} className="flex items-center space-x-2 cursor-pointer rounded-lg border border-gray-200 px-3 py-2 bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={sintaxisSeleccionadas.includes(sintaxis)}
+                    onChange={() => handleSintaxisChange(sintaxis)}
+                    className="w-4 h-4 text-[#4A90E2] border-gray-300 rounded focus:ring-[#4A90E2]"
+                  />
+                  <span className="text-sm text-[#3A4A5B] font-mono">{sintaxis}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-3">Solo se validan si el ejercicio las define. Si quedan vacías, el backend evaluará únicamente los 3 casos de prueba.</p>
+          </div>
+        </div>
+
+        <div className="space-y-3 min-w-0">
+          <div>
+            <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Casos de prueba obligatorios *</label>
+            <p className="text-xs text-gray-500 mb-3">Los inputs aceptan valores separados por comas, por ejemplo: 5,3</p>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+            {casosPrueba.map((caso: any, index: number) => (
+              <div key={index} className="space-y-3 bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
+                <div className="text-xs font-semibold uppercase tracking-wide text-[#3A4A5B]">Caso {index + 1}</div>
+                <div>
+                  <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Inputs *</label>
+                  <input
+                    type="text"
+                    value={caso.inputs || ''}
+                    onChange={(e) => handleCaseChange(index, 'inputs', e.target.value)}
+                    placeholder="Ej: 5,3"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Output esperado *</label>
+                  <input
+                    type="text"
+                    value={caso.output || ''}
+                    onChange={(e) => handleCaseChange(index, 'output', e.target.value)}
+                    placeholder="Resultado esperado"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -602,6 +730,9 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
 }
 
 export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenProps) {
+  const isProduction = import.meta.env.PROD;
+  const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  const API_BASE_URL = rawApiBaseUrl || (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
   const [ejercicios, setEjercicios] = useState<EjercicioItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -628,10 +759,19 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
       contenido_id: '',
       puntos: '',
       resultado_ejercicio: '',
+        codigoEstructura: '',
       tipo_ejercicio: 'Compilador',
       configuracion: {}
     }
   });
+
+  const getAuthHeaders = () => {
+    const authToken = localStorage.getItem('authToken');
+    return {
+      'Content-Type': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+    };
+  };
 
   useEffect(() => {
     loadEjercicios();
@@ -642,7 +782,10 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const loadEjercicios = async () => {
     setIsLoadingData(true);
     try {
-      const res = await fetch('https://edupath-backend-xch1.onrender.com/ejercicios');
+      const res = await fetch(`${API_BASE_URL}/ejercicios`, {
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
       if (!res.ok) throw new Error('No se pudieron cargar los ejercicios');
       const data = await res.json();
       setEjercicios(data as EjercicioItem[]);
@@ -657,7 +800,10 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const loadContenidos = async () => {
     setIsLoadingContenidos(true);
     try {
-      const res = await fetch('https://edupath-backend-xch1.onrender.com/contenidos');
+      const res = await fetch(`${API_BASE_URL}/contenidos`, {
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
       if (!res.ok) throw new Error('No se pudieron cargar los contenidos');
       const data = await res.json();
       const mapped: ContenidoOption[] = (data || []).map((c: any) => ({ id: Number(c.id), titulo: c.titulo }));
@@ -673,7 +819,10 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const loadTiposActividad = async () => {
     setIsLoadingTipos(true);
     try {
-      const res = await fetch('https://edupath-backend-xch1.onrender.com/tipoactividad');
+      const res = await fetch(`${API_BASE_URL}/tipoactividad`, {
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
       if (!res.ok) throw new Error('No se pudieron cargar los tipos de actividad');
       const data = await res.json();
       setTiposActividad(data || []);
@@ -700,8 +849,9 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         contenido_id: '',
         puntos: '',
         resultado_ejercicio: '',
+        codigoEstructura: '',
         tipo_ejercicio: 'Compilador',
-        configuracion: { tipo: 'programacion', esperado: '', lenguajesPermitidos: [] }
+        configuracion: createDefaultCompilerConfig()
       }
     });
     setShowModal(true);
@@ -723,10 +873,22 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     }
 
     if (!item.tipo_ejercicio || item.tipo_ejercicio === 'Compilador') {
+      const casos = Array.isArray(configuracion.casos_prueba) && configuracion.casos_prueba.length === 3
+        ? configuracion.casos_prueba
+        : [
+            { inputs: '', output: configuracion.esperado || item.resultado_ejercicio || '' },
+            emptyCompilerCase(),
+            emptyCompilerCase()
+          ];
       configuracion = {
-        tipo: 'programacion',
-        esperado: configuracion.esperado || item.resultado_ejercicio || '',
-        lenguajesPermitidos: configuracion.lenguajesPermitidos || []
+        ...createDefaultCompilerConfig(),
+        ...configuracion,
+        casos_prueba: casos,
+        metodo: configuracion.metodo || (item.codigoEstructura ? {
+          ...(parseMethodTemplate(item.codigoEstructura) || {}),
+          plantilla: item.codigoEstructura,
+        } : null),
+        lenguajesPermitidos: [62]
       };
     } else if (item.tipo_ejercicio === 'Diagramas UML') {
       configuracion = {
@@ -770,6 +932,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         contenido_id: item.contenido_id || '',
         puntos: item.puntos || '',
         resultado_ejercicio: item.resultado_ejercicio || '',
+        codigoEstructura: item.codigoEstructura || configuracion?.metodo?.plantilla || '',
         tipo_ejercicio: tipoReal as ExerciseFormData['ejercicio']['tipo_ejercicio'],
         configuracion
       }
@@ -807,7 +970,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
       if (key === 'tipo_ejercicio') {
         let nuevaConfiguracion = {};
         if (value === 'Compilador') {
-          nuevaConfiguracion = { tipo: 'programacion', esperado: '', lenguajesPermitidos: [] };
+          nuevaConfiguracion = createDefaultCompilerConfig();
         } else if (value === 'Diagramas UML') {
           nuevaConfiguracion = { opciones: {} };
         } else if (value === 'Preguntas') {
@@ -825,6 +988,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
           ejercicio: {
             ...prev.ejercicio,
             tipo_ejercicio: value as ExerciseFormData['ejercicio']['tipo_ejercicio'],
+            codigoEstructura: value === 'Compilador' ? prev.ejercicio.codigoEstructura : '',
             configuracion: nuevaConfiguracion,
             resultado_ejercicio: '' // Limpiar al cambiar tipo
           }
@@ -843,6 +1007,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    let compilerConfigForSubmit: any = null;
+    let compilerResultForSubmit = formData.ejercicio.resultado_ejercicio;
     
     // Validaciones básicas
     if (!formData.actividad.titulo || !formData.ejercicio.contenido_id || !formData.ejercicio.puntos) {
@@ -857,10 +1023,38 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         return;
       }
     } else if (formData.ejercicio.tipo_ejercicio === 'Compilador') {
-      if (!formData.ejercicio.configuracion?.esperado && !formData.ejercicio.resultado_ejercicio) {
-        toast.error('Respuesta requerida', { description: 'Define la respuesta esperada.' });
+      const plantilla = formData.ejercicio.codigoEstructura.trim();
+      const metodoDerivado = parseMethodTemplate(plantilla);
+      const casosPrueba = formData.ejercicio.configuracion?.casos_prueba || [];
+
+      if (!plantilla || !metodoDerivado) {
+        toast.error('Plantilla inválida', { description: 'La plantilla del método es obligatoria y debe incluir una firma Java válida.' });
         return;
       }
+      if (!Array.isArray(casosPrueba) || casosPrueba.length !== 3) {
+        toast.error('Casos de prueba requeridos', { description: 'Debes definir exactamente 3 casos de prueba.' });
+        return;
+      }
+      for (let i = 0; i < casosPrueba.length; i += 1) {
+        const caso = casosPrueba[i];
+        if (!caso.output?.trim()) {
+          toast.error('Caso de prueba incompleto', { description: `El caso ${i + 1} debe tener output esperado.` });
+          return;
+        }
+      }
+
+      const normalizedConfig = {
+        ...createDefaultCompilerConfig(),
+        ...formData.ejercicio.configuracion,
+        lenguajesPermitidos: [62],
+        metodo: { ...metodoDerivado, plantilla },
+        casos_prueba: casosPrueba.map((caso: any) => ({
+          inputs: (caso.inputs || '').toString().trim(),
+          output: (caso.output || '').toString().trim(),
+        }))
+      };
+      compilerConfigForSubmit = normalizedConfig;
+      compilerResultForSubmit = normalizedConfig.casos_prueba[0]?.output || 'Ejercicio con 3 casos de prueba';
     } else if (formData.ejercicio.tipo_ejercicio === 'Opción única') {
       const cfg = formData.ejercicio.configuracion;
       if (!cfg?.enunciado || !Array.isArray(cfg.opciones) || cfg.opciones.some((o: string) => !o) || !cfg?.respuestaCorrecta) {
@@ -885,8 +1079,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     try {
       const method = isEditMode ? 'PUT' : 'POST';
       const url = isEditMode && selectedEjercicio
-        ? 'https://edupath-backend-xch1.onrender.com/ejercicios/${selectedEjercicio.id}'
-        : 'https://edupath-backend-xch1.onrender.com/ejercicios';
+        ? `${API_BASE_URL}/ejercicios/${selectedEjercicio.id}`
+        : `${API_BASE_URL}/ejercicios`;
 
       // Preparar configuración según tipo
       let configuracionFinal = formData.ejercicio.configuracion;
@@ -894,10 +1088,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
       
       // Para Compilador, sincronizar esperado con resultado_ejercicio
       if (formData.ejercicio.tipo_ejercicio === 'Compilador') {
-        configuracionFinal = {
-          ...configuracionFinal,
-          esperado: formData.ejercicio.resultado_ejercicio || configuracionFinal.esperado
-        };
+        configuracionFinal = compilerConfigForSubmit;
+        resultadoFinal = compilerResultForSubmit;
       }
       
       // Para Opción única, asegurar que resultado_ejercicio sea la respuesta correcta
@@ -920,6 +1112,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
           contenido_id: formData.ejercicio.contenido_id,
           puntos: formData.ejercicio.puntos,
           resultado_ejercicio: resultadoFinal,
+          codigoEstructura: formData.ejercicio.codigoEstructura,
           tipo_ejercicio: tipoEjercicioBackend,
           configuracion: configuracionFinal
         }
@@ -927,7 +1120,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
+        credentials: 'include',
         body
       });
       if (!res.ok) {
@@ -1047,7 +1241,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                           {e.tipo_ejercicio || 'Compilador'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">{e.Contenido?.titulo || `Contenido ID ${e.contenido_id}`}</td>
+                      <td className="px-6 py-4 text-gray-600 text-sm">{e.contenido?.titulo || e.Contenido?.titulo || `Contenido ID ${e.contenido_id}`}</td>
                       <td className="px-6 py-4 text-gray-600 text-sm">{e.puntos}</td>
                       <td className="px-6 py-4 text-gray-600 text-sm">{e.actividad?.nivel_dificultad || '-'}</td>
                       <td className="px-6 py-4">
@@ -1071,7 +1265,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
       {/* Modal Crear/Editar */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-auto">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-[1200px] max-w-[95%] max-h-[90vh] overflow-auto relative">
+          <div className="bg-white rounded-2xl shadow-xl p-5 lg:p-6 w-[1600px] max-w-[99vw] max-h-[94vh] overflow-auto relative">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl" style={{ background: 'linear-gradient(90deg, rgba(74,144,226,0.12), rgba(74,144,226,0.06))' }} />
             <div className="flex items-center justify-between mb-6 pt-2">
               <h2 className="text-2xl font-bold text-[#3A4A5B]">{isEditMode ? 'Editar Ejercicio' : 'Crear Nuevo Ejercicio'}</h2>
@@ -1083,9 +1277,11 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] gap-5 items-start">
+                <div className="space-y-6 min-w-0">
               {/* Actividad */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Título *</label>
                   <input
@@ -1120,10 +1316,14 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                   value={formData.actividad.descripcion}
                   onChange={handleChange}
                   placeholder="Ingrese la descripción"
-                  className="w-full min-h-24 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                  className="w-full min-h-20 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                   required
                 />
               </div>
+
+                </div>
+
+                <div className="space-y-6 min-w-0">
 
               {/* Tipo de actividad */}
               <div>
@@ -1194,7 +1394,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
               </div>
 
               {/* Ejercicio - Campos comunes */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
                     Contenido *
@@ -1236,6 +1436,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                     required
                   />
+                </div>
+              </div>
                 </div>
               </div>
 

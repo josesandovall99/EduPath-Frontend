@@ -5,6 +5,7 @@
 
   export default defineConfig(({ mode }) => {
     const isProductionLike = mode === 'production';
+    const devProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:4000';
 
     // Keep dev server compatible with HMR; enforce stricter policy in preview/build scans.
     const devCsp = "default-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws: wss: https://edupath-backend-xch1.onrender.com http://localhost:3000; font-src 'self' data:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; child-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
@@ -80,7 +81,7 @@
       headers: devHeaders,
       proxy: {
         '/api': {
-          target: 'https://edupath-backend-xch1.onrender.com',
+          target: devProxyTarget,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },

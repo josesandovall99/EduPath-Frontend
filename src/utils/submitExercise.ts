@@ -4,6 +4,17 @@ export interface SubmitResult<T = any> {
   message?: string;
 }
 
+function getApiBaseUrl() {
+  const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  if (rawApiBaseUrl) {
+    return rawApiBaseUrl.replace(/\/$/, '');
+  }
+
+  return import.meta.env.PROD
+    ? 'https://edupath-backend-xch1.onrender.com'
+    : '/api';
+}
+
 /**
  * POST an exercise submission to the backend using the new contract.
  * Endpoint: POST /ejercicios/:id/enviar
@@ -28,12 +39,43 @@ export async function submitExercise(
       };
     }
 
-    const body = { estudiante_id: resolvedEstudianteId, respuesta };
+    const body = { estudiante_id: resolvedEstudianteId, respuesta, lenguaje_id: 62 };
+    const API_BASE_URL = getApiBaseUrl();
     console.log('📤 Enviando ejercicio:', ejercicioId, 'Body:', JSON.stringify(body, null, 2));
-    const res = await fetch(`https://edupath-backend-xch1.onrender.com/ejercicios/${ejercicioId}/enviar`, {
+    const res = await fetch(`${API_BASE_URL}/ejercicios/${ejercicioId}/enviar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
+    });
+
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch {
+      // Non-JSON or empty body
+    }
+
+    return { status: res.status, data, message: (data && (data.message || data.error)) };
+  } catch (error: any) {
+    return { status: 0, data: null, message: error?.message || 'Network error' };
+  }
+}
+
+export async function executeExercise(
+  ejercicioId: string | number,
+  respuesta: any,
+  lenguajeId: number = 62
+): Promise<SubmitResult> {
+  try {
+    const API_BASE_URL = getApiBaseUrl();
+    const res = await fetch(`${API_BASE_URL}/evaluaciones/compilador/ejecutar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ejercicio_id: ejercicioId,
+        lenguaje_id: lenguajeId,
+        respuesta
+      })
     });
 
     let data: any = null;

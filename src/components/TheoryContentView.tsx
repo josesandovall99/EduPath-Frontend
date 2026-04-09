@@ -1162,7 +1162,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
 
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto bg-[#F2F2F2] p-8">
-          <div className="max-w-4xl mx-auto">
+          <div className="mx-auto w-full max-w-[1500px]">
             {/* Back Button */}
             <button 
               onClick={onBack}
@@ -1176,36 +1176,6 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
             {/* Caso 1: Solo ejercicio (sin contenido) */}
             {!selectedContentData && ejercicioAsociado && (
               <div className="mb-6">
-                {/* Título del ejercicio */}
-                <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div 
-                      className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: `${subjectColor}20` }}
-                    >
-                      📝
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-[#3A4A5B]">
-                        {ejercicioAsociado.actividad?.titulo || 'Ejercicio Práctico'}
-                      </h2>
-                      {ejercicioAsociado.actividad?.descripcion && (
-                        <p className="text-gray-600 text-sm mt-1">
-                          {ejercicioAsociado.actividad?.descripcion}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
-                      {ejercicioAsociado.tipo_ejercicio}
-                    </span>
-                    <span className="text-gray-600">
-                      {ejercicioAsociado.puntos} puntos
-                    </span>
-                  </div>
-                </div>
-
                 {/* Componente del ejercicio */}
                 {ejercicioAsociado.tipo_ejercicio === 'Compilador' && (
                   <ProgrammingContentView
@@ -1215,6 +1185,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                       type: 'activity'
                     }}
                     onBack={onBack}
+                    embedded={true}
                   />
                 )}
 
