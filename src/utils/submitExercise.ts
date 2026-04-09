@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './constants';
+
 export interface SubmitResult<T = any> {
   status: number;
   data: T | null;

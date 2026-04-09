@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight, ChevronUp, ChevronDown, ArrowDownUp } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface Area {
   id: number;
@@ -141,11 +142,11 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
     setIsLoadingData(true);
     try {
       const [areasRes, temasRes, subtemasRes, contentsRes, sequencesRes] = await Promise.all([
-        fetch('https://edupath-backend-xch1.onrender.com/areas'),
-        fetch('https://edupath-backend-xch1.onrender.com/temas'),
-        fetch('https://edupath-backend-xch1.onrender.com/subtemas'),
-        fetch('https://edupath-backend-xch1.onrender.com/contenidos'),
-        fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido')
+        fetch(`${API_BASE_URL}/areas`),
+        fetch(`${API_BASE_URL}/temas`),
+        fetch(`${API_BASE_URL}/subtemas`),
+        fetch(`${API_BASE_URL}/contenidos`),
+        fetch(`${API_BASE_URL}/secuencias-contenido`)
       ]);
 
       if (!areasRes.ok || !temasRes.ok || !subtemasRes.ok || !contentsRes.ok || !sequencesRes.ok) {
@@ -391,7 +392,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       // Al seleccionar un área, obtener los temas del backend y luego filtrar contenidos
       if (value) {
         try {
-          const res = await fetch(`https://edupath-backend-xch1.onrender.com/temas/por-area/${value}`);
+          const res = await fetch(`${API_BASE_URL}/temas/por-area/${value}`);
           if (!res.ok) throw new Error('Error cargando temas');
           const data = await res.json();
           setModalTemas(data);
@@ -423,7 +424,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         setModalContents(filtered);
 
         try {
-          const res = await fetch(`https://edupath-backend-xch1.onrender.com/subtemas/por-tema/${value}`);
+          const res = await fetch(`${API_BASE_URL}/subtemas/por-tema/${value}`);
           if (!res.ok) throw new Error('Error cargando subtemas');
           const data = await res.json();
           setModalSubtemas(data);
@@ -445,7 +446,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
       if (value) {
         try {
-          const url = `https://edupath-backend-xch1.onrender.com/contenidos/subtema/${value}`;
+          const url = `${API_BASE_URL}/contenidos/subtema/${value}`;
           console.log('Cargando contenidos para modal desde:', url);
           const res = await fetch(url);
           if (!res.ok) {
@@ -527,7 +528,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       // Cargar temas del área seleccionada
       if (value) {
         try {
-          const url = `https://edupath-backend-xch1.onrender.com/temas/por-area/${value}`;
+          const url = `${API_BASE_URL}/temas/por-area/${value}`;
           console.log('Cargando temas desde:', url);
           const res = await fetch(url);
           console.log('Respuesta de temas:', res.status, res.statusText);
@@ -553,7 +554,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       // Cargar subtemas del tema seleccionado
       if (value) {
         try {
-          const url = `https://edupath-backend-xch1.onrender.com/subtemas/por-tema/${value}`;
+          const url = `${API_BASE_URL}/subtemas/por-tema/${value}`;
           console.log('Cargando subtemas desde:', url);
           const res = await fetch(url);
           console.log('Respuesta de subtemas:', res.status, res.statusText);
@@ -613,7 +614,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           // El origen SIEMPRE debe ser el que ya está (B)
           // El destino es el nuevo contenido intermedio (X)
           // Paso 1: Actualizar la secuencia existente B->C para que sea B->X
-          await fetch(`https://edupath-backend-xch1.onrender.com/secuencias-contenido/${insertAfterSequenceId}`, {
+          await fetch(`${API_BASE_URL}/secuencias-contenido/${insertAfterSequenceId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -625,7 +626,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           });
 
           // Paso 2: Crear nueva secuencia X->C (desde el contenido intermedio al destino original)
-          await fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido', {
+          await fetch(`${API_BASE_URL}/secuencias-contenido`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -645,7 +646,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           estado: formData.estado
         };
 
-        const response = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido', {
+        const response = await fetch(`${API_BASE_URL}/secuencias-contenido`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -658,7 +659,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       }
 
       // Recargar todas las secuencias del backend para tener el estado actualizado
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -719,7 +720,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         estado: formData.estado
       };
 
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/secuencias-contenido/${selectedSequence.id}`, {
+      const response = await fetch(`${API_BASE_URL}/secuencias-contenido/${selectedSequence.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -736,7 +737,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
 
       // Recargar todas las secuencias del backend para tener el estado actualizado
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -761,7 +762,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   const handleToggleEstado = async (id: number, currentEstado: boolean) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/secuencias-contenido/${id}/estado`, {
+      const response = await fetch(`${API_BASE_URL}/secuencias-contenido/${id}/estado`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -771,7 +772,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       }
 
       // Recargar todas las secuencias del backend para tener el estado actualizado
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -819,7 +820,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         deletePayload.nextSequenceId = nextSeq.id;
       }
 
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/secuencias-contenido/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/secuencias-contenido/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(deletePayload)
@@ -830,7 +831,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       }
 
       // Recargar todas las secuencias del backend para tener el estado actualizado
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -974,7 +975,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       const contenidosOrdenados = newOrder.map(item => item.contenido_id);
 
       // Usar el nuevo endpoint de reordenamiento
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido/reorder', {
+      const response = await fetch(`${API_BASE_URL}/secuencias-contenido/reorder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -990,7 +991,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       const result = await response.json();
 
       // Recargar secuencias para reflejar los cambios
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -1028,7 +1029,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       
       await Promise.all([
         // Actualizar secuencia anterior: origen -> destino de la actual
-        fetch(`https://edupath-backend-xch1.onrender.com/secuencias-contenido/${prevSeq.id}`, {
+        fetch(`${API_BASE_URL}/secuencias-contenido/${prevSeq.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1039,7 +1040,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           })
         }),
         // Actualizar secuencia actual: origen -> destino anterior
-        fetch(`https://edupath-backend-xch1.onrender.com/secuencias-contenido/${sequenceId}`, {
+        fetch(`${API_BASE_URL}/secuencias-contenido/${sequenceId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1052,7 +1053,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       ]);
 
       // Recargar secuencias
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -1090,7 +1091,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       
       await Promise.all([
         // Actualizar secuencia actual: origen -> destino de la siguiente
-        fetch(`https://edupath-backend-xch1.onrender.com/secuencias-contenido/${sequenceId}`, {
+        fetch(`${API_BASE_URL}/secuencias-contenido/${sequenceId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1101,7 +1102,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           })
         }),
         // Actualizar secuencia siguiente: origen -> destino anterior de la actual
-        fetch(`https://edupath-backend-xch1.onrender.com/secuencias-contenido/${nextSeq.id}`, {
+        fetch(`${API_BASE_URL}/secuencias-contenido/${nextSeq.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1114,7 +1115,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       ]);
 
       // Recargar secuencias
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-contenido');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);

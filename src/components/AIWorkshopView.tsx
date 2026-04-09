@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Lightbulb, FileText, Check, Save } from 'lucide-react';
+import { API_BASE_URL } from '../utils/constants';
 
 
 interface AIWorkshopViewProps {
@@ -9,10 +10,18 @@ interface AIWorkshopViewProps {
     title: string;
     isMiniproyecto?: boolean;
     actividadId?: number;
+    areaNombre?: string;
   };
   onBack: () => void;
   estudianteId?: number;
 }
+
+const normalizeAreaName = (value?: string | null) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 
 
 // Colores por materia
@@ -57,13 +66,6 @@ const workshopConfigs = {
 
 const taskColors = ['#4A90E2', '#7ED6A7', '#F5A97F', '#A78BFA', '#FBBF24', '#60A5FA'];
 
-// Use proxy in dev (/api), full URL in production
-const isProduction = import.meta.env.PROD;
-const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-const API_BASE_URL = rawApiBaseUrl 
-  ? rawApiBaseUrl.replace(/\/$/, '') 
-  : (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
-
 export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: AIWorkshopViewProps) {
   const [currentTask, setCurrentTask] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
@@ -89,14 +91,15 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
   const [expectedManagementCounts, setExpectedManagementCounts] = useState<{ scope: number; schedule: number; costs: number } | null>(null);
   const [evaluation, setEvaluation] = useState<{
     puntaje: number;
-    criterios?: Array<{ criterio: string; cumplido: boolean }>;
+    criterios?: Array<{ criterio: string; cumplido: boolean; puntaje?: number; peso?: number; detalle?: string }>;
   } | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingEstado, setPendingEstado] = useState<'ENVIADO' | 'COMPLETADO' | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const totalTasks = 5;
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
-  const isManagementWorkshop = workshop.actividadId === 13 || subjectName === 'Alcance, Tiempo y Costo';
+  const normalizedAreaName = normalizeAreaName(workshop.areaNombre || subjectName);
+  const isManagementWorkshop = normalizedAreaName.includes('alcance') || normalizedAreaName.includes('gestion');
   const workshopConfig = isManagementWorkshop ? workshopConfigs.management : workshopConfigs.analysis;
 
   const buildScheduleList = (rows: Array<{ activity: string; start: string; end: string }>) =>
@@ -234,7 +237,6 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           respuesta,
-          estudiante_id: esId,
           miniproyecto_id: miniId,
           estado
         })
@@ -373,7 +375,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
             {isManagementWorkshop ? (
               <div className="space-y-3 text-xs text-gray-700">
                 <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-                  Tu respuesta se evalúa por ítems. Debes cumplir al menos el 70% en cada sección.
+                  Tu respuesta se evalúa con una rúbrica ponderada por secciones. Cada sección se considera cumplida desde 70%.
                 </div>
                 <div className="grid gap-2">
                   <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
@@ -396,7 +398,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
             ) : (
               <div className="space-y-3 text-xs text-gray-700">
                 <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-                  Tu respuesta se evalúa por ítems. Debes cumplir al menos el 70% en cada sección.
+                  Tu respuesta se evalúa con una rúbrica ponderada por secciones. Cada sección se considera cumplida desde 70%.
                 </div>
                 <div className="grid gap-2">
                   <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
@@ -893,10 +895,16 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                     {evaluation.criterios.map((criterio) => (
                       <div
                         key={criterio.criterio}
-                        className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs ${criterio.cumplido ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}
+                        className={`rounded-lg border px-3 py-2 text-xs ${criterio.cumplido ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}
                       >
-                        <span>{criterio.criterio}</span>
-                        <span>{criterio.cumplido ? 'Cumple' : 'No cumple'}</span>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>{criterio.criterio}</span>
+                          <span>{criterio.cumplido ? 'Cumple' : 'No cumple'}</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between gap-3 text-[11px] opacity-90">
+                          <span>{typeof criterio.detalle === 'string' ? criterio.detalle : 'Evaluación por rúbrica'}</span>
+                          <span>{typeof criterio.puntaje === 'number' ? `${criterio.puntaje}/100` : ''}{typeof criterio.peso === 'number' ? ` · Peso ${criterio.peso}%` : ''}</span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1004,10 +1012,16 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                 {evaluation.criterios.map((criterio) => (
                   <div
                     key={criterio.criterio}
-                    className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs ${criterio.cumplido ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}
+                    className={`rounded-lg border px-3 py-2 text-xs ${criterio.cumplido ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}
                   >
-                    <span>{criterio.criterio}</span>
-                    <span>{criterio.cumplido ? 'Cumple' : 'No cumple'}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>{criterio.criterio}</span>
+                      <span>{criterio.cumplido ? 'Cumple' : 'No cumple'}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] opacity-90">
+                      <span>{typeof criterio.detalle === 'string' ? criterio.detalle : 'Evaluación por rúbrica'}</span>
+                      <span>{typeof criterio.puntaje === 'number' ? `${criterio.puntaje}/100` : ''}{typeof criterio.peso === 'number' ? ` · Peso ${criterio.peso}%` : ''}</span>
+                    </div>
                   </div>
                 ))}
               </div>

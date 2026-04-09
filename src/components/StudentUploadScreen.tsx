@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, X, ArrowLeft, Users, Download } from 'lucide-react';
 // Asegúrate de que la ruta de la imagen sea correcta en tu proyecto
 import logoImage from '../assets/logo.png'; 
+import { API_BASE_URL } from '../utils/constants';
 
 interface StudentUploadScreenProps {
   onBack: () => void;
@@ -74,7 +75,7 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
 
     try {
       // 1. Petición al Backend (Puerto 4000)
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/estudiante/importar-excel', {
+      const response = await fetch(`${API_BASE_URL}/estudiante/importar-excel`, {
         method: 'POST',
         body: formData, // No necesitas header Content-Type, fetch lo pone automático con FormData
       });

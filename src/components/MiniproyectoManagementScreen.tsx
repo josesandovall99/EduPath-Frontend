@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ClipboardList, RefreshCw, Save, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface MiniproyectoManagementScreenProps {
   onBack: () => void;
@@ -56,6 +57,13 @@ type ExpectedSnapshot =
       costos: string[];
     };
 
+const normalizeAreaName = (value?: string | null) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
 export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementScreenProps) {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
@@ -93,9 +101,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const [expectedSnapshot, setExpectedSnapshot] = useState<ExpectedSnapshot | null>(null);
 
   // El tipo de editor depende del area del miniproyecto, no del id de la actividad.
-  const selectedAreaId = selected?.Area?.id ? Number(selected.Area.id) : null;
-  const isProgrammingMiniproyecto = selectedAreaId === 2;
-  const isManagementMiniproyecto = selectedAreaId === 3;
+  const selectedAreaName = normalizeAreaName(selected?.Area?.nombre);
+  const isProgrammingMiniproyecto = selectedAreaName.includes('programacion');
+  const isManagementMiniproyecto = selectedAreaName.includes('alcance') || selectedAreaName.includes('gestion');
 
   useEffect(() => {
     if (!isProgrammingMiniproyecto) return;
@@ -167,7 +175,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/miniproyectos');
+      const response = await fetch(`${API_BASE_URL}/miniproyectos`);
       if (!response.ok) {
         throw new Error('No se pudieron cargar los miniproyectos');
       }
@@ -329,7 +337,8 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setScheduleRows(parsedSchedule.length > 0 ? parsedSchedule : [{ activity: '', start: '', end: '' }]);
     setCostRows(parsedCosts.length > 0 ? parsedCosts : [{ concept: '', type: 'Humano', quantity: '', unitCost: '' }]);
     setScopeInput('');
-    const isProgrammingItem = Number(item.Area?.id) === 2;
+    const normalizedItemAreaName = normalizeAreaName(item.Area?.nombre);
+    const isProgrammingItem = normalizedItemAreaName.includes('programacion');
     if (isProgrammingItem) {
       setExpectedOutput(parsedEsperado || item.respuesta_miniproyecto || '');
       setSintaxisRequerida(parsedSintaxis);
@@ -386,7 +395,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
       const scheduleList = buildScheduleList(scheduleRows);
       const costsList = buildCostList(costRows);
 
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/miniproyectos/${selected.id}`, {
+      const response = await fetch(`${API_BASE_URL}/miniproyectos/${selected.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

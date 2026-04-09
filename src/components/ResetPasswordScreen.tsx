@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { API_BASE_URL } from '../utils/constants';
 
 interface ResetPasswordScreenProps {
   token: string | null;
@@ -39,7 +40,7 @@ export function ResetPasswordScreen({ token, onComplete, onBack }: ResetPassword
 
     setLoading(true);
     try {
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/persona/reset-password', {
+      const response = await fetch(`${API_BASE_URL}/persona/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, nuevaContraseña: newPassword })

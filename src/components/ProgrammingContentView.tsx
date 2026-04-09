@@ -3,6 +3,7 @@ import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Trash2, XCircle } from '
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { toast } from 'sonner';
 import { executeExercise, submitExercise } from '../utils/submitExercise';
+import { API_BASE_URL } from '../utils/constants';
 
 interface Content {
   id: string;
@@ -148,9 +149,6 @@ function normalizeCaseValue(value?: string) {
 }
 
 export function ProgrammingContentView({ content, onBack, embedded = false }: ProgrammingContentViewProps) {
-  const isProduction = import.meta.env.PROD;
-  const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-  const API_BASE_URL = rawApiBaseUrl || (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
   const subjectColor = '#4A90E2';
 
   const [code, setCode] = useState('public static int resolver() {\n    // Escribe tu solución aquí\n    return 0;\n}');

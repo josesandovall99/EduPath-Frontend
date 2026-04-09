@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Plus, FileText, PlayCircle, Edit, Trash2, Eye, EyeOff, Search, Loader, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface ContentManagementScreenProps {
   onBack: () => void;
@@ -79,7 +80,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   // Funciones para cargar datos
   const loadAreas = async () => {
     try {
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/areas');
+      const response = await fetch(`${API_BASE_URL}/areas`);
       if (response.ok) {
         const data = await response.json();
         setAreas(data);
@@ -91,7 +92,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
 
   const loadTemasByArea = async (areaId: string) => {
     try {
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/temas/por-area/' + areaId);
+      const response = await fetch(`${API_BASE_URL}/temas/por-area/` + areaId);
       if (response.ok) {
         const data = await response.json();
         setTemas(data);
@@ -104,7 +105,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
 
   const loadSubtemasByTema = async (temaId: string) => {
     try {
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/subtemas/por-tema/' + temaId);
+      const response = await fetch(`${API_BASE_URL}/subtemas/por-tema/` + temaId);
       if (response.ok) {
         const data = await response.json();
         setSubtemas(data);
@@ -146,7 +147,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   const loadContenidos = async () => {
     setIsLoadingData(true);
     try {
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/contenidos', {
+      const response = await fetch(`${API_BASE_URL}/contenidos`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -169,7 +170,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
           // Obtener información del tema
           if (item.tema_id) {
             try {
-              const temaResponse = await fetch(`https://edupath-backend-xch1.onrender.com/temas/${item.tema_id}`);
+              const temaResponse = await fetch(`${API_BASE_URL}/temas/${item.tema_id}`);
               if (temaResponse.ok) {
                 const tema = await temaResponse.json();
                 temaNombre = tema.nombre;
@@ -177,7 +178,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                 // Obtener información del área
                 if (tema.area_id) {
                   try {
-                    const areaResponse = await fetch(`https://edupath-backend-xch1.onrender.com/areas/${tema.area_id}`);
+                    const areaResponse = await fetch(`${API_BASE_URL}/areas/${tema.area_id}`);
                     if (areaResponse.ok) {
                       const area = await areaResponse.json();
                       areaNombre = area.nombre;
@@ -195,7 +196,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
           // Obtener información del subtema
           if (item.subtema_id) {
             try {
-              const subtemaResponse = await fetch(`https://edupath-backend-xch1.onrender.com/subtemas/${item.subtema_id}`);
+              const subtemaResponse = await fetch(`${API_BASE_URL}/subtemas/${item.subtema_id}`);
               if (subtemaResponse.ok) {
                 const subtema = await subtemaResponse.json();
                 subtemaNombre = subtema.nombre;
@@ -240,8 +241,8 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     try {
       const method = isEditMode ? 'PUT' : 'POST';
       const url = isEditMode 
-        ? `https://edupath-backend-xch1.onrender.com/contenidos/${selectedContent?.id}`
-        : 'https://edupath-backend-xch1.onrender.com/contenidos';
+        ? `${API_BASE_URL}/contenidos/${selectedContent?.id}`
+        : `${API_BASE_URL}/contenidos`;
 
       const descripcionHtml = quillRef.current ? quillRef.current.root.innerHTML : formData.descripcion;
 
@@ -358,7 +359,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     // Si hay tema_id, cargar el tema para obtener el área
     if (content.tema_id) {
       try {
-        const response = await fetch('https://edupath-backend-xch1.onrender.com/temas/' + content.tema_id);
+        const response = await fetch(`${API_BASE_URL}/temas/` + content.tema_id);
         if (response.ok) {
           const tema = await response.json();
           setSelectedAreaId(tema.area_id.toString());
@@ -388,7 +389,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     setShowDeleteConfirmation(false);
 
     try {
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/contenidos/${contentToDelete.id}`, {
+      const response = await fetch(`${API_BASE_URL}/contenidos/${contentToDelete.id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

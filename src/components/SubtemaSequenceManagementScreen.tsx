@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight, ChevronUp, ChevronDown } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface Area {
   id: number;
@@ -107,10 +108,10 @@ export function SubtemaSequenceManagementScreen({
     setIsLoadingData(true);
     try {
       const [areasRes, temasRes, subtemasRes, sequencesRes] = await Promise.all([
-        fetch('https://edupath-backend-xch1.onrender.com/areas'),
-        fetch('https://edupath-backend-xch1.onrender.com/temas'),
-        fetch('https://edupath-backend-xch1.onrender.com/subtemas'),
-        fetch('https://edupath-backend-xch1.onrender.com/secuencias-subtema')
+        fetch(`${API_BASE_URL}/areas`),
+        fetch(`${API_BASE_URL}/temas`),
+        fetch(`${API_BASE_URL}/subtemas`),
+        fetch(`${API_BASE_URL}/secuencias-subtema`)
       ]);
 
       if (!areasRes.ok || !temasRes.ok || !subtemasRes.ok || !sequencesRes.ok) {
@@ -347,7 +348,7 @@ export function SubtemaSequenceManagementScreen({
 
       if (value) {
         try {
-          const res = await fetch(`https://edupath-backend-xch1.onrender.com/temas/por-area/${value}`);
+          const res = await fetch(`${API_BASE_URL}/temas/por-area/${value}`);
           if (!res.ok) throw new Error('Error cargando temas');
           const data = await res.json();
           setModalTemas(data);
@@ -415,7 +416,7 @@ export function SubtemaSequenceManagementScreen({
 
       if (value) {
         try {
-          const res = await fetch(`https://edupath-backend-xch1.onrender.com/temas/por-area/${value}`);
+          const res = await fetch(`${API_BASE_URL}/temas/por-area/${value}`);
           if (!res.ok) throw new Error('Error cargando temas');
           const data = await res.json();
           setTemas(data);
@@ -456,7 +457,7 @@ export function SubtemaSequenceManagementScreen({
         if (afterSequence) {
           const destinoOriginal = afterSequence.subtema_destino_id;
 
-          await fetch(`https://edupath-backend-xch1.onrender.com/secuencias-subtema/${insertAfterSequenceId}`, {
+          await fetch(`${API_BASE_URL}/secuencias-subtema/${insertAfterSequenceId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -467,7 +468,7 @@ export function SubtemaSequenceManagementScreen({
             })
           });
 
-          await fetch('https://edupath-backend-xch1.onrender.com/secuencias-subtema', {
+          await fetch(`${API_BASE_URL}/secuencias-subtema`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -486,7 +487,7 @@ export function SubtemaSequenceManagementScreen({
           estado: formData.estado
         };
 
-        const response = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-subtema', {
+        const response = await fetch(`${API_BASE_URL}/secuencias-subtema`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -498,7 +499,7 @@ export function SubtemaSequenceManagementScreen({
         }
       }
 
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-subtema');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-subtema`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -558,7 +559,7 @@ export function SubtemaSequenceManagementScreen({
         estado: formData.estado
       };
 
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/secuencias-subtema/${selectedSequence.id}`, {
+      const response = await fetch(`${API_BASE_URL}/secuencias-subtema/${selectedSequence.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -569,7 +570,7 @@ export function SubtemaSequenceManagementScreen({
         throw new Error(data.error || data.message || 'Error al actualizar la secuencia');
       }
 
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-subtema');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-subtema`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -588,7 +589,7 @@ export function SubtemaSequenceManagementScreen({
   const handleToggleEstado = async (id: number, currentEstado: boolean) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/secuencias-subtema/${id}/estado`, {
+      const response = await fetch(`${API_BASE_URL}/secuencias-subtema/${id}/estado`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -597,7 +598,7 @@ export function SubtemaSequenceManagementScreen({
         throw new Error('Error al cambiar estado');
       }
 
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-subtema');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-subtema`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -641,7 +642,7 @@ export function SubtemaSequenceManagementScreen({
         deletePayload.nextSequenceId = nextSeq.id;
       }
 
-      const response = await fetch(`https://edupath-backend-xch1.onrender.com/secuencias-subtema/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/secuencias-subtema/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(deletePayload)
@@ -651,7 +652,7 @@ export function SubtemaSequenceManagementScreen({
         throw new Error('Error al eliminar la secuencia');
       }
 
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-subtema');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-subtema`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -816,7 +817,7 @@ export function SubtemaSequenceManagementScreen({
     try {
       const subtemasOrdenados = newOrder.map(item => item.subtema_id);
 
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-subtema/reorder', {
+      const response = await fetch(`${API_BASE_URL}/secuencias-subtema/reorder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -831,7 +832,7 @@ export function SubtemaSequenceManagementScreen({
 
       const result = await response.json();
 
-      const sequencesRes = await fetch('https://edupath-backend-xch1.onrender.com/secuencias-subtema');
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-subtema`);
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);

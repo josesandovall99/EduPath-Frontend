@@ -2,13 +2,10 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Code, Database, BarChart3, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Plus, Edit2, ChevronUp, X } from 'lucide-react';
 import axios from 'axios';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
-
-// Use proxy in dev (/api), full URL in production
-const isProduction = import.meta.env.PROD;
-const apiBaseURL = isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api';
+import { API_BASE_URL } from '../utils/constants';
 
 const api = axios.create({
-  baseURL: apiBaseURL,
+  baseURL: API_BASE_URL,
   withCredentials: true
 });
 
@@ -151,7 +148,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
         
         if (axios.isAxiosError(err)) {
           if (err.code === 'ECONNREFUSED') {
-            errorMessage = 'No se pudo conectar al servidor en https://edupath-backend-xch1.onrender.com. ¿Está corriendo?';
+            errorMessage = 'No se pudo conectar al servidor. ¿Está corriendo?';
           } else if (err.response?.status === 404) {
             errorMessage = 'El endpoint /areas no existe en el servidor.';
           } else if (err.response?.status) {
@@ -228,7 +225,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
         
         if (axios.isAxiosError(err)) {
           if (err.code === 'ECONNREFUSED') {
-            errorMessage = 'No se pudo conectar al servidor en https://edupath-backend-xch1.onrender.com.';
+            errorMessage = 'No se pudo conectar al servidor.';
           } else if (err.response?.status === 404) {
             errorMessage = 'No hay temas para esta área.';
           } else if (err.response?.status) {

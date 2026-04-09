@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Plus, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface AdminManagementScreenProps {
   onBack: () => void;
@@ -14,8 +15,6 @@ interface AdminFormData {
   cargo: string;
   nivelAcceso: string;
 }
-
-const API_BASE_URL = 'https://edupath-backend-xch1.onrender.com';
 
 const emptyForm: AdminFormData = {
   nombre: '',

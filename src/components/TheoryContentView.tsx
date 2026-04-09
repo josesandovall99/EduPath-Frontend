@@ -7,6 +7,7 @@ import { QuizActivityView } from './QuizActivityView';
 import { MultipleChoiceExercise } from './MultipleChoiceExercise';
 import { OrderingExercise } from './OrderingExercise';
 import { MatchingExercise } from './MatchingExercise';
+import { API_BASE_URL } from '../utils/constants';
 
 // Estilos para renderizado de HTML
 const htmlContentStyles = `
@@ -182,13 +183,6 @@ const subjectColors: Record<string, string> = {
   'Alcance, Tiempo y Costo': '#F5A97F',
   'Fundamentos de Programación': '#4A90E2'
 };
-
-// Use proxy in dev (/api), full URL in production
-const isProduction = import.meta.env.PROD;
-const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-const API_BASE_URL = rawApiBaseUrl 
-  ? rawApiBaseUrl.replace(/\/$/, '') 
-  : (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
 
 // Fallback data for subtemas
 const FALLBACK_MODULES: Module[] = [

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Plus, Edit, Loader, Trash2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface ExerciseManagementScreenProps {
   onBack: () => void;

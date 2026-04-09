@@ -1,6 +1,7 @@
 import { LogOut, Code, Database, BarChart3, BookOpen, Clock, CheckCircle2, TrendingUp } from 'lucide-react';
 import { ChatbotButton } from './ChatbotButton';
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../utils/constants';
 
 interface Subject {
   id: string;
@@ -21,13 +22,6 @@ interface DashboardScreenProps {
 }
 
 const colorPalette = ['#4A90E2', '#7ED6A7', '#F5A97F', '#FFB84D', '#A78BFA', '#EC4899'];
-
-// Use proxy in dev (/api), full URL in production
-const isProduction = import.meta.env.PROD;
-const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-const API_BASE_URL = rawApiBaseUrl 
-  ? rawApiBaseUrl.replace(/\/$/, '') 
-  : (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
 
 // Fallback data por si falla el fetch
 const FALLBACK_SUBJECTS = [

@@ -1,16 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send, Minimize2, MessageCircle } from 'lucide-react';
+import { API_BASE_URL } from '../utils/constants';
 
 export function ChatbotButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState([
-    { text: '¡Hola! Soy tu asistente experto en RUT. ¿Qué dato deseas consultar?', isBot: true }
+    { text: '¡Hola! Soy tu asistente PathBot. ¿Qué dato deseas consultar?', isBot: true }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  const API_BASE = 'https://edupath-backend-xch1.onrender.com';
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -30,7 +29,7 @@ export function ChatbotButton() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/chatbot/chat`, {
+      const response = await fetch(`${API_BASE_URL}/chatbot/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

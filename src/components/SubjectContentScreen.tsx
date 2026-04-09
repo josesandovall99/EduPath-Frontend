@@ -1,6 +1,7 @@
 import { ArrowLeft, CheckCircle2, Clock, FileText, PlayCircle, Edit, Share2, Users, Lock } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface Subject {
   id: string;
@@ -22,6 +23,8 @@ interface Content {
   status: 'completed' | 'in-progress' | 'not-started';
   isMiniproyecto?: boolean;
   actividadId?: number;
+  areaId?: number;
+  areaNombre?: string;
   miniproyectoAprobado?: boolean;
   // Campos opcionales para el sistema de desbloqueo progresivo
   desbloqueado?: boolean;
@@ -68,13 +71,6 @@ const subjectColors: Record<string, { primary: string; light: string; icon: any 
 const getSubjectColor = (subjectId: string) => {
   return subjectColors[subjectId] || { primary: '#4A90E2', light: '#E3F2FD' };
 };
-
-// Use proxy in dev (/api), full URL in production
-const isProduction = import.meta.env.PROD;
-const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-const API_BASE_URL = rawApiBaseUrl 
-  ? rawApiBaseUrl.replace(/\/$/, '') 
-  : (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
 
 const FALLBACK_CONTENT: Content[] = [
   { id: '1', title: 'Introducción al curso', type: 'video', duration: '15 min', status: 'completed' },
@@ -344,7 +340,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 minisArray.map(async (mini) => {
                   try {
                     const response = await fetch(
-                      `${API_BASE_URL}/evaluaciones/by?estudiante_id=${estudianteId}&miniproyecto_id=${mini.id}`
+                      `${API_BASE_URL}/evaluaciones/by?miniproyecto_id=${mini.id}`
                     );
                     if (!response.ok) return [mini.id, false] as const;
                     const data = await response.json();
@@ -371,6 +367,8 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 status: aprobado ? 'completed' : ('not-started' as const),
                 isMiniproyecto: true,
                 actividadId: Number(mini.actividad_id),
+                areaId: mini.Area?.id,
+                areaNombre: mini.Area?.nombre,
                 miniproyectoAprobado: aprobado,
                 completo: aprobado
               };

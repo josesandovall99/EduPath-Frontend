@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Play, Trash2 } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { submitMiniproyecto } from '../utils/submitMiniproyecto';
+import { API_BASE_URL } from '../utils/constants';
 
 interface ProgrammingMiniproyectoViewProps {
   content: {
@@ -29,10 +30,6 @@ interface MiniproyectoApiResponse {
 }
 
 export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMiniproyectoViewProps) {
-  // Use proxy in dev (/api), full URL in production
-  const isProduction = import.meta.env.PROD;
-  const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-  const API_BASE_URL = rawApiBaseUrl || (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
   const [code, setCode] = useState('# Escribe tu código aquí\nprint("Hola Mundo")');
   const subjectColor = '#4A90E2';
   const [output, setOutput] = useState('');

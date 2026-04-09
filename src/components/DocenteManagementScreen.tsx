@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Plus, Pencil, Trash2, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface DocenteManagementScreenProps {
   onBack: () => void;
@@ -32,8 +33,6 @@ interface DocenteFormData {
   especialidad: string;
   areaId: string;
 }
-
-const API_BASE_URL = 'https://edupath-backend-xch1.onrender.com';
 
 const emptyForm: DocenteFormData = {
   nombre: '',

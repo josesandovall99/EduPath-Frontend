@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
+import { API_BASE_URL } from '../utils/constants';
 
 interface ChangePasswordScreenProps {
   onComplete: () => void;
@@ -37,7 +38,7 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
     setLoading(true);
     try {
       // Nota: Asegúrate de que el puerto sea el correcto (4000 para backend)
-      const response = await fetch('https://edupath-backend-xch1.onrender.com/persona/cambiar-password-inicial', {
+      const response = await fetch(`${API_BASE_URL}/persona/cambiar-password-inicial`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

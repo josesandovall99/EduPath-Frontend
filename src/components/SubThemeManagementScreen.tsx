@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Code, Database, BarChart3, ChevronUp, ChevronDown, ToggleLeft, ToggleRight, Plus, Edit2, Search, X } from 'lucide-react';
 import axios from 'axios';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 
 interface SubThemeManagementScreenProps {
   onBack: () => void;
@@ -76,7 +77,7 @@ export function SubThemeManagementScreen({
         setLoading(true);
         setError(null);
         
-        const response = await axios.get('https://edupath-backend-xch1.onrender.com/areas', {
+        const response = await axios.get(`${API_BASE_URL}/areas`, {
           timeout: 5000,
           headers: {
             'Accept': 'application/json',
@@ -101,7 +102,7 @@ export function SubThemeManagementScreen({
         
         if (axios.isAxiosError(err)) {
           if (err.code === 'ECONNREFUSED') {
-            errorMessage = 'No se pudo conectar al servidor en https://edupath-backend-xch1.onrender.com. ¿Está corriendo?';
+            errorMessage = 'No se pudo conectar al servidor. ¿Está corriendo?';
           } else if (err.response?.status === 404) {
             errorMessage = 'El endpoint /areas no existe en el servidor.';
           } else if (err.response?.status) {
@@ -134,7 +135,7 @@ export function SubThemeManagementScreen({
         setSelectedTema(''); // Resetear tema seleccionado
         setSubtemas([]); // Limpiar subtemas
         
-        const response = await axios.get('https://edupath-backend-xch1.onrender.com/temas', {
+        const response = await axios.get(`${API_BASE_URL}/temas`, {
           timeout: 5000,
           headers: {
             'Accept': 'application/json',
@@ -166,7 +167,7 @@ export function SubThemeManagementScreen({
         
         if (axios.isAxiosError(err)) {
           if (err.code === 'ECONNREFUSED') {
-            errorMessage = 'No se pudo conectar al servidor en https://edupath-backend-xch1.onrender.com.';
+            errorMessage = 'No se pudo conectar al servidor.';
           } else if (err.response?.status === 404) {
             errorMessage = 'No hay temas para esta área.';
           } else if (err.response?.status) {
@@ -198,7 +199,7 @@ export function SubThemeManagementScreen({
         setSubtemasLoading(true);
         setSubtemasError(null);
         
-        const response = await axios.get(`https://edupath-backend-xch1.onrender.com/subtemas/por-tema/${selectedTema}`, {
+        const response = await axios.get(`${API_BASE_URL}/subtemas/por-tema/${selectedTema}`, {
           timeout: 5000,
           headers: {
             'Accept': 'application/json',
@@ -217,7 +218,7 @@ export function SubThemeManagementScreen({
         
         if (axios.isAxiosError(err)) {
           if (err.code === 'ECONNREFUSED') {
-            errorMessage = 'No se pudo conectar al servidor en https://edupath-backend-xch1.onrender.com.';
+            errorMessage = 'No se pudo conectar al servidor.';
           } else if (err.response?.status === 404) {
             errorMessage = 'No hay subtemas para este tema.';
           } else if (err.response?.status) {
@@ -247,7 +248,7 @@ export function SubThemeManagementScreen({
           return;
         }
 
-        const temasResponse = await axios.get('https://edupath-backend-xch1.onrender.com/temas', {
+        const temasResponse = await axios.get(`${API_BASE_URL}/temas`, {
           timeout: 5000,
           headers: { Accept: 'application/json' }
         });
@@ -271,7 +272,7 @@ export function SubThemeManagementScreen({
           return;
         }
 
-        const subtemasResponse = await axios.get(`https://edupath-backend-xch1.onrender.com/subtemas/por-tema/${temaObjetivo}`, {
+        const subtemasResponse = await axios.get(`${API_BASE_URL}/subtemas/por-tema/${temaObjetivo}`, {
           timeout: 5000,
           headers: { Accept: 'application/json' }
         });
@@ -334,7 +335,7 @@ export function SubThemeManagementScreen({
       
       if (editingSubtema) {
         // Actualizar subtema existente
-        await axios.put(`https://edupath-backend-xch1.onrender.com/subtemas/${editingSubtema.id}`, formData);
+        await axios.put(`${API_BASE_URL}/subtemas/${editingSubtema.id}`, formData);
         setSuccessMessage('Subtema actualizado exitosamente');
         
         // Actualizar en el estado local
@@ -343,7 +344,7 @@ export function SubThemeManagementScreen({
         );
       } else {
         // Crear nuevo subtema
-        const response = await axios.post('https://edupath-backend-xch1.onrender.com/subtemas', formData);
+        const response = await axios.post(`${API_BASE_URL}/subtemas`, formData);
         setSuccessMessage('Subtema creado exitosamente');
         
         // Agregar al estado local
@@ -375,7 +376,7 @@ export function SubThemeManagementScreen({
     if (!confirmDelete) return;
     
     try {
-      await axios.delete(`https://edupath-backend-xch1.onrender.com/subtemas/${subtema.id}`);
+      await axios.delete(`${API_BASE_URL}/subtemas/${subtema.id}`);
       setSuccessMessage('Subtema eliminado exitosamente');
       
       // Eliminar del estado local
