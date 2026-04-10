@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Send, Minimize2, MessageCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 
-const CHATBOT_TIMEOUT_MS = 60000;
+const CHATBOT_TIMEOUT_MS = 65000;
 
 export function ChatbotButton() {
   const [isOpen, setIsOpen] = useState(false);

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Upload, RefreshCw, Trash2, MessageCircle, FileText, Database, Send } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 
-const CHATBOT_TIMEOUT_MS = 60000;
+const CHATBOT_TIMEOUT_MS = 65000;
 
 interface ChatbotManagementScreenProps {
   onBack: () => void;
