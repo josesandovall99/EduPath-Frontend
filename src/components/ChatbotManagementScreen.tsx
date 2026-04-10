@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Upload, RefreshCw, Trash2, MessageCircle, FileText, Database, Send } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 
+const CHATBOT_TIMEOUT_MS = 60000;
+
 interface ChatbotManagementScreenProps {
   onBack: () => void;
 }
@@ -143,14 +145,28 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     setIsAsking(true);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), CHATBOT_TIMEOUT_MS);
+
       const response = await fetch(`${API_BASE_URL}/chatbot/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           question: userMessage,
           topK: 3
         })
       });
+
+      window.clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 504) {
+          throw new Error('timeout');
+        }
+
+        throw new Error('request_failed');
+      }
 
       const data = await response.json();
       
@@ -158,14 +174,18 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
         setMessages(prev => [...prev, { text: data.answer, isBot: true }]);
       } else {
         setMessages(prev => [...prev, { 
-          text: 'Error al obtener respuesta del chatbot', 
+          text: data.error || 'Error al obtener respuesta del chatbot', 
           isBot: true 
         }]);
       }
     } catch (error) {
       console.error('Ask error:', error);
       setMessages(prev => [...prev, { 
-        text: 'Error de conexión con el chatbot', 
+        text: error instanceof Error && error.name === 'AbortError'
+          ? 'Timeout: el chatbot tardó más de 1 minuto en responder.'
+          : error instanceof Error && error.message === 'timeout'
+            ? 'Timeout: el chatbot tardó más de 1 minuto en responder.'
+            : 'Error de conexión con el chatbot', 
         isBot: true 
       }]);
     } finally {
