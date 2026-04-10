@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Upload, RefreshCw, Trash2, MessageCircle, FileText, Database, Send } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 
-const CHATBOT_TIMEOUT_MS = 65000;
+const CHATBOT_TIMEOUT_MS = 120000;
 
 function replaceLastBotMessage(messages: ChatMessage[], text: string) {
   const nextMessages = [...messages];
@@ -168,7 +168,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
         signal: controller.signal,
         body: JSON.stringify({
           question: userMessage,
-          topK: 2
+          topK: 1
         })
       });
 
@@ -212,9 +212,9 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
       console.error('Ask error:', error);
       setMessages(prev => replaceLastBotMessage(prev,
         error instanceof Error && error.name === 'AbortError'
-          ? 'Timeout: el chatbot tardó más de 1 minuto en responder.'
+          ? 'Timeout: el chatbot tardó más de 2 minutos en responder.'
           : error instanceof Error && error.message === 'timeout'
-            ? 'Timeout: el chatbot tardó más de 1 minuto en responder.'
+            ? 'Timeout: el chatbot tardó más de 2 minutos en responder.'
             : 'Error de conexión con el chatbot'));
     } finally {
       setIsAsking(false);
