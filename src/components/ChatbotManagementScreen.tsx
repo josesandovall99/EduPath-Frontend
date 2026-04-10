@@ -4,6 +4,19 @@ import { API_BASE_URL } from '../utils/constants';
 
 const CHATBOT_TIMEOUT_MS = 65000;
 
+function replaceLastBotMessage(messages: ChatMessage[], text: string) {
+  const nextMessages = [...messages];
+  for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
+    if (nextMessages[index].isBot) {
+      nextMessages[index] = { ...nextMessages[index], text };
+      return nextMessages;
+    }
+  }
+
+  nextMessages.push({ text, isBot: true });
+  return nextMessages;
+}
+
 interface ChatbotManagementScreenProps {
   onBack: () => void;
 }
@@ -140,27 +153,27 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     if (!inputValue.trim() || isAsking) return;
 
     const userMessage = inputValue.trim();
-    setMessages(prev => [...prev, { text: userMessage, isBot: false }]);
+    setMessages(prev => [...prev, { text: userMessage, isBot: false }, { text: '', isBot: true }]);
     setInputValue('');
     setIsAsking(true);
 
     try {
       const controller = new AbortController();
+      let receivedFirstChunk = false;
       const timeoutId = window.setTimeout(() => controller.abort(), CHATBOT_TIMEOUT_MS);
 
-      const response = await fetch(`${API_BASE_URL}/chatbot/chat`, {
+      const response = await fetch(`${API_BASE_URL}/chatbot/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
           question: userMessage,
-          topK: 3
+          topK: 2
         })
       });
 
-      window.clearTimeout(timeoutId);
-
       if (!response.ok) {
+        window.clearTimeout(timeoutId);
         if (response.status === 504) {
           throw new Error('timeout');
         }
@@ -168,26 +181,41 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
         throw new Error('request_failed');
       }
 
-      const data = await response.json();
-      
-      if (data.success) {
-        setMessages(prev => [...prev, { text: data.answer, isBot: true }]);
-      } else {
-        setMessages(prev => [...prev, { 
-          text: data.error || 'Error al obtener respuesta del chatbot', 
-          isBot: true 
-        }]);
+      if (!response.body) {
+        window.clearTimeout(timeoutId);
+        throw new Error('Respuesta sin streaming');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        if (!receivedFirstChunk) {
+          receivedFirstChunk = true;
+          window.clearTimeout(timeoutId);
+        }
+
+        accumulatedText += decoder.decode(value, { stream: true });
+        setMessages(prev => replaceLastBotMessage(prev, accumulatedText));
+      }
+
+      window.clearTimeout(timeoutId);
+
+      if (!accumulatedText.trim()) {
+        setMessages(prev => replaceLastBotMessage(prev, 'No pude obtener respuesta.'));
       }
     } catch (error) {
       console.error('Ask error:', error);
-      setMessages(prev => [...prev, { 
-        text: error instanceof Error && error.name === 'AbortError'
+      setMessages(prev => replaceLastBotMessage(prev,
+        error instanceof Error && error.name === 'AbortError'
           ? 'Timeout: el chatbot tardó más de 1 minuto en responder.'
           : error instanceof Error && error.message === 'timeout'
             ? 'Timeout: el chatbot tardó más de 1 minuto en responder.'
-            : 'Error de conexión con el chatbot', 
-        isBot: true 
-      }]);
+            : 'Error de conexión con el chatbot'));
     } finally {
       setIsAsking(false);
     }
