@@ -700,7 +700,7 @@ export default function App() {
             onContentSelect={handleContentSelect}
             estudianteId={userSession.id}
           />
-          <ChatbotButton />
+          <ChatbotButton areaId={Number(selectedSubject.id)} contextLabel={selectedSubject.name} />
         </>
       )}
 
@@ -710,7 +710,7 @@ export default function App() {
             content={selectedContent}
             onBack={handleBackToSubject}
           />
-          <ChatbotButton />
+          <ChatbotButton areaId={selectedContent.areaId ?? Number(selectedSubject?.id)} contextLabel={selectedContent.title} />
         </>
       )}
 
@@ -720,7 +720,12 @@ export default function App() {
             content={selectedContent}
             onBack={handleBackToSubject}
           />
-          <ChatbotButton />
+          <ChatbotButton
+            chatbotType="MINIPROYECTO"
+            areaId={selectedContent.areaId ?? Number(selectedSubject?.id)}
+            miniproyectoId={selectedContent.id}
+            contextLabel={selectedContent.title}
+          />
         </>
       )}
 
@@ -733,7 +738,7 @@ export default function App() {
             onBack={handleBackToSubject}
             estudianteId={userSession.id}
           />
-          <ChatbotButton />
+          <ChatbotButton areaId={selectedContent.areaId ?? Number(selectedSubject.id)} contextLabel={selectedContent.title} />
         </>
       )}
 
@@ -744,7 +749,7 @@ export default function App() {
             activity={selectedContent}
             onBack={handleBackToSubject}
           />
-          <ChatbotButton />
+          <ChatbotButton areaId={selectedContent.areaId ?? Number(selectedSubject.id)} contextLabel={selectedContent.title} />
         </>
       )}
 
@@ -754,7 +759,7 @@ export default function App() {
             activity={selectedContent}
             onBack={handleBackToSubject}
           />
-          <ChatbotButton />
+          <ChatbotButton areaId={selectedContent.areaId ?? Number(selectedSubject?.id)} contextLabel={selectedContent.title} />
         </>
       )}
 

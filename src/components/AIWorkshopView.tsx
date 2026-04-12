@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Lightbulb, FileText, Check, Save } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
+import { MiniproyectoChatbotPanel } from './MiniproyectoChatbotPanel';
 
 
 interface AIWorkshopViewProps {
@@ -10,6 +11,7 @@ interface AIWorkshopViewProps {
     title: string;
     isMiniproyecto?: boolean;
     actividadId?: number;
+    areaId?: number;
     areaNombre?: string;
   };
   onBack: () => void;
@@ -44,8 +46,7 @@ const workshopConfigs = {
       'Identificar stakeholders del proyecto',
       'Recopilar requisitos funcionales',
       'Definir requisitos no funcionales'
-    ],
-    iframeSrc: 'https://zenoembed.textcortex.com/?embed_id=emb_01kg7mwvbgfw2r9tjcat0get0c'
+    ]
   },
   management: {
     description: (
@@ -59,8 +60,7 @@ const workshopConfigs = {
       'Definir alcance del proyecto',
       'Crear cronograma del proyecto',
       'Estimar costos y recursos'
-    ],
-    iframeSrc: 'https://zenoembed.textcortex.com/?embed_id=emb_01kg7w1f7aep7axvz2r0wjw6jm'
+    ]
   }
 };
 
@@ -467,15 +467,14 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
               <span>Volver</span>
             </button>
 
-            <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-              <iframe
-                src={workshopConfig.iframeSrc}
-                width="100%"
-                height="760"
-                frameBorder={0}
-                title="Chatbot cliente"
-              />
-            </div>
+            <MiniproyectoChatbotPanel
+              chatbotType={workshop.isMiniproyecto ? 'MINIPROYECTO' : 'GENERAL'}
+              areaId={workshop.areaId}
+              miniproyectoId={workshop.isMiniproyecto ? workshop.id : null}
+              title="Cliente del Proyecto"
+              subtitle="Este chatbot reemplaza la integración anterior de TextCortex"
+              contextLabel={workshop.title}
+            />
 
             <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 space-y-5">
               <div className="flex items-start justify-between gap-4">

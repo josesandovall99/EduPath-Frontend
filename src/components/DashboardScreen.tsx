@@ -354,7 +354,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           </div>
         </div>
       </main>
-      <ChatbotButton />
+      <ChatbotButton contextLabel="panel del estudiante" />
     </div>
   );
 }

@@ -4,6 +4,22 @@ import { API_BASE_URL } from '../utils/constants';
 
 const CHATBOT_TIMEOUT_MS = 120000;
 
+type ChatbotType = 'GENERAL' | 'MINIPROYECTO';
+
+interface ChatbotButtonProps {
+  chatbotType?: ChatbotType;
+  areaId?: number | null;
+  miniproyectoId?: number | string | null;
+  contextLabel?: string;
+}
+
+interface ResolvedChatbot {
+  id: number;
+  nombre: string;
+  tipo: ChatbotType;
+  fallback?: boolean;
+}
+
 function replaceLastBotMessage(messages: Array<{ text: string; isBot: boolean }>, text: string) {
   const nextMessages = [...messages];
   for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
@@ -17,14 +33,40 @@ function replaceLastBotMessage(messages: Array<{ text: string; isBot: boolean }>
   return nextMessages;
 }
 
-export function ChatbotButton() {
+function buildWelcomeMessage(chatbotType: ChatbotType, chatbotName?: string | null, contextLabel?: string, unavailable?: boolean) {
+  if (unavailable) {
+    if (chatbotType === 'MINIPROYECTO') {
+      return 'No hay un chatbot activo para este miniproyecto en este momento.';
+    }
+
+    return 'No hay un chatbot general activo para esta vista en este momento.';
+  }
+
+  if (chatbotType === 'MINIPROYECTO') {
+    if (chatbotName) {
+      return `Hola, soy ${chatbotName}. Puedo ayudarte con ${contextLabel || 'este miniproyecto'}.`;
+    }
+
+    return `Hola, puedo ayudarte con ${contextLabel || 'este miniproyecto'}.`;
+  }
+
+  if (chatbotName) {
+    return `Hola, soy ${chatbotName}. ¿Qué quieres consultar?`;
+  }
+
+  return '¡Hola! Soy tu asistente EduPath. ¿Qué dato deseas consultar?';
+}
+
+export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproyectoId = null, contextLabel }: ChatbotButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState([
-    { text: '¡Hola! Soy tu asistente PathBot. ¿Qué dato deseas consultar?', isBot: true }
+    { text: buildWelcomeMessage(chatbotType, null, contextLabel), isBot: true }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
+  const [resolvedChatbot, setResolvedChatbot] = useState<ResolvedChatbot | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -35,8 +77,57 @@ export function ChatbotButton() {
     }
   }, [messages]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveChatbot = async () => {
+      setIsResolving(true);
+      setResolvedChatbot(null);
+
+      try {
+        const searchParams = new URLSearchParams();
+        searchParams.set('tipo', chatbotType);
+
+        if (Number.isFinite(Number(areaId))) {
+          searchParams.set('area_id', String(Number(areaId)));
+        }
+
+        if (chatbotType === 'MINIPROYECTO' && Number.isFinite(Number(miniproyectoId))) {
+          searchParams.set('miniproyecto_id', String(Number(miniproyectoId)));
+        }
+
+        const response = await fetch(`${API_BASE_URL}/chatbots/resolve?${searchParams.toString()}`);
+        if (!response.ok) {
+          throw new Error(response.status === 404 ? 'not_found' : 'resolve_failed');
+        }
+
+        const data = await response.json();
+        if (cancelled) return;
+
+        setResolvedChatbot(data);
+        setMessages([{ text: buildWelcomeMessage(chatbotType, data?.nombre, contextLabel), isBot: true }]);
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error('Error resolving chatbot:', error);
+        setResolvedChatbot(null);
+        setMessages([{ text: buildWelcomeMessage(chatbotType, null, contextLabel, true), isBot: true }]);
+      } finally {
+        if (!cancelled) {
+          setIsResolving(false);
+        }
+      }
+    };
+
+    void resolveChatbot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chatbotType, areaId, miniproyectoId, contextLabel]);
+
   const handleSend = async () => {
-    if (!inputValue.trim() || isLoading) return;
+    if (!inputValue.trim() || isLoading || !resolvedChatbot?.id) return;
 
     const userMessage = inputValue.trim();
     setMessages(prev => [...prev, { text: userMessage, isBot: false }, { text: '', isBot: true }]);
@@ -48,7 +139,7 @@ export function ChatbotButton() {
       let receivedFirstChunk = false;
       const timeoutId = window.setTimeout(() => controller.abort(), CHATBOT_TIMEOUT_MS);
 
-      const response = await fetch(`${API_BASE_URL}/chatbot/chat/stream`, {
+      const response = await fetch(`${API_BASE_URL}/chatbots/${resolvedChatbot.id}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
@@ -138,7 +229,16 @@ export function ChatbotButton() {
     >
       {/* Header */}
       <div style={{ backgroundColor: "#7ED6A7", color: "white", padding: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "600" }}>Asistente EduPath</h3>
+        <div>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "600" }}>{resolvedChatbot?.nombre || 'Asistente EduPath'}</h3>
+          <p style={{ margin: 0, fontSize: '12px', opacity: 0.9 }}>
+            {chatbotType === 'MINIPROYECTO'
+              ? resolvedChatbot?.fallback
+                ? 'Usando chatbot general del área'
+                : 'Soporte del miniproyecto'
+              : 'Asistente general'}
+          </p>
+        </div>
         <div style={{ display: "flex", gap: "8px" }}>
           <button onClick={() => setIsMinimized(!isMinimized)} style={{ background: "none", border: "none", color: "white", cursor: "pointer" }}><Minimize2 size={18} /></button>
           <button onClick={() => setIsOpen(false)} style={{ background: "none", border: "none", color: "white", cursor: "pointer" }}><X size={18} /></button>
@@ -160,7 +260,7 @@ export function ChatbotButton() {
                 {msg.text}
               </div>
             ))}
-            {isLoading && <div style={{ alignSelf: "flex-start", color: "#999", fontSize: "12px" }}>Escribiendo...</div>}
+            {(isLoading || isResolving) && <div style={{ alignSelf: "flex-start", color: "#999", fontSize: "12px" }}>{isResolving ? 'Cargando chatbot...' : 'Escribiendo...'}</div>}
           </div>
 
           {/* Input Area */}
@@ -169,10 +269,11 @@ export function ChatbotButton() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Pregunta algo..."
-              style={{ flex: 1, border: "1px solid #ddd", borderRadius: "20px", padding: "8px 15px", outline: "none" }}
+              disabled={isResolving || !resolvedChatbot?.id}
+              placeholder={resolvedChatbot?.id ? 'Pregunta algo...' : 'No hay chatbot disponible para este contexto'}
+              style={{ flex: 1, border: "1px solid #ddd", borderRadius: "20px", padding: "8px 15px", outline: "none", backgroundColor: isResolving || !resolvedChatbot?.id ? '#f3f4f6' : 'white' }}
             />
-            <button onClick={handleSend} disabled={isLoading} style={{ background: "#7ED6A7", border: "none", borderRadius: "50%", width: "35px", height: "35px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white" }}>
+            <button onClick={handleSend} disabled={isLoading || isResolving || !resolvedChatbot?.id} style={{ background: "#7ED6A7", border: "none", borderRadius: "50%", width: "35px", height: "35px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white", opacity: isLoading || isResolving || !resolvedChatbot?.id ? 0.5 : 1 }}>
               <Send size={18} />
             </button>
           </div>
