@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Building2, GraduationCap, Mail, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -15,6 +15,7 @@ interface Area {
 interface DocentePersona {
   nombre?: string;
   email?: string;
+  codigoAcceso?: string;
 }
 
 interface Docente {
@@ -42,6 +43,10 @@ const emptyForm: DocenteFormData = {
   areaId: ''
 };
 
+const accentColor = '#14B8A6';
+const inputClassName =
+  'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition-all placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-teal-500/25';
+
 export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps) {
   const [docentes, setDocentes] = useState<Docente[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
@@ -55,6 +60,13 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
   const [editingDocente, setEditingDocente] = useState<Docente | null>(null);
   const [formData, setFormData] = useState<DocenteFormData>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAreaFilter, setSelectedAreaFilter] = useState('all');
+
+  const modalTitle = editingDocente ? 'Editar docente' : 'Crear docente';
+  const modalDescription = editingDocente
+    ? 'Actualiza la información del docente manteniendo la misma experiencia visual del panel administrativo.'
+    : 'Completa los datos del docente y EduPath enviará automáticamente las credenciales al correo registrado.';
 
   const loadAreas = async () => {
     try {
@@ -108,7 +120,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
     setFormData({
       nombre: docente.persona?.nombre || '',
       email: docente.persona?.email || '',
-      codigoAcceso: docente.codigoAcceso || '',
+      codigoAcceso: docente.persona?.codigoAcceso || docente.codigoAcceso || '',
       especialidad: docente.especialidad || '',
       areaId: String(docente.area?.id ?? docente.areaId ?? '')
     });
@@ -127,6 +139,10 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
 
   const handleCloseResult = () => {
     setResultModal({ open: false, success: true, message: '' });
+  };
+
+  const updateField = (field: keyof DocenteFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleDelete = async (docente: Docente) => {
@@ -164,6 +180,61 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
     }
     return true;
   }, [editingDocente, formData]);
+
+  const filteredDocentes = useMemo(() => {
+    const normalizedQuery = searchTerm.trim().toLowerCase();
+
+    return docentes.filter((docente) => {
+      const matchesArea =
+        selectedAreaFilter === 'all' ||
+        String(docente.area?.id ?? docente.areaId ?? '') === selectedAreaFilter;
+
+      if (!matchesArea) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      const searchableText = [
+        docente.persona?.nombre,
+        docente.persona?.email,
+        docente.persona?.codigoAcceso,
+        docente.especialidad,
+        docente.area?.nombre,
+        docente.codigoAcceso
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return searchableText.includes(normalizedQuery);
+    });
+  }, [docentes, searchTerm, selectedAreaFilter]);
+
+  const stats = useMemo(() => {
+    const docentesConCorreo = docentes.filter((docente) => docente.persona?.email?.trim()).length;
+    const especialidades = new Set(
+      docentes
+        .map((docente) => docente.especialidad?.trim())
+        .filter((value): value is string => Boolean(value))
+    ).size;
+    const areasCubiertas = new Set(
+      docentes
+        .map((docente) => String(docente.area?.id ?? docente.areaId ?? ''))
+        .filter((value) => value && value !== '0')
+    ).size;
+
+    return {
+      total: docentes.length,
+      docentesConCorreo,
+      especialidades,
+      areasCubiertas
+    };
+  }, [docentes]);
+
+  const visibleAreas = useMemo(() => areas.slice(0, 4), [areas]);
 
   const handleSave = async () => {
     if (!isFormValid) {
@@ -229,45 +300,79 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-8 py-4">
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="mx-auto max-w-7xl px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-[#3A4A5B]">Gestion de Docentes</h1>
+                <h1 className="text-[#3A4A5B]">Gestión de Docentes</h1>
                 <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
               </div>
             </div>
+            <button
+              onClick={handleOpenCreate}
+              className="app-btn app-btn-success px-6 py-3"
+            >
+              <Plus className="h-5 w-5" />
+              <span>Crear Nuevo Docente</span>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="app-main">
         <button
           onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
+          className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
         </button>
 
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl text-[#3A4A5B]">Docentes registrados</h2>
-            <p className="text-gray-500 text-sm">Administra los docentes, sus areas y especialidades.</p>
+        <div className="grid grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Users className="h-6 w-6" />
+              </div>
+              <span className="text-3xl text-[#4A90E2]">{stats.total}</span>
+            </div>
+            <p className="text-gray-600 text-sm">Total Docentes</p>
           </div>
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white shadow-md hover:shadow-lg transition-all"
-            style={{ backgroundColor: '#14B8A6' }}
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nuevo docente</span>
-          </button>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <Mail className="h-6 w-6" />
+              </div>
+              <span className="text-3xl text-[#7ED6A7]">{stats.docentesConCorreo}</span>
+            </div>
+            <p className="text-gray-600 text-sm">Con correo</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <Building2 className="h-6 w-6" />
+              </div>
+              <span className="text-3xl text-gray-500">{stats.areasCubiertas}</span>
+            </div>
+            <p className="text-gray-600 text-sm">Áreas cubiertas</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <GraduationCap className="h-6 w-6" />
+              </div>
+              <span className="text-3xl text-[#4A90E2]">{stats.especialidades}</span>
+            </div>
+            <p className="text-gray-600 text-sm">Especialidades</p>
+          </div>
         </div>
 
         {error && (
@@ -276,169 +381,283 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
           </div>
         )}
 
+        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setSelectedAreaFilter('all')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  selectedAreaFilter === 'all'
+                    ? 'app-primary-btn text-white shadow-md'
+                    : 'app-btn-secondary text-gray-700'
+                }`}
+              >
+                Todos
+              </button>
+              {visibleAreas.map((area) => {
+                const isActive = selectedAreaFilter === String(area.id);
+                return (
+                  <button
+                    key={area.id}
+                    onClick={() => setSelectedAreaFilter(String(area.id))}
+                    className={`px-4 py-2 rounded-lg transition-all ${
+                      isActive
+                        ? 'app-primary-btn text-white shadow-md'
+                        : 'app-btn-secondary text-gray-700'
+                    }`}
+                  >
+                    {area.nombre}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Buscar docentes..."
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent w-[240px] md:w-[300px]"
+              />
+            </div>
+          </div>
+        </div>
+
         {loading ? (
           <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
             <p className="text-gray-600">Cargando docentes...</p>
           </div>
-        ) : docentes.length === 0 ? (
+        ) : filteredDocentes.length === 0 ? (
           <div className="bg-white rounded-xl shadow-md p-12 text-center">
             <p className="text-gray-600">No hay docentes registrados.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-            <div className="grid grid-cols-6 gap-4 px-6 py-4 border-b border-gray-200 text-sm font-medium text-gray-500">
-              <span>Nombre</span>
-              <span>Email</span>
-              <span>Especialidad</span>
-              <span>Area</span>
-              <span>Codigo</span>
-              <span className="text-right">Acciones</span>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {docentes.map((docente) => (
-                <div key={docente.id} className="grid grid-cols-6 gap-4 px-6 py-4 text-sm text-gray-700 items-center">
-                  <div>
-                    <p className="text-[#3A4A5B] font-medium">{docente.persona?.nombre || 'Sin nombre'}</p>
-                  </div>
-                  <div>
-                    <p>{docente.persona?.email || '-'}</p>
-                  </div>
-                  <div>
-                    <p>{docente.especialidad || '-'}</p>
-                  </div>
-                  <div>
-                    <p>{docente.area?.nombre || '-'}</p>
-                  </div>
-                  <div>
-                    <p>{docente.codigoAcceso || '-'}</p>
-                  </div>
-                  <div className="flex items-center justify-end gap-3">
-                    <button
-                      onClick={() => handleOpenEdit(docente)}
-                      className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                    >
-                      <Pencil className="w-4 h-4" />
-                      <span>Editar</span>
-                    </button>
-                    <button
-                      onClick={() => handleDelete(docente)}
-                      className="flex items-center gap-1 text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Eliminar</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Nombre</th>
+                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Email</th>
+                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Especialidad</th>
+                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Área</th>
+                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Código</th>
+                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredDocentes.map((docente) => (
+                    <tr key={docente.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-blue-100">
+                            <Users className="w-5 h-5 text-[#4A90E2]" />
+                          </div>
+                          <div>
+                            <div className="text-[#3A4A5B]">{docente.persona?.nombre || 'Sin nombre'}</div>
+                            <div className="text-xs text-gray-400">ID #{docente.id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-600 text-sm break-all">{docente.persona?.email || '-'}</td>
+                      <td className="px-6 py-4 text-gray-600 text-sm">{docente.especialidad || '-'}</td>
+                      <td className="px-6 py-4 text-gray-600 text-sm">{docente.area?.nombre || '-'}</td>
+                      <td className="px-6 py-4 text-gray-600 text-sm">{docente.persona?.codigoAcceso || docente.codigoAcceso || '-'}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleOpenEdit(docente)}
+                            className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(docente)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
       </main>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-              <h3 className="text-2xl font-semibold text-[#3A4A5B]">
-                {editingDocente ? 'Editar Docente' : 'Crear Docente'}
-              </h3>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-5">
-              {!editingDocente && (
-                <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
-                  Se enviaran automaticamente las credenciales al correo del docente.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 border-b border-slate-200 bg-gradient-to-r from-teal-50 via-white to-cyan-50 px-6 py-5 rounded-t-[28px] lg:px-8">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="mb-3 inline-flex rounded-full bg-teal-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
+                    Gestión docente
+                  </div>
+                  <h3 className="text-2xl font-semibold text-[#3A4A5B]">{modalTitle}</h3>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{modalDescription}</p>
                 </div>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
-                  <input
-                    type="text"
-                    value={formData.nombre}
-                    onChange={(event) => setFormData({ ...formData, nombre: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
-                    placeholder="Ej: Ana Gomez"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(event) => setFormData({ ...formData, email: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
-                    placeholder="ana@demo.com"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Codigo de acceso *</label>
-                  <input
-                    type="text"
-                    value={formData.codigoAcceso}
-                    onChange={(event) => setFormData({ ...formData, codigoAcceso: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
-                    placeholder="DOC123"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Especialidad *</label>
-                  <input
-                    type="text"
-                    value={formData.especialidad}
-                    onChange={(event) => setFormData({ ...formData, especialidad: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
-                    placeholder="Matematicas"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Area *</label>
-                  <select
-                    value={formData.areaId}
-                    onChange={(event) => setFormData({ ...formData, areaId: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all bg-white"
-                    required
+                <div className="flex items-center gap-3">
+                  <div className="hidden rounded-2xl border border-teal-100 bg-white/80 px-4 py-3 text-right shadow-sm sm:block">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Estado</div>
+                    <div className="mt-1 text-sm font-semibold text-[#3A4A5B]">{editingDocente ? 'Edición activa' : 'Nuevo registro'}</div>
+                  </div>
+                  <button
+                    onClick={handleCloseModal}
+                    className="rounded-full border border-slate-200 p-2 text-slate-400 transition-colors hover:text-slate-600"
                   >
-                    <option value="">Selecciona un area</option>
-                    {areas.map((area) => (
-                      <option key={area.id} value={area.id}>
-                        {area.nombre}
-                      </option>
-                    ))}
-                  </select>
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex gap-4 justify-end bg-gray-50 rounded-b-2xl">
+            <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.85fr)] lg:px-8 lg:py-7">
+              <div className="space-y-6">
+                {!editingDocente && (
+                  <div className="rounded-2xl border border-teal-100 bg-teal-50/70 px-5 py-4 text-sm leading-6 text-teal-800 shadow-sm">
+                    El alta del docente mantiene el flujo del panel y enviará las credenciales automáticamente al correo registrado.
+                  </div>
+                )}
+
+                <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 shadow-sm">
+                  <div className="mb-4">
+                    <h4 className="text-base font-semibold text-[#3A4A5B]">Información personal</h4>
+                    <p className="mt-1 text-sm text-slate-500">Datos base para identificar al docente dentro de la plataforma.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Nombre *</label>
+                      <input
+                        type="text"
+                        value={formData.nombre}
+                        onChange={(event) => updateField('nombre', event.target.value)}
+                        className={inputClassName}
+                        placeholder="Ej: Ana Gomez"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Email *</label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(event) => updateField('email', event.target.value)}
+                        className={inputClassName}
+                        placeholder="ana@demo.com"
+                        required
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="mb-4">
+                    <h4 className="text-base font-semibold text-[#3A4A5B]">Perfil académico</h4>
+                    <p className="mt-1 text-sm text-slate-500">Relaciona el código de acceso, la especialidad y el área que usará el docente.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Código de acceso *</label>
+                      <input
+                        type="text"
+                        value={formData.codigoAcceso}
+                        onChange={(event) => updateField('codigoAcceso', event.target.value)}
+                        className={inputClassName}
+                        placeholder="DOC123"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Especialidad *</label>
+                      <input
+                        type="text"
+                        value={formData.especialidad}
+                        onChange={(event) => updateField('especialidad', event.target.value)}
+                        className={inputClassName}
+                        placeholder="Matematicas"
+                        required
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Área *</label>
+                      <select
+                        value={formData.areaId}
+                        onChange={(event) => updateField('areaId', event.target.value)}
+                        className={`${inputClassName} bg-white`}
+                        required
+                      >
+                        <option value="">Selecciona un area</option>
+                        {areas.map((area) => (
+                          <option key={area.id} value={area.id}>
+                            {area.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <aside className="space-y-5">
+                <section className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 via-white to-cyan-50 p-5 shadow-sm">
+                  <h4 className="text-base font-semibold text-[#3A4A5B]">Resumen del registro</h4>
+                  <div className="mt-4 space-y-4 text-sm">
+                    <div className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Docente</div>
+                      <div className="mt-2 font-semibold text-slate-800">{formData.nombre.trim() || 'Sin nombre definido'}</div>
+                      <div className="mt-1 break-all text-slate-500">{formData.email.trim() || 'Correo pendiente'}</div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                      <div className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Código</div>
+                        <div className="mt-2 font-semibold text-slate-800">{formData.codigoAcceso.trim() || 'Pendiente'}</div>
+                      </div>
+                      <div className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Especialidad</div>
+                        <div className="mt-2 font-semibold text-slate-800">{formData.especialidad.trim() || 'Pendiente'}</div>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-dashed border-teal-200 bg-teal-50/70 p-4 text-teal-800">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em]">Área asignada</div>
+                      <div className="mt-2 font-semibold">{areas.find((area) => String(area.id) === formData.areaId)?.nombre || 'Selecciona un area'}</div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h4 className="text-base font-semibold text-[#3A4A5B]">Antes de guardar</h4>
+                  <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                    <p>Verifica el correo porque ahí llegarán las credenciales iniciales.</p>
+                    <p>Usa un código de acceso fácil de comunicar pero suficientemente claro para el equipo docente.</p>
+                    <p>Asigna el área correcta para mantener consistencia con contenidos y permisos.</p>
+                  </div>
+                </section>
+              </aside>
+            </div>
+
+            <div className="sticky bottom-0 flex gap-4 justify-end rounded-b-[28px] border-t border-slate-200 bg-white/95 px-6 py-5 backdrop-blur lg:px-8">
               <button
                 onClick={handleCloseModal}
                 disabled={submitting}
-                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-xl border-2 border-slate-300 px-6 py-3 text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSave}
                 disabled={submitting || !isFormValid}
-                className="px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                style={{ backgroundColor: '#14B8A6' }}
+                className="flex items-center gap-2 rounded-xl px-6 py-3 text-white shadow-md transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: accentColor }}
               >
                 {submitting ? (
                   <>
@@ -455,9 +674,9 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
       )}
 
       {showConfirmCreate && !editingDocente && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[26px] border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-teal-50 via-white to-cyan-50 p-6 rounded-t-[26px]">
               <h3 className="text-xl font-semibold text-[#3A4A5B]">Confirmar creacion</h3>
               <button
                 onClick={handleCloseConfirm}
@@ -466,23 +685,23 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="p-6 space-y-3 text-sm text-gray-600">
+            <div className="space-y-3 p-6 text-sm leading-6 text-slate-600">
               <p>Verifica que los datos del docente sean correctos.</p>
               <p>Se enviaran las credenciales al correo proporcionado.</p>
             </div>
-            <div className="p-6 border-t border-gray-200 flex gap-3 justify-end bg-gray-50 rounded-b-2xl">
+            <div className="flex gap-3 justify-end rounded-b-[26px] border-t border-slate-200 bg-white p-6">
               <button
                 onClick={handleCloseConfirm}
                 disabled={submitting}
-                className="px-5 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-xl border-2 border-slate-300 px-5 py-2.5 text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSave}
                 disabled={submitting}
-                className="px-5 py-2.5 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: '#14B8A6' }}
+                className="rounded-xl px-5 py-2.5 text-white transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: accentColor }}
               >
                 Confirmar y crear
               </button>
@@ -492,9 +711,9 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
       )}
 
       {resultModal.open && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[26px] border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-teal-50 via-white to-cyan-50 p-6 rounded-t-[26px]">
               <h3 className="text-xl font-semibold text-[#3A4A5B]">
                 {resultModal.success ? 'Correo enviado' : 'Fallo al enviar'}
               </h3>
@@ -505,14 +724,14 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="p-6 text-sm text-gray-600">
+            <div className="p-6 text-sm leading-6 text-slate-600">
               {resultModal.message}
             </div>
-            <div className="p-6 border-t border-gray-200 flex justify-end bg-gray-50 rounded-b-2xl">
+            <div className="flex justify-end rounded-b-[26px] border-t border-slate-200 bg-white p-6">
               <button
                 onClick={handleCloseResult}
-                className="px-5 py-2.5 text-white rounded-lg hover:shadow-lg transition-all"
-                style={{ backgroundColor: resultModal.success ? '#14B8A6' : '#EF4444' }}
+                className="rounded-xl px-5 py-2.5 text-white transition-all hover:shadow-lg"
+                style={{ backgroundColor: resultModal.success ? accentColor : '#EF4444' }}
               >
                 Entendido
               </button>

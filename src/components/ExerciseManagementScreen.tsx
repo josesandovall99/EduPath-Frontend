@@ -731,9 +731,6 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
 }
 
 export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenProps) {
-  const isProduction = import.meta.env.PROD;
-  const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-  const API_BASE_URL = rawApiBaseUrl || (isProduction ? 'https://edupath-backend-xch1.onrender.com' : '/api');
   const [ejercicios, setEjercicios] = useState<EjercicioItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [showModal, setShowModal] = useState(false);
