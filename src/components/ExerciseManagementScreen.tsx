@@ -175,7 +175,7 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
     <div className="space-y-4 p-4 lg:p-5 bg-blue-50 rounded-xl border border-blue-200">
       <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración de Compilador</h3>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)] gap-4 items-start">
         <div className="space-y-4 min-w-0">
           <div>
             <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Plantilla del método *</label>
@@ -183,7 +183,8 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
               value={plantillaMetodo}
               onChange={handleTemplateChange}
               placeholder={"public static int sumar(int a, int b) {\n    // TODO\n}"}
-              className="w-full min-h-32 lg:min-h-36 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono text-sm leading-6 bg-white"
+              rows={12}
+              className="w-full min-h-64 lg:min-h-72 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono text-sm leading-7 bg-white resize-y"
               required
             />
             <p className="text-xs text-gray-500 mt-2">La plantilla del método es el campo principal. El backend encapsulará este método dentro de una clase Main y ejecutará los 3 casos automáticamente.</p>
@@ -208,22 +209,39 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
-            <label className="block text-sm font-medium text-[#3A4A5B] mb-3">Restricciones técnicas (opcionales)</label>
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-              {sintaxisDisponibles.map(sintaxis => (
-                <label key={sintaxis} className="flex items-center space-x-2 cursor-pointer rounded-lg border border-gray-200 px-3 py-2 bg-gray-50">
-                  <input
-                    type="checkbox"
-                    checked={sintaxisSeleccionadas.includes(sintaxis)}
-                    onChange={() => handleSintaxisChange(sintaxis)}
-                    className="w-4 h-4 text-[#4A90E2] border-gray-300 rounded focus:ring-[#4A90E2]"
-                  />
-                  <span className="text-sm text-[#3A4A5B] font-mono">{sintaxis}</span>
-                </label>
-              ))}
+          <div className="rounded-2xl border border-blue-100/80 bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF6FF] p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <label className="text-sm font-semibold text-[#3A4A5B]">Restricciones técnicas (opcionales)</label>
+              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                {sintaxisSeleccionadas.length} activas
+              </span>
             </div>
-            <p className="text-xs text-gray-500 mt-3">Solo se validan si el ejercicio las define. Si quedan vacías, el backend evaluará únicamente los 3 casos de prueba.</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {sintaxisDisponibles.map(sintaxis => {
+                const active = sintaxisSeleccionadas.includes(sintaxis);
+                return (
+                  <label
+                    key={sintaxis}
+                    className={`group flex items-center gap-3.5 cursor-pointer rounded-xl border px-3 py-2.5 transition-all ${
+                      active
+                        ? 'border-blue-300 bg-blue-50 shadow-[0_6px_16px_rgba(74,144,226,0.12)]'
+                        : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() => handleSintaxisChange(sintaxis)}
+                      className="h-4 w-4 rounded border-gray-300 text-[#4A90E2] focus:ring-[#4A90E2]"
+                    />
+                    <span className={`ml-2 text-sm font-mono ${active ? 'text-blue-800 font-semibold' : 'text-[#3A4A5B]'}`}>
+                      {sintaxis}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-600">Solo se validan si el ejercicio las define. Si quedan vacías, el backend evaluará únicamente los 3 casos de prueba.</p>
           </div>
         </div>
 
@@ -232,7 +250,7 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
             <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Casos de prueba obligatorios *</label>
             <p className="text-xs text-gray-500 mb-3">Los inputs aceptan valores separados por comas, por ejemplo: 5,3</p>
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {casosPrueba.map((caso: any, index: number) => (
               <div key={index} className="space-y-3 bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
                 <div className="text-xs font-semibold uppercase tracking-wide text-[#3A4A5B]">Caso {index + 1}</div>
@@ -1447,8 +1465,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
 
       {/* Modal Crear/Editar */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-auto">
-          <div className="bg-white rounded-2xl shadow-xl p-5 lg:p-6 w-[1600px] max-w-[99vw] max-h-[94vh] overflow-auto relative">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-3 lg:p-4 overflow-auto">
+          <div className="bg-white rounded-2xl shadow-xl p-5 lg:p-6 w-[min(1800px,99vw)] max-h-[96vh] overflow-auto relative">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl" style={{ background: 'linear-gradient(90deg, rgba(74,144,226,0.12), rgba(74,144,226,0.06))' }} />
             <div className="flex items-center justify-between mb-6 pt-2">
               <h2 className="text-2xl font-bold text-[#3A4A5B]">{isEditMode ? 'Editar Ejercicio' : 'Crear Nuevo Ejercicio'}</h2>
@@ -1461,10 +1479,10 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] gap-5 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] gap-5 items-start">
                 <div className="space-y-6 min-w-0">
               {/* Actividad */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Título *</label>
                   <input
@@ -1577,7 +1595,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
               </div>
 
               {/* Ejercicio - Campos comunes */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
                     Contenido *
@@ -1649,7 +1667,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                 <MatchingConfig formData={formData} setFormData={setFormData} />
               )}
 
-              <div className="flex gap-3 justify-end">
+              <div className="mt-6 flex gap-3 justify-end border-t border-slate-200 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
