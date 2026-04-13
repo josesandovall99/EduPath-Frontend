@@ -106,6 +106,29 @@ function parseMethodTemplate(template: string): MetodoDerivado | null {
   };
 }
 
+function formatJavaLikeTemplate(input: string) {
+  const lines = input.split('\n');
+  let indentLevel = 0;
+
+  return lines
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return '';
+
+      const leadingClosers = (trimmed.match(/^\}+/) || [''])[0].length;
+      indentLevel = Math.max(0, indentLevel - leadingClosers);
+
+      const formatted = `${'    '.repeat(indentLevel)}${trimmed}`;
+
+      const openBraces = (trimmed.match(/\{/g) || []).length;
+      const closeBraces = (trimmed.match(/\}/g) || []).length;
+      indentLevel = Math.max(0, indentLevel + openBraces - closeBraces + leadingClosers);
+
+      return formatted;
+    })
+    .join('\n');
+}
+
 // Componente para configuración de Compilador
 function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormData; setFormData: React.Dispatch<React.SetStateAction<ExerciseFormData>> }) {
   const compilerConfig = {
@@ -146,6 +169,21 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
     });
   };
 
+  const handleFormatTemplate = () => {
+    const plantillaFormateada = formatJavaLikeTemplate(plantillaMetodo || '');
+    const metodo = parseMethodTemplate(plantillaFormateada);
+
+    updateCompilerConfig({
+      metodo: metodo ? { ...metodo, plantilla: plantillaFormateada } : null,
+      lenguajesPermitidos: [62],
+      casos_prueba: casosPrueba,
+    }, {
+      codigoEstructura: plantillaFormateada,
+    });
+
+    toast.success('Plantilla formateada');
+  };
+
   const handleSintaxisChange = (sintaxis: string) => {
     const currentSintaxis = compilerConfig?.sintaxis || [];
     const newSintaxis = currentSintaxis.includes(sintaxis)
@@ -178,7 +216,16 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
       <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)] gap-4 items-start">
         <div className="space-y-4 min-w-0">
           <div>
-            <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Plantilla del método *</label>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <label className="block text-sm font-medium text-[#3A4A5B]">Plantilla del método *</label>
+              <button
+                type="button"
+                onClick={handleFormatTemplate}
+                className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+              >
+                Dar formato
+              </button>
+            </div>
             <textarea
               value={plantillaMetodo}
               onChange={handleTemplateChange}
