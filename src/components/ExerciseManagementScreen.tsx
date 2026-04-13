@@ -84,6 +84,14 @@ const createDefaultCompilerConfig = () => ({
   metodo: null,
 });
 
+const createDefaultUmlConfig = () => ({
+  opciones: {
+    minClasses: 2,
+    requireRelationships: false,
+    requireMultiplicities: false,
+  }
+});
+
 function parseMethodTemplate(template: string): MetodoDerivado | null {
   const match = template.match(/(?:public|private|protected)?\s*(?:static\s+)?([A-Za-z_][A-Za-z0-9_<>\[\],\s?]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/);
   if (!match) return null;
@@ -535,15 +543,24 @@ function MatchingConfig({ formData, setFormData }: { formData: ExerciseFormData;
 
 // Componente para configuración de Diagramas UML
 function UMLConfig({ formData, setFormData }: { formData: ExerciseFormData; setFormData: React.Dispatch<React.SetStateAction<ExerciseFormData>> }) {
+  const umlConfig = {
+    ...createDefaultUmlConfig(),
+    ...(formData.ejercicio.configuracion || {}),
+    opciones: {
+      ...createDefaultUmlConfig().opciones,
+      ...(formData.ejercicio.configuracion?.opciones || {})
+    }
+  };
+
   const handleOpcionChange = (campo: string, valor: any) => {
     setFormData(prev => ({
       ...prev,
       ejercicio: {
         ...prev.ejercicio,
         configuracion: {
-          ...prev.ejercicio.configuracion,
+          ...umlConfig,
           opciones: {
-            ...prev.ejercicio.configuracion.opciones,
+            ...umlConfig.opciones,
             [campo]: valor
           }
         }
@@ -561,7 +578,7 @@ function UMLConfig({ formData, setFormData }: { formData: ExerciseFormData; setF
           <input
             type="number"
             min="0"
-            value={formData.ejercicio.configuracion?.opciones?.minClasses || ''}
+            value={umlConfig.opciones.minClasses}
             onChange={(e) => handleOpcionChange('minClasses', e.target.value ? Number(e.target.value) : undefined)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
             placeholder="Ej: 3"
@@ -572,7 +589,7 @@ function UMLConfig({ formData, setFormData }: { formData: ExerciseFormData; setF
           <input
             type="checkbox"
             id="requireRelationships"
-            checked={formData.ejercicio.configuracion?.opciones?.requireRelationships || false}
+            checked={umlConfig.opciones.requireRelationships}
             onChange={(e) => handleOpcionChange('requireRelationships', e.target.checked)}
             className="w-4 h-4 text-[#4A90E2] border-gray-300 rounded focus:ring-[#4A90E2]"
           />
@@ -583,26 +600,12 @@ function UMLConfig({ formData, setFormData }: { formData: ExerciseFormData; setF
           <input
             type="checkbox"
             id="requireMultiplicities"
-            checked={formData.ejercicio.configuracion?.opciones?.requireMultiplicities || false}
+            checked={umlConfig.opciones.requireMultiplicities}
             onChange={(e) => handleOpcionChange('requireMultiplicities', e.target.checked)}
             className="w-4 h-4 text-[#4A90E2] border-gray-300 rounded focus:ring-[#4A90E2]"
           />
           <label htmlFor="requireMultiplicities" className="text-sm text-[#3A4A5B]">Requerir multiplicidades</label>
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Diagrama Esperado (JSON)</label>
-        <textarea
-          value={formData.ejercicio.resultado_ejercicio}
-          onChange={(e) => setFormData(prev => ({
-            ...prev,
-            ejercicio: { ...prev.ejercicio, resultado_ejercicio: e.target.value }
-          }))}
-          placeholder='{"cells": []}'
-          className="w-full min-h-24 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono text-xs"
-        />
-        <p className="text-xs text-gray-500 mt-1">Opcional: JSON del diagrama esperado para validación exacta</p>
       </div>
     </div>
   );
@@ -1042,7 +1045,12 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
       };
     } else if (item.tipo_ejercicio === 'Diagramas UML') {
       configuracion = {
-        opciones: configuracion.opciones || {}
+        ...createDefaultUmlConfig(),
+        ...configuracion,
+        opciones: {
+          ...createDefaultUmlConfig().opciones,
+          ...(configuracion.opciones || {})
+        }
       };
     } else if (tipoReal === 'Preguntas') {
       configuracion = {
@@ -1122,7 +1130,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         if (value === 'Compilador') {
           nuevaConfiguracion = createDefaultCompilerConfig();
         } else if (value === 'Diagramas UML') {
-          nuevaConfiguracion = { opciones: {} };
+          nuevaConfiguracion = createDefaultUmlConfig();
         } else if (value === 'Preguntas') {
           nuevaConfiguracion = { tipo: 'cuestionario', preguntas: [] };
         } else if (value === 'Opción única') {
