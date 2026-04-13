@@ -21,7 +21,42 @@ interface DashboardScreenProps {
   estudianteId?: number;
 }
 
+type AreaCategory = 'fundamentos' | 'analisis' | 'atc';
+
 const colorPalette = ['#4A90E2', '#7ED6A7', '#F5A97F', '#FFB84D', '#A78BFA', '#EC4899'];
+
+const normalizeAreaName = (value?: string | null) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+
+const getAreaCategory = (areaName?: string | null): AreaCategory | null => {
+  const normalizedName = normalizeAreaName(areaName);
+
+  if (normalizedName.includes('fundamentos') && normalizedName.includes('program')) {
+    return 'fundamentos';
+  }
+
+  if (normalizedName.includes('analisis')) {
+    return 'analisis';
+  }
+
+  if (
+    normalizedName === 'atc' ||
+    normalizedName.includes('alcance') ||
+    normalizedName.includes('tiempo') ||
+    normalizedName.includes('costo') ||
+    normalizedName.includes('gestion de proyectos') ||
+    normalizedName.includes('gestion proyectos')
+  ) {
+    return 'atc';
+  }
+
+  return null;
+};
 
 // Fallback data por si falla el fetch
 const FALLBACK_SUBJECTS = [
@@ -44,6 +79,16 @@ const FALLBACK_SUBJECTS = [
     topics: 10,
     completed: 4,
     nextTopic: 'Diagramas de Secuencia'
+  },
+  {
+    id: '3',
+    name: 'Alcance, Tiempo y Costo',
+    icon: BarChart3,
+    color: '#F5A97F',
+    progress: 30,
+    topics: 8,
+    completed: 2,
+    nextTopic: 'Estimación inicial del proyecto'
   }
 ];
 
@@ -55,13 +100,13 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
   const [loadingProgresos, setLoadingProgresos] = useState(false);
 
   // Función para obtener áreas permitidas según el semestre
-  const obtenerAreasPermitidas = (semestre: number): string[] => {
+  const obtenerAreasPermitidas = (semestre: number): AreaCategory[] => {
     if (semestre >= 1 && semestre <= 4) {
-      return ['Fundamentos de Programación', 'Fundamentos de programación'];
+      return ['fundamentos'];
     } else if (semestre >= 5 && semestre <= 6) {
-      return ['Fundamentos de Programación', 'Fundamentos de programación', 'Análisis', 'Analisis'];
+      return ['fundamentos', 'analisis'];
     } else if (semestre >= 7 && semestre <= 10) {
-      return ['Fundamentos de Programación', 'Fundamentos de programación', 'Análisis', 'Analisis', 'Gestión de Proyectos', 'Gestion de Proyectos'];
+      return ['fundamentos', 'analisis', 'atc'];
     }
     return []; // Si el semestre está fuera de rango
   };
@@ -120,12 +165,10 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         const areasPermitidas = obtenerAreasPermitidas(semestre);
         
         // Filtrar áreas según el semestre
-        const areasFiltradas = areas.filter((area: Area) => 
-          areasPermitidas.some(permitida => 
-            area.nombre.toLowerCase().includes(permitida.toLowerCase()) ||
-            permitida.toLowerCase().includes(area.nombre.toLowerCase())
-          )
-        );
+        const areasFiltradas = areas.filter((area: Area) => {
+          const category = getAreaCategory(area.nombre);
+          return category ? areasPermitidas.includes(category) : false;
+        });
 
         console.log(`🎓 Semestre ${semestre} - Áreas permitidas:`, areasPermitidas);
         console.log('✅ Áreas filtradas:', areasFiltradas);

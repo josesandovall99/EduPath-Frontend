@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Code, Database, BarChart3, ChevronUp, ChevronDown, ToggleLeft, ToggleRight, Plus, Edit2, Search, X } from 'lucide-react';
+import { ArrowLeft, Code, Database, BarChart3, Eye, EyeOff, ChevronUp, ChevronDown, ToggleLeft, ToggleRight, Plus, Edit2, Search, X } from 'lucide-react';
 import axios from 'axios';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
@@ -31,6 +31,7 @@ interface Subtema {
   nombre: string;
   descripcion: string;
   tema_id: string;
+  estado?: boolean;
 }
 
 // Colores por materia
@@ -67,8 +68,10 @@ export function SubThemeManagementScreen({
   });
   const [searchSubtemaTerm, setSearchSubtemaTerm] = useState('');
   const [searchAreaTerm, setSearchAreaTerm] = useState('');
+  const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const isSubtemaActive = (subtema: Subtema) => subtema.estado !== false;
 
   // Cargar áreas del backend
   useEffect(() => {
@@ -199,7 +202,7 @@ export function SubThemeManagementScreen({
         setSubtemasLoading(true);
         setSubtemasError(null);
         
-        const response = await axios.get(`${API_BASE_URL}/subtemas/por-tema/${selectedTema}`, {
+        const response = await axios.get(`${API_BASE_URL}/subtemas`, {
           timeout: 5000,
           headers: {
             'Accept': 'application/json',
@@ -212,7 +215,8 @@ export function SubThemeManagementScreen({
           throw new Error('La respuesta no es un array de subtemas');
         }
         
-        setSubtemas(data);
+        const subtemasPorTema = data.filter((subtema) => subtema.tema_id === selectedTema);
+        setSubtemas(subtemasPorTema);
       } catch (err) {
         let errorMessage = 'Error desconocido al cargar los subtemas';
         
@@ -272,13 +276,13 @@ export function SubThemeManagementScreen({
           return;
         }
 
-        const subtemasResponse = await axios.get(`${API_BASE_URL}/subtemas/por-tema/${temaObjetivo}`, {
+        const subtemasResponse = await axios.get(`${API_BASE_URL}/subtemas`, {
           timeout: 5000,
           headers: { Accept: 'application/json' }
         });
 
         if (Array.isArray(subtemasResponse.data)) {
-          setSubtemas(subtemasResponse.data);
+          setSubtemas(subtemasResponse.data.filter((subtema) => subtema.tema_id === temaObjetivo));
         }
       } catch (refreshError) {
         console.warn('Auto-actualización de subtemas omitida temporalmente:', refreshError);
@@ -367,29 +371,33 @@ export function SubThemeManagementScreen({
     }
   };
 
-  // Eliminar subtema
-  const handleDeleteSubtema = async (subtema: Subtema) => {
+  const handleToggleSubtema = async (subtema: Subtema) => {
+    const currentlyActive = isSubtemaActive(subtema);
+    const actionLabel = currentlyActive ? 'inhabilitar' : 'habilitar';
+
     const confirmDelete = window.confirm(
-      `¿Estás seguro de que deseas eliminar el subtema "${subtema.nombre}"?\n\nEsta acción no se puede deshacer.`
+      `¿Estás seguro de que deseas ${actionLabel} el subtema "${subtema.nombre}"?`
     );
     
     if (!confirmDelete) return;
     
     try {
-      await axios.delete(`${API_BASE_URL}/subtemas/${subtema.id}`);
-      setSuccessMessage('Subtema eliminado exitosamente');
+      const response = await axios.put(`${API_BASE_URL}/subtemas/${subtema.id}/toggle-estado`);
+      const updatedEstado = response.data?.estado ?? !currentlyActive;
+      setSuccessMessage(`Subtema ${updatedEstado ? 'habilitado' : 'inhabilitado'} exitosamente`);
       
-      // Eliminar del estado local
-      setSubtemas(prev => prev.filter(s => s.id !== subtema.id));
+      setSubtemas(prev => prev.map((item) => (
+        item.id === subtema.id ? { ...item, estado: updatedEstado } : item
+      )));
       
       // Limpiar mensaje después de 3 segundos
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      console.error('Error deleting subtema:', err);
+      console.error('Error toggling subtema:', err);
       if (axios.isAxiosError(err) && err.response) {
-        alert(`Error: ${err.response.data.message || 'No se pudo eliminar el subtema'}`);
+        alert(`Error: ${err.response.data.message || 'No se pudo cambiar el estado del subtema'}`);
       } else {
-        alert('Error al eliminar el subtema');
+        alert('Error al cambiar el estado del subtema');
       }
     }
   };
@@ -413,11 +421,16 @@ export function SubThemeManagementScreen({
     selectedTema &&
     currentArea &&
     currentTemaObj &&
+    currentTemaObj.estado !== false &&
     hasMinimumSubtemasForSequence
   );
 
   const filteredSubtemas = subtemas.filter((subtema) =>
-    subtema.nombre.toLowerCase().includes(searchSubtemaTerm.toLowerCase().trim())
+    subtema.nombre.toLowerCase().includes(searchSubtemaTerm.toLowerCase().trim()) &&
+    (
+      stateFilter === 'all' ||
+      (stateFilter === 'active' ? isSubtemaActive(subtema) : !isSubtemaActive(subtema))
+    )
   );
 
   const filteredAreas = areas.filter((area) =>
@@ -581,7 +594,8 @@ export function SubThemeManagementScreen({
                       }`}
                       style={{
                         borderColor: isSelected ? currentColor.primary : undefined,
-                        backgroundColor: isSelected ? `${currentColor.primary}10` : 'white'
+                        backgroundColor: isSelected ? `${currentColor.primary}10` : 'white',
+                        opacity: tema.estado === false ? 0.65 : 1
                       }}
                     >
                       <div className="flex items-center gap-2 mb-2">
@@ -590,6 +604,13 @@ export function SubThemeManagementScreen({
                           style={{ backgroundColor: currentColor.primary }}
                         ></div>
                         <h4 className="text-[#3A4A5B] font-semibold">{tema.nombre}</h4>
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          tema.estado !== false
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {tema.estado !== false ? 'Activo' : 'Inhabilitado'}
+                        </span>
                       </div>
                       <p className="text-gray-600 text-xs">{tema.descripcion}</p>
                     </button>
@@ -666,6 +687,12 @@ export function SubThemeManagementScreen({
               </p>
             )}
 
+            {currentTemaObj?.estado === false && (
+              <p className="mb-6 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                Este tema está inhabilitado. Puedes revisar sus subtemas, pero no conviene gestionar secuencias hasta volver a habilitarlo.
+              </p>
+            )}
+
             <div className="bg-white rounded-xl shadow-md p-4 mb-6">
               <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
                 Filtrar por nombre de subtema
@@ -679,6 +706,39 @@ export function SubThemeManagementScreen({
                   placeholder="Escribe el nombre del subtema..."
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                 />
+              </div>
+
+              <div className="mt-4 flex gap-2 flex-wrap">
+                <button
+                  onClick={() => setStateFilter('all')}
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    stateFilter === 'all'
+                      ? 'bg-slate-800 text-white shadow-md'
+                      : 'app-btn-secondary text-gray-700'
+                  }`}
+                >
+                  Todos ({subtemas.length})
+                </button>
+                <button
+                  onClick={() => setStateFilter('active')}
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    stateFilter === 'active'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'app-btn-secondary text-gray-700'
+                  }`}
+                >
+                  Activos ({subtemas.filter((subtema) => isSubtemaActive(subtema)).length})
+                </button>
+                <button
+                  onClick={() => setStateFilter('inactive')}
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    stateFilter === 'inactive'
+                      ? 'bg-amber-600 text-white shadow-md'
+                      : 'app-btn-secondary text-gray-700'
+                  }`}
+                >
+                  Inactivos ({subtemas.filter((subtema) => !isSubtemaActive(subtema)).length})
+                </button>
               </div>
             </div>
 
@@ -707,7 +767,9 @@ export function SubThemeManagementScreen({
                 {filteredSubtemas.map((subtema) => (
                   <div
                     key={subtema.id}
-                    className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg"
+                    className={`bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 ${
+                      isSubtemaActive(subtema) ? 'hover:shadow-lg' : 'opacity-70 saturate-50'
+                    }`}
                   >
                     <div className="p-6">
                       <div className="flex items-center justify-between gap-4">
@@ -717,7 +779,16 @@ export function SubThemeManagementScreen({
                             style={{ backgroundColor: currentColor.primary }}
                           ></div>
                           <div className="flex-1">
-                            <h4 className="text-[#3A4A5B] text-lg font-semibold">{subtema.nombre}</h4>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="text-[#3A4A5B] text-lg font-semibold">{subtema.nombre}</h4>
+                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                isSubtemaActive(subtema)
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {isSubtemaActive(subtema) ? 'Activo' : 'Inhabilitado'}
+                              </span>
+                            </div>
                             <p className="text-gray-600 text-sm mt-1">{subtema.descripcion}</p>
                           </div>
                         </div>
@@ -733,13 +804,17 @@ export function SubThemeManagementScreen({
                             <Edit2 className="w-5 h-5" />
                           </button>
                           
-                          {/* Eliminar */}
                           <button
-                            onClick={() => handleDeleteSubtema(subtema)}
-                            className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-                            title="Eliminar subtema"
+                            onClick={() => handleToggleSubtema(subtema)}
+                            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                              isSubtemaActive(subtema)
+                                ? 'text-amber-700 hover:bg-amber-50'
+                                : 'text-emerald-700 hover:bg-emerald-50'
+                            }`}
+                            title={isSubtemaActive(subtema) ? 'Inhabilitar subtema' : 'Habilitar subtema'}
                           >
-                            <X className="w-5 h-5" />
+                            {isSubtemaActive(subtema) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            <span>{isSubtemaActive(subtema) ? 'Inhabilitar' : 'Habilitar'}</span>
                           </button>
                         </div>
                       </div>

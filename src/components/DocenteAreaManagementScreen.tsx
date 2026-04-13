@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { ArrowLeft, ChevronDown, ChevronUp, Plus, Pencil, Search, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Eye, EyeOff, Plus, Pencil, Search, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -28,6 +28,7 @@ interface Subtema {
   nombre: string;
   descripcion?: string;
   tema_id: number;
+  estado?: boolean;
 }
 
 interface Contenido {
@@ -38,6 +39,7 @@ interface Contenido {
   url?: string;
   tema_id?: number;
   subtema_id?: number;
+  estado?: boolean;
 }
 
 interface ContenidoForm {
@@ -55,6 +57,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
   const [expandedTemas, setExpandedTemas] = useState<Record<number, boolean>>({});
   const [loadingTemas, setLoadingTemas] = useState(true);
   const [searchTemaTerm, setSearchTemaTerm] = useState('');
+  const [temaStateFilter, setTemaStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [loadingSubtemas, setLoadingSubtemas] = useState<Record<number, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -153,12 +156,13 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
     setLoadingTemas(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/temas/por-area/${selectedAreaId}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/temas`, { headers });
       const parsed = await parseResponse(response);
       if (!parsed.ok) {
         throw new Error(parsed.body?.mensaje || 'Error al cargar temas');
       }
-      setTemas(Array.isArray(parsed.body) ? parsed.body : []);
+      const temasData = Array.isArray(parsed.body) ? parsed.body : [];
+      setTemas(temasData.filter((tema: Tema) => Number(tema.area_id) === Number(selectedAreaId)));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar temas');
     } finally {
@@ -170,12 +174,16 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
     setLoadingSubtemas((prev) => ({ ...prev, [temaId]: true }));
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/subtemas/por-tema/${temaId}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/subtemas`, { headers });
       const parsed = await parseResponse(response);
       if (!parsed.ok) {
         throw new Error(parsed.body?.mensaje || 'Error al cargar subtemas');
       }
-      setSubtemas((prev) => ({ ...prev, [temaId]: Array.isArray(parsed.body) ? parsed.body : [] }));
+      const subtemasData = Array.isArray(parsed.body) ? parsed.body : [];
+      setSubtemas((prev) => ({
+        ...prev,
+        [temaId]: subtemasData.filter((subtema: Subtema) => Number(subtema.tema_id) === Number(temaId))
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar subtemas');
     } finally {
@@ -264,26 +272,27 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
     }
   };
 
-  const handleDeleteTema = async (tema: Tema) => {
-    if (!window.confirm(`Deseas eliminar el tema ${tema.nombre}?`)) {
+  const handleToggleTemaEstado = async (tema: Tema) => {
+    const currentlyActive = tema.estado !== false;
+    if (!window.confirm(`Deseas ${currentlyActive ? 'inhabilitar' : 'habilitar'} el tema ${tema.nombre}?`)) {
       return;
     }
 
     setError(null);
     setSuccess(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/temas/${tema.id}`, {
-        method: 'DELETE',
+      const response = await fetch(`${API_BASE_URL}/temas/${tema.id}/toggle-estado`, {
+        method: 'PUT',
         headers
       });
       const parsed = await parseResponse(response);
       if (!parsed.ok) {
-        throw new Error(parsed.body?.mensaje || 'No se pudo eliminar el tema');
+        throw new Error(parsed.body?.mensaje || 'No se pudo cambiar el estado del tema');
       }
       await loadTemas();
-      setSuccess('Tema eliminado');
+      setSuccess(`Tema ${currentlyActive ? 'inhabilitado' : 'habilitado'}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al eliminar tema');
+      setError(err instanceof Error ? err.message : 'Error al cambiar el estado del tema');
     }
   };
 
@@ -345,26 +354,27 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
     }
   };
 
-  const handleDeleteSubtema = async (temaId: number, subtema: Subtema) => {
-    if (!window.confirm(`Deseas eliminar el subtema ${subtema.nombre}?`)) {
+  const handleToggleSubtemaEstado = async (temaId: number, subtema: Subtema) => {
+    const currentlyActive = subtema.estado !== false;
+    if (!window.confirm(`Deseas ${currentlyActive ? 'inhabilitar' : 'habilitar'} el subtema ${subtema.nombre}?`)) {
       return;
     }
 
     setError(null);
     setSuccess(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/subtemas/${subtema.id}`, {
-        method: 'DELETE',
+      const response = await fetch(`${API_BASE_URL}/subtemas/${subtema.id}/toggle-estado`, {
+        method: 'PUT',
         headers
       });
       const parsed = await parseResponse(response);
       if (!parsed.ok) {
-        throw new Error(parsed.body?.mensaje || 'No se pudo eliminar el subtema');
+        throw new Error(parsed.body?.mensaje || 'No se pudo cambiar el estado del subtema');
       }
       await loadSubtemas(temaId);
-      setSuccess('Subtema eliminado');
+      setSuccess(`Subtema ${currentlyActive ? 'inhabilitado' : 'habilitado'}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al eliminar subtema');
+      setError(err instanceof Error ? err.message : 'Error al cambiar el estado del subtema');
     }
   };
 
@@ -522,30 +532,32 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
     }
   };
 
-  const handleDeleteContenido = async (contenido: Contenido) => {
-    if (!window.confirm(`Deseas eliminar el contenido "${contenido.titulo}"?`)) {
+  const handleToggleContenidoEstado = async (contenido: Contenido) => {
+    const currentlyActive = contenido.estado !== false;
+    if (!window.confirm(`Deseas ${currentlyActive ? 'inhabilitar' : 'habilitar'} el contenido "${contenido.titulo}"?`)) {
       return;
     }
 
     setError(null);
     setSuccess(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/contenidos/${contenido.id}`, {
-        method: 'DELETE',
+      const response = await fetch(`${API_BASE_URL}/contenidos/${contenido.id}/toggle-estado`, {
+        method: 'PUT',
         headers
       });
       const parsed = await parseResponse(response);
       if (!parsed.ok) {
-        throw new Error(parsed.body?.mensaje || parsed.body?.message || 'No se pudo eliminar el contenido');
+        throw new Error(parsed.body?.mensaje || parsed.body?.message || 'No se pudo cambiar el estado del contenido');
       }
 
-      if (activeSubtemaId) {
-        await loadContenidos(activeSubtemaId);
+      const subtemaId = contenido.subtema_id || activeSubtemaId;
+      if (subtemaId) {
+        await loadContenidos(subtemaId);
       }
 
-      setSuccess('Contenido eliminado');
+      setSuccess(`Contenido ${currentlyActive ? 'inhabilitado' : 'habilitado'}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al eliminar contenido');
+      setError(err instanceof Error ? err.message : 'Error al cambiar el estado del contenido');
     }
   };
 
@@ -613,9 +625,14 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
 
   const temaFormValid = temaForm.nombre.trim().length > 0;
   const subtemaFormValid = subtemaForm.nombre.trim().length > 0;
-  const filteredTemas = temas.filter((tema) =>
-    tema.nombre.toLowerCase().includes(searchTemaTerm.toLowerCase().trim())
-  );
+  const filteredTemas = temas.filter((tema) => {
+    const matchesName = tema.nombre.toLowerCase().includes(searchTemaTerm.toLowerCase().trim());
+    const matchesState =
+      temaStateFilter === 'all' ||
+      (temaStateFilter === 'active' ? tema.estado !== false : tema.estado === false);
+
+    return matchesName && matchesState;
+  });
 
   return (
     <div className="app-shell">
@@ -715,6 +732,39 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
               />
             </div>
+
+            <div className="mt-4 flex gap-2 flex-wrap">
+              <button
+                onClick={() => setTemaStateFilter('all')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  temaStateFilter === 'all'
+                    ? 'bg-slate-800 text-white shadow-md'
+                    : 'app-btn-secondary text-gray-700'
+                }`}
+              >
+                Todos ({temas.length})
+              </button>
+              <button
+                onClick={() => setTemaStateFilter('active')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  temaStateFilter === 'active'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'app-btn-secondary text-gray-700'
+                }`}
+              >
+                Activos ({temas.filter((tema) => tema.estado !== false).length})
+              </button>
+              <button
+                onClick={() => setTemaStateFilter('inactive')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  temaStateFilter === 'inactive'
+                    ? 'bg-amber-600 text-white shadow-md'
+                    : 'app-btn-secondary text-gray-700'
+                }`}
+              >
+                Inactivos ({temas.filter((tema) => tema.estado === false).length})
+              </button>
+            </div>
           </div>
         )}
 
@@ -732,7 +782,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
           </div>
         ) : filteredTemas.length === 0 ? (
           <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <p className="text-gray-600">No se encontraron temas con ese nombre.</p>
+            <p className="text-gray-600">No se encontraron temas con el filtro aplicado.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -742,10 +792,17 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
               const subtemaLoading = loadingSubtemas[tema.id];
 
               return (
-                <div key={tema.id} className="bg-white rounded-2xl shadow-md overflow-hidden">
+                <div key={tema.id} className={`bg-white rounded-2xl shadow-md overflow-hidden ${tema.estado === false ? 'opacity-75 saturate-50' : ''}`}>
                   <div className="flex items-center justify-between p-6 bg-gradient-to-r from-[#4A90E2] to-[#5B9FED]">
                     <div>
-                      <h3 className="text-xl font-semibold text-white">{tema.nombre}</h3>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h3 className="text-xl font-semibold text-white">{tema.nombre}</h3>
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          tema.estado !== false ? 'bg-white/20 text-white' : 'bg-black/20 text-white'
+                        }`}>
+                          {tema.estado !== false ? 'Activo' : 'Inhabilitado'}
+                        </span>
+                      </div>
                       <p className="text-white/90 text-sm">{tema.descripcion || 'Sin descripción'}</p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -757,11 +814,11 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                         <span>Editar</span>
                       </button>
                       <button
-                        onClick={() => handleDeleteTema(tema)}
+                        onClick={() => handleToggleTemaEstado(tema)}
                         className="app-btn mt-1 bg-white/20 px-3 py-1.5 text-white hover:bg-white/30"
                       >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Eliminar</span>
+                        {tema.estado !== false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        <span>{tema.estado !== false ? 'Inhabilitar' : 'Habilitar'}</span>
                       </button>
                       <button
                         onClick={() => handleToggleTema(tema.id)}
@@ -793,10 +850,19 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                       ) : (
                         <div className="space-y-3">
                           {temaSubtemas.map((subtema) => (
-                            <div key={subtema.id} className="rounded-lg border border-gray-200 overflow-hidden">
+                            <div key={subtema.id} className={`rounded-lg border border-gray-200 overflow-hidden ${subtema.estado === false ? 'opacity-70 saturate-50' : ''}`}>
                               <div className="flex items-center justify-between bg-gray-50 px-4 py-3">
                                 <div className="flex-1">
-                                  <p className="text-sm font-medium text-[#3A4A5B]">{subtema.nombre}</p>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-sm font-medium text-[#3A4A5B]">{subtema.nombre}</p>
+                                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                                      subtema.estado !== false
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : 'bg-amber-100 text-amber-700'
+                                    }`}>
+                                      {subtema.estado !== false ? 'Activo' : 'Inhabilitado'}
+                                    </span>
+                                  </div>
                                   <p className="text-xs text-gray-500">{subtema.descripcion || 'Sin descripcion'}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -815,11 +881,13 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                                     <span>Editar</span>
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteSubtema(tema.id, subtema)}
-                                    className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs"
+                                    onClick={() => handleToggleSubtemaEstado(tema.id, subtema)}
+                                    className={`flex items-center gap-1 text-xs ${
+                                      subtema.estado !== false ? 'text-amber-700 hover:text-amber-800' : 'text-emerald-700 hover:text-emerald-800'
+                                    }`}
                                   >
-                                    <Trash2 className="w-3 h-3" />
-                                    <span>Eliminar</span>
+                                    {subtema.estado !== false ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                    <span>{subtema.estado !== false ? 'Inhabilitar' : 'Habilitar'}</span>
                                   </button>
                                 </div>
                               </div>
@@ -844,11 +912,18 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                                   ) : (
                                     <div className="space-y-2">
                                       {(contenidos[subtema.id] || []).map((contenido) => (
-                                        <div key={contenido.id} className="flex items-start justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                                        <div key={contenido.id} className={`flex items-start justify-between border rounded-lg px-4 py-3 ${contenido.estado !== false ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200 opacity-70'}`}>
                                           <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
                                               <span className="text-lg">{getTypeIcon(contenido.tipo)}</span>
                                               <p className="text-xs font-medium text-[#3A4A5B] truncate">{contenido.titulo}</p>
+                                              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                                contenido.estado !== false
+                                                  ? 'bg-emerald-100 text-emerald-700'
+                                                  : 'bg-amber-100 text-amber-700'
+                                              }`}>
+                                                {contenido.estado !== false ? 'Activo' : 'Inhabilitado'}
+                                              </span>
                                             </div>
                                             <p className="text-xs text-gray-600 line-clamp-2">{contenido.descripcion?.replace(/<[^>]*>/g, '') || 'Sin descripcion'}</p>
                                             {contenido.url && (
@@ -864,11 +939,11 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                                               <Pencil className="w-3 h-3" />
                                             </button>
                                             <button
-                                              onClick={() => handleDeleteContenido(contenido)}
-                                              className="text-red-600 hover:text-red-700"
-                                              title="Eliminar contenido"
+                                              onClick={() => handleToggleContenidoEstado(contenido)}
+                                              className={contenido.estado !== false ? 'text-amber-700 hover:text-amber-800' : 'text-emerald-700 hover:text-emerald-800'}
+                                              title={contenido.estado !== false ? 'Inhabilitar contenido' : 'Habilitar contenido'}
                                             >
-                                              <Trash2 className="w-3 h-3" />
+                                              {contenido.estado !== false ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                                             </button>
                                           </div>
                                         </div>

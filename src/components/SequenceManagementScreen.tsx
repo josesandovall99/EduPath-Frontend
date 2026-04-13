@@ -12,12 +12,14 @@ interface Tema {
   id: number;
   nombre: string;
   area_id: number;
+  estado?: boolean;
 }
 
 interface Subtema {
   id: number;
   nombre: string;
   tema_id: number;
+  estado?: boolean;
 }
 
 interface ContentItem {
@@ -28,6 +30,7 @@ interface ContentItem {
   area_id?: number;
   tema_id?: number;
   subtema_id?: number;
+  estado?: boolean;
 }
 
 interface Sequence {
@@ -87,6 +90,10 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
     estado: true
   });
 
+  const isTemaActive = (tema: Tema) => tema.estado !== false;
+  const isSubtemaActive = (subtema: Subtema) => subtema.estado !== false;
+  const isContentActive = (content: ContentItem) => content.estado !== false;
+
   // Cargar datos al montar
   useEffect(() => {
     loadData();
@@ -105,15 +112,15 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       setModalSelectedSubtema(subtemaId.toString());
       
       // Cargar temas del área en el modal
-      const temasArea = temas.filter(t => Number(t.area_id) === Number(areaId));
+      const temasArea = temas.filter((t) => Number(t.area_id) === Number(areaId) && isTemaActive(t));
       setModalTemas(temasArea);
       
       // Cargar subtemas del tema en el modal
-      const filtered = subtemas.filter(s => s.tema_id === temaId);
+      const filtered = subtemas.filter((s) => s.tema_id === temaId && isSubtemaActive(s));
       setModalSubtemas(filtered);
       
       // Cargar contenidos del subtema en el modal
-      const contenidosFiltered = contents.filter(c => c.subtema_id === subtemaId);
+      const contenidosFiltered = contents.filter((c) => c.subtema_id === subtemaId && isContentActive(c));
       setModalContents(contenidosFiltered);
     }
   }, [areaId, temaId, subtemaId, temas, subtemas, contents]);
@@ -126,14 +133,14 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       setModalSelectedSubtema(subtemaId.toString());
       
       // Cargar los datos del modal
-      const temasArea = temas.filter(t => Number(t.area_id) === Number(areaId));
+      const temasArea = temas.filter((t) => Number(t.area_id) === Number(areaId) && isTemaActive(t));
       setModalTemas(temasArea);
       
-      const filtered = subtemas.filter(s => s.tema_id === temaId);
+      const filtered = subtemas.filter((s) => s.tema_id === temaId && isSubtemaActive(s));
       setModalSubtemas(filtered);
       
       // Cargar contenidos del subtema
-      const contenidosFiltered = contents.filter(c => c.subtema_id === subtemaId);
+      const contenidosFiltered = contents.filter((c) => c.subtema_id === subtemaId && isContentActive(c));
       setModalContents(contenidosFiltered);
     }
   }, [showCreateModal, areaId, temaId, subtemaId, temas, subtemas, contents]);
@@ -179,15 +186,16 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
   // Obtener temas filtrados por área
   // Ya están filtrados del backend, así que usarlos directamente
-  const filteredTemas = temas;
+  const filteredTemas = temas.filter(isTemaActive);
 
   // Obtener subtemas filtrados por tema
   // Ya están filtrados del backend, así que usarlos directamente
-  const filteredSubtemas = subtemas;
+  const filteredSubtemas = subtemas.filter(isSubtemaActive);
 
   // Obtener contenidos filtrados por área, tema y subtema
   const getFilteredContents = () => {
     return contents.filter(c => {
+      if (!isContentActive(c)) return false;
       if (selectedArea && Number(c.area_id) !== Number(selectedArea)) return false;
       if (selectedTema && Number(c.tema_id) !== Number(selectedTema)) return false;
       if (selectedSubtema && Number(c.subtema_id) !== Number(selectedSubtema)) return false;
@@ -237,7 +245,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
     const contenidoIdsSubtema = new Set(
       contents
-        .filter((contenido) => Number(contenido.subtema_id) === Number(subtemaScopeId))
+        .filter((contenido) => Number(contenido.subtema_id) === Number(subtemaScopeId) && isContentActive(contenido))
         .map((contenido) => Number(contenido.id))
     );
 
@@ -286,10 +294,11 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   const getFilteredModalContents = () => {
     // Si viene de un subtema específico, solo mostrar contenidos de ese subtema
     if (subtemaId) {
-      return modalContents.filter(c => c.subtema_id === subtemaId);
+      return modalContents.filter((c) => c.subtema_id === subtemaId && isContentActive(c));
     }
     
     return modalContents.filter(c => {
+      if (!isContentActive(c)) return false;
       if (modalSelectedArea) {
         const allowedTemaIds = modalTemas.map(t => Number(t.id));
         if (!allowedTemaIds.includes(Number(c.tema_id))) return false;

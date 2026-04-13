@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ArrowLeft, Plus, Edit, Loader, Trash2, AlertCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Plus, Edit, Eye, EyeOff, Search, Loader, Trash2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
@@ -29,14 +29,17 @@ interface EjercicioItem {
     nivel_dificultad?: 'facil' | 'medio' | 'dificil';
     fecha_creacion?: string;
     tipo_actividad_id?: number;
+    estado?: boolean;
   };
   Contenido?: {
     id: number;
     titulo?: string;
+    estado?: boolean;
   };
   contenido?: {
     id: number;
     titulo?: string;
+    estado?: boolean;
   };
 }
 
@@ -745,6 +748,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const [tiposActividad, setTiposActividad] = useState<TipoActividad[]>([]);
   const [isLoadingTipos, setIsLoadingTipos] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [formData, setFormData] = useState<ExerciseFormData>({
     actividad: {
@@ -770,6 +775,11 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
     };
   };
+
+  const isEjercicioActivo = (ejercicio: EjercicioItem) =>
+    ejercicio.actividad?.estado !== false &&
+    ejercicio.contenido?.estado !== false &&
+    ejercicio.Contenido?.estado !== false;
 
   useEffect(() => {
     loadEjercicios();
@@ -831,6 +841,83 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
       setIsLoadingTipos(false);
     }
   };
+
+  const handleToggleEstado = async (item: EjercicioItem) => {
+    const currentlyActive = isEjercicioActivo(item);
+    const actionLabel = currentlyActive ? 'inhabilitar' : 'habilitar';
+
+    if (!window.confirm(`Deseas ${actionLabel} el ejercicio "${item.actividad?.titulo || `#${item.id}`}"?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/ejercicios/${item.id}/toggle-estado`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
+
+      if (!res.ok) {
+        let serverMessage = '';
+        try {
+          const asJson = await res.json();
+          serverMessage = asJson?.message || JSON.stringify(asJson);
+        } catch {
+          serverMessage = await res.text().catch(() => '');
+        }
+        throw new Error(serverMessage || `No se pudo ${actionLabel} el ejercicio`);
+      }
+
+      const data = await res.json().catch(() => null);
+      const updatedEstado = data?.estado ?? !currentlyActive;
+
+      setEjercicios((prev) => prev.map((ejercicio) => (
+        ejercicio.id === item.id
+          ? {
+              ...ejercicio,
+              actividad: {
+                ...ejercicio.actividad,
+                id: ejercicio.actividad?.id || ejercicio.id,
+                titulo: ejercicio.actividad?.titulo || `Ejercicio #${ejercicio.id}`,
+                estado: updatedEstado,
+              }
+            }
+          : ejercicio
+      )));
+
+      toast.success(`Ejercicio ${updatedEstado ? 'habilitado' : 'inhabilitado'}`, {
+        description: `"${item.actividad?.titulo || `Ejercicio #${item.id}`}" cambió de estado correctamente.`
+      });
+    } catch (err) {
+      toast.error('Error al cambiar estado', {
+        description: err instanceof Error ? err.message : 'No se pudo actualizar el ejercicio'
+      });
+    }
+  };
+
+  const filteredEjercicios = useMemo(() => {
+    return ejercicios.filter((ejercicio) => {
+      const matchesState =
+        stateFilter === 'all' ||
+        (stateFilter === 'active' ? isEjercicioActivo(ejercicio) : !isEjercicioActivo(ejercicio));
+
+      const searchableText = [
+        ejercicio.actividad?.titulo,
+        ejercicio.actividad?.descripcion,
+        ejercicio.tipo_ejercicio,
+        ejercicio.contenido?.titulo,
+        ejercicio.Contenido?.titulo,
+        String(ejercicio.puntos),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      const matchesSearch = !searchTerm.trim() || searchableText.includes(searchTerm.trim().toLowerCase());
+
+      return matchesState && matchesSearch;
+    });
+  }, [ejercicios, searchTerm, stateFilter]);
 
   const openCreate = () => {
     setIsEditMode(false);
@@ -1204,6 +1291,77 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
           <span>Volver al Panel</span>
         </button>
 
+        <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md">
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1.25fr)_320px]">
+            <div className="space-y-4 p-6">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                <div className="mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del ejercicio</p>
+                  <p className="mt-1 text-sm text-slate-600">Muestra ejercicios activos, inactivos o todos los registros.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setStateFilter('all')}
+                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+                      stateFilter === 'all'
+                        ? 'border-slate-800 bg-slate-800 text-white shadow-md'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>Todos ({ejercicios.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setStateFilter('active')}
+                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+                      stateFilter === 'active'
+                        ? 'border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-200'
+                        : 'border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>Activos ({ejercicios.filter((ejercicio) => isEjercicioActivo(ejercicio)).length})</span>
+                  </button>
+                  <button
+                    onClick={() => setStateFilter('inactive')}
+                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+                      stateFilter === 'inactive'
+                        ? 'border-amber-500 bg-amber-500 text-white shadow-md shadow-amber-200'
+                        : 'border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                    }`}
+                  >
+                    <EyeOff className="w-4 h-4" />
+                    <span>Inactivos ({ejercicios.filter((ejercicio) => !isEjercicioActivo(ejercicio)).length})</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-6 lg:border-l lg:border-t-0">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda rápida</p>
+                <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Buscar ejercicio</h3>
+                <p className="mt-1 text-sm text-slate-600">Busca por título, contenido, tipo o puntaje.</p>
+              </div>
+
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Ej: compilador, UML, 10 puntos"
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-700 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/25"
+                />
+              </div>
+
+              <div className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resultados visibles</p>
+                <p className="mt-2 text-2xl font-semibold text-[#3A4A5B]">{filteredEjercicios.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Loading */}
         {isLoadingData ? (
           <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
@@ -1223,12 +1381,16 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Contenido</th>
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Puntos</th>
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Dificultad</th>
+                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {ejercicios.map((e) => (
-                    <tr key={e.id} className="hover:bg-gray-50 transition-colors">
+                  {filteredEjercicios.map((e) => {
+                    const ejercicioActivo = isEjercicioActivo(e);
+
+                    return (
+                    <tr key={e.id} className={`transition-colors ${ejercicioActivo ? 'hover:bg-gray-50' : 'bg-slate-50/70 text-slate-500'}`}>
                       <td className="px-6 py-4 text-[#3A4A5B]">{e.actividad?.titulo || `Ejercicio #${e.id}`}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -1243,16 +1405,39 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                       <td className="px-6 py-4 text-gray-600 text-sm">{e.puntos}</td>
                       <td className="px-6 py-4 text-gray-600 text-sm">{e.actividad?.nivel_dificultad || '-'}</td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => openEdit(e)}
-                          className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
+                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                          ejercicioActivo
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {ejercicioActivo ? 'Activo' : 'Inhabilitado'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            onClick={() => openEdit(e)}
+                            className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleToggleEstado(e)}
+                            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                              ejercicioActivo
+                                ? 'text-amber-700 hover:bg-amber-50'
+                                : 'text-emerald-700 hover:bg-emerald-50'
+                            }`}
+                            title={ejercicioActivo ? 'Inhabilitar ejercicio' : 'Habilitar ejercicio'}
+                          >
+                            {ejercicioActivo ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            <span>{ejercicioActivo ? 'Inhabilitar' : 'Habilitar'}</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                  );})}
                 </tbody>
               </table>
             </div>

@@ -12,6 +12,7 @@ interface Tema {
   id: number;
   nombre: string;
   area_id: number;
+  estado?: boolean;
 }
 
 interface Subtema {
@@ -19,6 +20,7 @@ interface Subtema {
   nombre: string;
   descripcion?: string;
   tema_id: number;
+  estado?: boolean;
 }
 
 interface Sequence {
@@ -80,6 +82,9 @@ export function SubtemaSequenceManagementScreen({
     estado: true
   });
 
+  const isTemaActive = (tema: Tema) => tema.estado !== false;
+  const isSubtemaActive = (subtema: Subtema) => subtema.estado !== false;
+
   // Drag and drop
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
@@ -137,8 +142,8 @@ export function SubtemaSequenceManagementScreen({
 
   // Obtener temas filtrados por área
   const getFilteredTemas = () => {
-    if (!selectedArea) return temas;
-    return temas.filter(t => Number(t.area_id) === Number(selectedArea));
+    if (!selectedArea) return temas.filter(isTemaActive);
+    return temas.filter((t) => Number(t.area_id) === Number(selectedArea) && isTemaActive(t));
   };
 
   // Obtener subtemas filtrados por tema
@@ -148,17 +153,17 @@ export function SubtemaSequenceManagementScreen({
     // Filter by area if areaId is provided
     if (areaId !== undefined) {
       const allowedTemaIds = temas
-        .filter(t => Number(t.area_id) === Number(areaId))
+        .filter((t) => Number(t.area_id) === Number(areaId) && isTemaActive(t))
         .map(t => Number(t.id));
-      filtered = filtered.filter(s => allowedTemaIds.includes(Number(s.tema_id)));
+      filtered = filtered.filter((s) => allowedTemaIds.includes(Number(s.tema_id)) && isSubtemaActive(s));
     }
     
     // Filter by tema if selected
     if (selectedTema) {
-      filtered = filtered.filter(s => Number(s.tema_id) === Number(selectedTema));
+      filtered = filtered.filter((s) => Number(s.tema_id) === Number(selectedTema) && isSubtemaActive(s));
     }
-    
-    return filtered;
+
+    return filtered.filter(isSubtemaActive);
   };
 
   // Obtener subtemas usados en secuencias
@@ -201,7 +206,7 @@ export function SubtemaSequenceManagementScreen({
 
     const subtemaIdsTema = new Set(
       subtemas
-        .filter((subtema) => Number(subtema.tema_id) === Number(temaScopeId))
+        .filter((subtema) => Number(subtema.tema_id) === Number(temaScopeId) && isSubtemaActive(subtema))
         .map((subtema) => Number(subtema.id))
     );
 
@@ -251,6 +256,7 @@ export function SubtemaSequenceManagementScreen({
     // Si tenemos subtemas en el modal, usar esos
     if (modalSubtemas.length > 0) {
       return modalSubtemas.filter(s => {
+        if (!isSubtemaActive(s)) return false;
         // Si hay filtro de tema, solo mostrar subtemas de ese tema
         if (modalSelectedTema && Number(s.tema_id) !== Number(modalSelectedTema)) return false;
         return true;
@@ -259,18 +265,18 @@ export function SubtemaSequenceManagementScreen({
     
     // Si no, filtrar por tema seleccionado
     if (modalSelectedTema) {
-      return subtemas.filter(s => Number(s.tema_id) === Number(modalSelectedTema));
+      return subtemas.filter((s) => Number(s.tema_id) === Number(modalSelectedTema) && isSubtemaActive(s));
     }
     
     // Si hay filtro de area, mostrar subtemas de temas del area
     if (modalSelectedArea) {
       const allowedTemaIds = temas
-        .filter(t => Number(t.area_id) === Number(modalSelectedArea))
+        .filter((t) => Number(t.area_id) === Number(modalSelectedArea) && isTemaActive(t))
         .map(t => Number(t.id));
-      return subtemas.filter(s => allowedTemaIds.includes(Number(s.tema_id)));
+      return subtemas.filter((s) => allowedTemaIds.includes(Number(s.tema_id)) && isSubtemaActive(s));
     }
     
-    return subtemas;
+    return subtemas.filter(isSubtemaActive);
   };
 
   const getAvailableOriginModalSubtemas = () => {

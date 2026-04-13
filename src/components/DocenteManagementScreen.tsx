@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Building2, GraduationCap, Mail, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react';
+import { ArrowLeft, Building2, Eye, EyeOff, GraduationCap, Mail, Pencil, Plus, Search, Users, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -16,6 +16,7 @@ interface DocentePersona {
   nombre?: string;
   email?: string;
   codigoAcceso?: string;
+  estado?: boolean;
 }
 
 interface Docente {
@@ -47,6 +48,25 @@ const accentColor = '#14B8A6';
 const inputClassName =
   'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition-all placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-teal-500/25';
 
+const areaFilterButtonClass = (selected: boolean) =>
+  `inline-flex items-center rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+    selected
+      ? 'border-[#4A90E2] bg-[#4A90E2] text-white shadow-md shadow-blue-200'
+      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+  }`;
+
+const stateFilterButtonClass = (tone: 'all' | 'active' | 'inactive', selected: boolean) => {
+  if (selected) {
+    if (tone === 'active') return 'inline-flex items-center gap-2 rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-md shadow-emerald-200 transition-all';
+    if (tone === 'inactive') return 'inline-flex items-center gap-2 rounded-xl border border-amber-500 bg-amber-500 px-4 py-2.5 text-sm font-medium text-white shadow-md shadow-amber-200 transition-all';
+    return 'inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-800 px-4 py-2.5 text-sm font-medium text-white shadow-md transition-all';
+  }
+
+  if (tone === 'active') return 'inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-all hover:border-emerald-200 hover:bg-emerald-100';
+  if (tone === 'inactive') return 'inline-flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700 transition-all hover:border-amber-200 hover:bg-amber-100';
+  return 'inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-100';
+};
+
 export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps) {
   const [docentes, setDocentes] = useState<Docente[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
@@ -62,6 +82,8 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAreaFilter, setSelectedAreaFilter] = useState('all');
+  const [selectedStateFilter, setSelectedStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const modalTitle = editingDocente ? 'Editar docente' : 'Crear docente';
   const modalDescription = editingDocente
@@ -99,6 +121,8 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
       setLoading(false);
     }
   };
+
+  const isDocenteActive = (docente: Docente) => docente.persona?.estado !== false;
 
   useEffect(() => {
     loadAreas();
@@ -145,25 +169,29 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleDelete = async (docente: Docente) => {
+  const handleToggleEstado = async (docente: Docente) => {
     const nombre = docente.persona?.nombre || 'este docente';
-    if (!window.confirm(`Deseas eliminar a ${nombre}?`)) {
+    const currentlyActive = isDocenteActive(docente);
+    const actionLabel = currentlyActive ? 'inhabilitar' : 'habilitar';
+
+    if (!window.confirm(`Deseas ${actionLabel} a ${nombre}?`)) {
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/docente/${docente.id}`, {
-        method: 'DELETE'
+      const response = await fetch(`${API_BASE_URL}/docente/${docente.id}/toggle-estado`, {
+        method: 'PUT'
       });
 
       if (!response.ok) {
-        throw new Error('No se pudo eliminar el docente');
+        throw new Error(`No se pudo ${actionLabel} el docente`);
       }
 
       await loadDocentes();
+      setSuccessMessage(`Docente ${currentlyActive ? 'inhabilitado' : 'habilitado'} correctamente.`);
     } catch (err) {
-      console.error('Error deleting docente:', err);
-      setError(err instanceof Error ? err.message : 'Error al eliminar docente');
+      console.error('Error toggling docente:', err);
+      setError(err instanceof Error ? err.message : 'Error al cambiar el estado del docente');
     }
   };
 
@@ -185,11 +213,16 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
     const normalizedQuery = searchTerm.trim().toLowerCase();
 
     return docentes.filter((docente) => {
+      const docenteIsActive = isDocenteActive(docente);
       const matchesArea =
         selectedAreaFilter === 'all' ||
         String(docente.area?.id ?? docente.areaId ?? '') === selectedAreaFilter;
 
-      if (!matchesArea) {
+      const matchesState =
+        selectedStateFilter === 'all' ||
+        (selectedStateFilter === 'active' ? docenteIsActive : !docenteIsActive);
+
+      if (!matchesArea || !matchesState) {
         return false;
       }
 
@@ -211,7 +244,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
 
       return searchableText.includes(normalizedQuery);
     });
-  }, [docentes, searchTerm, selectedAreaFilter]);
+  }, [docentes, searchTerm, selectedAreaFilter, selectedStateFilter]);
 
   const stats = useMemo(() => {
     const docentesConCorreo = docentes.filter((docente) => docente.persona?.email?.trim()).length;
@@ -225,12 +258,16 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
         .map((docente) => String(docente.area?.id ?? docente.areaId ?? ''))
         .filter((value) => value && value !== '0')
     ).size;
+    const activos = docentes.filter((docente) => isDocenteActive(docente)).length;
+    const inactivos = docentes.length - activos;
 
     return {
       total: docentes.length,
       docentesConCorreo,
       especialidades,
-      areasCubiertas
+      areasCubiertas,
+      activos,
+      inactivos
     };
   }, [docentes]);
 
@@ -381,46 +418,110 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
           </div>
         )}
 
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => setSelectedAreaFilter('all')}
-                className={`px-4 py-2 rounded-lg transition-all ${
-                  selectedAreaFilter === 'all'
-                    ? 'app-primary-btn text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
-                }`}
-              >
-                Todos
-              </button>
-              {visibleAreas.map((area) => {
-                const isActive = selectedAreaFilter === String(area.id);
-                return (
+        {successMessage && (
+          <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg">
+            {successMessage}
+          </div>
+        )}
+
+        <div className="mb-6 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-md">
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1.35fr)_340px]">
+            <div className="space-y-5 p-6">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Filtrar por área</p>
+                    <p className="mt-1 text-sm text-slate-600">Muestra docentes por su área asignada.</p>
+                  </div>
+                  <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
+                    {selectedAreaFilter === 'all'
+                      ? 'Todas'
+                      : areas.find((area) => String(area.id) === selectedAreaFilter)?.nombre || 'Área'}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
                   <button
-                    key={area.id}
-                    onClick={() => setSelectedAreaFilter(String(area.id))}
-                    className={`px-4 py-2 rounded-lg transition-all ${
-                      isActive
-                        ? 'app-primary-btn text-white shadow-md'
-                        : 'app-btn-secondary text-gray-700'
-                    }`}
+                    onClick={() => setSelectedAreaFilter('all')}
+                    className={areaFilterButtonClass(selectedAreaFilter === 'all')}
                   >
-                    {area.nombre}
+                    Todas las áreas
                   </button>
-                );
-              })}
+                  {visibleAreas.map((area) => {
+                    const isActive = selectedAreaFilter === String(area.id);
+                    return (
+                      <button
+                        key={area.id}
+                        onClick={() => setSelectedAreaFilter(String(area.id))}
+                        className={areaFilterButtonClass(isActive)}
+                      >
+                        {area.nombre}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del registro</p>
+                  <p className="mt-1 text-sm text-slate-600">Alterna entre docentes activos, inactivos o la vista completa.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedStateFilter('all')}
+                    className={stateFilterButtonClass('all', selectedStateFilter === 'all')}
+                  >
+                    <Users className="h-4 w-4" />
+                    <span>Todos</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedStateFilter('active')}
+                    className={stateFilterButtonClass('active', selectedStateFilter === 'active')}
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>Activos ({stats.activos})</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedStateFilter('inactive')}
+                    className={stateFilterButtonClass('inactive', selectedStateFilter === 'inactive')}
+                  >
+                    <EyeOff className="h-4 w-4" />
+                    <span>Inactivos ({stats.inactivos})</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Buscar docentes..."
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent w-[240px] md:w-[300px]"
-              />
+            <div className="border-t border-slate-200 bg-gradient-to-br from-teal-50 via-white to-cyan-50 p-6 lg:border-l lg:border-t-0">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda rápida</p>
+                <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Buscar docente</h3>
+                <p className="mt-1 text-sm text-slate-600">Busca por nombre, correo, código, especialidad o área.</p>
+              </div>
+
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Ej: Ana, matemáticas o Programación"
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-700 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/25"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resultados</p>
+                  <p className="mt-2 text-2xl font-semibold text-[#3A4A5B]">{filteredDocentes.length}</p>
+                </div>
+                <div className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">
+                    {selectedStateFilter === 'all' ? 'Combinada' : selectedStateFilter === 'active' ? 'Solo activos' : 'Solo inactivos'}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -444,19 +545,28 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Especialidad</th>
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Área</th>
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Código</th>
+                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {filteredDocentes.map((docente) => (
-                    <tr key={docente.id} className="hover:bg-gray-50 transition-colors">
+                  {filteredDocentes.map((docente) => {
+                    const docenteIsActive = isDocenteActive(docente);
+
+                    return (
+                    <tr
+                      key={docente.id}
+                      className={`transition-colors ${
+                        docenteIsActive ? 'hover:bg-gray-50' : 'bg-slate-50/70 text-slate-500'
+                      }`}
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-blue-100">
-                            <Users className="w-5 h-5 text-[#4A90E2]" />
+                          <div className={`p-2 rounded-lg ${docenteIsActive ? 'bg-blue-100' : 'bg-slate-200'}`}>
+                            <Users className={`w-5 h-5 ${docenteIsActive ? 'text-[#4A90E2]' : 'text-slate-500'}`} />
                           </div>
                           <div>
-                            <div className="text-[#3A4A5B]">{docente.persona?.nombre || 'Sin nombre'}</div>
+                            <div className={docenteIsActive ? 'text-[#3A4A5B]' : 'text-slate-500'}>{docente.persona?.nombre || 'Sin nombre'}</div>
                             <div className="text-xs text-gray-400">ID #{docente.id}</div>
                           </div>
                         </div>
@@ -466,7 +576,18 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                       <td className="px-6 py-4 text-gray-600 text-sm">{docente.area?.nombre || '-'}</td>
                       <td className="px-6 py-4 text-gray-600 text-sm">{docente.persona?.codigoAcceso || docente.codigoAcceso || '-'}</td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                            docenteIsActive
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {docenteIsActive ? 'Activo' : 'Inhabilitado'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             onClick={() => handleOpenEdit(docente)}
                             className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
@@ -475,16 +596,21 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDelete(docente)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Eliminar"
+                            onClick={() => handleToggleEstado(docente)}
+                            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                              docenteIsActive
+                                ? 'text-amber-700 hover:bg-amber-50'
+                                : 'text-emerald-700 hover:bg-emerald-50'
+                            }`}
+                            title={docenteIsActive ? 'Inhabilitar docente' : 'Habilitar docente'}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {docenteIsActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            <span>{docenteIsActive ? 'Inhabilitar' : 'Habilitar'}</span>
                           </button>
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );})}
                 </tbody>
               </table>
             </div>

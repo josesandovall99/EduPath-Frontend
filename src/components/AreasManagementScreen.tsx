@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Pencil, Plus, Search, X } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Pencil, Plus, Search, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -7,6 +7,7 @@ interface Area {
   id: number;
   nombre: string;
   descripcion?: string;
+  estado?: boolean;
 }
 
 interface AreasManagementScreenProps {
@@ -25,10 +26,13 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [editingAreaId, setEditingAreaId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: ''
   });
+
+  const isAreaActive = (area: Area) => area.estado !== false;
 
   useEffect(() => {
     loadAreas();
@@ -46,6 +50,7 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
 
   const loadAreas = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const response = await fetch(`${API_BASE_URL}/areas`);
       if (!response.ok) {
@@ -58,6 +63,40 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
       setError(err instanceof Error ? err.message : 'Error al cargar áreas');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleToggleArea = async (area: Area) => {
+    const currentlyActive = isAreaActive(area);
+    const actionLabel = currentlyActive ? 'inhabilitar' : 'habilitar';
+
+    if (!window.confirm(`Deseas ${actionLabel} el área ${area.nombre}?`)) {
+      return;
+    }
+
+    try {
+      setError(null);
+      const response = await fetch(`${API_BASE_URL}/areas/${area.id}/toggle-estado`, {
+        method: 'PUT',
+        headers: {
+          Accept: 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Error al ${actionLabel} el área`);
+      }
+
+      const data = await response.json().catch(() => null);
+      const updatedEstado = data?.estado ?? !currentlyActive;
+
+      setAreas((prev) => prev.map((item) => (
+        item.id === area.id ? { ...item, estado: updatedEstado } : item
+      )));
+      setSuccessMessage(`Área ${updatedEstado ? 'habilitada' : 'inhabilitada'} correctamente.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cambiar el estado del área');
     }
   };
 
@@ -149,9 +188,17 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
     }
   };
 
-  const filteredAreas = areas.filter((area) =>
-    area.nombre.toLowerCase().includes(searchTerm.toLowerCase().trim())
-  );
+  const filteredAreas = areas.filter((area) => {
+    const matchesName = area.nombre.toLowerCase().includes(searchTerm.toLowerCase().trim());
+    const matchesState =
+      stateFilter === 'all' ||
+      (stateFilter === 'active' ? isAreaActive(area) : !isAreaActive(area));
+
+    return matchesName && matchesState;
+  });
+
+  const activeAreas = areas.filter((area) => isAreaActive(area)).length;
+  const inactiveAreas = areas.length - activeAreas;
 
   return (
     <div className="app-shell">
@@ -225,6 +272,39 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
             />
           </div>
+
+          <div className="mt-4 flex gap-2 flex-wrap">
+            <button
+              onClick={() => setStateFilter('all')}
+              className={`px-4 py-2 rounded-lg transition-all ${
+                stateFilter === 'all'
+                  ? 'bg-slate-800 text-white shadow-md'
+                  : 'app-btn-secondary text-gray-700'
+              }`}
+            >
+              Todas ({areas.length})
+            </button>
+            <button
+              onClick={() => setStateFilter('active')}
+              className={`px-4 py-2 rounded-lg transition-all ${
+                stateFilter === 'active'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'app-btn-secondary text-gray-700'
+              }`}
+            >
+              Activas ({activeAreas})
+            </button>
+            <button
+              onClick={() => setStateFilter('inactive')}
+              className={`px-4 py-2 rounded-lg transition-all ${
+                stateFilter === 'inactive'
+                  ? 'bg-amber-600 text-white shadow-md'
+                  : 'app-btn-secondary text-gray-700'
+              }`}
+            >
+              Inactivas ({inactiveAreas})
+            </button>
+          </div>
         </div>
 
         {successMessage && (
@@ -274,6 +354,7 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredAreas.map((area, index) => {
                 const gradient = getColorForArea(index);
+                const areaIsActive = isAreaActive(area);
                 return (
                   <div
                     key={area.id}
@@ -286,28 +367,52 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                         onSelectArea(area.id, area.nombre);
                       }
                     }}
-                    className={`bg-gradient-to-br ${gradient} rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-8 text-left group hover:scale-[1.05] cursor-pointer`}
+                    className={`bg-gradient-to-br ${gradient} rounded-2xl shadow-lg transition-all duration-300 p-8 text-left group cursor-pointer ${
+                      areaIsActive ? 'hover:shadow-2xl hover:scale-[1.05]' : 'opacity-70 saturate-50'
+                    }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
+                        <div className="mb-3 flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            areaIsActive ? 'bg-white/20 text-white' : 'bg-black/20 text-white'
+                          }`}>
+                            {areaIsActive ? 'Activa' : 'Inhabilitada'}
+                          </span>
+                        </div>
                         <h2 className="text-white text-2xl font-bold group-hover:text-gray-100 transition-colors mb-2">
                           {area.nombre}
                         </h2>
                         <p className="text-white text-opacity-90 text-sm">
-                          Click para gestionar subtemas y contenidos
+                          {areaIsActive
+                            ? 'Click para gestionar subtemas y contenidos'
+                            : 'Área inhabilitada. Puedes abrirla para revisar su estructura o volver a habilitarla.'}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleOpenEdit(area);
-                        }}
-                        className="app-btn mt-1 bg-white/20 px-3 py-1.5 text-white hover:bg-white/30"
-                      >
-                        <Pencil className="w-4 h-4" />
-                        <span className="text-sm font-medium">Editar</span>
-                      </button>
+                      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleToggleArea(area);
+                          }}
+                          className="app-btn mt-1 bg-white/20 px-3 py-1.5 text-white hover:bg-white/30"
+                        >
+                          {areaIsActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          <span className="text-sm font-medium">{areaIsActive ? 'Inhabilitar' : 'Habilitar'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleOpenEdit(area);
+                          }}
+                          className="app-btn mt-1 bg-white/20 px-3 py-1.5 text-white hover:bg-white/30"
+                        >
+                          <Pencil className="w-4 h-4" />
+                          <span className="text-sm font-medium">Editar</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

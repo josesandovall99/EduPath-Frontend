@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plus, FileText, PlayCircle, Edit, Trash2, Eye, EyeOff, Search, Loader, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, PlayCircle, Edit, Eye, EyeOff, Search, Loader } from 'lucide-react';
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
@@ -18,6 +18,7 @@ interface ContentItem {
   subject: string;
   duration?: string;
   status: 'published' | 'draft';
+  estado?: boolean;
   tema_id?: number;
   subtema_id?: number;
   descripcion?: string;
@@ -54,10 +55,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
+  const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [contents, setContents] = useState<ContentItem[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [contentToDelete, setContentToDelete] = useState<ContentItem | null>(null);
 
   const [formData, setFormData] = useState<CreateContentFormData>({
     titulo: '',
@@ -76,6 +77,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   const [temas, setTemas] = useState<Tema[]>([]);
   const [subtemas, setSubtemas] = useState<Subtema[]>([]);
   const [selectedAreaId, setSelectedAreaId] = useState<string>('');
+  const isContentActive = (content: ContentItem) => content.estado !== false;
 
   // Funciones para cargar datos
   const loadAreas = async () => {
@@ -213,7 +215,8 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
             linkedTo: 'subtheme',
             linkedName: temaNombre && subtemaNombre ? `${temaNombre} - ${subtemaNombre}` : 'Sin vincular',
             subject: areaNombre,
-            status: 'draft',
+            status: item.estado === false ? 'draft' : 'published',
+            estado: item.estado !== false,
             tema_id: item.tema_id,
             subtema_id: item.subtema_id,
             descripcion: item.descripcion,
@@ -271,16 +274,23 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
       if (isEditMode) {
         // Actualizar en la lista
         const contenidosActualizados = contents.map(c => 
-          c.id === selectedContent?.id 
-            ? {
-                ...c,
-                title: contenidoActualizado.titulo,
-                type: contenidoActualizado.tipo,
-                descripcion: contenidoActualizado.descripcion,
-                url: contenidoActualizado.url,
-                tema_id: contenidoActualizado.tema_id,
-                subtema_id: contenidoActualizado.subtema_id
-              }
+          c.id === selectedContent?.id
+            ? (() => {
+                const nextEstado = contenidoActualizado.estado ?? c.estado;
+                const nextStatus: ContentItem['status'] = nextEstado === false ? 'draft' : 'published';
+
+                return {
+                  ...c,
+                  title: contenidoActualizado.titulo,
+                  type: contenidoActualizado.tipo,
+                  descripcion: contenidoActualizado.descripcion,
+                  url: contenidoActualizado.url,
+                  estado: nextEstado,
+                  status: nextStatus,
+                  tema_id: contenidoActualizado.tema_id,
+                  subtema_id: contenidoActualizado.subtema_id
+                };
+              })()
             : c
         );
         setContents(contenidosActualizados);
@@ -297,7 +307,8 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
           linkedTo: 'subtheme',
           linkedName: `Tema ${contenidoActualizado.tema_id} - Subtema ${contenidoActualizado.subtema_id}`,
           subject: 'Sin clasificar',
-          status: 'draft',
+          status: 'published',
+          estado: true,
           tema_id: contenidoActualizado.tema_id,
           subtema_id: contenidoActualizado.subtema_id,
           descripcion: contenidoActualizado.descripcion,
@@ -372,50 +383,55 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     setShowCreateModal(true);
   };
 
-  // Función para eliminar contenido
-  const handleDeleteContent = async (id: string) => {
-    const content = contents.find(c => c.id === id);
-    if (content) {
-      setContentToDelete(content);
-      setShowDeleteConfirmation(true);
-    }
-  };
+  const handleToggleContent = async (content: ContentItem) => {
+    const currentlyActive = isContentActive(content);
+    const actionLabel = currentlyActive ? 'inhabilitar' : 'habilitar';
 
-  // Función para confirmar eliminación
-  const confirmDeleteContent = async () => {
-    if (!contentToDelete) return;
+    if (!window.confirm(`Deseas ${actionLabel} el contenido "${content.title}"?`)) {
+      return;
+    }
 
     setIsLoading(true);
-    setShowDeleteConfirmation(false);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/contenidos/${contentToDelete.id}`, {
-        method: 'DELETE',
+      const response = await fetch(`${API_BASE_URL}/contenidos/${content.id}/toggle-estado`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         }
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al eliminar el contenido');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `Error al ${actionLabel} el contenido`);
       }
 
-      setContents(contents.filter(c => c.id !== contentToDelete.id));
+      const data = await response.json().catch(() => null);
+      const updatedEstado = data?.contenido?.estado ?? !currentlyActive;
+
+      setContents((prev) => prev.map((item) => (
+        item.id === content.id
+          ? {
+              ...item,
+              estado: updatedEstado,
+              status: updatedEstado ? 'published' : 'draft'
+            }
+          : item
+      )));
       
-      // Toast informativo cuando se elimina contenido
-      toast.warning('⚠️ Contenido eliminado', {
-        description: `"${contentToDelete.title}" ha sido eliminado. Si estaba en una secuencia, verifica y actualiza esa Secuencia de Contenido.`,
-        duration: 8000,
+      toast.success(`Contenido ${updatedEstado ? 'habilitado' : 'inhabilitado'}`, {
+        description: updatedEstado
+          ? `"${content.title}" vuelve a estar disponible en la gestión administrativa.`
+          : `"${content.title}" quedó inhabilitado. Si estaba en una secuencia, revisa esa Secuencia de Contenido.`,
+        duration: 6000,
         closeButton: true
       });
     } catch (err) {
-      toast.error('Error al eliminar', {
+      toast.error('Error al cambiar estado', {
         description: err instanceof Error ? err.message : 'Error desconocido'
       });
     } finally {
       setIsLoading(false);
-      setContentToDelete(null);
     }
   };
 
@@ -494,9 +510,24 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     };
   }, [showCreateModal, isEditMode, selectedContent]);
 
-  const filteredContents = filterType === 'all' 
-    ? contents 
-    : contents.filter(c => c.type === filterType);
+  const filteredContents = contents.filter((content) => {
+    const matchesType = filterType === 'all' || content.type === filterType;
+    const matchesState =
+      stateFilter === 'all' ||
+      (stateFilter === 'active' ? isContentActive(content) : !isContentActive(content));
+    const matchesSearch = !searchTerm.trim() || [
+      content.title,
+      content.subject,
+      content.linkedName,
+      content.descripcion
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(searchTerm.trim().toLowerCase());
+
+    return matchesType && matchesState && matchesSearch;
+  });
 
   const getTypeIcon = (type: ContentItem['type']) => {
     switch (type) {
@@ -574,10 +605,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                 <Eye className="w-6 h-6 text-[#7ED6A7]" />
               </div>
               <span className="text-3xl text-[#7ED6A7]">
-                {contents.filter(c => c.status === 'published').length}
+                {contents.filter((content) => isContentActive(content)).length}
               </span>
             </div>
-            <p className="text-gray-600 text-sm">Publicados</p>
+            <p className="text-gray-600 text-sm">Activos</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-md p-6">
@@ -586,10 +617,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                 <EyeOff className="w-6 h-6 text-gray-500" />
               </div>
               <span className="text-3xl text-gray-500">
-                {contents.filter(c => c.status === 'draft').length}
+                {contents.filter((content) => !isContentActive(content)).length}
               </span>
             </div>
-            <p className="text-gray-600 text-sm">Borradores</p>
+            <p className="text-gray-600 text-sm">Inhabilitados</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-md p-6">
@@ -607,8 +638,9 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
 
         {/* Filters and Search */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="space-y-3">
+              <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => setFilterType('all')}
                 className={`px-4 py-2 rounded-lg transition-all ${
@@ -651,10 +683,46 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
               </button>
             </div>
 
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => setStateFilter('all')}
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    stateFilter === 'all'
+                      ? 'bg-slate-800 text-white shadow-md'
+                      : 'app-btn-secondary text-gray-700'
+                  }`}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => setStateFilter('active')}
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    stateFilter === 'active'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'app-btn-secondary text-gray-700'
+                  }`}
+                >
+                  Activos ({contents.filter((content) => isContentActive(content)).length})
+                </button>
+                <button
+                  onClick={() => setStateFilter('inactive')}
+                  className={`px-4 py-2 rounded-lg transition-all ${
+                    stateFilter === 'inactive'
+                      ? 'bg-amber-600 text-white shadow-md'
+                      : 'app-btn-secondary text-gray-700'
+                  }`}
+                >
+                  Inactivos ({contents.filter((content) => !isContentActive(content)).length})
+                </button>
+              </div>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Buscar contenidos..."
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
               />
@@ -682,6 +750,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Tipo</th>
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Materia</th>
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Vinculado a</th>
+                  <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Acciones</th>
                 </tr>
               </thead>
@@ -689,9 +758,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                 {filteredContents.map((content) => {
                   const Icon = getTypeIcon(content.type);
                   const color = getTypeColor(content.type);
+                  const contentIsActive = isContentActive(content);
                   
                   return (
-                    <tr key={content.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={content.id} className={`transition-colors ${contentIsActive ? 'hover:bg-gray-50' : 'bg-slate-50/70 text-slate-500'}`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div 
@@ -711,7 +781,16 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                       <td className="px-6 py-4 text-gray-600 text-sm">{content.subject}</td>
                       <td className="px-6 py-4 text-gray-600 text-sm">{content.linkedName}</td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                          contentIsActive
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {contentIsActive ? 'Activo' : 'Inhabilitado'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             onClick={() => handleEditContent(content)}
                             className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
@@ -720,12 +799,17 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteContent(content.id)}
+                            onClick={() => handleToggleContent(content)}
                             disabled={isLoading}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                            title="Eliminar"
+                            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+                              contentIsActive
+                                ? 'text-amber-700 hover:bg-amber-50'
+                                : 'text-emerald-700 hover:bg-emerald-50'
+                            }`}
+                            title={contentIsActive ? 'Inhabilitar contenido' : 'Habilitar contenido'}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            {contentIsActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            <span>{contentIsActive ? 'Inhabilitar' : 'Habilitar'}</span>
                           </button>
                         </div>
                       </td>
@@ -938,65 +1022,6 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
         </div>
       )}
 
-      {/* Modal de Confirmación de Eliminación */}
-      {showDeleteConfirmation && contentToDelete && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', maxWidth: '420px', width: '100%', padding: '32px' }}>
-            
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-              <div style={{ flexShrink: 0 }}>
-                <AlertTriangle style={{ width: '32px', height: '32px', color: '#dc2626' }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#3A4A5B', marginBottom: '16px' }}>
-                  Eliminar contenido
-                </h3>
-                <p style={{ color: '#4b5563', marginBottom: '16px', lineHeight: '1.5' }}>
-                  ¿Estás seguro de que deseas eliminar <strong>"{contentToDelete.title}"</strong>?
-                </p>
-                
-                <div style={{ backgroundColor: '#fef3c7', borderLeft: '4px solid #f59e0b', borderRadius: '6px', padding: '12px', marginBottom: '24px' }}>
-                  <p style={{ fontSize: '14px', color: '#78350f', lineHeight: '1.6' }}>
-                    <strong>⚠️ Importante:</strong> Si este contenido está vinculado a una <strong>Secuencia de Contenido</strong>, la secuencia se verá afectada y se redireccionará automáticamente al siguiente contenido.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDeleteConfirmation(false);
-                  setContentToDelete(null);
-                }}
-                disabled={isLoading}
-                style={{ padding: '8px 16px', color: '#374151', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '8px', cursor: isLoading ? 'not-allowed' : 'pointer', fontWeight: '500', opacity: isLoading ? 0.5 : 1 }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={confirmDeleteContent}
-                disabled={isLoading}
-                style={{ padding: '8px 16px', color: 'white', backgroundColor: '#dc2626', borderRadius: '8px', border: 'none', cursor: isLoading ? 'not-allowed' : 'pointer', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '8px', opacity: isLoading ? 0.5 : 1 }}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
-                    Eliminando...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 style={{ width: '16px', height: '16px' }} />
-                    Sí, eliminar
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

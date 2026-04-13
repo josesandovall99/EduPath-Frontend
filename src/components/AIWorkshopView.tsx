@@ -87,6 +87,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
   >([
     { concept: '', type: 'Humano', quantity: '', unitCost: '' }
   ]);
+  const [managementJustification, setManagementJustification] = useState('');
   const [expectedCounts, setExpectedCounts] = useState<{ stakeholders: number; functional: number; nonFunctional: number } | null>(null);
   const [expectedManagementCounts, setExpectedManagementCounts] = useState<{ scope: number; schedule: number; costs: number } | null>(null);
   const [evaluation, setEvaluation] = useState<{
@@ -123,6 +124,77 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
   const totalCost = costRows.reduce((sum, row) => sum + calculateRowTotal(row), 0);
 
+  const normalizeDate = (value?: string) => {
+    if (!value) return '';
+    if (/\d{4}-\d{2}-\d{2}/.test(value)) return value;
+    if (/\d{2}\/\d{2}\/\d{4}/.test(value)) {
+      const [day, month, year] = value.split('/');
+      return `${year}-${month}-${day}`;
+    }
+    return value;
+  };
+
+  const parseExpectedScheduleRows = (value: unknown) => {
+    const scheduleItems = Array.isArray(value) ? value : [];
+    const parsedRows = scheduleItems.map((entry) => {
+      if (entry && typeof entry === 'object') {
+        const objectEntry = entry as { activity?: string; actividad?: string; tarea?: string; start?: string; inicio?: string; end?: string; fin?: string };
+        return {
+          activity: (objectEntry.activity ?? objectEntry.actividad ?? objectEntry.tarea ?? '').toString(),
+          start: normalizeDate((objectEntry.start ?? objectEntry.inicio ?? '').toString()),
+          end: normalizeDate((objectEntry.end ?? objectEntry.fin ?? '').toString())
+        };
+      }
+
+      const text = entry?.toString?.() ?? '';
+      const activityMatch = text.match(/Actividad\s*\d*:?\s*([^|]+)\|/i);
+      const startMatch = text.match(/Inicio\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/\d{2}\/\d{4})/i);
+      const endMatch = text.match(/Fin\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/\d{2}\/\d{4})/i);
+
+      return {
+        activity: activityMatch ? activityMatch[1].trim() : text,
+        start: normalizeDate(startMatch?.[1]),
+        end: normalizeDate(endMatch?.[1])
+      };
+    }).filter((row) => row.activity || row.start || row.end);
+
+    return parsedRows.length > 0 ? parsedRows : [{ activity: '', start: '', end: '' }];
+  };
+
+  const parseExpectedCostRows = (value: unknown) => {
+    const costItems = Array.isArray(value) ? value : [];
+    const parsedRows = costItems.map((entry) => {
+      if (entry && typeof entry === 'object') {
+        const objectEntry = entry as { concept?: string; concepto?: string; type?: string; quantity?: string | number; cantidad?: string | number; unitCost?: string | number; costoUnitario?: string | number };
+        return {
+          concept: (objectEntry.concept ?? objectEntry.concepto ?? '').toString(),
+          type: objectEntry.type === 'Material' ? 'Material' as const : 'Humano' as const,
+          quantity: (objectEntry.quantity ?? objectEntry.cantidad ?? '').toString(),
+          unitCost: (objectEntry.unitCost ?? objectEntry.costoUnitario ?? '').toString()
+        };
+      }
+
+      const text = entry?.toString?.() ?? '';
+      if (/total\s+general/i.test(text)) return null;
+
+      const conceptMatch = text.match(/Costo\s*\d*:?\s*([^|]+)\|/i);
+      const typeMatch = text.match(/Tipo\s*:?\s*(Humano|Material)/i);
+      const quantityMatch = text.match(/Cantidad\s*:?\s*([0-9.,]+)/i);
+      const unitCostMatch = text.match(/Costo\s*unitario\s*:?\s*([0-9.,]+)/i);
+
+      return {
+        concept: conceptMatch ? conceptMatch[1].trim() : text,
+        type: typeMatch?.[1] === 'Material' ? 'Material' as const : 'Humano' as const,
+        quantity: quantityMatch?.[1] ?? '',
+        unitCost: unitCostMatch?.[1] ?? ''
+      };
+    }).filter((row): row is { concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string } => Boolean(row && (row.concept || row.quantity || row.unitCost)));
+
+    return parsedRows.length > 0
+      ? parsedRows
+      : [{ concept: '', type: 'Humano' as const, quantity: '', unitCost: '' }];
+  };
+
   const buildCostList = (
     rows: Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }>
   ) =>
@@ -154,6 +226,28 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
           if (scope || schedule || costs) {
             setExpectedManagementCounts({ scope, schedule, costs });
           }
+
+          const defaultScope = Array.isArray(parsed?.alcance)
+            ? parsed.alcance.map((item: unknown) => item?.toString?.().trim?.() ?? '').filter(Boolean)
+            : [];
+          const defaultSchedule = parseExpectedScheduleRows(parsed?.cronograma);
+          const defaultCosts = parseExpectedCostRows(parsed?.costos);
+
+          if (defaultScope.length > 0) {
+            setScopeList((prev) => (prev.length > 0 ? prev : defaultScope));
+          }
+
+          setScheduleRows((prev) => (
+            prev.some((row) => row.activity || row.start || row.end)
+              ? prev
+              : defaultSchedule
+          ));
+
+          setCostRows((prev) => (
+            prev.some((row) => row.concept || row.quantity || row.unitCost)
+              ? prev
+              : defaultCosts
+          ));
         } else {
           const stakeholders = Array.isArray(parsed?.stakeholders) ? parsed.stakeholders.length : 0;
           const functional = Array.isArray(parsed?.requisitosFuncionales) ? parsed.requisitosFuncionales.length : 0;
@@ -169,30 +263,6 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
     fetchExpectedCounts();
   }, [workshop.id, workshop.isMiniproyecto, isManagementWorkshop]);
-
-  useEffect(() => {
-    if (!isManagementWorkshop || !workshop.isMiniproyecto) return;
-    if (scopeList.length || scheduleRows.some((row) => row.activity || row.start || row.end) || costRows.some((row) => row.concept || row.quantity || row.unitCost)) {
-      return;
-    }
-
-    setScopeList([
-      'Implementar módulo de matrícula en línea',
-      'Notificaciones por correo y SMS',
-      'Panel de administración para reportes'
-    ]);
-    setScheduleRows([
-      { activity: 'Levantamiento requisitos', start: '2026-02-02', end: '2026-02-14' },
-      { activity: 'Diseño UI/UX', start: '2026-02-15', end: '2026-02-20' },
-      { activity: 'Desarrollo', start: '2026-02-21', end: '2026-03-10' },
-      { activity: 'Pruebas', start: '2026-03-11', end: '2026-03-15' }
-    ]);
-    setCostRows([
-      { concept: 'Analista', type: 'Humano', quantity: '1', unitCost: '3500000' },
-      { concept: 'Desarrollador', type: 'Humano', quantity: '2', unitCost: '3000000' },
-      { concept: 'Licencia SMS', type: 'Material', quantity: '1', unitCost: '800000' }
-    ]);
-  }, [isManagementWorkshop, workshop.isMiniproyecto, scopeList.length, scheduleRows, costRows]);
 
   const resolveEstudianteId = () => {
     if (estudianteId) return estudianteId;
@@ -213,7 +283,8 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
       ? {
           alcance: scopeList,
           cronograma: buildScheduleList(scheduleRows),
-          costos: buildCostList(costRows)
+          costos: buildCostList(costRows),
+          justificacionGestion: managementJustification.trim()
         }
       : {
           stakeholders: stakeholdersList,
@@ -382,17 +453,17 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                     <strong>Alcance:</strong> funcionalidades clave y términos concretos del cliente.
                   </div>
                   <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
-                    <strong>Cronograma:</strong> actividad + fechas coherentes. La fecha se considera correcta si está dentro de
-                    ±3 días respecto a la esperada (por ejemplo, si el inicio esperado es 10/02, se acepta del 07/02 al 13/02).
+                    <strong>Cronograma:</strong> actividades relevantes, orden lógico entre fases y fechas coherentes con la duración propuesta.
                   </div>
                   <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
-                    <strong>Costos:</strong> se valida concepto y costo unitario. El costo unitario debe estar dentro de ±20%.
-                    Si hay 2 conceptos errados o 2 costos unitarios fuera del rango, no aprueba.
-                    Además, el total debe estar dentro de ±30% (si no, falla toda la sección).
+                    <strong>Costos:</strong> se revisan rubros, consistencia entre cantidad, costo unitario, subtotales y total general.
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                    <strong>Supuestos:</strong> si indicas de dónde salen fechas, tarifas o recursos, la evaluación valora ese razonamiento.
                   </div>
                 </div>
                 <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-[11px] text-gray-600">
-                  Mientras más completos y específicos sean tus ítems, mayor será la calificación.
+                  No necesitas coincidir exactamente con una única respuesta: necesitas justificar una propuesta coherente.
                 </div>
               </div>
             ) : (
@@ -494,11 +565,20 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
               <div className="my-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600">
                 <p className="font-semibold text-gray-700">¿Cómo se evalúa?</p>
-                <ul className="mt-2 list-disc pl-4 space-y-1">
-                  <li>Se comparan tus respuestas con criterios esperados por palabras clave.</li>
-                  <li>Incluye conceptos del cliente, fechas y términos específicos.</li>
-                  <li>Mientras más completos y concretos sean los ítems, mejor puntuación.</li>
-                </ul>
+                {isManagementWorkshop ? (
+                  <ul className="mt-2 list-disc pl-4 space-y-1">
+                    <li>Se revisan actividades y rubros clave, no una fecha o costo exacto.</li>
+                    <li>El cronograma suma más si las fases siguen un orden lógico y las fechas son coherentes.</li>
+                    <li>Los costos suman más si los subtotales y el total general son consistentes.</li>
+                    <li>Explica tus supuestos para que la estimación hecha con la IA tenga respaldo.</li>
+                  </ul>
+                ) : (
+                  <ul className="mt-2 list-disc pl-4 space-y-1">
+                    <li>Se comparan tus respuestas con criterios esperados por palabras clave.</li>
+                    <li>Incluye conceptos del cliente, fechas y términos específicos.</li>
+                    <li>Mientras más completos y concretos sean los ítems, mejor puntuación.</li>
+                  </ul>
+                )}
               </div>
               {isManagementWorkshop ? (
                 <div className="space-y-4">
@@ -736,6 +816,19 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                         + Agregar fila
                       </button>
                     </div>
+                  </div>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <label className="text-xs text-gray-500">Supuestos y justificación</label>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Explica brevemente cómo definiste las fechas y costos con apoyo del chat: duración estimada, tamaño del equipo, tarifas, licencias o restricciones.
+                    </p>
+                    <textarea
+                      value={managementJustification}
+                      onChange={(event) => setManagementJustification(event.target.value)}
+                      placeholder="Ejemplo: asumí 1 analista y 2 desarrolladores durante 4 semanas; usé una licencia mensual de mensajería y dejé una fase corta de pruebas al final."
+                      rows={4}
+                      className="mt-3 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                    />
                   </div>
                 </div>
               ) : (

@@ -13,22 +13,22 @@ api.interceptors.request.use((config) => {
   const personaId = localStorage.getItem('personaId');
   const authToken = localStorage.getItem('authToken');
   const adminId = localStorage.getItem('adminId');
+  const nextHeaders = { ...(config.headers || {}) } as Record<string, unknown>;
 
   if (personaId) {
-    config.headers = { ...config.headers, 'x-persona-id': personaId };
+    nextHeaders['x-persona-id'] = personaId;
   }
 
   if (adminId) {
-    config.headers = {
-      ...config.headers,
-      'x-admin-id': adminId,
-      'x-administrador-id': adminId
-    };
+    nextHeaders['x-admin-id'] = adminId;
+    nextHeaders['x-administrador-id'] = adminId;
   }
 
   if (authToken) {
-    config.headers = { ...config.headers, Authorization: `Bearer ${authToken}` };
+    nextHeaders.Authorization = `Bearer ${authToken}`;
   }
+
+  config.headers = nextHeaders as any;
 
   return config;
 });
@@ -101,6 +101,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   const [expandedThemes, setExpandedThemes] = useState<Record<string, boolean>>({});
   const [showModal, setShowModal] = useState(false);
   const [editingTema, setEditingTema] = useState<Tema | null>(null);
+  const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -397,10 +398,8 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   const toggleTema = async (tema: Tema) => {
     try {
       const updatedEstado = !tema.estado;
-      await api.put(`/temas/${tema.id}`, {
-        ...tema,
-        estado: updatedEstado
-      });
+      await api.put(`/temas/${tema.id}/toggle-estado`);
+      setSuccessMessage(`Tema ${updatedEstado ? 'habilitado' : 'inhabilitado'} correctamente`);
       
       // Recargar todos los temas para que coincidan con el orden de la BD
       const response = await api.get('/temas', {
@@ -420,6 +419,18 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
       alert('Error al cambiar el estado del tema');
     }
   };
+
+  const filteredTemas = temas.filter((tema) => {
+    if (stateFilter === 'active') {
+      return tema.estado !== false;
+    }
+
+    if (stateFilter === 'inactive') {
+      return tema.estado === false;
+    }
+
+    return true;
+  });
 
   const toggleExpand = (temaId: string) => {
     const isExpanding = !expandedThemes[temaId];
@@ -613,7 +624,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
 
         {/* Botón para agregar nuevo tema */}
         {selectedSubject && (
-          <div className="mb-6">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <button
               onClick={handleCreateTema}
               className="flex items-center gap-2 px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all font-medium"
@@ -622,6 +633,39 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
               <Plus className="w-5 h-5" />
               <span>Agregar Nuevo Tema</span>
             </button>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setStateFilter('all')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  stateFilter === 'all'
+                    ? 'bg-slate-800 text-white shadow-md'
+                    : 'app-btn-secondary text-gray-700'
+                }`}
+              >
+                Todos ({temas.length})
+              </button>
+              <button
+                onClick={() => setStateFilter('active')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  stateFilter === 'active'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'app-btn-secondary text-gray-700'
+                }`}
+              >
+                Activos ({temas.filter((tema) => tema.estado !== false).length})
+              </button>
+              <button
+                onClick={() => setStateFilter('inactive')}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  stateFilter === 'inactive'
+                    ? 'bg-amber-600 text-white shadow-md'
+                    : 'app-btn-secondary text-gray-700'
+                }`}
+              >
+                Inactivos ({temas.filter((tema) => tema.estado === false).length})
+              </button>
+            </div>
           </div>
         )}
 
@@ -641,12 +685,21 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
             <p className="text-gray-600">No hay temas disponibles para esta área</p>
           </div>
+        ) : filteredTemas.length === 0 ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+            <p className="text-gray-600">No hay temas para el filtro seleccionado</p>
+          </div>
         ) : (
           <div className="space-y-4">
-            {temas.map((tema, index) => (
+            {filteredTemas.map((tema) => {
+              const temaIndex = temas.findIndex((item) => item.id === tema.id);
+
+              return (
               <div
                 key={tema.id}
-                className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg"
+                className={`bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 ${
+                  tema.estado === false ? 'opacity-70 saturate-50' : 'hover:shadow-lg'
+                }`}
               >
                 {/* Tema Header */}
                 <div className="p-6">
@@ -654,10 +707,10 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                     {/* Controles de ordenamiento */}
                     <div className="flex flex-col gap-1 flex-shrink-0">
                       <button
-                        onClick={() => moveTemaUp(index)}
-                        disabled={index === 0}
+                        onClick={() => moveTemaUp(temaIndex)}
+                        disabled={stateFilter !== 'all' || temaIndex === 0}
                         className={`p-1 rounded transition-colors ${
-                          index === 0 
+                          stateFilter !== 'all' || temaIndex === 0 
                             ? 'text-gray-300 cursor-not-allowed' 
                             : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
                         }`}
@@ -666,10 +719,10 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                         <ChevronUp className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => moveTemaDown(index)}
-                        disabled={index === temas.length - 1}
+                        onClick={() => moveTemaDown(temaIndex)}
+                        disabled={stateFilter !== 'all' || temaIndex === temas.length - 1}
                         className={`p-1 rounded transition-colors ${
-                          index === temas.length - 1
+                          stateFilter !== 'all' || temaIndex === temas.length - 1
                             ? 'text-gray-300 cursor-not-allowed'
                             : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
                         }`}
@@ -692,7 +745,16 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                         )}
                       </button>
                       <div className="flex-1">
-                        <h4 className="text-[#3A4A5B] text-lg font-semibold">{tema.nombre}</h4>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-[#3A4A5B] text-lg font-semibold">{tema.nombre}</h4>
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            tema.estado !== false
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {tema.estado !== false ? 'Activo' : 'Inhabilitado'}
+                          </span>
+                        </div>
                         <p className="text-gray-600 text-sm mt-1">{tema.descripcion}</p>
                       </div>
                     </div>
@@ -773,7 +835,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                   </div>
                 )}
               </div>
-            ))}
+            );})}
           </div>
         )}
 
@@ -812,7 +874,6 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                   value={formData.nombre}
                   onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
-                  style={{ focusRing: currentColor.primary }}
                   placeholder="Ej: Variables y Tipos de Datos"
                   required
                 />
