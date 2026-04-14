@@ -8,7 +8,7 @@ interface LoginScreenProps {
   onLoginSuccess: (data: any) => void; // Cambiado
   onDocenteLoginSuccess: (data: any) => void;
   onLogin?: () => void;
-  onAdminLogin: () => void;
+  onAdminLogin: (data: any) => void;
   onShowRegister: () => void;
   onShowChangePassword?: () => void;
   onShowForgotPassword?: () => void;
@@ -101,7 +101,7 @@ const handleStudentLogin = async () => {
           }
           applyAuthHeaders();
           // Si es admin y credenciales correctas, redirigimos al dashboard admin
-          onAdminLogin && onAdminLogin();
+          onAdminLogin && onAdminLogin(adminParsed.body);
           setLoading(false);
           return;
         }

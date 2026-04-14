@@ -6,7 +6,7 @@ interface ChangePasswordScreenProps {
   onComplete: () => void;
   isFirstLogin?: boolean;
   personaId?: number | null;
-  userRole?: 'estudiante' | 'docente';
+  userRole?: 'estudiante' | 'docente' | 'admin';
 }
 
 export function ChangePasswordScreen({ onComplete, isFirstLogin = false, personaId, userRole = 'estudiante' }: ChangePasswordScreenProps) {
@@ -85,6 +85,8 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
             {isFirstLogin
               ? userRole === 'docente'
                 ? 'Por seguridad, configura tu nueva clave para acceder como docente.'
+                : userRole === 'admin'
+                  ? 'Por seguridad, configura tu nueva clave para acceder como administrador.'
                 : 'Por seguridad, configura tu nueva clave de acceso.'
               : 'Mantén tu cuenta segura.'}
           </p>

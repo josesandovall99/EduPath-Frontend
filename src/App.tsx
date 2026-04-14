@@ -71,6 +71,13 @@ interface DocenteSession {
   areaNombre?: string;
 }
 
+interface AdminSession {
+  id: number;
+  personaId: number;
+  nombre: string;
+  email: string;
+}
+
 interface Subject {
   id: string;
   name: string;
@@ -99,6 +106,7 @@ export default function App() {
   const APP_NAV_STATE_KEY = 'appNavigationState';
   const APP_ROLE_KEY = 'appActiveRole';
   const DOCENTE_SESSION_KEY = 'docenteSession';
+  const ADMIN_SESSION_KEY = 'adminSession';
 
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
@@ -109,12 +117,13 @@ export default function App() {
   const [userData, setUserData] = useState<{id: number, personaId: number, nombre: string} | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [docenteSession, setDocenteSession] = useState<DocenteSession | null>(null);
+  const [adminSession, setAdminSession] = useState<AdminSession | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [isHydratingState, setIsHydratingState] = useState(true);
-  const changePasswordPersonaId = userSession?.personaId ?? docenteSession?.personaId ?? null;
-  const changePasswordNextScreen: Screen = userSession ? 'dashboard' : 'docente-dashboard';
-  const changePasswordRole = userSession ? 'estudiante' : 'docente';
+  const changePasswordPersonaId = userSession?.personaId ?? docenteSession?.personaId ?? adminSession?.personaId ?? null;
+  const changePasswordNextScreen: Screen = userSession ? 'dashboard' : adminSession ? 'admin-dashboard' : 'docente-dashboard';
+  const changePasswordRole = userSession ? 'estudiante' : adminSession ? 'admin' : 'docente';
 
   const extractAuthToken = (apiResponse: any): string | null => {
     const candidates = [
@@ -189,6 +198,7 @@ export default function App() {
       const adminIdRaw = localStorage.getItem('adminId');
       const role = localStorage.getItem(APP_ROLE_KEY);
       const storedDocenteSession = localStorage.getItem(DOCENTE_SESSION_KEY);
+      const storedAdminSession = localStorage.getItem(ADMIN_SESSION_KEY);
 
       if (personaIdRaw && estudianteIdRaw && nombreEstudiante && codigoEstudiante) {
         const restoredStudent: UserSession = {
@@ -199,10 +209,17 @@ export default function App() {
         };
         setUserSession(restoredStudent);
         setDocenteSession(null);
+        setAdminSession(null);
       } else if (storedDocenteSession && role === 'docente') {
         const parsedDocente = JSON.parse(storedDocenteSession) as DocenteSession;
         setDocenteSession(parsedDocente);
         setUserSession(null);
+        setAdminSession(null);
+      } else if (storedAdminSession && role === 'admin') {
+        const parsedAdmin = JSON.parse(storedAdminSession) as AdminSession;
+        setAdminSession(parsedAdmin);
+        setUserSession(null);
+        setDocenteSession(null);
       }
 
       const navRaw = localStorage.getItem(APP_NAV_STATE_KEY);
@@ -307,7 +324,9 @@ export default function App() {
   // 2. Función manejadora del Login Exitoso
   const handleLoginSuccess = (apiResponse: any) => {
     setDocenteSession(null);
+    setAdminSession(null);
     localStorage.removeItem('adminId');
+    localStorage.removeItem(ADMIN_SESSION_KEY);
 
     // Guardamos los datos importantes que vienen del backend
     const session = {
@@ -351,11 +370,13 @@ export default function App() {
     }
 
     setUserSession(null);
+    setAdminSession(null);
     localStorage.removeItem('estudianteId');
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('nombreEstudiante');
     localStorage.removeItem('semestreEstudiante');
     localStorage.removeItem('adminId');
+    localStorage.removeItem(ADMIN_SESSION_KEY);
 
     const session: DocenteSession = {
       id: docente.id,
@@ -381,6 +402,42 @@ export default function App() {
     }
   };
 
+  const handleAdminLoginSuccess = (apiResponse: any) => {
+    const administrador = apiResponse.administrador;
+    if (!administrador) {
+      return;
+    }
+
+    setUserSession(null);
+    setDocenteSession(null);
+    localStorage.removeItem('estudianteId');
+    localStorage.removeItem('codigoEstudiante');
+    localStorage.removeItem('nombreEstudiante');
+    localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem(DOCENTE_SESSION_KEY);
+
+    const session: AdminSession = {
+      id: administrador.id,
+      personaId: administrador.personaId,
+      nombre: administrador.nombre,
+      email: administrador.email,
+    };
+
+    setAdminSession(session);
+    localStorage.setItem('adminId', String(administrador.id));
+    localStorage.setItem('personaId', String(administrador.personaId));
+    localStorage.setItem(APP_ROLE_KEY, 'admin');
+    localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
+    persistAuthToken(apiResponse);
+    applyAuthHeaders();
+
+    if (apiResponse.primerIngreso) {
+      setCurrentScreen('change-password');
+    } else {
+      setCurrentScreen('admin-dashboard');
+    }
+  };
+
   /*const handleLogout = () => {
     setUserSession(null);
     setCurrentScreen('login');
@@ -389,11 +446,6 @@ export default function App() {
   // Student login (Google)
   const handleLogin = () => {
     setCurrentScreen('dashboard');
-  };
-
-  // Admin login (Ingresar button)
-  const handleAdminLogin = () => {
-    setCurrentScreen('admin-dashboard');
   };
 
   // Show admin register
@@ -414,6 +466,7 @@ export default function App() {
     setSelectedSubject(null);
     setSelectedContent(null);
     setUserSession(null);
+    setAdminSession(null);
     // Limpiar localStorage
     localStorage.removeItem('estudianteId');
     localStorage.removeItem('personaId');
@@ -423,6 +476,7 @@ export default function App() {
     localStorage.removeItem('adminId');
     localStorage.removeItem('authToken');
     localStorage.removeItem(DOCENTE_SESSION_KEY);
+    localStorage.removeItem(ADMIN_SESSION_KEY);
     clearPersistedNavigation();
     setDocenteSession(null);
     applyAuthHeaders();
@@ -440,6 +494,7 @@ export default function App() {
     setSelectedSubject(null);
     setSelectedContent(null);
     setUserSession(null);
+    setAdminSession(null);
     // Limpiar localStorage
     localStorage.removeItem('estudianteId');
     localStorage.removeItem('personaId');
@@ -449,6 +504,7 @@ export default function App() {
     localStorage.removeItem('adminId');
     localStorage.removeItem('authToken');
     localStorage.removeItem(DOCENTE_SESSION_KEY);
+    localStorage.removeItem(ADMIN_SESSION_KEY);
     clearPersistedNavigation();
     setDocenteSession(null);
     applyAuthHeaders();
@@ -550,10 +606,7 @@ export default function App() {
           onLoginSuccess={handleLoginSuccess} // Conectamos la función
           onDocenteLoginSuccess={handleDocenteLoginSuccess}
           onLogin={handleLogin}
-          onAdminLogin={() => {
-            localStorage.setItem(APP_ROLE_KEY, 'admin');
-            setCurrentScreen('admin-dashboard');
-          }} 
+          onAdminLogin={handleAdminLoginSuccess}
           onShowRegister={() => setCurrentScreen('admin-register')} 
           onShowForgotPassword={() => setCurrentScreen('forgot-password')}
         />
@@ -625,7 +678,6 @@ export default function App() {
             if (section === 'reports') setCurrentScreen('admin-reports');
             if (section === 'students') setCurrentScreen('admin-students');
             if (section === 'upload') setCurrentScreen('admin-upload');
-            if (section === 'sequences') setCurrentScreen('admin-sequences');
             if (section === 'subtema-sequences') setCurrentScreen('admin-subtema-sequences');
           }}
         />
