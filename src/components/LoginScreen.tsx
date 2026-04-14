@@ -1,4 +1,4 @@
-import { Mail, Lock, ArrowRight, KeyRound, AlertCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { applyAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
@@ -14,7 +14,7 @@ interface LoginScreenProps {
   onShowForgotPassword?: () => void;
 }
 
-export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, onAdminLogin, onShowRegister, onShowChangePassword, onShowForgotPassword }: LoginScreenProps) {
+export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, onAdminLogin, onShowRegister, onShowForgotPassword }: LoginScreenProps) {
   const [codigoEstudiantil, setCodigoEstudiantil] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -274,23 +274,6 @@ return (
               {!loading && <ArrowRight className="w-5 h-5" />}
             </button>
 
-            {/* Divider */}
-            <div className="my-6 flex items-center gap-4">
-              <div className="flex-1 border-t border-gray-300"></div>
-              <span className="text-gray-400">o</span>
-              <div className="flex-1 border-t border-gray-300"></div>
-            </div>
-
-            {/* Acceso Administrativo */}
-            <button 
-              onClick={handleStudentLogin}
-              disabled={loading}
-              className={`w-full bg-white border border-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-50 transition-all flex items-center justify-center gap-2 shadow-sm ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-              <span>{loading ? 'Verificando...' : 'Acceso Administrativo'}</span>
-            </button>
-
             {/* Forgot Password Link */}
             <div className="mt-4 text-center">
               <button
@@ -298,17 +281,6 @@ return (
                 className="text-[#4A90E2] hover:text-[#3A7BC8] transition-colors"
               >
                 ¿Olvidaste tu contraseña?
-              </button>
-            </div>
-
-            {/* Change Password Button (Temporal para pruebas) */}
-            <div className="mt-3">
-              <button
-                onClick={() => onShowChangePassword && onShowChangePassword()}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-[#7ED6A7] hover:text-[#6EC597] border border-[#7ED6A7] hover:border-[#6EC597] rounded-lg transition-all duration-300 hover:bg-green-50"
-              >
-                <KeyRound className="w-4 h-4" />
-                <span>Cambiar contraseña (Demo)</span>
               </button>
             </div>
           </div>

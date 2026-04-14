@@ -11,18 +11,12 @@ interface AdminFormData {
   nombre: string;
   email: string;
   codigoAcceso: string;
-  contrasena: string;
-  cargo: string;
-  nivelAcceso: string;
 }
 
 const emptyForm: AdminFormData = {
   nombre: '',
   email: '',
   codigoAcceso: '',
-  contrasena: '',
-  cargo: '',
-  nivelAcceso: ''
 };
 
 export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
@@ -53,18 +47,21 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
     if (
       !formData.nombre.trim() ||
       !formData.email.trim() ||
-      !formData.codigoAcceso.trim() ||
-      !formData.contrasena.trim() ||
-      !formData.cargo.trim() ||
-      !formData.nivelAcceso.trim()
+      !formData.codigoAcceso.trim()
     ) {
       setFormError('Completa todos los campos obligatorios.');
       return;
     }
 
     const personaId = localStorage.getItem('personaId');
+    const authToken = localStorage.getItem('authToken');
     if (!personaId) {
       setFormError('No se encontro personaId del administrador actual.');
+      return;
+    }
+
+    if (!authToken) {
+      setFormError('Tu sesion no es valida. Inicia sesion nuevamente.');
       return;
     }
 
@@ -76,16 +73,14 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
         nombre: formData.nombre.trim(),
         email: formData.email.trim(),
         codigoAcceso: formData.codigoAcceso.trim(),
-        cargo: formData.cargo.trim(),
-        nivelAcceso: formData.nivelAcceso.trim()
       };
-      payload['contraseña'] = formData.contrasena.trim();
 
       const response = await fetch(`${API_BASE_URL}/administrador/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
           'x-persona-id': personaId
         },
         body: JSON.stringify(payload)
@@ -96,7 +91,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
         throw new Error(errorData?.mensaje || 'Error al crear administrador');
       }
 
-      setSuccessMessage('Administrador creado correctamente.');
+      setSuccessMessage('Administrador creado correctamente. Las credenciales fueron enviadas por correo.');
       setShowModal(false);
       resetForm();
     } catch (err) {
@@ -136,7 +131,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
         <div className="mb-8 p-6 bg-gradient-to-r from-[#4A90E2] to-[#357abd] text-white rounded-xl shadow-lg">
           <h2 className="text-lg font-bold mb-2">Crear Administradores</h2>
           <p className="text-sm opacity-95">
-            Desde aqui puedes registrar administradores del sistema con sus credenciales y nivel de acceso.
+            Desde aqui puedes registrar administradores del sistema y enviar sus credenciales automaticamente por correo.
           </p>
         </div>
 
@@ -248,44 +243,12 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Contrasena *</label>
-                  <input
-                    type="password"
-                    value={formData.contrasena}
-                    onChange={(event) => setFormData({ ...formData, contrasena: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
-                    placeholder="Pass123!"
-                    required
-                  />
+                  <div className="h-full rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 flex items-center">
+                    La contrasena se genera automaticamente y se envia al correo del administrador.
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Cargo *</label>
-                  <input
-                    type="text"
-                    value={formData.cargo}
-                    onChange={(event) => setFormData({ ...formData, cargo: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
-                    placeholder="Administrador del Sistema"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nivel de acceso *</label>
-                  <select
-                    value={formData.nivelAcceso}
-                    onChange={(event) => setFormData({ ...formData, nivelAcceso: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all bg-white"
-                    required
-                  >
-                    <option value="">Seleccionar nivel...</option>
-                    <option value="TOTAL">TOTAL</option>
-                    <option value="LIMITADO">LIMITADO</option>
-                  </select>
-                </div>
-              </div>
             </div>
 
             <div className="p-6 border-t border-gray-200 flex gap-4 justify-end bg-gray-50 rounded-b-2xl">
@@ -298,7 +261,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
               </button>
               <button
                 onClick={handleCreateAdmin}
-                disabled={submitting || !formData.nombre.trim() || !formData.email.trim() || !formData.codigoAcceso.trim() || !formData.contrasena.trim() || !formData.cargo.trim() || !formData.nivelAcceso.trim()}
+                disabled={submitting || !formData.nombre.trim() || !formData.email.trim() || !formData.codigoAcceso.trim()}
                 className="px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 style={{ backgroundColor: '#4A90E2' }}
               >

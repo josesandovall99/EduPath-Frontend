@@ -1,4 +1,4 @@
-import { ArrowLeft, Mail, User, Building, FileText, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Mail, User, Building, FileText } from 'lucide-react';
 
 
 interface AdminRegisterScreenProps {
@@ -83,60 +83,6 @@ export function AdminRegisterScreen({ onBack, onRegister }: AdminRegisterScreenP
                 className="w-full border-2 border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent transition-all"
                 placeholder="correo@universidad.edu.co"
               />
-            </div>
-
-            {/* Position/Role */}
-            <div>
-              <label className="flex items-center gap-2 text-[#3A4A5B] mb-2">
-                <Building className="w-4 h-4" />
-                Cargo o rol
-              </label>
-              <select className="w-full border-2 border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent transition-all bg-white">
-                <option value="">Seleccionar cargo...</option>
-                <option value="docente">Docente</option>
-                <option value="coordinador">Coordinador Académico</option>
-                <option value="director">Director de Programa</option>
-                <option value="asistente">Asistente Académico</option>
-              </select>
-            </div>
-
-            {/* Access Level */}
-            <div>
-              <label className="flex items-center gap-2 text-[#3A4A5B] mb-3">
-                <CheckCircle2 className="w-4 h-4" />
-                Nivel de acceso solicitado
-              </label>
-              <div className="space-y-3">
-                <label className="flex items-start gap-3 p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-[#4A90E2] hover:bg-blue-50/30 transition-all">
-                  <input type="radio" name="accessLevel" value="basic" className="mt-1 accent-[#4A90E2]" />
-                  <div>
-                    <div className="text-[#3A4A5B]">Básico</div>
-                    <div className="text-gray-500 text-sm">
-                      Ver informes y seguimiento de estudiantes
-                    </div>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-3 p-4 border-2 border-[#4A90E2] bg-blue-50/30 rounded-xl cursor-pointer transition-all">
-                  <input type="radio" name="accessLevel" value="advanced" className="mt-1 accent-[#4A90E2]" defaultChecked />
-                  <div>
-                    <div className="text-[#3A4A5B]">Avanzado</div>
-                    <div className="text-gray-500 text-sm">
-                      Gestión de contenidos, temas y generación de informes
-                    </div>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-3 p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-[#4A90E2] hover:bg-blue-50/30 transition-all">
-                  <input type="radio" name="accessLevel" value="full" className="mt-1 accent-[#4A90E2]" />
-                  <div>
-                    <div className="text-[#3A4A5B]">Completo</div>
-                    <div className="text-gray-500 text-sm">
-                      Acceso total al sistema incluida administración de usuarios
-                    </div>
-                  </div>
-                </label>
-              </div>
             </div>
 
             {/* Department/Program */}

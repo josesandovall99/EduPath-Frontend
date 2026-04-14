@@ -269,7 +269,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
     {
       id: 'administradores',
       title: 'Gestión de Administradores',
-      description: 'Crear administradores con cargo y nivel de acceso. Controla credenciales del sistema.',
+      description: 'Crear administradores y controlar sus credenciales dentro del sistema.',
       icon: Shield,
       color: '#2563EB',
       gradient: 'from-[#2563EB] to-[#3B82F6]',
