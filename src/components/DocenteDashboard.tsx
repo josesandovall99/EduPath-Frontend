@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BookOpen, ChevronRight, ClipboardList, Clock, GitBranch, LogOut, MapPinned, Users } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 import { ExerciseManagementScreen } from './ExerciseManagementScreen';
 import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
 import { ReportsScreen } from './ReportsScreen';
@@ -19,37 +20,163 @@ interface DocenteDashboardProps {
   } | null;
 }
 
+type DashboardStats = {
+  assignedAreas: number;
+  areaTemas: number;
+  areaSubtemas: number;
+};
+
+type AreaSummary = {
+  id: number;
+  nombre?: string;
+  estado?: boolean;
+};
+
+type TemaSummary = {
+  id: number;
+  area_id?: number;
+  estado?: boolean;
+};
+
+type SubtemaSummary = {
+  id: number;
+  tema_id?: number;
+  estado?: boolean;
+};
+
+const EMPTY_STATS: DashboardStats = {
+  assignedAreas: 0,
+  areaTemas: 0,
+  areaSubtemas: 0,
+};
+
+const isActiveFlag = (value: unknown) => value !== false;
+
 export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDashboardProps) {
   const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'ejercicios' | 'miniproyectos' | 'reports'>('dashboard');
+  const [statsData, setStatsData] = useState<DashboardStats>(EMPTY_STATS);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+
+  useEffect(() => {
+    if (currentScreen !== 'dashboard') {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const loadDashboardStats = async () => {
+      setIsLoadingStats(true);
+      try {
+        const authToken = localStorage.getItem('authToken');
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          ...(docente?.id ? { 'x-docente-id': String(docente.id) } : {}),
+          ...(docente?.personaId ? { 'x-persona-id': String(docente.personaId) } : {}),
+        };
+
+        const parseJson = async (response: Response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          return response.json();
+        };
+
+        const areasResponse = await fetch(`${API_BASE_URL}/areas/mis-areas`, {
+          headers,
+          credentials: 'include'
+        });
+
+        const rawAreas = await parseJson(areasResponse);
+        const activeAreas = Array.isArray(rawAreas)
+          ? rawAreas.filter((area: AreaSummary) => Number.isFinite(Number(area?.id)) && isActiveFlag(area?.estado))
+          : [];
+
+        const temasResponse = await fetch(`${API_BASE_URL}/temas`, {
+          headers,
+          credentials: 'include'
+        });
+        const rawTemas = await parseJson(temasResponse);
+
+        const allowedAreaIds = new Set(activeAreas.map((area: AreaSummary) => Number(area.id)));
+        const activeTemas = Array.isArray(rawTemas)
+          ? rawTemas.filter((tema: TemaSummary) => allowedAreaIds.has(Number(tema?.area_id)) && isActiveFlag(tema?.estado))
+          : [];
+
+        const subtemasByTema = await Promise.all(
+          activeTemas.map(async (tema: TemaSummary) => {
+            const temaAreaId = Number(tema.area_id);
+            const subtemasResponse = await fetch(`${API_BASE_URL}/subtemas/por-tema/${tema.id}`, {
+              headers: {
+                ...headers,
+                ...(Number.isFinite(temaAreaId) ? { 'x-area-id': String(temaAreaId) } : {})
+              },
+              credentials: 'include'
+            });
+
+            const rawSubtemas = await parseJson(subtemasResponse);
+            return Array.isArray(rawSubtemas)
+              ? rawSubtemas.filter((subtema: SubtemaSummary) => isActiveFlag(subtema?.estado))
+              : [];
+          })
+        );
+
+        if (isCancelled) {
+          return;
+        }
+
+        setStatsData({
+          assignedAreas: activeAreas.length,
+          areaTemas: activeTemas.length,
+          areaSubtemas: subtemasByTema.reduce((total, subtemas) => total + subtemas.length, 0),
+        });
+      } catch (error) {
+        console.error('No se pudieron cargar las estadísticas del dashboard docente:', error);
+        if (!isCancelled) {
+          setStatsData(EMPTY_STATS);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingStats(false);
+        }
+      }
+    };
+
+    loadDashboardStats();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentScreen, docente?.id, docente?.personaId]);
 
   const stats = [
     {
-      label: 'Área asignada',
-      value: docente?.areaNombre ? '1' : '0',
+      label: 'Áreas asignadas',
+      value: String(statsData.assignedAreas),
       icon: MapPinned,
       color: '#4A90E2',
-      trend: '+0%'
+      trend: isLoadingStats ? 'Cargando' : 'En BD'
     },
     {
-      label: 'Gestiones disponibles',
-      value: '4',
+      label: 'Temas de sus áreas',
+      value: String(statsData.areaTemas),
       icon: GitBranch,
       color: '#7ED6A7',
-      trend: '+0'
+      trend: isLoadingStats ? 'Cargando' : 'En BD'
     },
     {
-      label: 'Módulos de evaluación',
-      value: '2',
+      label: 'Subtemas de sus áreas',
+      value: String(statsData.areaSubtemas),
       icon: ClipboardList,
       color: '#F5A97F',
-      trend: '+0'
+      trend: isLoadingStats ? 'Cargando' : 'En BD'
     },
     {
       label: 'Perfil docente',
       value: docente?.nombre ? 'Activo' : '-',
       icon: Users,
       color: '#A78BFA',
-      trend: '+0'
+      trend: 'Sesión'
     }
   ];
 

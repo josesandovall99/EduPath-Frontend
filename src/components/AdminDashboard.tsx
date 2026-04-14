@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBranch, ClipboardList, Shield } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { API_BASE_URL } from '../utils/constants';
 import { ContentManagementScreen } from './ContentManagementScreen';
 import { SequenceManagementScreen } from './SequenceManagementScreen';
 import { SubtemaSequenceManagementScreen } from './SubtemaSequenceManagementScreen';
@@ -22,6 +23,22 @@ interface AdminDashboardProps {
 
 type AdminScreen = 'dashboard' | 'areas' | 'temas' | 'subtema-sequences' | 'contents' | 'content-management' | 'subthemes' | 'miniproyectos' | 'ejercicios' | 'chatbot' | 'docentes' | 'administradores';
 
+type DashboardStats = {
+  activeAreas: number;
+  activeTemas: number;
+  activeEstudiantes: number;
+  activeContenidos: number;
+};
+
+const EMPTY_STATS: DashboardStats = {
+  activeAreas: 0,
+  activeTemas: 0,
+  activeEstudiantes: 0,
+  activeContenidos: 0,
+};
+
+const isActiveFlag = (value: unknown) => value !== false;
+
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   const ADMIN_DASHBOARD_STATE_KEY = 'adminDashboardState';
 
@@ -33,6 +50,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   const [selectedTemaName, setSelectedTemaName] = useState<string>('');
   const [selectedSubtemaId, setSelectedSubtemaId] = useState<number | null>(null);
   const [selectedSubtemaNombre, setSelectedSubtemaNombre] = useState<string>('');
+  const [statsData, setStatsData] = useState<DashboardStats>(EMPTY_STATS);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
   useEffect(() => {
     try {
@@ -87,6 +106,79 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
     selectedSubtemaNombre
   ]);
 
+  useEffect(() => {
+    if (currentScreen !== 'dashboard') {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const loadDashboardStats = async () => {
+      setIsLoadingStats(true);
+      try {
+        const authToken = localStorage.getItem('authToken');
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        };
+
+        const fetchJsonWithFallback = async (paths: string[]) => {
+          let lastError = null;
+
+          for (const path of paths) {
+            try {
+              const response = await fetch(`${API_BASE_URL}${path}`, { headers, credentials: 'include' });
+              if (!response.ok) {
+                lastError = new Error(`HTTP ${response.status} en ${path}`);
+                continue;
+              }
+              return await response.json();
+            } catch (error) {
+              lastError = error;
+            }
+          }
+
+          throw lastError || new Error('No se pudo obtener la respuesta del servidor');
+        };
+
+        const [areas, temas, estudiantes, contenidos] = await Promise.all([
+          fetchJsonWithFallback(['/areas']),
+          fetchJsonWithFallback(['/temas']),
+          fetchJsonWithFallback(['/estudiante', '/estudiantes']),
+          fetchJsonWithFallback(['/contenidos'])
+        ]);
+
+        if (isCancelled) {
+          return;
+        }
+
+        setStatsData({
+          activeAreas: Array.isArray(areas) ? areas.filter((area) => isActiveFlag(area?.estado)).length : 0,
+          activeTemas: Array.isArray(temas) ? temas.filter((tema) => isActiveFlag(tema?.estado)).length : 0,
+          activeEstudiantes: Array.isArray(estudiantes)
+            ? estudiantes.filter((estudiante) => isActiveFlag(estudiante?.persona?.estado)).length
+            : 0,
+          activeContenidos: Array.isArray(contenidos) ? contenidos.filter((contenido) => isActiveFlag(contenido?.estado)).length : 0,
+        });
+      } catch (error) {
+        console.error('No se pudieron cargar las estadísticas del dashboard admin:', error);
+        if (!isCancelled) {
+          setStatsData(EMPTY_STATS);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingStats(false);
+        }
+      }
+    };
+
+    loadDashboardStats();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentScreen]);
+
   const navigateTo = (nextScreen: AdminScreen) => {
     if (nextScreen === currentScreen) {
       return;
@@ -114,10 +206,10 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
     setCurrentScreen('dashboard');
   };
   const stats = [
-    { label: 'Materias activas', value: '3', icon: BookOpen, color: '#4A90E2', trend: '+0%' },
-    { label: 'Temas disponibles', value: '12', icon: FileEdit, color: '#7ED6A7', trend: '+2' },
-    { label: 'Estudiantes activos', value: '45', icon: Users, color: '#F5A97F', trend: '+5' },
-    { label: 'Contenidos publicados', value: '87', icon: TrendingUp, color: '#A78BFA', trend: '+12' }
+    { label: 'Áreas activas', value: statsData.activeAreas, icon: BookOpen, color: '#4A90E2' },
+    { label: 'Temas activos', value: statsData.activeTemas, icon: FileEdit, color: '#7ED6A7' },
+    { label: 'Estudiantes activos', value: statsData.activeEstudiantes, icon: Users, color: '#F5A97F' },
+    { label: 'Contenidos activos', value: statsData.activeContenidos, icon: TrendingUp, color: '#A78BFA' }
   ];
 
   const actions = [
@@ -453,8 +545,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
                   <div className="p-3 rounded-lg" style={{ backgroundColor: `${stat.color}15` }}>
                     <Icon className="w-6 h-6" style={{ color: stat.color }} />
                   </div>
-                  <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
-                    {stat.trend}
+                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                    {isLoadingStats ? 'Cargando' : 'En BD'}
                   </span>
                 </div>
                 <div className="text-3xl mb-1" style={{ color: stat.color }}>{stat.value}</div>
