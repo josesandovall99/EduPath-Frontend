@@ -3,18 +3,23 @@ import {
   ArrowLeft,
   Bot,
   Database,
+  Eye,
   FileText,
+  Loader,
   MessageCircle,
   Plus,
   RefreshCw,
   Save,
+  Search,
   Send,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 
 const CHATBOT_TIMEOUT_MS = 120000;
+const MODEL_OPTIONS = ['qwen2.5:0.5b', 'llama3.2:1b', 'llama3.2'];
 
 interface ChatbotManagementScreenProps {
   onBack: () => void;
@@ -165,9 +170,24 @@ function mapChatbotToForm(chatbot: ChatbotItem): ChatbotFormState {
   };
 }
 
+function InfoBadge({ text }: { text: string }) {
+  return (
+    <span
+      title={text}
+      aria-label={text}
+      className="relative inline-flex w-5 h-5 shrink-0 rounded-full border border-slate-200 bg-slate-100 cursor-help align-middle"
+    >
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] leading-none font-bold text-slate-500">
+        i
+      </span>
+    </span>
+  );
+}
+
 export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const documentSectionRef = useRef<HTMLDivElement | null>(null);
+
   const [chatbots, setChatbots] = useState<ChatbotItem[]>([]);
   const [areas, setAreas] = useState<AreaItem[]>([]);
   const [miniproyectos, setMiniproyectos] = useState<MiniproyectoItem[]>([]);
@@ -184,7 +204,10 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
   const [isReloading, setIsReloading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
+  const [isFormVisible, setIsFormVisible] = useState(false);
   const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'GENERAL' | 'MINIPROYECTO'>('all');
+  const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [statusMessage, setStatusMessage] = useState('');
 
   useEffect(() => {
@@ -227,9 +250,10 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     }
   }, [form.tipo, form.area_id, form.miniproyecto_id, miniproyectos]);
 
-  const filteredChatbots = useMemo(() => {
+  const searchedChatbots = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return chatbots;
+
     return chatbots.filter((chatbot) => {
       const name = chatbot.nombre?.toLowerCase() || '';
       const type = chatbot.tipo?.toLowerCase() || '';
@@ -237,6 +261,17 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
       return name.includes(term) || type.includes(term) || model.includes(term);
     });
   }, [chatbots, search]);
+
+  const visibleChatbots = useMemo(() => {
+    return searchedChatbots.filter((chatbot) => {
+      const matchesType = typeFilter === 'all' || chatbot.tipo === typeFilter;
+      const isActive = chatbot.estado !== false;
+      const matchesState =
+        stateFilter === 'all' ||
+        (stateFilter === 'active' ? isActive : !isActive);
+      return matchesType && matchesState;
+    });
+  }, [searchedChatbots, typeFilter, stateFilter]);
 
   const areaOptions = useMemo(() => areas.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)), [areas]);
 
@@ -250,12 +285,25 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
 
         return getMiniproyectoAreaId(item) === areaId;
       })
-      .sort((a, b) => {
-        const left = getMiniproyectoLabel(a);
-        const right = getMiniproyectoLabel(b);
-        return left.localeCompare(right);
-      });
+      .sort((a, b) => getMiniproyectoLabel(a).localeCompare(getMiniproyectoLabel(b)));
   }, [form.area_id, miniproyectos]);
+
+  const selectedArea = areaOptions.find((area) => String(area.id) === form.area_id);
+  const selectedMiniproyecto = miniproyectos.find((item) => String(item.id) === form.miniproyecto_id);
+  const totalChatbots = chatbots.length;
+  const activeChatbots = chatbots.filter((chatbot) => chatbot.estado !== false).length;
+  const generalChatbots = chatbots.filter((chatbot) => chatbot.tipo === 'GENERAL').length;
+  const miniproyectoChatbots = chatbots.filter((chatbot) => chatbot.tipo === 'MINIPROYECTO').length;
+  const formCompletion = [
+    form.nombre_chatbot.trim(),
+    form.descripcion.trim(),
+    form.tipo,
+    form.model.trim(),
+    form.tipo === 'GENERAL' ? true : form.area_id,
+    form.tipo === 'GENERAL' ? true : form.miniproyecto_id,
+  ].filter(Boolean).length;
+  const canConfirmPdf = Boolean(selectedChatbotId && selectedFile && !isUploading);
+  const canCancelPdf = Boolean(selectedFile);
 
   function scrollToDocumentSection() {
     documentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -360,7 +408,34 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     setStats(null);
     setSelectedFile(null);
     setMessages([]);
+    setIsFormVisible(true);
     setStatusMessage('Preparando un nuevo chatbot.');
+  }
+
+  function handleEditSelected() {
+    if (!selectedChatbotId) {
+      setStatusMessage('Selecciona un chatbot antes de editarlo.');
+      return;
+    }
+
+    setIsFormVisible(true);
+    setStatusMessage('Editando configuración del chatbot seleccionado.');
+  }
+
+  function handleCloseForm() {
+    setIsFormVisible(false);
+    setSelectedFile(null);
+
+    if (selectedChatbotId) {
+      const selectedChatbot = chatbots.find((item) => item.id === selectedChatbotId);
+      if (selectedChatbot) {
+        setForm(mapChatbotToForm(selectedChatbot));
+      }
+    } else {
+      setForm(emptyForm());
+    }
+
+    setStatusMessage('Formulario oculto. Usa Crear Nuevo Chatbot o Editar para abrirlo cuando lo necesites.');
   }
 
   function updateForm<K extends keyof ChatbotFormState>(key: K, value: ChatbotFormState[K]) {
@@ -418,6 +493,8 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
       if (selected) {
         await selectChatbot(selected);
       }
+
+      setIsFormVisible(false);
       setStatusMessage(isEditing ? 'Chatbot actualizado correctamente.' : 'Chatbot creado correctamente.');
       if (!isEditing) {
         window.setTimeout(() => {
@@ -451,8 +528,14 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
       if (refreshed.length > 0) {
         await selectChatbot(refreshed[0]);
       } else {
-        handleCreateNew();
+        setSelectedChatbotId(null);
+        setForm(emptyForm());
+        setDocuments([]);
+        setStats(null);
+        setSelectedFile(null);
+        setMessages([]);
       }
+      setIsFormVisible(false);
       setStatusMessage('Chatbot eliminado correctamente.');
     } catch (error) {
       console.error('Error deleting chatbot:', error);
@@ -629,81 +712,164 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
-      <header className="bg-white shadow-sm border-b border-gray-200">
+    <div className="app-shell relative">
+      <div className={isFormVisible ? 'pointer-events-none select-none blur-[3px] transition-all duration-200' : 'transition-all duration-200'}>
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center gap-4">
-            <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <ArrowLeft className="w-6 h-6 text-gray-600" />
-            </button>
-            <div>
-              <h1 className="text-2xl text-[#3A4A5B]">Gestión de Chatbots</h1>
-              <p className="text-gray-500 text-sm">Administra chatbots generales y de miniproyecto con aislamiento de conocimiento.</p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <ArrowLeft className="w-6 h-6 text-gray-600" />
+              </button>
+              <div>
+                <h1 className="text-[#3A4A5B]">Gestión de Chatbots</h1>
+                <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+              </div>
             </div>
+            <button onClick={handleCreateNew} className="app-btn app-btn-success px-6 py-3">
+              <Plus className="w-5 h-5" />
+              <span>Crear Nuevo Chatbot</span>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-8 py-8">
-        <div className="grid grid-cols-[320px_1fr] gap-6">
-          <section className="bg-white rounded-xl shadow-md p-5 h-fit">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <h2 className="text-lg text-[#3A4A5B]">Chatbots</h2>
-                <p className="text-sm text-gray-500">General y miniproyecto</p>
+      <main className="app-main">
+        <button onClick={onBack} className="app-back-button mb-6">
+          <ArrowLeft className="w-4 h-4" />
+          <span>Volver al Panel</span>
+        </button>
+
+        <div className="grid grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Bot className="w-6 h-6 text-[#4A90E2]" />
               </div>
-              <button
-                onClick={handleCreateNew}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[#4A90E2] text-white hover:bg-[#3A7ED1] transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Nuevo
-              </button>
+              <span className="text-3xl text-[#4A90E2]">{totalChatbots}</span>
+            </div>
+            <p className="text-gray-600 text-sm">Total Chatbots</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <Eye className="w-6 h-6 text-[#7ED6A7]" />
+              </div>
+              <span className="text-3xl text-[#7ED6A7]">{activeChatbots}</span>
+            </div>
+            <p className="text-gray-600 text-sm">Activos</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-emerald-100 rounded-lg">
+                <MessageCircle className="w-6 h-6 text-emerald-600" />
+              </div>
+              <span className="text-3xl text-emerald-600">{generalChatbots}</span>
+            </div>
+            <p className="text-gray-600 text-sm">Generales</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <FileText className="w-6 h-6 text-orange-500" />
+              </div>
+              <span className="text-3xl text-orange-500">{miniproyectoChatbots}</span>
+            </div>
+            <p className="text-gray-600 text-sm">Miniproyecto</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="space-y-3">
+              <div className="app-filter-row">
+                <button onClick={() => setTypeFilter('all')} className={`app-filter-chip ${typeFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>Todos</button>
+                <button onClick={() => setTypeFilter('GENERAL')} className={`app-filter-chip ${typeFilter === 'GENERAL' ? 'app-filter-chip--green' : ''}`}>Generales</button>
+                <button onClick={() => setTypeFilter('MINIPROYECTO')} className={`app-filter-chip ${typeFilter === 'MINIPROYECTO' ? 'app-filter-chip--amber' : ''}`}>Miniproyecto</button>
+              </div>
+
+              <div className="app-filter-row">
+                <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>Todos</button>
+                <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>Activos ({activeChatbots})</button>
+                <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>Inactivos ({totalChatbots - activeChatbots})</button>
+              </div>
             </div>
 
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar chatbot..."
-              className="w-full mb-4 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-            />
-
-            <div className="space-y-3 max-h-[720px] overflow-y-auto pr-1">
-              {isLoading ? (
-                <div className="text-sm text-gray-500">Cargando chatbots...</div>
-              ) : filteredChatbots.length === 0 ? (
-                <div className="text-sm text-gray-500">No hay chatbots registrados.</div>
-              ) : (
-                filteredChatbots.map((chatbot) => {
-                  const isSelected = chatbot.id === selectedChatbotId;
-                  return (
-                    <button
-                      key={chatbot.id}
-                      onClick={() => void selectChatbot(chatbot)}
-                      className={`w-full text-left rounded-xl border p-4 transition-all ${
-                        isSelected
-                          ? 'border-[#4A90E2] bg-blue-50 shadow-sm'
-                          : 'border-gray-200 bg-white hover:border-[#A7C8F2] hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="min-w-0">
-                          <p className="text-[#3A4A5B] truncate">{chatbot.nombre}</p>
-                          <p className="text-xs text-gray-500">{chatbot.model_name || 'Modelo por defecto'}</p>
-                        </div>
-                        <span className={`px-2 py-1 rounded-full text-xs ${chatbot.tipo === 'GENERAL' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
-                          {chatbot.tipo === 'GENERAL' ? 'General' : 'Miniproyecto'}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 flex items-center justify-between">
-                        <span>{chatbot.estado === false ? 'Inactivo' : 'Activo'}</span>
-                        <span>{chatbot.documentos?.length || 0} PDF(s)</span>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar chatbots..."
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+              />
             </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[minmax(0,1.05fr)_minmax(0,1.6fr)] gap-6">
+          <section className="bg-white rounded-xl shadow-md overflow-hidden">
+            {isLoading ? (
+              <div className="p-12 flex justify-center items-center">
+                <div className="flex flex-col items-center gap-4">
+                  <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
+                  <p className="text-gray-600">Cargando chatbots...</p>
+                </div>
+              </div>
+            ) : visibleChatbots.length === 0 ? (
+              <div className="p-12 text-center text-gray-500">No hay chatbots que coincidan con los filtros.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-[#3A4A5B]">Chatbot</th>
+                      <th className="px-6 py-4 text-left text-[#3A4A5B]">Tipo</th>
+                      <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {visibleChatbots.map((chatbot) => {
+                      const isSelected = chatbot.id === selectedChatbotId;
+                      const chatbotIsActive = chatbot.estado !== false;
+                      return (
+                        <tr
+                          key={chatbot.id}
+                          onClick={() => void selectChatbot(chatbot)}
+                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : chatbotIsActive ? 'hover:bg-gray-50' : 'bg-slate-50/70 text-slate-500'}`}
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${chatbot.tipo === 'GENERAL' ? 'bg-emerald-100' : 'bg-orange-100'}`}>
+                                <Bot className={`w-5 h-5 ${chatbot.tipo === 'GENERAL' ? 'text-emerald-700' : 'text-orange-700'}`} />
+                              </div>
+                              <div>
+                                <div className="text-[#3A4A5B]">{chatbot.nombre}</div>
+                                <div className="text-xs text-gray-500">{chatbot.model_name || 'Modelo por defecto'}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-3 py-1 rounded-full text-sm ${chatbot.tipo === 'GENERAL' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+                              {chatbot.tipo === 'GENERAL' ? 'General' : 'Miniproyecto'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${chatbotIsActive ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {chatbotIsActive ? 'Activo' : 'Inhabilitado'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           <section className="space-y-6">
@@ -713,362 +879,193 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
               </div>
             ) : null}
 
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <div className="flex items-start justify-between gap-4 mb-6">
-                <div>
-                  <h2 className="text-xl text-[#3A4A5B]">Configuración del Chatbot</h2>
-                  <p className="text-sm text-gray-500">Define si el chatbot es global o específico de un miniproyecto.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={openPdfPicker}
-                    disabled={!selectedChatbotId}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Cargar PDF
-                  </button>
-                  {selectedChatbotId ? (
-                    <button
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Eliminar
-                    </button>
-                  ) : null}
-                  <button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4A90E2] text-white hover:bg-[#3A7ED1] disabled:opacity-50"
-                  >
-                    <Save className="w-4 h-4" />
-                    {selectedChatbotId ? 'Guardar cambios' : 'Crear chatbot'}
+            {!isFormVisible && selectedChatbotId ? (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-5 py-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="text-xs uppercase tracking-[0.28em] text-slate-400 mb-1">Chatbot seleccionado</div>
+                    <div className="text-lg text-[#3A4A5B]">{form.nombre_chatbot || `Chatbot #${selectedChatbotId}`}</div>
+                    <div className="text-sm text-slate-500">
+                      {form.tipo === 'GENERAL' ? 'General' : 'Miniproyecto'}
+                      {form.model ? ` • ${form.model}` : ''}
+                    </div>
+                  </div>
+                  <button onClick={handleEditSelected} className="app-btn app-btn-secondary px-4 py-3">
+                    <span>Editar chatbot seleccionado</span>
                   </button>
                 </div>
               </div>
+            ) : null}
 
-              <div className="grid grid-cols-2 gap-4">
-                <label className="block">
-                  <span className="block text-sm text-gray-600 mb-2">Nombre</span>
-                  <input
-                    value={form.nombre_chatbot}
-                    onChange={(event) => updateForm('nombre_chatbot', event.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                    placeholder="Tutor de Inventarios v1"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm text-gray-600 mb-2">Tipo</span>
-                  <select
-                    value={form.tipo}
-                    onChange={(event) => updateForm('tipo', event.target.value as ChatbotFormState['tipo'])}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                  >
-                    <option value="GENERAL">General</option>
-                    <option value="MINIPROYECTO">Miniproyecto</option>
-                  </select>
-                </label>
-
-                <label className="block col-span-2">
-                  <span className="block text-sm text-gray-600 mb-2">Descripción</span>
-                  <textarea
-                    value={form.descripcion}
-                    onChange={(event) => updateForm('descripcion', event.target.value)}
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                    placeholder="Describe el propósito del chatbot."
-                  />
-                </label>
-
-                <label className="block col-span-2">
-                  <span className="block text-sm text-gray-600 mb-2">Prompt base</span>
-                  <textarea
-                    value={form.prompt_base}
-                    onChange={(event) => updateForm('prompt_base', event.target.value)}
-                    rows={4}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                    placeholder="Instrucciones base opcionales para el chatbot."
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm text-gray-600 mb-2">Área</span>
-                  <select
-                    value={form.area_id}
-                    onChange={(event) => updateForm('area_id', event.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                  >
-                    <option value="">{form.tipo === 'GENERAL' ? 'Sin área (global)' : 'Selecciona un área'}</option>
-                    {areaOptions.map((area) => (
-                      <option key={area.id} value={area.id}>{area.nombre}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm text-gray-600 mb-2">Miniproyecto</span>
-                  <select
-                    value={form.miniproyecto_id}
-                    onChange={(event) => updateForm('miniproyecto_id', event.target.value)}
-                    disabled={form.tipo !== 'MINIPROYECTO' || !form.area_id}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] disabled:bg-gray-100 disabled:text-gray-400"
-                  >
-                    <option value="">
-                      {form.tipo !== 'MINIPROYECTO'
-                        ? 'No aplica para General'
-                        : !form.area_id
-                          ? 'Primero selecciona un área'
-                          : miniproyectoOptions.length === 0
-                            ? 'No hay miniproyectos para esta área'
-                            : 'Selecciona un miniproyecto'}
-                    </option>
-                    {miniproyectoOptions.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {getMiniproyectoLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm text-gray-600 mb-2">Modelo</span>
-                  <input
-                    value={form.model}
-                    onChange={(event) => updateForm('model', event.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm text-gray-600 mb-2">topK</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={form.topK}
-                    onChange={(event) => updateForm('topK', event.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm text-gray-600 mb-2">Máx. chars de contexto</span>
-                  <input
-                    type="number"
-                    min={200}
-                    value={form.max_context_chars}
-                    onChange={(event) => updateForm('max_context_chars', event.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm text-gray-600 mb-2">Máx. tokens</span>
-                  <input
-                    type="number"
-                    min={64}
-                    value={form.max_tokens}
-                    onChange={(event) => updateForm('max_tokens', event.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm text-gray-600 mb-2">Temperatura</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min={0}
-                    max={1}
-                    value={form.temperature}
-                    onChange={(event) => updateForm('temperature', event.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                  />
-                </label>
-
-                <label className="inline-flex items-center gap-3 mt-8">
-                  <input
-                    type="checkbox"
-                    checked={form.estado}
-                    onChange={(event) => updateForm('estado', event.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-[#4A90E2] focus:ring-[#4A90E2]"
-                  />
-                  <span className="text-sm text-gray-700">Chatbot activo</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              <div ref={documentSectionRef} className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <FileText className="w-5 h-5 text-green-600" />
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-6">
+              <section ref={documentSectionRef} className="app-form-section app-form-section--muted bg-white rounded-xl shadow-md p-5 lg:p-6">
+                <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 bg-emerald-100 rounded-xl">
+                      <FileText className="w-5 h-5 text-emerald-700" />
                     </div>
                     <div>
                       <h3 className="text-lg text-[#3A4A5B]">Base Documental</h3>
-                      <p className="text-sm text-gray-500">PDFs aislados por chatbot y por miniproyecto.</p>
+                      <p className="text-sm text-slate-500">Gestiona la base de PDFs vinculada al chatbot con el mismo patrón visual del panel administrativo.</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => void handleReloadDocuments()}
-                    disabled={!selectedChatbotId || isReloading}
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-                  >
+                  <button onClick={() => void handleReloadDocuments()} disabled={!selectedChatbotId || isReloading} className="app-btn app-btn-secondary px-4 py-3 text-slate-700 disabled:opacity-50">
                     <RefreshCw className={`w-4 h-4 ${isReloading ? 'animate-spin' : ''}`} />
-                    Recargar
+                    <span>Recargar</span>
                   </button>
                 </div>
 
-                <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-5 py-4 mb-5">
-                  <div className="flex items-start gap-4">
-                    <div className="w-9 h-9 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center text-sm font-semibold shrink-0">
-                      1
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-amber-900">Guardar chatbot antes de cargar documentos</p>
-                      <p className="text-sm text-amber-800 mt-1">
-                        {selectedChatbotId
-                          ? `Chatbot activo para documentos: ${form.nombre_chatbot || `#${selectedChatbotId}`}.`
-                          : 'Primero crea y guarda el chatbot. Cuando quede guardado se habilitará la confirmación del PDF.'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <input ref={uploadInputRef} id="chatbot-pdf-upload" type="file" accept=".pdf" onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} className="hidden" />
 
-                <div className="border-2 border-dashed border-gray-300 rounded-2xl p-5 mb-4 bg-gray-50">
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="w-9 h-9 rounded-full bg-[#D9E8FB] text-[#2F6FB2] flex items-center justify-center text-sm font-semibold shrink-0">
-                      2
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[#3A4A5B]">Seleccionar el PDF</p>
-                      <p className="text-sm text-gray-500 mt-1">Elige el archivo que quieres asociar de forma inmediata al chatbot seleccionado.</p>
-                    </div>
-                  </div>
-
-                  <input
-                    ref={uploadInputRef}
-                    id="chatbot-pdf-upload"
-                    type="file"
-                    accept=".pdf"
-                    onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="p-3 rounded-xl bg-white border border-gray-200">
-                        <Upload className="w-6 h-6 text-gray-500" />
-                      </div>
+                <div className="app-form-stack">
+                  <div className="app-form-summary-card">
+                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-4 items-start">
                       <div className="min-w-0">
-                        <p className="text-sm text-[#3A4A5B] font-medium">Archivo listo para asociar</p>
-                        <p className="text-sm text-gray-500 truncate">
-                          {selectedFile ? selectedFile.name : 'Todavía no has seleccionado ningún PDF'}
-                        </p>
+                        <div className="app-form-summary-label">Destino documental</div>
+                        <div className="app-form-summary-value">{selectedChatbotId ? (form.nombre_chatbot || `#${selectedChatbotId}`) : 'Guarda o selecciona un chatbot'}</div>
+                        <div className="app-form-summary-help">{selectedChatbotId ? 'La carga quedará asociada a este chatbot.' : 'Debes guardar el chatbot antes de confirmar la carga.'}</div>
                       </div>
-                    </div>
-
-                    <label
-                      htmlFor="chatbot-pdf-upload"
-                      className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-300 bg-white text-[#3A4A5B] hover:bg-gray-50 cursor-pointer font-medium"
-                    >
-                      <Upload className="w-4 h-4" />
-                      Seleccionar PDF
-                    </label>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-green-200 bg-green-50 px-5 py-5 mb-2">
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="w-9 h-9 rounded-full bg-green-200 text-green-800 flex items-center justify-center text-sm font-semibold shrink-0">
-                      3
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-green-900">Confirmar y vincular PDF al chatbot</p>
-                      <p className="text-sm text-green-800 mt-1">
-                        Este botón confirma la carga y asocia el PDF directamente al chatbot actual.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-white border border-green-200 px-4 py-4 mb-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-gray-500 mb-1">Chatbot destino</p>
-                        <p className="text-[#3A4A5B] font-medium">{selectedChatbotId ? (form.nombre_chatbot || `#${selectedChatbotId}`) : 'Ninguno todavía'}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 mb-1">PDF seleccionado</p>
-                        <p className="text-[#3A4A5B] font-medium truncate">{selectedFile ? selectedFile.name : 'Ningún archivo seleccionado'}</p>
+                      <div className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${selectedChatbotId ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {selectedChatbotId ? 'Listo para cargar' : 'Pendiente de guardar'}
                       </div>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => void handleUploadDocument()}
-                    disabled={!selectedChatbotId || !selectedFile || isUploading}
-                    className="w-full inline-flex items-center justify-center gap-3 px-5 py-4 rounded-2xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-base font-semibold shadow-sm"
-                  >
-                    <Upload className="w-5 h-5" />
-                    {isUploading ? 'Confirmando y cargando PDF...' : 'Confirmar PDF y cargarlo a este chatbot'}
-                  </button>
-                </div>
+                  <div className="app-form-section border border-slate-200 bg-slate-50/80">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Cargar documento</h4>
+                      <p className="app-form-section-description">Selecciona, confirma o cancela la carga del PDF desde una sola banda operativa.</p>
+                    </div>
 
-                <div className="mt-5 space-y-3 max-h-64 overflow-y-auto pr-1">
-                  {documents.length === 0 ? (
-                    <div className="text-sm text-gray-500">No hay documentos asociados.</div>
-                  ) : (
-                    documents.map((document) => (
-                      <div key={document.id} className="rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm text-[#3A4A5B] truncate">{document.nombre_original || document.nombre_archivo}</p>
-                          <p className="text-xs text-gray-500">{formatBytes(document.tamano_bytes)}</p>
-                        </div>
-                        <button
-                          onClick={() => void handleDeleteDocument(document.id)}
-                          className="p-2 rounded-lg text-red-600 hover:bg-red-50"
-                          title="Eliminar documento"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                    <div className="rounded-xl border border-white bg-white px-4 py-3 flex items-center justify-between gap-3 mb-4">
+                      <div className="min-w-0">
+                        <div className="app-form-summary-label">Archivo seleccionado</div>
+                        <div className="text-sm text-[#3A4A5B] truncate">{selectedFile ? selectedFile.name : 'Ningún PDF seleccionado'}</div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
+                      <div className="text-xs text-slate-400">{selectedFile ? 'Listo para confirmar' : 'Sin selección'}</div>
+                    </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Database className="w-5 h-5 text-blue-600" />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <label
+                        htmlFor="chatbot-pdf-upload"
+                        className="relative inline-flex h-14 items-center justify-center rounded-xl border px-4 text-sm font-semibold shadow-sm transition-all cursor-pointer text-center"
+                        style={{
+                          backgroundColor: '#3b82f6',
+                          borderColor: '#3b82f6',
+                          color: '#ffffff',
+                          boxShadow: '0 10px 20px rgba(59, 130, 246, 0.18)',
+                        }}
+                      >
+                        <span className="absolute inset-0 flex items-center justify-center leading-none">
+                          Seleccionar PDF
+                        </span>
+                      </label>
+                      <button
+                        onClick={() => void handleUploadDocument()}
+                        disabled={!canConfirmPdf}
+                        className="inline-flex h-14 items-center justify-center rounded-xl border px-4 text-sm font-semibold shadow-sm transition-all disabled:cursor-not-allowed text-center"
+                        style={{
+                          backgroundColor: '#22c55e',
+                          borderColor: '#22c55e',
+                          color: '#ffffff',
+                          boxShadow: '0 10px 20px rgba(34, 197, 94, 0.18)',
+                          opacity: 1,
+                        }}
+                      >
+                        <span>{isUploading ? 'Cargando...' : 'Cargar PDF'}</span>
+                      </button>
+                      <button
+                        onClick={() => setSelectedFile(null)}
+                        disabled={!canCancelPdf}
+                        className="inline-flex h-14 items-center justify-center rounded-xl border px-4 text-sm font-semibold shadow-sm transition-all disabled:cursor-not-allowed text-center"
+                        style={{
+                          backgroundColor: '#ef4444',
+                          borderColor: '#ef4444',
+                          color: '#111827',
+                          boxShadow: '0 10px 20px rgba(239, 68, 68, 0.18)',
+                          opacity: 1,
+                        }}
+                      >
+                        <span>Cancelar PDF</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="app-form-section">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Documentos vinculados</h4>
+                      <p className="app-form-section-description">Listado limpio de los recursos ya incorporados a la base del chatbot.</p>
+                    </div>
+
+                    <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                      {documents.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-sm text-slate-500 text-center bg-slate-50/60">No hay documentos asociados.</div>
+                      ) : (
+                        documents.map((document) => (
+                          <div key={document.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-3 shadow-sm">
+                            <div className="min-w-0">
+                              <p className="text-sm text-[#3A4A5B] truncate">{document.nombre_original || document.nombre_archivo}</p>
+                              <p className="text-xs text-slate-500">{formatBytes(document.tamano_bytes)}</p>
+                            </div>
+                            <button onClick={() => void handleDeleteDocument(document.id)} className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-red-600 hover:bg-red-50" title="Eliminar documento">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="app-form-section bg-white rounded-xl shadow-md p-5 lg:p-6">
+                <div className="flex items-start gap-3 mb-5">
+                  <div className="p-2.5 bg-blue-100 rounded-xl">
+                    <Database className="w-5 h-5 text-blue-700" />
                   </div>
                   <div>
                     <h3 className="text-lg text-[#3A4A5B]">Rendimiento y Estado</h3>
-                    <p className="text-sm text-gray-500">Estado del índice y parámetros persistidos.</p>
+                    <p className="text-sm text-slate-500">Indicadores compactos sobre el índice cargado y la configuración persistida del chatbot.</p>
                   </div>
                 </div>
 
                 {stats ? (
-                  <div className="space-y-3 text-sm text-gray-700">
-                    <div className="flex justify-between"><span>Proveedor</span><span>{stats.provider || '-'}</span></div>
-                    <div className="flex justify-between"><span>Modelo</span><span>{stats.model || '-'}</span></div>
-                    <div className="flex justify-between"><span>Documentos</span><span>{stats.documentos ?? documents.length}</span></div>
-                    <div className="flex justify-between"><span>Chunks</span><span>{stats.chunksLoaded ?? 0}</span></div>
-                    <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-gray-600">
-                      {stats.message || 'Sin datos de indexación.'}
+                  <div className="app-form-stack">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="app-form-summary-card">
+                        <div className="app-form-summary-label">Proveedor</div>
+                        <div className="app-form-summary-value">{stats.provider || '-'}</div>
+                      </div>
+                      <div className="app-form-summary-card">
+                        <div className="app-form-summary-label">Modelo</div>
+                        <div className="app-form-summary-value">{stats.model || '-'}</div>
+                      </div>
+                      <div className="app-form-summary-card">
+                        <div className="app-form-summary-label">Documentos</div>
+                        <div className="app-form-summary-value">{stats.documentos ?? documents.length}</div>
+                      </div>
+                      <div className="app-form-summary-card">
+                        <div className="app-form-summary-label">Chunks</div>
+                        <div className="app-form-summary-value">{stats.chunksLoaded ?? 0}</div>
+                      </div>
+                    </div>
+
+                    <div className="app-form-note">
+                      <div className="app-form-summary-label">Estado del índice</div>
+                      <div className="text-sm text-slate-600 mt-2">{stats.message || 'Sin datos de indexación.'}</div>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-500">Guarda o selecciona un chatbot para ver sus estadísticas.</div>
+                  <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-sm text-slate-500 text-center bg-slate-50/60">
+                    Guarda o selecciona un chatbot para ver sus estadísticas.
+                  </div>
                 )}
 
-                <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  Base sugerida para nuevos chatbots: `topK = 1`, `max_context_chars = 600` y documentos mínimos por miniproyecto para no saturar el RAG.
+                <div className="app-form-note mt-5">
+                  <div className="app-form-summary-label">Sugerencia base</div>
+                  <div className="text-sm text-slate-600 mt-2">Usa `topK = 1`, `max_context_chars = 600` y una base documental contenida para mantener respuestas más rápidas y enfocadas.</div>
                 </div>
-              </div>
+              </section>
             </div>
 
             <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -1113,11 +1110,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
                       placeholder={selectedChatbotId ? 'Haz una pregunta al chatbot seleccionado...' : 'Primero crea o selecciona un chatbot'}
                       className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] disabled:bg-gray-100"
                     />
-                    <button
-                      onClick={() => void handleAskQuestion()}
-                      disabled={isAsking || !selectedChatbotId || !inputValue.trim()}
-                      className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-[#4A90E2] text-white hover:bg-[#3A7ED1] disabled:opacity-50"
-                    >
+                    <button onClick={() => void handleAskQuestion()} disabled={isAsking || !selectedChatbotId || !inputValue.trim()} className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-[#4A90E2] text-white hover:bg-[#3A7ED1] disabled:opacity-50">
                       <Send className="w-4 h-4" />
                       Enviar
                     </button>
@@ -1128,6 +1121,249 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
           </section>
         </div>
       </main>
+      </div>
+
+      {isFormVisible ? (
+        <div className="app-modal-overlay app-modal-overlay--top z-50">
+          <div
+            className="app-modal-card app-modal-card--xl"
+            style={{ height: 'min(860px, calc(100vh - 2rem))' }}
+          >
+            <div className="app-modal-header border-b border-gray-100">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="app-modal-kicker">Chatbot</div>
+                  <h2 className="app-modal-title">{selectedChatbotId ? 'Editar chatbot' : 'Crear nuevo chatbot'}</h2>
+                  <p className="app-modal-description">
+                    Configura el comportamiento del tutor, asígnalo al contexto académico correcto y deja lista su base documental.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="app-modal-meta hidden sm:block">
+                    <div className="app-modal-meta-label">Estado</div>
+                    <div className="app-modal-meta-value">{selectedChatbotId ? 'Edición activa' : 'Nuevo chatbot'}</div>
+                  </div>
+                  <button onClick={handleCloseForm} className="app-modal-close">
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="app-modal-scroll">
+              <div className="app-form-layout app-form-layout--with-aside lg:px-8 lg:py-7">
+                <div className="app-form-main app-form-stack">
+                  {!selectedChatbotId && (
+                    <div className="app-form-note">
+                      Crea primero el chatbot y luego completa su base documental para dejarlo listo para estudiantes o miniproyectos.
+                    </div>
+                  )}
+
+                  <section className="app-form-section app-form-section--muted">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Información base</h4>
+                      <p className="app-form-section-description">Define el nombre, el propósito y el tipo de chatbot que vas a publicar.</p>
+                    </div>
+
+                    <div className="app-form-grid app-form-grid-2">
+                      <div className="app-form-field md:col-span-2">
+                        <label className="app-form-label">Nombre</label>
+                        <input value={form.nombre_chatbot} onChange={(event) => updateForm('nombre_chatbot', event.target.value)} className="app-form-input" placeholder="Tutor de Inventarios v1" />
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Tipo</label>
+                        <select value={form.tipo} onChange={(event) => updateForm('tipo', event.target.value as ChatbotFormState['tipo'])} className="app-form-select">
+                          <option value="GENERAL">General</option>
+                          <option value="MINIPROYECTO">Miniproyecto</option>
+                        </select>
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Modelo</label>
+                        <select value={form.model} onChange={(event) => updateForm('model', event.target.value)} className="app-form-select">
+                          {MODEL_OPTIONS.map((modelOption) => (
+                            <option key={modelOption} value={modelOption}>{modelOption}</option>
+                          ))}
+                        </select>
+                        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-600">
+                          <p><strong>Qwen 2.5 0.5b:</strong> más ligero y estable para el servidor.</p>
+                          <p><strong>Llama 3.2 1b:</strong> suele responder más rápido, pero consume más memoria.</p>
+                          <p><strong>Llama 3.2:</strong> ofrece respuestas más completas, con mayor costo general.</p>
+                        </div>
+                      </div>
+
+                      <div className="app-form-field md:col-span-2">
+                        <label className="app-form-label">Descripción</label>
+                        <textarea value={form.descripcion} onChange={(event) => updateForm('descripcion', event.target.value)} rows={3} className="app-form-textarea" placeholder="Describe el propósito del chatbot." />
+                      </div>
+
+                      <div className="app-form-field md:col-span-2">
+                        <label className="app-form-label">Prompt base</label>
+                        <textarea value={form.prompt_base} onChange={(event) => updateForm('prompt_base', event.target.value)} rows={4} className="app-form-textarea" placeholder="Instrucciones base opcionales para el chatbot." />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="app-form-section">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Vinculación académica</h4>
+                      <p className="app-form-section-description">Asocia el chatbot al área correcta y, si aplica, al miniproyecto específico que lo va a consumir.</p>
+                    </div>
+
+                    <div className="app-form-grid app-form-grid-2">
+                      <div className="app-form-field">
+                        <label className="app-form-label">Área</label>
+                        <select value={form.area_id} onChange={(event) => updateForm('area_id', event.target.value)} className="app-form-select">
+                          <option value="">{form.tipo === 'GENERAL' ? 'Sin área (global)' : 'Selecciona un área'}</option>
+                          {areaOptions.map((area) => (
+                            <option key={area.id} value={area.id}>{area.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Miniproyecto</label>
+                        <select
+                          value={form.miniproyecto_id}
+                          onChange={(event) => updateForm('miniproyecto_id', event.target.value)}
+                          disabled={form.tipo !== 'MINIPROYECTO' || !form.area_id}
+                          className="app-form-select disabled:bg-gray-100 disabled:text-gray-400"
+                        >
+                          <option value="">
+                            {form.tipo !== 'MINIPROYECTO'
+                              ? 'No aplica para General'
+                              : !form.area_id
+                                ? 'Primero selecciona un área'
+                                : miniproyectoOptions.length === 0
+                                  ? 'No hay miniproyectos para esta área'
+                                  : 'Selecciona un miniproyecto'}
+                          </option>
+                          {miniproyectoOptions.map((item) => (
+                            <option key={item.id} value={item.id}>{getMiniproyectoLabel(item)}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="app-form-field md:col-span-2">
+                        <label className="inline-flex items-center gap-3 mt-2">
+                          <input type="checkbox" checked={form.estado} onChange={(event) => updateForm('estado', event.target.checked)} className="w-4 h-4 rounded border-gray-300 text-[#4A90E2] focus:ring-[#4A90E2]" />
+                          <span className="text-sm text-gray-700">Chatbot activo</span>
+                        </label>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="app-form-section">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Parámetros de generación</h4>
+                      <p className="app-form-section-description">Ajusta la recuperación y la respuesta del modelo para equilibrar precisión, costo y velocidad.</p>
+                    </div>
+
+                    <div className="app-form-grid app-form-grid-2">
+                      <div className="app-form-field">
+                        <label className="app-form-label flex items-center gap-2">topK <InfoBadge text="Cantidad de fragmentos recuperados del PDF antes de responder." /></label>
+                        <input type="number" min={1} value={form.topK} onChange={(event) => updateForm('topK', event.target.value)} className="app-form-input" />
+                      </div>
+                      <div className="app-form-field">
+                        <label className="app-form-label flex items-center gap-2">Máx. chars de contexto <InfoBadge text="Límite de texto de apoyo que se envía al modelo en cada consulta." /></label>
+                        <input type="number" min={200} value={form.max_context_chars} onChange={(event) => updateForm('max_context_chars', event.target.value)} className="app-form-input" />
+                      </div>
+                      <div className="app-form-field">
+                        <label className="app-form-label flex items-center gap-2">Máx. tokens <InfoBadge text="Cantidad máxima de texto que puede generar el chatbot en su respuesta." /></label>
+                        <input type="number" min={64} value={form.max_tokens} onChange={(event) => updateForm('max_tokens', event.target.value)} className="app-form-input" />
+                      </div>
+                      <div className="app-form-field">
+                        <label className="app-form-label flex items-center gap-2">Temperatura <InfoBadge text="Define qué tan creativa o estable será la respuesta del chatbot." /></label>
+                        <input type="number" step="0.1" min={0} max={1} value={form.temperature} onChange={(event) => updateForm('temperature', event.target.value)} className="app-form-input" />
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <aside className="app-form-aside app-form-stack md:self-start">
+                  <section className="app-form-section app-form-section--accent">
+                    <h4 className="app-form-section-title">Resumen del chatbot</h4>
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div className="app-form-summary-card">
+                        <div className="app-form-summary-label">Nombre</div>
+                        <div className="app-form-summary-value">{form.nombre_chatbot.trim() || 'Sin nombre definido'}</div>
+                        <div className="app-form-summary-help">{form.tipo === 'GENERAL' ? 'Chatbot transversal' : 'Chatbot de miniproyecto'}</div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                        <div className="app-form-summary-card">
+                          <div className="app-form-summary-label">Área</div>
+                          <div className="app-form-summary-value">{selectedArea?.nombre || 'Pendiente'}</div>
+                        </div>
+                        <div className="app-form-summary-card">
+                          <div className="app-form-summary-label">Miniproyecto</div>
+                          <div className="app-form-summary-value">{selectedMiniproyecto ? getMiniproyectoLabel(selectedMiniproyecto) : 'Pendiente'}</div>
+                        </div>
+                      </div>
+                      <div className="app-form-note">
+                        <div className="app-form-summary-label">Estado del formulario</div>
+                        <div className="app-form-summary-value">{selectedChatbotId ? 'Editando configuración existente' : 'Preparando nuevo chatbot'}</div>
+                        <div className="app-form-summary-help">Avance del formulario: {formCompletion}/{form.tipo === 'GENERAL' ? 5 : 6} campos clave completos.</div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="app-form-section">
+                    <h4 className="app-form-section-title">Antes de guardar</h4>
+                    <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                      <p>Verifica que el modelo escrito exista realmente en tu proveedor configurado.</p>
+                      <p>Para chatbots de miniproyecto, confirma que el área y el miniproyecto correspondan al contexto correcto.</p>
+                      <p>Después de guardar, completa la base documental y prueba una conversación corta antes de publicarlo.</p>
+                    </div>
+                  </section>
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {selectedChatbotId ? (
+                      <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="app-btn px-4 py-3 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Eliminar</span>
+                      </button>
+                    ) : null}
+                  </div>
+                </aside>
+              </div>
+            </div>
+
+            <div className="app-form-footer">
+              <button
+                type="button"
+                onClick={handleCloseForm}
+                disabled={isSaving}
+                className="app-btn app-btn-secondary px-6 py-3 text-slate-700 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={isSaving}
+                className="app-btn app-btn-success rounded-xl px-6 py-3 text-white disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    <span>{selectedChatbotId ? 'Guardando...' : 'Creando...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>{selectedChatbotId ? 'Guardar cambios' : 'Crear chatbot'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
