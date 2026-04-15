@@ -26,7 +26,7 @@ export default function ClassDiagramEditor() {
     });
     paperRef.current = paper;
 
-    // ✅ Corrección: tipado explícito para evitar error con elementView.model
+    // Corrección: tipado explícito para evitar error con elementView.model
     paper.on('element:pointerclick', (elementView: joint.dia.ElementView) => {
       const element = ((elementView as any).model) as joint.dia.Element;
       setSelectedElement(element);
@@ -79,9 +79,9 @@ export default function ClassDiagramEditor() {
     <div className="p-4">
       <h2 className="text-xl font-bold mb-4">Editor gráfico de Diagramas UML</h2>
       <div className="flex gap-4 mb-4">
-        <button onClick={addClass} className="px-4 py-2 bg-green-600 text-white rounded">➕ Nueva Clase</button>
-        <button onClick={connectClasses} className="px-4 py-2 bg-blue-600 text-white rounded">🔗 Conectar Últimas</button>
-        <button onClick={exportDiagram} className="px-4 py-2 bg-purple-600 text-white rounded">📤 Validar Diagrama</button>
+        <button onClick={addClass} className="px-4 py-2 bg-green-600 text-white rounded">Nueva Clase</button>
+        <button onClick={connectClasses} className="px-4 py-2 bg-blue-600 text-white rounded">Conectar Últimas</button>
+        <button onClick={exportDiagram} className="px-4 py-2 bg-purple-600 text-white rounded">Validar Diagrama</button>
       </div>
 
       {selectedElement && (

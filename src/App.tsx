@@ -346,7 +346,7 @@ export default function App() {
     localStorage.setItem('nombreEstudiante', apiResponse.estudiante.nombre);
     localStorage.setItem('codigoEstudiante', apiResponse.estudiante.codigo);
     
-    // 🎓 Guardar semestre si viene del backend
+    // Guardar semestre si viene del backend
     if (apiResponse.estudiante.semestre) {
       localStorage.setItem('semestreEstudiante', apiResponse.estudiante.semestre.toString());
     }

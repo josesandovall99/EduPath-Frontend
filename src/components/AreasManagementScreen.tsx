@@ -338,7 +338,7 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
               No se encontraron áreas en el sistema. Crea una nueva área para comenzar a organizar contenidos.
             </p>
             <p className="text-sm text-gray-500">
-              🎓 Las áreas son las categorías principales de aprendizaje en la plataforma educativa.
+              Las áreas son las categorías principales de aprendizaje en la plataforma educativa.
             </p>
           </div>
         ) : filteredAreas.length === 0 ? (

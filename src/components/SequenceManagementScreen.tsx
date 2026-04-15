@@ -1296,7 +1296,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         {/* Stats Helper Message */}
         <div className="mb-6 p-4 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] rounded-xl text-white">
           <p className="text-sm">
-            📊 <span className="font-semibold">Estado de tus secuencias:</span> Supervisa el total de secuencias de contenidos, 
+            <span className="font-semibold">Estado de tus secuencias:</span> Supervisa el total de secuencias de contenidos, 
             cuántas están activas guiando el flujo de aprendizaje, y cuántas están inactivas.
           </p>
         </div>
@@ -1524,7 +1524,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                     Crea tu primera secuencia para establecer el orden de aprendizaje de los contenidos.
                   </p>
                   <p className="text-sm text-gray-500">
-                    💡 Una secuencia define qué contenido debe completarse después de otro, creando un flujo educativo cohesivo.
+                    Una secuencia define qué contenido debe completarse después de otro, creando un flujo educativo cohesivo.
                   </p>
                 </div>
               ) : (
@@ -1648,7 +1648,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
             {/* Helper Message */}
             <div className="app-form-note mb-6">
               <p className="text-sm text-blue-800">
-                <span className="font-semibold">💡 Consejo:</span> Selecciona un contenido origen y el destino que debe completarse después. 
+                <span className="font-semibold">Consejo:</span> Selecciona un contenido origen y el destino que debe completarse después. 
                 Esto crea un flujo educativo que los estudiantes deben seguir.
               </p>
             </div>

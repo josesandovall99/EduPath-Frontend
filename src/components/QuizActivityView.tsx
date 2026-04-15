@@ -48,7 +48,7 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
     setIsSubmitting(true);
     const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
     if (!estudianteId) {
-      alert('❌ No se encontró el ID del estudiante. Inicia sesión.');
+      alert('No se encontró el ID del estudiante. Inicia sesión.');
       setIsSubmitting(false);
       return;
     }
@@ -57,14 +57,14 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
     const result = await submitExercise(activity.id, payload, estudianteId!);
 
     if (result.status === 429) {
-      alert(`⏳ ${result.message || 'Evaluación en curso'}`);
+      alert(`${result.message || 'Evaluación en curso'}`);
       setIsSubmitting(false);
       return;
     }
 
     if (result.status === 409) {
       setAprobado(true);
-      alert(`⚠️ ${result.message || 'Ejercicio ya aprobado'}`);
+      alert(`${result.message || 'Ejercicio ya aprobado'}`);
       setIsSubmitting(false);
       return;
     }
@@ -73,7 +73,7 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
       const data: any = result.data || {};
       setFeedback(data?.retroalimentacion || 'Respuesta incorrecta. Puedes reintentar.');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
-      alert(`❌ Incorrecta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
+      alert(`Incorrecta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
       setAprobado(false);
       setIsSubmitting(false);
       return;
@@ -84,12 +84,12 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
       setAprobado(true);
       setFeedback(data?.retroalimentacion || '¡Correcto!');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
-      alert(`✅ Correcta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
+      alert(`Correcta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
       setIsSubmitting(false);
       return;
     }
 
-    alert(`❌ Error del servidor: ${result.message || 'Error desconocido'}`);
+    alert(`Error del servidor: ${result.message || 'Error desconocido'}`);
     setIsSubmitting(false);
   };
 
@@ -282,7 +282,7 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
                       }}
                     >
                       <p className="text-gray-700 text-sm">
-                        💡 Piensa en los aspectos fundamentales de seguridad y transparencia 
+                        Piensa en los aspectos fundamentales de seguridad y transparencia 
                         en el desarrollo de sistemas de IA.
                       </p>
                     </div>

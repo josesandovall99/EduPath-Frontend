@@ -267,7 +267,7 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
                 <p className="text-gray-500 text-sm">{docente?.especialidad || 'Especialidad no definida'}</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-[#F5A97F] to-[#F7B98F] rounded-full flex items-center justify-center text-white shadow-md">
-                <span className="text-xl">👩‍🏫</span>
+                <span className="text-xl">D</span>
               </div>
               <button
                 onClick={onLogout}

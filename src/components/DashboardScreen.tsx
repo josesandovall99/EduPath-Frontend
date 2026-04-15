@@ -1,4 +1,4 @@
-import { LogOut, Code, Database, BarChart3, BookOpen, Clock, CheckCircle2, TrendingUp } from 'lucide-react';
+import { LogOut, Code, Database, BarChart3, BookOpen, Clock, CheckCircle2, TrendingUp, User } from 'lucide-react';
 import { ChatbotButton } from './ChatbotButton';
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../utils/constants';
@@ -123,7 +123,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
       const response = await fetch(url);
       
       if (!response.ok) {
-        console.warn(`⚠️ Error al obtener progreso del área ${areaId}:`, response.status);
+        console.warn(`Error al obtener progreso del área ${areaId}:`, response.status);
         return 0;
       }
       
@@ -131,7 +131,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
       const porcentaje = data.resumen?.porcentajeTotalArea || 0;
       return Math.round(porcentaje);
     } catch (err) {
-      console.error(`❌ Error al obtener progreso del área ${areaId}:`, err);
+      console.error(`Error al obtener progreso del área ${areaId}:`, err);
       return 0;
     }
   };
@@ -142,11 +142,11 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         setLoading(true);
         setError(null);
 
-        console.log('🔄 Fetching areas from:', `${API_BASE_URL}/areas`);
+        console.log('Fetching areas from:', `${API_BASE_URL}/areas`);
 
         const response = await fetch(`${API_BASE_URL}/areas`);
 
-        // ✅ Validación crítica: verificar si la respuesta es exitosa
+        // Validación crítica: verificar si la respuesta es exitosa
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -157,9 +157,9 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         }
 
         const areas = await response.json();
-        console.log('✅ Areas loaded successfully:', areas);
+        console.log('Areas loaded successfully:', areas);
 
-        // 🔒 FILTRO DE SEGURIDAD: Obtener semestre del estudiante
+        // Filtro de seguridad: obtener semestre del estudiante
         // NOTA: Esto debería venir del backend en producción
         const semestre = parseInt(localStorage.getItem('semestreEstudiante') || '1');
         const areasPermitidas = obtenerAreasPermitidas(semestre);
@@ -170,8 +170,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           return category ? areasPermitidas.includes(category) : false;
         });
 
-        console.log(`🎓 Semestre ${semestre} - Áreas permitidas:`, areasPermitidas);
-        console.log('✅ Áreas filtradas:', areasFiltradas);
+        console.log(`Semestre ${semestre} - Áreas permitidas:`, areasPermitidas);
+        console.log('Áreas filtradas:', areasFiltradas);
 
         // Transformar áreas a formato de subjects
         const transformedSubjects = areasFiltradas.map((area: Area, index: number) => ({
@@ -188,11 +188,11 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         setSubjects(transformedSubjects);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-        console.error('❌ Error fetching areas:', errorMessage);
+        console.error('Error fetching areas:', errorMessage);
         setError(`No se pudieron cargar las áreas: ${errorMessage}`);
         
         // Usar fallback data
-        console.log('📦 Using fallback data');
+        console.log('Using fallback data');
         setSubjects(FALLBACK_SUBJECTS);
       } finally {
         setLoading(false);
@@ -244,7 +244,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
                 <p className="text-gray-500 text-sm">Ingeniería de Sistemas</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-[#4A90E2] to-[#5B9FED] rounded-full flex items-center justify-center text-white shadow-md">
-                <span className="text-xl">👨‍🎓</span>
+                <User className="h-5 w-5" />
               </div>
               <button
                 onClick={onLogout}
@@ -285,7 +285,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           
           {error && (
             <div className="col-span-3 bg-yellow-50 border-l-4 border-yellow-400 p-4">
-              <p className="text-yellow-700 text-sm">⚠️ {error}</p>
+              <p className="text-yellow-700 text-sm">{error}</p>
               <p className="text-yellow-600 text-xs mt-2">Se están mostrando datos de prueba.</p>
             </div>
           )}

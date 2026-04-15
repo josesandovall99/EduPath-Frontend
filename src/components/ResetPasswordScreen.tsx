@@ -67,7 +67,7 @@ export function ResetPasswordScreen({ token, onComplete, onBack }: ResetPassword
       <div className="w-full max-w-md mx-auto">
         <div className="mb-8 text-center">
           <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl shadow-lg flex items-center justify-center p-4">
-            <span className="text-3xl">🎓</span>
+            <Lock className="h-8 w-8 text-[#4A90E2]" />
           </div>
           <h1 className="text-white mb-2 text-3xl font-bold">Restablecer contrasena</h1>
           <p className="text-white/90">Crea una nueva contrasena segura.</p>

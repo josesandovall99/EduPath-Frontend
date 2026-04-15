@@ -519,7 +519,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
                 <p className="text-gray-500 text-sm">Coordinador Académico</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-[#F5A97F] to-[#F7B98F] rounded-full flex items-center justify-center text-white shadow-md">
-                <span className="text-xl">👨‍💼</span>
+                <span className="text-xl">A</span>
               </div>
               <button
                 onClick={onLogout}

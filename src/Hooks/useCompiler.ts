@@ -18,19 +18,19 @@ export function useCompiler() {
       codigo: code,
     };
     
-    console.log('📤 Enviando al backend:', payload);
+    console.log('Enviando al backend:', payload);
     
     try {
       const response = await axios.post(`${API_BASE_URL}/evaluaciones/compilador`, payload);
 
-      console.log('📥 Respuesta del backend:', response.data);
+      console.log('Respuesta del backend:', response.data);
       const resultado = response.data;
       
       let finalOutput = '';
       if (resultado.esCorrecta) {
-        finalOutput = `✅ EJERCICIO APROBADO!\n\nSalida del programa:\n${resultado.stdout || resultado.obtenido || ''}\n\nPuntos obtenidos: ${resultado.puntosObtenidos || 0}`;
+        finalOutput = `EJERCICIO APROBADO!\n\nSalida del programa:\n${resultado.stdout || resultado.obtenido || ''}\n\nPuntos obtenidos: ${resultado.puntosObtenidos || 0}`;
       } else {
-        finalOutput = `❌ Ejercicio NO aprobado\n\nTu salida:\n${resultado.stdout || resultado.obtenido || ''}\n\nSalida esperada:\n${resultado.esperado || ''}\n\nRevisa tu código e intenta de nuevo`;
+        finalOutput = `Ejercicio NO aprobado\n\nTu salida:\n${resultado.stdout || resultado.obtenido || ''}\n\nSalida esperada:\n${resultado.esperado || ''}\n\nRevisa tu código e intenta de nuevo`;
       }
       
       setOutput(finalOutput);
@@ -38,8 +38,8 @@ export function useCompiler() {
       setIsLoading(false);
 
     } catch (error: any) {
-      console.error("❌ Error completo:", error);
-      console.error("📋 Respuesta del servidor:", error.response?.data);
+      console.error("Error completo:", error);
+      console.error("Respuesta del servidor:", error.response?.data);
       
       // Si el backend responde con 400 y tiene información del ejercicio
       if (error.response?.status === 400 && error.response?.data) {
@@ -47,17 +47,17 @@ export function useCompiler() {
         let finalOutput = '';
         
         if (resultado.esCorrecta === false) {
-          finalOutput = `❌ Ejercicio NO aprobado\n\nTu salida:\n${resultado.stdout || resultado.obtenido || ''}\n\nSalida esperada:\n${resultado.esperado || ''}\n\nRevisa tu código e intenta de nuevo`;
+          finalOutput = `Ejercicio NO aprobado\n\nTu salida:\n${resultado.stdout || resultado.obtenido || ''}\n\nSalida esperada:\n${resultado.esperado || ''}\n\nRevisa tu código e intenta de nuevo`;
         } else {
           const errorMsg = resultado.error || resultado.message || "Error desconocido";
-          finalOutput = `❌ Error: ${errorMsg}`;
+          finalOutput = `Error: ${errorMsg}`;
         }
         
         setOutput(finalOutput);
         setResultData(resultado);
       } else {
         const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error desconocido";
-        setOutput(`❌ Error: ${errorMsg}`);
+        setOutput(`Error: ${errorMsg}`);
       }
       
       setIsLoading(false);

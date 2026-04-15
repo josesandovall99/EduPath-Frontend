@@ -29,9 +29,9 @@ export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la op
       const data: any = result.data || {};
       setFeedback(data?.retroalimentacion || '');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
-      alert(`${result.status === 200 ? '✅ Correcta (preview)' : '❌ Incorrecta (preview)'}${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
+      alert(`${result.status === 200 ? 'Correcta (preview)' : 'Incorrecta (preview)'}${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
     } else {
-      alert(`❌ Error: ${result.message || 'No se pudo validar'}`);
+      alert(`Error: ${result.message || 'No se pudo validar'}`);
     }
   };
 
@@ -42,24 +42,24 @@ export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la op
     const opcionSeleccionada = opcionesAleatorias[selected];
     const res = await submitExercise(activity.id, { opcion: opcionSeleccionada }, estudianteId || undefined);
     if (res.status === 429) {
-      alert(`⏳ ${res.message || 'Otro envío en proceso; intenta de nuevo'}`);
+      alert(`${res.message || 'Otro envío en proceso; intenta de nuevo'}`);
     } else if (res.status === 409) {
       setAprobado(true);
-      alert(`⚠️ ${res.message || 'Ejercicio ya aprobado'}`);
+      alert(`${res.message || 'Ejercicio ya aprobado'}`);
     } else if (res.status === 400) {
       const data: any = res.data || {};
       setFeedback(data?.retroalimentacion || '');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
-      alert(`❌ Incorrecta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
+      alert(`Incorrecta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
       setAprobado(false);
     } else if (res.status === 200) {
       const data: any = res.data || {};
       setFeedback(data?.retroalimentacion || '');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
       setAprobado(true);
-      alert(`✅ Correcta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
+      alert(`Correcta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
     } else {
-      alert(`❌ Error del servidor: ${res.message || 'Error desconocido'}`);
+      alert(`Error del servidor: ${res.message || 'Error desconocido'}`);
     }
     setIsSubmitting(false);
   };

@@ -43,7 +43,7 @@ export async function submitExercise(
 
     const body = { estudiante_id: resolvedEstudianteId, respuesta, lenguaje_id: 62 };
     const API_BASE_URL = getApiBaseUrl();
-    console.log('📤 Enviando ejercicio:', ejercicioId, 'Body:', JSON.stringify(body, null, 2));
+    console.log('Enviando ejercicio:', ejercicioId, 'Body:', JSON.stringify(body, null, 2));
     const res = await fetch(`${API_BASE_URL}/ejercicios/${ejercicioId}/enviar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

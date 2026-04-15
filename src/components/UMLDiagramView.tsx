@@ -330,7 +330,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     setIsValidating(true);
     const json = graphRef.current?.toJSON();
     
-    console.log('📤 Validando diagrama (preview):', json);
+    console.log('Validando diagrama (preview):', json);
     
     try {
       const response = await fetch(`${API_BASE_URL}/ejercicios/${activity.id}/resolver`, {
@@ -340,7 +340,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
       });
 
       const data: EjercicioResponse = await response.json();
-      console.log('📥 Response (preview):', data);
+      console.log('Response (preview):', data);
 
       const errors = data.detalle?.errors || [];
       const warnings = data.detalle?.warnings || [];
@@ -369,11 +369,11 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
         setValidationErrors([]);
         setValidationWarnings(warnings);
         setShowErrorModal(false);
-        alert(`✓ Diagrama válido (preview)\n\nPuntos: ${data.puntosObtenidos}\nCorrecto: ${data.esCorrecta ? 'Sí' : 'No'}`);
+        alert(`Diagrama válido (preview)\n\nPuntos: ${data.puntosObtenidos}\nCorrecto: ${data.esCorrecta ? 'Sí' : 'No'}`);
       }
     } catch (error) {
-      console.error('❌ Error completo:', error);
-      alert('❌ Error al validar. Backend no disponible en este momento.');
+      console.error('Error completo:', error);
+      alert('Error al validar. Backend no disponible en este momento.');
     } finally {
       setIsValidating(false);
     }
@@ -386,7 +386,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
 
     const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
     if (!estudianteId) {
-      alert('❌ Error: No se encontró el ID del estudiante. Por favor, inicia sesión nuevamente.');
+      alert('Error: No se encontró el ID del estudiante. Por favor, inicia sesión nuevamente.');
       setIsValidating(false);
       return;
     }
@@ -402,7 +402,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
 
       // 429: Evaluación en curso (evitar doble click)
       if (response.status === 429) {
-        alert(`⏳ ${data?.message || data?.error || 'Evaluación en curso'}\n\nIntenta nuevamente en unos segundos.`);
+        alert(`${data?.message || data?.error || 'Evaluación en curso'}\n\nIntenta nuevamente en unos segundos.`);
         setIsValidating(false);
         return;
       }
@@ -410,7 +410,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
       // 409: Ejercicio ya aprobado (bloquear envíos)
       if (response.status === 409) {
         setEjercicioAprobado(true);
-        alert(`⚠️ ${data?.message || data?.error || 'Ejercicio ya aprobado'}`);
+        alert(`${data?.message || data?.error || 'Ejercicio ya aprobado'}`);
         setIsValidating(false);
         return;
       }
@@ -434,7 +434,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
         setValidationWarnings(warnings);
         setShowErrorModal(true);
 
-        let msg = `❌ Respuesta incorrecta`;
+        let msg = `Respuesta incorrecta`;
         if (typeof ejercicioData.puntosObtenidos === 'number') msg += `\n\nPuntos obtenidos: ${ejercicioData.puntosObtenidos}`;
         if (ejercicioData.retroalimentacion) msg += `\n\nRetroalimentación:\n${ejercicioData.retroalimentacion}`;
         alert(msg);
@@ -453,7 +453,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
         setShowErrorModal(false);
         setEjercicioAprobado(true);
 
-        let msg = `✅ ¡Correcta!`;
+        let msg = `Correcta`;
         if (typeof ejercicioData.puntosObtenidos === 'number') msg += `\n\nPuntos obtenidos: ${ejercicioData.puntosObtenidos}`;
         if (ejercicioData.retroalimentacion) msg += `\n\nRetroalimentación:\n${ejercicioData.retroalimentacion}`;
         alert(msg);
@@ -462,10 +462,10 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
       }
 
       // Otros errores
-      alert(`❌ Error del servidor: ${data?.message || data?.error || 'Error desconocido'}`);
+      alert(`Error del servidor: ${data?.message || data?.error || 'Error desconocido'}`);
     } catch (error) {
-      console.error('❌ Error completo:', error);
-      alert('❌ Error al enviar el diagrama. Backend no disponible.');
+      console.error('Error completo:', error);
+      alert('Error al enviar el diagrama. Backend no disponible.');
     } finally {
       setIsValidating(false);
     }
@@ -477,15 +477,15 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
       const response = await fetch(`${API_BASE_URL}/ejercicios/${activity.id}/retroalimentacion`);
       
       if (!response.ok) {
-        alert('❌ No se pudo obtener la retroalimentación.');
+        alert('No se pudo obtener la retroalimentación.');
         return;
       }
       
       const data = await response.json();
-      console.log('📖 Retroalimentación:', data);
+      console.log('Retroalimentación:', data);
       
       // Mostrar retroalimentación en un alert o modal
-      let mensaje = '📖 Retroalimentación del Ejercicio\n\n';
+      let mensaje = 'Retroalimentación del Ejercicio\n\n';
       
       if (data.salidaEsperada) {
         mensaje += `Salida esperada:\n${JSON.stringify(data.salidaEsperada, null, 2)}\n\n`;
@@ -502,7 +502,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
       alert(mensaje);
     } catch (error) {
       console.error('Error al obtener retroalimentación:', error);
-      alert('❌ Error al obtener la retroalimentación.');
+      alert('Error al obtener la retroalimentación.');
     }
   };
 
@@ -566,7 +566,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                 fontWeight: '600',
                 color: '#d32f2f',
                 margin: 0,
-              }}>❌ Errores en el diagrama</h3>
+              }}>Errores en el diagrama</h3>
               <button
                 onClick={() => setShowErrorModal(false)}
                 style={{
@@ -613,7 +613,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                       fontSize: '14px',
                       marginBottom: '5px',
                     }}>
-                      📍 {err.location}
+                      {err.location}
                     </div>
                     <div style={{
                       color: '#c62828',
@@ -628,7 +628,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                         fontSize: '12px',
                         fontStyle: 'italic',
                       }}>
-                        💡 {err.details}
+                        {err.details}
                       </div>
                     )}
                   </div>
@@ -645,7 +645,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                     fontWeight: 'bold',
                     fontSize: '14px',
                   }}>
-                    ⚠️ Advertencias
+                    Advertencias
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {validationWarnings.map((warn, idx) => (
@@ -672,7 +672,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                             fontSize: '12px',
                             marginTop: '5px',
                           }}>
-                            💡 {warn.suggestion}
+                            {warn.suggestion}
                           </div>
                         )}
                       </div>
@@ -888,7 +888,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
           textAlign: 'center',
         }}>
           {selectedForRelation 
-            ? `✓ Primera clase seleccionada (${drawingMode}) - Toca la segunda clase`
+            ? `Primera clase seleccionada (${drawingMode}) - Toca la segunda clase`
             : `Modo ${drawingMode}: Selecciona la PRIMERA clase`}
         </div>
       )}
@@ -1029,7 +1029,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
             <div className="bg-gradient-to-r from-blue-50 to-white px-6 py-3 border-b border-blue-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white text-sm">✏️</span>
+                  <span className="text-white text-sm">E</span>
                 </div>
                 <div>
                   <label className="text-sm font-semibold text-[#3A4A5B]">Clase Seleccionada</label>
@@ -1046,7 +1046,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
                   color: 'white'
                 }}
               >
-                {isEditingClass ? '✕ Cancelar' : '✏️ Editar'}
+                {isEditingClass ? 'Cancelar' : 'Editar'}
               </button>
             </div>
           )}

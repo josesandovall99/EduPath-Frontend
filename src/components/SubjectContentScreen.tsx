@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Clock, FileText, PlayCircle, Edit, Share2, Users, Lock } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, FileText, PlayCircle, Edit, Share2, Users, Lock, User } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
@@ -170,13 +170,13 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     setLoadingProgress(true);
     try {
       const url = `${API_BASE_URL}/progresos/por-area?area_id=${subject.id}&estudiante_id=${estudianteId}`;
-      console.log(`🔄 Obteniendo progreso desde: ${url}`);
+      console.log(`Obteniendo progreso desde: ${url}`);
       
       const response = await fetch(url);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`❌ Error ${response.status}:`, errorText);
+        console.error(`Error ${response.status}:`, errorText);
         setCurrentProgress(0);
         return;
       }
@@ -184,9 +184,9 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
       const data = await response.json();
       const porcentaje = data.resumen?.porcentajeTotalArea || 0;
       setCurrentProgress(Math.round(porcentaje));
-      console.log(`✅ Progreso del área: ${porcentaje}%`);
+      console.log(`Progreso del área: ${porcentaje}%`);
     } catch (err) {
-      console.error('❌ Error al obtener progreso:', err);
+      console.error('Error al obtener progreso:', err);
       setCurrentProgress(0);
     } finally {
       setLoadingProgress(false);
@@ -242,13 +242,13 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
             });
           });
           setTemasConEstadoProgreso(estadoMap);
-          console.log('✅ Estado de desbloqueo cargado:', estadoMap);
+          console.log('Estado de desbloqueo cargado:', estadoMap);
         }
       } else {
-        console.log('ℹ️ Endpoint de desbloqueo no disponible, usando comportamiento estándar');
+        console.log('Endpoint de desbloqueo no disponible, usando comportamiento estándar');
       }
     } catch (err) {
-      console.log('ℹ️ Sistema de desbloqueo no disponible, usando comportamiento estándar');
+      console.log('Sistema de desbloqueo no disponible, usando comportamiento estándar');
     }
   };
 
@@ -269,7 +269,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         // Obtener todos los temas del área
         const temasResponse = await fetch(`${API_BASE_URL}/temas/por-area/${subject.id}`);
 
-        // ✅ Validación: Verificar si response es exitosa
+        // Validación: verificar si response es exitosa
         if (!temasResponse.ok) {
           throw new Error(`Failed to fetch temas: HTTP ${temasResponse.status}`);
         }
@@ -280,7 +280,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         }
 
         const temas: Tema[] = await temasResponse.json();
-        console.log('✅ Temas loaded:', temas);
+        console.log('Temas loaded:', temas);
 
         // Ordenar temas por la columna 'orden' antes de transformar
         const temasOrdenados = temas.sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0));
@@ -348,7 +348,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                     const aprobado = evaluaciones.some((item) => String(item?.estado || '').toUpperCase() === 'APROBADO');
                     return [mini.id, aprobado] as const;
                   } catch (checkError) {
-                    console.warn('⚠️ Error al verificar aprobación del miniproyecto:', checkError);
+                    console.warn('Error al verificar aprobación del miniproyecto:', checkError);
                     return [mini.id, false] as const;
                   }
                 })
@@ -374,10 +374,10 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
               };
             });
           } else {
-            console.warn('⚠️ No se pudieron cargar miniproyectos del área');
+            console.warn('No se pudieron cargar miniproyectos del área');
           }
         } catch (minisError) {
-          console.warn('⚠️ Error al cargar miniproyectos:', minisError);
+          console.warn('Error al cargar miniproyectos:', minisError);
         }
 
         // Create map of content.id -> temaId
@@ -390,7 +390,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         const fullContent = [...transformedContent, ...miniproyectosContent];
 
         if (fullContent.length === 0) {
-          console.warn('⚠️ No temas found, using fallback data');
+          console.warn('No temas found, using fallback data');
           setContentList(FALLBACK_CONTENT);
           setError('No se encontraron temas en la BD. Se muestran datos de prueba.');
         } else {
@@ -399,7 +399,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-        console.error('❌ Error al obtener temas:', errorMessage);
+        console.error('Error al obtener temas:', errorMessage);
         setError(`Error: ${errorMessage}. Se muestran datos de prueba.`);
         setContentList(FALLBACK_CONTENT);
       } finally {
@@ -432,7 +432,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 <p className="text-gray-500 text-sm">Ingeniería de Sistemas</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-[#4A90E2] to-[#5B9FED] rounded-full flex items-center justify-center text-white shadow-md">
-                <span className="text-xl">👨‍🎓</span>
+                <User className="h-5 w-5" />
               </div>
             </div>
           </div>
@@ -502,7 +502,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
 
         {error && (
           <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
-            <p className="text-yellow-700 text-sm">⚠️ {error}</p>
+            <p className="text-yellow-700 text-sm">{error}</p>
           </div>
         )}
 

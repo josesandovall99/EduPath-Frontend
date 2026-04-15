@@ -102,7 +102,7 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
 
     const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
     if (!estudianteId) {
-      alert('❌ No se encontró el ID del estudiante. Inicia sesión.');
+      alert('No se encontró el ID del estudiante. Inicia sesión.');
       setIsLoading(false);
       return;
     }
@@ -115,7 +115,7 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
 
     if (result.status === 409) {
       setAprobado(true);
-      alert(`⚠️ ${result.message || 'Miniproyecto ya aprobado'}`);
+      alert(`${result.message || 'Miniproyecto ya aprobado'}`);
       setIsLoading(false);
       return;
     }
@@ -131,25 +131,25 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
         setAprobado(true);
         setFeedback('¡Correcto!');
         if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
-        const finalOutput = `✅ EJERCICIO APROBADO!\n\nSalida del programa:\n${salida}\n\nPuntos obtenidos: ${data.puntosObtenidos || 0}`;
+        const finalOutput = `EJERCICIO APROBADO!\n\nSalida del programa:\n${salida}\n\nPuntos obtenidos: ${data.puntosObtenidos || 0}`;
         setOutput(finalOutput);
         setIsLoading(false);
-        alert(`✅ Correcto${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}`);
+        alert(`Correcto${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}`);
         return;
       }
 
       setAprobado(false);
       const detalleErrores = errores ? `\n\nErrores de sintaxis:\n${errores}` : '';
       const detalleStderr = stderr ? `\n\nErrores del compilador:\n${stderr}` : '';
-      const finalOutput = `❌ Ejercicio NO aprobado\n\nTu salida:\n${salida}\n\nSalida esperada:\n${esperado}${detalleErrores}${detalleStderr}`;
+      const finalOutput = `Ejercicio NO aprobado\n\nTu salida:\n${salida}\n\nSalida esperada:\n${esperado}${detalleErrores}${detalleStderr}`;
       setOutput(finalOutput);
       setFeedback(errores || stderr || 'Respuesta incorrecta. Intenta nuevamente.');
       setIsLoading(false);
-      alert(`❌ Respuesta incorrecta`);
+      alert(`Respuesta incorrecta`);
       return;
     }
 
-    alert(`❌ Error del servidor: ${result.message || 'Error desconocido'}`);
+    alert(`Error del servidor: ${result.message || 'Error desconocido'}`);
     setIsLoading(false);
   };
 

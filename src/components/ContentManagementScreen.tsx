@@ -295,7 +295,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
             : c
         );
         setContents(contenidosActualizados);
-        toast.success('✓ Contenido actualizado', {
+        toast.success('Contenido actualizado', {
           description: 'El contenido se ha actualizado exitosamente',
           duration: 5000
         });
@@ -318,7 +318,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
         setContents([...contents, nuevoItemLocal]);
         
         // Toast informativo para nuevo contenido
-        toast.warning('⚠️ Nuevo contenido creado', {
+        toast.warning('Nuevo contenido creado', {
           description: `"${contenidoActualizado.titulo}" ha sido creado. Debes agregarlo a la Secuencia de Contenido para ordenarlo dentro del subtema.`,
           duration: 8000,
           closeButton: true

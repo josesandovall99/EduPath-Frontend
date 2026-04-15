@@ -565,13 +565,13 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
   const getTypeIcon = (tipo: Contenido['tipo']) => {
     switch (tipo) {
       case 'video':
-        return '🎥';
+        return 'Vid';
       case 'document':
-        return '📄';
+        return 'Doc';
       case 'activity':
-        return '🧠';
+        return 'Act';
       default:
-        return '📦';
+        return 'Cont';
     }
   };
 
@@ -919,7 +919,7 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                                             </div>
                                             <p className="text-xs text-gray-600 line-clamp-2">{contenido.descripcion?.replace(/<[^>]*>/g, '') || 'Sin descripcion'}</p>
                                             {contenido.url && (
-                                              <p className="text-xs text-blue-600 truncate mt-1">🔗 {contenido.url}</p>
+                                              <p className="text-xs text-blue-600 truncate mt-1">{contenido.url}</p>
                                             )}
                                           </div>
                                           <div className="flex items-center gap-2 ml-2 flex-shrink-0">

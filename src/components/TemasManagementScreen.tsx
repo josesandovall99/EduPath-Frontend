@@ -206,7 +206,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
               No se encontraron temas en esta área. Crea un nuevo tema para comenzar a organizar contenidos.
             </p>
             <p className="text-sm text-gray-500 mb-4">
-              📚 Los temas son las categorías principales de aprendizaje dentro de cada área.
+              Los temas son las categorías principales de aprendizaje dentro de cada área.
             </p>
           </div>
         ) : filteredTemas.length === 0 ? (

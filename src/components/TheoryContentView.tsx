@@ -439,7 +439,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`❌ Error ${response.status}:`, errorText);
+        console.error(`Error ${response.status}:`, errorText);
         setCurrentProgress(0);
         return;
       }
@@ -447,9 +447,9 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       const data = await response.json();
       const porcentaje = data.resumen?.porcentajeTotalArea || 0;
       setCurrentProgress(Math.round(porcentaje));
-      console.log(`✅ Progreso del área: ${porcentaje}%`);
+      console.log(`Progreso del área: ${porcentaje}%`);
     } catch (err) {
-      console.error('❌ Error al obtener progreso:', err);
+      console.error('Error al obtener progreso:', err);
       setCurrentProgress(0);
     } finally {
       setLoadingProgress(false);
@@ -494,9 +494,9 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         }))
       );
 
-      console.log('✅ Contenido marcado como visualizado');
+      console.log('Contenido marcado como visualizado');
     } catch (err) {
-      console.error('❌ Error al marcar contenido como visualizado:', err);
+      console.error('Error al marcar contenido como visualizado:', err);
     }
   };
 
@@ -507,33 +507,33 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     try {
       // Intentar cargar estado de subtemas
       const urlSubtemas = `${API_BASE_URL}/progresos/estado-subtemas-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
-      console.log('🔄 [OPCIONAL] Intentando cargar estado de subtemas desde:', urlSubtemas);
+      console.log('[OPCIONAL] Intentando cargar estado de subtemas desde:', urlSubtemas);
       
       const responseSubtemas = await fetch(urlSubtemas);
       if (responseSubtemas.ok) {
         const dataSubtemas = await responseSubtemas.json();
-        console.log('✅ Estado de subtemas cargado:', dataSubtemas);
+        console.log('Estado de subtemas cargado:', dataSubtemas);
         const mapSubtemas = new Map<string, any>(dataSubtemas.map((item: any) => [String(item.subtema_id), item]));
         setSubtemasConEstadoProgreso(mapSubtemas);
       } else {
-        console.log('ℹ️ Endpoint de subtemas no disponible (404) - usando comportamiento actual');
+        console.log('Endpoint de subtemas no disponible (404) - usando comportamiento actual');
       }
 
       // Intentar cargar estado de contenidos
       const urlContenidos = `${API_BASE_URL}/progresos/estado-contenidos-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
-      console.log('🔄 [OPCIONAL] Intentando cargar estado de contenidos desde:', urlContenidos);
+      console.log('[OPCIONAL] Intentando cargar estado de contenidos desde:', urlContenidos);
       
       const responseContenidos = await fetch(urlContenidos);
       if (responseContenidos.ok) {
         const dataContenidos = await responseContenidos.json();
-        console.log('✅ Estado de contenidos cargado:', dataContenidos);
+        console.log('Estado de contenidos cargado:', dataContenidos);
         const mapContenidos = new Map<string, any>(dataContenidos.map((item: any) => [String(item.contenido_id), item]));
         setContenidosConEstadoProgreso(mapContenidos);
       } else {
-        console.log('ℹ️ Endpoint de contenidos no disponible (404) - usando comportamiento actual');
+        console.log('Endpoint de contenidos no disponible (404) - usando comportamiento actual');
       }
     } catch (err) {
-      console.log('ℹ️ Endpoints de desbloqueo no disponibles - manteniendo lógica actual:', err);
+      console.log('Endpoints de desbloqueo no disponibles - manteniendo lógica actual:', err);
     }
   };
 
@@ -579,8 +579,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
 
       const ejercicios: Ejercicio[] = await response.json();
       
-      console.log('📦 Ejercicios recibidos del backend:', ejercicios);
-      console.log('🔍 Buscando ejercicio con contenido_id:', parseInt(contenidoId));
+      console.log('Ejercicios recibidos del backend:', ejercicios);
+      console.log('Buscando ejercicio con contenido_id:', parseInt(contenidoId));
       
       // Buscar el ejercicio que coincida con el contenido_id
       const ejercicio = ejercicios.find(ej => {
@@ -590,7 +590,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       });
       
       if (ejercicio) {
-        console.log('✅ Ejercicio encontrado:', ejercicio);
+        console.log('Ejercicio encontrado:', ejercicio);
         
         // Detectar el subtipo real desde la configuración para ejercicios de tipo "Preguntas"
         let ejercicioConTipoReal = { ...ejercicio };
@@ -606,12 +606,12 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         
         setEjercicioAsociado(ejercicioConTipoReal);
       } else {
-        console.log('ℹ️ No hay ejercicio asociado a este contenido');
-        console.log('💡 Ejercicios disponibles:', ejercicios.map(ej => ({ id: ej.id, contenido_id: ej.contenido_id })));
+        console.log('No hay ejercicio asociado a este contenido');
+        console.log('Ejercicios disponibles:', ejercicios.map(ej => ({ id: ej.id, contenido_id: ej.contenido_id })));
         setEjercicioAsociado(null);
       }
     } catch (err) {
-      console.error('❌ Error al cargar ejercicio asociado:', err);
+      console.error('Error al cargar ejercicio asociado:', err);
       setEjercicioAsociado(null);
     } finally {
       setLoadingEjercicio(false);
@@ -621,7 +621,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
   // Fetch subtemas when temaId changes
   useEffect(() => {
     if (!temaId) {
-      console.log('🚫 No temaId provided, using fallback data');
+      console.log('No temaId provided, using fallback data');
       setModules(FALLBACK_MODULES);
       return;
     }
@@ -630,7 +630,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       setLoading(true);
       setError(null);
       try {
-        console.log(`🔄 Fetching subtemas for temaId: ${temaId}`);
+        console.log(`Fetching subtemas for temaId: ${temaId}`);
         const response = await fetch(`${API_BASE_URL}/subtemas/por-tema/${temaId}`);
         
         if (!response.ok) {
@@ -643,7 +643,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         }
 
         let subtemas = await response.json();
-        console.log('✅ Subtemas fetched (sin ordenar):', subtemas);
+        console.log('Subtemas fetched (sin ordenar):', subtemas);
 
         // Intentar cargar estado de desbloqueo (OPCIONAL)
         await intentarCargarEstadoDesbloqueo();
@@ -656,14 +656,14 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
           const seqResponse = await fetch(`${API_BASE_URL}/secuencias-subtema`);
           if (seqResponse.ok) {
             const sequences = await seqResponse.json();
-            console.log('✅ Secuencias de subtemas cargadas:', sequences);
+            console.log('Secuencias de subtemas cargadas:', sequences);
             
             // Ordenar subtemas basado en las secuencias
             subtemas = orderSubtemasBySequence(subtemas, sequences);
-            console.log('✅ Subtemas ordenados por secuencia:', subtemas);
+            console.log('Subtemas ordenados por secuencia:', subtemas);
           }
         } catch (err) {
-          console.warn('⚠️ Error cargando secuencias, usando orden original:', err);
+          console.warn('Error cargando secuencias, usando orden original:', err);
         }
 
         // Transform subtemas to modules format - incluir estado de desbloqueo
@@ -706,14 +706,14 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         
         // Fetch contents for first subtema automatically
         if (transformedModules.length > 0) {
-          console.log('🔄 Loading contenidos for first subtema:', transformedModules[0].id);
+          console.log('Loading contenidos for first subtema:', transformedModules[0].id);
           loadContenidosForSubtema(transformedModules[0].id, transformedModules);
         }
 
         // Actualizar progreso después de cargar contenidos
         obtenerProgresoArea();
       } catch (err) {
-        console.error('❌ Error fetching subtemas:', err);
+        console.error('Error fetching subtemas:', err);
         setError(`Error loading subtemas: ${err instanceof Error ? err.message : 'Unknown error'}`);
         setModules(FALLBACK_MODULES);
       } finally {
@@ -730,12 +730,12 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
   // Fetch contenidos for a specific subtema
   const loadContenidosForSubtema = async (subtemaId: string, modulosActuales?: Module[]) => {
     try {
-      console.log(`🔄 Fetching contenidos for subtemaId: ${subtemaId}`);
+      console.log(`Fetching contenidos for subtemaId: ${subtemaId}`);
       // Usar el nuevo endpoint que ordena por secuencia del backend
       const response = await fetch(`${API_BASE_URL}/secuencias-contenido/subtema/${subtemaId}/ordenados`);
       
       if (!response.ok) {
-        console.warn(`⚠️ HTTP ${response.status} when fetching contenidos`);
+        console.warn(`HTTP ${response.status} when fetching contenidos`);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -745,7 +745,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       }
 
       const contenidos: Contenido[] = await response.json();
-      console.log('✅ Contenidos fetched ordenados por secuencia:', contenidos);
+      console.log('Contenidos fetched ordenados por secuencia:', contenidos);
 
       // Obtener todas las secuencias para identificar qué contenidos están en alguna secuencia
       let sequencias: any[] = [];
@@ -815,19 +815,19 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
 
       // Cargar ejercicios asociados y agregarlos como ítems separados
       try {
-        console.log('🔄 Cargando ejercicios asociados para agregar al menú...');
+        console.log('Cargando ejercicios asociados para agregar al menú...');
         const ejerciciosResponse = await fetch(`${API_BASE_URL}/ejercicios`);
         
         if (ejerciciosResponse.ok) {
           const todosEjercicios: Ejercicio[] = await ejerciciosResponse.json();
-          console.log('📦 Todos los ejercicios del backend:', todosEjercicios);
+          console.log('Todos los ejercicios del backend:', todosEjercicios);
           
           // IDs de contenidos de este subtema
           const contenidoIdsDeEsteSubtema = contenidosSecuenciados.map(c => String(c.id));
-          console.log('📋 IDs de contenidos en este subtema:', contenidoIdsDeEsteSubtema);
+          console.log('IDs de contenidos en este subtema:', contenidoIdsDeEsteSubtema);
           
           // Mostrar contenido_id de cada ejercicio para debug
-          console.log('🔍 Ejercicios y sus contenido_id:');
+          console.log('Ejercicios y sus contenido_id:');
           todosEjercicios.forEach(ej => {
             console.log(`   - Ejercicio ${ej.id}: contenido_id=${ej.contenido_id} (tipo: ${typeof ej.contenido_id})`);
           });
@@ -835,11 +835,11 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
           // Filtrar ejercicios que pertenecen a contenidos de este subtema
           const ejerciciosDeEsteSubtema = todosEjercicios.filter(ej => {
             const match = contenidoIdsDeEsteSubtema.includes(String(ej.contenido_id));
-            console.log(`   Comparando ejercicio ${ej.id} con contenido_id=${ej.contenido_id} → ${match ? '✅' : '❌'}`);
+            console.log(`   Comparando ejercicio ${ej.id} con contenido_id=${ej.contenido_id} -> ${match ? 'coincide' : 'no coincide'}`);
             return match;
           });
           
-          console.log(`✅ Encontrados ${ejerciciosDeEsteSubtema.length} ejercicios para este subtema`, ejerciciosDeEsteSubtema);
+          console.log(`Encontrados ${ejerciciosDeEsteSubtema.length} ejercicios para este subtema`, ejerciciosDeEsteSubtema);
           
           // Crear nuevo array con contenidos y ejercicios intercalados
           const itemsConEjercicios: ModuleItem[] = [];
@@ -855,11 +855,11 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
             
             // Agregar cada ejercicio justo después del contenido
             ejerciciosDeEsteContenido.forEach(ejercicio => {
-              console.log(`   📝 Agregando ejercicio "${ejercicio.actividad?.titulo}" después del contenido "${contenidoItem.title}"`);
+              console.log(`   Agregando ejercicio "${ejercicio.actividad?.titulo}" después del contenido "${contenidoItem.title}"`);
               
               const ejercicioItem: ModuleItem = {
                 id: `ejercicio-${ejercicio.id}`,
-                title: `📝 ${ejercicio.actividad?.titulo || 'Ejercicio Práctico'}`,
+                title: `${ejercicio.actividad?.titulo || 'Ejercicio Práctico'}`,
                 duration: undefined,
                 type: 'activity',
                 completed: false,
@@ -874,14 +874,14 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
             });
           });
           
-          console.log(`✅ Total de ítems en menú: ${itemsConEjercicios.length} (${items.length} contenidos + ${ejerciciosDeEsteSubtema.length} ejercicios)`);
+          console.log(`Total de ítems en menú: ${itemsConEjercicios.length} (${items.length} contenidos + ${ejerciciosDeEsteSubtema.length} ejercicios)`);
           
           // Reemplazar el array items con el nuevo que incluye ejercicios
           items.length = 0;
           items.push(...itemsConEjercicios);
         }
       } catch (err) {
-        console.error('⚠️ Error al cargar ejercicios para el menú:', err);
+        console.error('Error al cargar ejercicios para el menú:', err);
         // No es crítico, continuar sin ejercicios
       }
 
@@ -906,7 +906,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         setSelectedContentData(null);
       }
     } catch (err) {
-      console.error('❌ Error fetching contenidos:', err);
+      console.error('Error fetching contenidos:', err);
       setModules(prevModules => 
         prevModules.map(m => 
           m.id === subtemaId 
@@ -1053,7 +1053,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                             
                             // Si es un ejercicio, manejarlo de forma especial
                             if (item.ejercicioData) {
-                              console.log('📝 Seleccionando ejercicio:', item.ejercicioData);
+                              console.log('Seleccionando ejercicio:', item.ejercicioData);
                               setSelectedContentId(item.id);
                               setSelectedContentData(null); // No hay contenido asociado
                               
