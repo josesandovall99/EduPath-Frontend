@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { ArrowLeft, ChevronDown, ChevronUp, Eye, EyeOff, Plus, Pencil, Search, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
+import { createQuillModules, loadQuill } from '../utils/quill';
 
 interface DocenteAreaManagementScreenProps {
   onBack: () => void;
@@ -575,36 +576,24 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
   };
 
   useEffect(() => {
-    if (showContenidoModal && editorRef.current && !quillRef.current && (window as any).Quill) {
-      const Quill = (window as any).Quill;
+    let cancelled = false;
 
-      try {
-        const FontStyle = Quill.import('attributors/style/font');
-        FontStyle.whitelist = ['Arial', 'Monospace', 'Algerian'];
-        Quill.register(FontStyle, true);
-      } catch (err) {
-        console.warn('Quill format registration failed', err);
+    const initializeQuill = async () => {
+      if (!showContenidoModal || !editorRef.current || quillRef.current) {
+        return;
+      }
+
+      const Quill = await loadQuill();
+      if (cancelled || !editorRef.current) {
+        return;
       }
 
       editorRef.current.innerHTML = '';
       quillRef.current = new Quill(editorRef.current, {
         theme: 'snow',
         placeholder: 'Ingrese la descripción del contenido',
-        modules: {
-          toolbar: [
-            [{ font: ['Arial', 'Monospace', 'Algerian'] }],
-            [{ size: ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'] }],
-            ['bold', 'italic', 'underline', 'strike'],
-            [{ color: [] }, { background: [] }],
-            [{ list: 'ordered' }, { list: 'bullet' }],
-            [{ align: [] }],
-            ['link', 'image', 'video'],
-            ['clean']
-          ]
-        }
+        modules: createQuillModules()
       });
-
-      quillRef.current.format('size', '14px');
 
       const initialHtml = editingContenido ? (editingContenido.descripcion || '') : (contenidoForm.descripcion || '');
       quillRef.current.root.innerHTML = initialHtml;
@@ -613,9 +602,12 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
       quillRef.current.on('text-change', () => {
         setContenidoForm((prev) => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
       });
-    }
+    };
+
+    initializeQuill();
 
     return () => {
+      cancelled = true;
       if (!showContenidoModal && quillRef.current) {
         if (editorRef.current) editorRef.current.innerHTML = '';
         quillRef.current = null;
@@ -733,33 +725,33 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
               />
             </div>
 
-            <div className="mt-4 flex gap-2 flex-wrap">
+            <div className="app-filter-row mt-4">
               <button
                 onClick={() => setTemaStateFilter('all')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`app-filter-chip ${
                   temaStateFilter === 'all'
-                    ? 'bg-slate-800 text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
+                    ? 'app-filter-chip--blue'
+                    : ''
                 }`}
               >
                 Todos ({temas.length})
               </button>
               <button
                 onClick={() => setTemaStateFilter('active')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`app-filter-chip ${
                   temaStateFilter === 'active'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
+                    ? 'app-filter-chip--green'
+                    : ''
                 }`}
               >
                 Activos ({temas.filter((tema) => tema.estado !== false).length})
               </button>
               <button
                 onClick={() => setTemaStateFilter('inactive')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`app-filter-chip ${
                   temaStateFilter === 'inactive'
-                    ? 'bg-amber-600 text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
+                    ? 'app-filter-chip--amber'
+                    : ''
                 }`}
               >
                 Inactivos ({temas.filter((tema) => tema.estado === false).length})
@@ -966,37 +958,41 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
       </main>
 
       {showTemaModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-xl font-semibold text-[#3A4A5B]">
+        <div className="app-modal-overlay app-modal-overlay--center">
+          <div className="app-modal-card app-modal-card--sm">
+            <div className="app-modal-header">
+              <div>
+              <h3 className="app-modal-title text-[1.45rem]">
                 {editingTema ? 'Editar tema' : 'Crear tema'}
               </h3>
+              </div>
               <button
                 onClick={() => setShowTemaModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="app-modal-close"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
+            <div className="app-modal-scroll">
+            <div className="app-form-layout">
+              <section className="app-form-section app-form-section--muted">
+              <div className="app-form-field">
+                <label className="app-form-label">Nombre *</label>
                 <input
                   type="text"
                   value={temaForm.nombre}
                   onChange={(event) => setTemaForm({ ...temaForm, nombre: event.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
+                  className="app-form-input"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Descripcion</label>
+              <div className="app-form-field">
+                <label className="app-form-label">Descripción</label>
                 <textarea
                   rows={3}
                   value={temaForm.descripcion}
                   onChange={(event) => setTemaForm({ ...temaForm, descripcion: event.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all resize-none"
+                  className="app-form-textarea"
                 />
               </div>
               <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
@@ -1011,9 +1007,11 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
                   {temaForm.estado ? 'Habilitado' : 'Deshabilitado'}
                 </button>
               </div>
+              </section>
+            </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex gap-3 justify-end bg-gray-50">
+            <div className="app-form-footer">
               <button
                 onClick={() => setShowTemaModal(false)}
                 disabled={submitting}
@@ -1034,42 +1032,48 @@ export function DocenteAreaManagementScreen({ onBack, docenteId, areaId, areaNom
       )}
 
       {showSubtemaModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-xl font-semibold text-[#3A4A5B]">
+        <div className="app-modal-overlay app-modal-overlay--center">
+          <div className="app-modal-card app-modal-card--sm">
+            <div className="app-modal-header">
+              <div>
+              <h3 className="app-modal-title text-[1.45rem]">
                 {editingSubtema ? 'Editar subtema' : 'Crear subtema'}
               </h3>
+              </div>
               <button
                 onClick={() => setShowSubtemaModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="app-modal-close"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
+            <div className="app-modal-scroll">
+            <div className="app-form-layout">
+              <section className="app-form-section app-form-section--muted">
+              <div className="app-form-field">
+                <label className="app-form-label">Nombre *</label>
                 <input
                   type="text"
                   value={subtemaForm.nombre}
                   onChange={(event) => setSubtemaForm({ ...subtemaForm, nombre: event.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
+                  className="app-form-input"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Descripcion</label>
+              <div className="app-form-field">
+                <label className="app-form-label">Descripción</label>
                 <textarea
                   rows={3}
                   value={subtemaForm.descripcion}
                   onChange={(event) => setSubtemaForm({ ...subtemaForm, descripcion: event.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all resize-none"
+                  className="app-form-textarea"
                 />
               </div>
+              </section>
+            </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex gap-3 justify-end bg-gray-50">
+            <div className="app-form-footer">
               <button
                 onClick={() => setShowSubtemaModal(false)}
                 disabled={submitting}

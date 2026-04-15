@@ -3,6 +3,7 @@ import { ArrowLeft, Plus, FileText, PlayCircle, Edit, Eye, EyeOff, Search, Loade
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
+import { createQuillModules, loadQuill } from '../utils/quill';
 
 interface ContentManagementScreenProps {
   onBack: () => void;
@@ -447,66 +448,57 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   const editorRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
 
-  // Initialize Quill when modal opens and sync content
+  // Initialize Quill when modal opens and sync content.
   useEffect(() => {
-    // When the modal opens, (re)create the Quill instance so the toolbar
-    // and editor are always freshly rendered. Register custom font and
-    // numeric size whitelists so the toolbar shows desired options.
-    if (showCreateModal && editorRef.current && (window as any).Quill) {
-      try {
-        const Quill = (window as any).Quill;
-        // Register size as STYLE attributor (applies font-size in px, not classes)
-        const SizeStyle = Quill.import('attributors/style/size');
-        SizeStyle.whitelist = ['10px','12px','14px','16px','18px','20px','24px','32px'];
-        Quill.register(SizeStyle, true);
+    let cancelled = false;
 
-        // Register fonts as STYLE attributor 
-        const FontStyle = Quill.import('attributors/style/font');
-        FontStyle.whitelist = ['Arial','Monospace','Algerian'];
-        Quill.register(FontStyle, true);
-      } catch (err) {
-        console.warn('Quill format registration failed', err);
+    const destroyEditor = () => {
+      if (editorRef.current) {
+        editorRef.current.innerHTML = '';
       }
+      quillRef.current = null;
+    };
 
-      // Ensure container is empty before creating Quill
-      editorRef.current.innerHTML = '';
-      quillRef.current = new (window as any).Quill(editorRef.current, {
-        theme: 'snow',
-        placeholder: 'Ingrese la descripción del contenido',
-        modules: {
-          toolbar: [
-            [{ 'font': ['Arial','Monospace','Algerian'] }],
-            [{ 'size': ['10px','12px','14px','16px','18px','20px','24px','32px'] }],
-            ['bold', 'italic', 'underline', 'strike'],
-            [{ 'color': [] }, { 'background': [] }],
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-            [{ 'align': [] }],
-            ['link', 'image', 'video'],
-            ['clean']
-          ]
-        }
-      });
-
-      // Set default size to 14px
-      quillRef.current.format('size', '14px');
-
-      // Determine initial content (edit mode takes precedence)
-      const initialHtml = isEditMode && selectedContent ? (selectedContent.descripcion || '') : (formData.descripcion || '');
-      quillRef.current.root.innerHTML = initialHtml;
-      setFormData(prev => ({ ...prev, descripcion: initialHtml }));
-
-      quillRef.current.on('text-change', () => {
-        setFormData(prev => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
-      });
+    if (!showCreateModal) {
+      destroyEditor();
+      return undefined;
     }
 
-    // Cleanup: when modal closes, remove Quill's DOM and clear ref so it
-    // will be recreated next time the modal opens (prevents toolbar missing).
-    return () => {
-      if (!showCreateModal && quillRef.current) {
-        if (editorRef.current) editorRef.current.innerHTML = '';
-        quillRef.current = null;
+    const initialHtml = isEditMode && selectedContent ? (selectedContent.descripcion || '') : (formData.descripcion || '');
+
+    const initializeQuill = async () => {
+      if (!editorRef.current) {
+        return;
       }
+
+      const Quill = await loadQuill();
+      if (cancelled || !editorRef.current) {
+        return;
+      }
+
+      if (quillRef.current) {
+        quillRef.current.root.innerHTML = initialHtml;
+        return;
+      }
+
+      editorRef.current.innerHTML = '';
+      quillRef.current = new Quill(editorRef.current, {
+        theme: 'snow',
+        placeholder: 'Ingrese la descripción del contenido',
+        modules: createQuillModules()
+      });
+      quillRef.current.root.innerHTML = initialHtml;
+      setFormData((prev) => ({ ...prev, descripcion: initialHtml }));
+
+      quillRef.current.on('text-change', () => {
+        setFormData((prev) => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
+      });
+    };
+
+    initializeQuill();
+
+    return () => {
+      cancelled = true;
     };
   }, [showCreateModal, isEditMode, selectedContent]);
 
@@ -528,6 +520,23 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
 
     return matchesType && matchesState && matchesSearch;
   });
+
+  const selectedArea = areas.find((area) => String(area.id) === selectedAreaId);
+  const selectedTema = temas.find((tema) => String(tema.id) === formData.tema_id);
+  const selectedSubtema = subtemas.find((subtema) => String(subtema.id) === formData.subtema_id);
+  const contentTypeLabel = formData.tipo === 'video'
+    ? 'Video'
+    : formData.tipo === 'document'
+      ? 'Documento'
+      : 'Explicación';
+  const contentCompletion = [
+    formData.titulo.trim(),
+    formData.descripcion.replace(/<[^>]*>/g, '').trim(),
+    formData.url.trim(),
+    selectedAreaId,
+    formData.tema_id,
+    formData.subtema_id
+  ].filter(Boolean).length;
 
   const getTypeIcon = (type: ContentItem['type']) => {
     switch (type) {
@@ -640,76 +649,76 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="space-y-3">
-              <div className="flex gap-2 flex-wrap">
+              <div className="app-filter-row">
               <button
                 onClick={() => setFilterType('all')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`app-filter-chip ${
                   filterType === 'all'
-                    ? 'app-primary-btn text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
+                    ? 'app-filter-chip--blue'
+                    : ''
                 }`}
               >
                 Todos
               </button>
               <button
                 onClick={() => setFilterType('video')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`app-filter-chip ${
                   filterType === 'video'
-                    ? 'app-primary-btn text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
+                    ? 'app-filter-chip--blue'
+                    : ''
                 }`}
               >
                 Videos
               </button>
               <button
                 onClick={() => setFilterType('document')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`app-filter-chip ${
                   filterType === 'document'
-                    ? 'app-btn-success text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
+                    ? 'app-filter-chip--green'
+                    : ''
                 }`}
               >
                 Documentos
               </button>
               <button
                 onClick={() => setFilterType('activity')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`app-filter-chip ${
                   filterType === 'activity'
-                    ? 'bg-[#F5A97F] text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
+                    ? 'app-filter-chip--amber'
+                    : ''
                 }`}
               >
                 Actividades
               </button>
             </div>
 
-              <div className="flex gap-2 flex-wrap">
+              <div className="app-filter-row">
                 <button
                   onClick={() => setStateFilter('all')}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`app-filter-chip ${
                     stateFilter === 'all'
-                      ? 'bg-slate-800 text-white shadow-md'
-                      : 'app-btn-secondary text-gray-700'
+                      ? 'app-filter-chip--blue'
+                      : ''
                   }`}
                 >
                   Todos
                 </button>
                 <button
                   onClick={() => setStateFilter('active')}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`app-filter-chip ${
                     stateFilter === 'active'
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'app-btn-secondary text-gray-700'
+                      ? 'app-filter-chip--green'
+                      : ''
                   }`}
                 >
                   Activos ({contents.filter((content) => isContentActive(content)).length})
                 </button>
                 <button
                   onClick={() => setStateFilter('inactive')}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`app-filter-chip ${
                     stateFilter === 'inactive'
-                      ? 'bg-amber-600 text-white shadow-md'
-                      : 'app-btn-secondary text-gray-700'
+                      ? 'app-filter-chip--amber'
+                      : ''
                   }`}
                 >
                   Inactivos ({contents.filter((content) => !isContentActive(content)).length})
@@ -751,7 +760,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Materia</th>
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Vinculado a</th>
                   <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
-                  <th className="px-6 py-4 text-left text-[#3A4A5B]">Acciones</th>
+                  <th className="px-6 py-4 text-center text-[#3A4A5B]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -789,8 +798,8 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                           {contentIsActive ? 'Activo' : 'Inhabilitado'}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 flex-wrap">
+                      <td className="px-6 py-4 align-middle">
+                        <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                           <button
                             onClick={() => handleEditContent(content)}
                             className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
@@ -827,197 +836,265 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
 
       {/* Modal de Crear/Editar Contenido */}
       {showCreateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-auto">
-                  <div className="bg-white rounded-xl shadow-xl p-4 sm:p-6 w-[1640px] max-w-[80%] max-h-[90vh] overflow-auto relative" style={{ borderLeft: '6px solid rgba(74,144,226,0.08)', width: 1640, maxWidth: '95%', maxHeight: '90vh' }}>
-                  <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl" style={{ background: 'linear-gradient(90deg, rgba(74,144,226,0.12), rgba(74,144,226,0.06))' }} />
-                  <div className="flex items-center justify-between mb-6 pt-2">
-              <h2 className="text-2xl font-bold text-[#3A4A5B]">
-                {isEditMode ? 'Editar Contenido' : 'Crear Nuevo Contenido'}
-              </h2>
-              <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setIsEditMode(false);
-                  setSelectedContent(null);
-                  setFormData({
-                    titulo: '',
-                    tipo: 'video',
-                    descripcion: '',
-                    url: '',
-                    tema_id: '',
-                    subtema_id: ''
-                  });
-                }}
-                      className="text-gray-400 hover:text-[#4A90E2] text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitContent} className="space-y-4">
-              {/* Título */}
-              <div>
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                  Título *
-                </label>
-                <input
-                  type="text"
-                  name="titulo"
-                  value={formData.titulo}
-                  onChange={handleInputChange}
-                  placeholder="Ingrese el título del contenido"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                  required
-                />
-              </div>
-
-              {/* Descripción (editor enriquecido) */}
-              <div>
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                  Descripción *
-                </label>
-                <div className="quill-editor-container">
-                  <div
-                    ref={editorRef}
-                    className="w-full"
-                    data-placeholder="Ingrese la descripción del contenido"
-                  />
+        <div className="app-modal-overlay app-modal-overlay--top">
+          <div
+            className="app-modal-card app-modal-card--xl"
+            style={{ height: 'min(860px, calc(100vh - 2rem))' }}
+          >
+            <div className="app-modal-header">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="app-modal-kicker">Contenido</div>
+                  <h2 className="app-modal-title">
+                    {isEditMode ? 'Editar contenido' : 'Crear nuevo contenido'}
+                  </h2>
+                  <p className="app-modal-description">
+                    Completa la ficha del recurso y déjalo listo para ubicarlo dentro de la secuencia del subtema correcto.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="app-modal-meta hidden sm:block">
+                    <div className="app-modal-meta-label">Estado</div>
+                    <div className="app-modal-meta-value">{isEditMode ? 'Edición activa' : 'Nuevo recurso'}</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setIsEditMode(false);
+                      setSelectedContent(null);
+                      setFormData({
+                        titulo: '',
+                        tipo: 'video',
+                        descripcion: '',
+                        url: '',
+                        tema_id: '',
+                        subtema_id: ''
+                      });
+                      setSelectedAreaId('');
+                    }}
+                    className="app-modal-close"
+                  >
+                    ✕
+                  </button>
                 </div>
               </div>
+            </div>
 
-              {/* URL */}
-              <div>
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                  URL *
-                </label>
-                <input
-                  type="url"
-                  name="url"
-                  value={formData.url}
-                  onChange={handleInputChange}
-                  placeholder="https://ejemplo.com/contenido"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                  required
-                />
-              </div>
-
-              {/* Tipo de Contenido */}
-              <div>
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                  Tipo de Contenido *
-                </label>
-                <select
-                  name="tipo"
-                  value={formData.tipo}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                  required
-                >
-                  <option value="video">Videos</option>
-                  <option value="document">Documento</option>
-                  <option value="activity">Explicación</option>
-                </select>
-              </div>
-
-              {/* Área */}
-              <div>
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                  Área *
-                </label>
-                <select
-                  value={selectedAreaId}
-                  onChange={(e) => setSelectedAreaId(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                  required
-                >
-                  <option value="">Seleccione un área</option>
-                  {areas.map((area) => (
-                    <option key={area.id} value={area.id}>
-                      {area.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Tema */}
-              <div>
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                  Tema *
-                </label>
-                <select
-                  name="tema_id"
-                  value={formData.tema_id}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                  required
-                  disabled={!selectedAreaId || temas.length === 0}
-                >
-                  <option value="">Seleccione un tema</option>
-                  {temas.map((tema) => (
-                    <option key={tema.id} value={tema.id}>
-                      {tema.nombre}
-                    </option>
-                  ))}
-                </select>
-                {selectedAreaId && temas.length === 0 && (
-                  <p className="text-sm text-gray-500 mt-1">No hay temas disponibles para esta área</p>
-                )}
-              </div>
-
-              {/* Subtema */}
-              <div>
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                  Subtema *
-                </label>
-                <select
-                  name="subtema_id"
-                  value={formData.subtema_id}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                  required
-                  disabled={!formData.tema_id || subtemas.length === 0}
-                >
-                  <option value="">Seleccione un subtema</option>
-                  {subtemas.map((subtema) => (
-                    <option key={subtema.id} value={subtema.id}>
-                      {subtema.nombre}
-                    </option>
-                  ))}
-                </select>
-                {formData.tema_id && subtemas.length === 0 && (
-                  <p className="text-sm text-gray-500 mt-1">No hay subtemas disponibles para este tema</p>
-                )}
-              </div>
-
-              {/* Botones de Acción */}
-              <div className="flex gap-4 justify-end mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  disabled={isLoading}
-                  className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="px-6 py-2 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader className="w-4 h-4 animate-spin" />
-                      <span>{isEditMode ? 'Actualizando...' : 'Creando...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      <span>{isEditMode ? 'Actualizar Contenido' : 'Crear Contenido'}</span>
-                    </>
+            <div className="app-modal-scroll">
+              <div className="app-form-layout app-form-layout--with-aside lg:px-8 lg:py-7">
+                <form id="content-form" onSubmit={handleSubmitContent} className="app-form-main app-form-stack">
+                  {!isEditMode && (
+                    <div className="app-form-note">
+                      Después de crear el contenido, aún debes incorporarlo a la secuencia correspondiente para definir su orden dentro del recorrido de aprendizaje.
+                    </div>
                   )}
-                </button>
+
+                  <section className="app-form-section app-form-section--muted">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Información base</h4>
+                      <p className="app-form-section-description">Define el nombre del recurso, su formato y la URL principal que utilizarán docentes o estudiantes.</p>
+                    </div>
+
+                    <div className="app-form-grid app-form-grid-2">
+                      <div className="app-form-field md:col-span-2">
+                        <label className="app-form-label">Título *</label>
+                        <input
+                          type="text"
+                          name="titulo"
+                          value={formData.titulo}
+                          onChange={handleInputChange}
+                          placeholder="Ingrese el título del contenido"
+                          className="app-form-input"
+                          required
+                        />
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Tipo de contenido *</label>
+                        <select
+                          name="tipo"
+                          value={formData.tipo}
+                          onChange={handleInputChange}
+                          className="app-form-select"
+                          required
+                        >
+                          <option value="video">Videos</option>
+                          <option value="document">Documento</option>
+                          <option value="activity">Explicación</option>
+                        </select>
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">URL *</label>
+                        <input
+                          type="url"
+                          name="url"
+                          value={formData.url}
+                          onChange={handleInputChange}
+                          placeholder="https://ejemplo.com/contenido"
+                          className="app-form-input"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="app-form-section">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Descripción del recurso</h4>
+                      <p className="app-form-section-description">Usa el editor enriquecido para explicar el enfoque del contenido, instrucciones de uso o contexto pedagógico.</p>
+                    </div>
+
+                    <div className="app-form-field">
+                      <label className="app-form-label">Descripción *</label>
+                      <div className="quill-editor-container app-rich-text-editor">
+                        <div
+                          ref={editorRef}
+                          className="w-full"
+                          data-placeholder="Ingrese la descripción del contenido"
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="app-form-section">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Vinculación académica</h4>
+                      <p className="app-form-section-description">Asocia el contenido con el área, tema y subtema correctos para mantener ordenada la navegación del estudiante.</p>
+                    </div>
+
+                    <div className="app-form-grid app-form-grid-2">
+                      <div className="app-form-field md:col-span-2">
+                        <label className="app-form-label">Área *</label>
+                        <select
+                          value={selectedAreaId}
+                          onChange={(e) => setSelectedAreaId(e.target.value)}
+                          className="app-form-select"
+                          required
+                        >
+                          <option value="">Seleccione un área</option>
+                          {areas.map((area) => (
+                            <option key={area.id} value={area.id}>
+                              {area.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Tema *</label>
+                        <select
+                          name="tema_id"
+                          value={formData.tema_id}
+                          onChange={handleInputChange}
+                          className="app-form-select"
+                          required
+                          disabled={!selectedAreaId || temas.length === 0}
+                        >
+                          <option value="">Seleccione un tema</option>
+                          {temas.map((tema) => (
+                            <option key={tema.id} value={tema.id}>
+                              {tema.nombre}
+                            </option>
+                          ))}
+                        </select>
+                        {selectedAreaId && temas.length === 0 && (
+                          <p className="text-sm text-gray-500">No hay temas disponibles para esta área.</p>
+                        )}
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Subtema *</label>
+                        <select
+                          name="subtema_id"
+                          value={formData.subtema_id}
+                          onChange={handleInputChange}
+                          className="app-form-select"
+                          required
+                          disabled={!formData.tema_id || subtemas.length === 0}
+                        >
+                          <option value="">Seleccione un subtema</option>
+                          {subtemas.map((subtema) => (
+                            <option key={subtema.id} value={subtema.id}>
+                              {subtema.nombre}
+                            </option>
+                          ))}
+                        </select>
+                        {formData.tema_id && subtemas.length === 0 && (
+                          <p className="text-sm text-gray-500">No hay subtemas disponibles para este tema.</p>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                </form>
+
+                <aside className="app-form-aside app-form-stack md:self-start">
+                  <section className="app-form-section app-form-section--accent">
+                    <h4 className="app-form-section-title">Resumen del contenido</h4>
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div className="app-form-summary-card">
+                        <div className="app-form-summary-label">Recurso</div>
+                        <div className="app-form-summary-value">{formData.titulo.trim() || 'Sin título definido'}</div>
+                        <div className="app-form-summary-help">{contentTypeLabel}</div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                        <div className="app-form-summary-card">
+                          <div className="app-form-summary-label">Área</div>
+                          <div className="app-form-summary-value">{selectedArea?.nombre || 'Pendiente'}</div>
+                        </div>
+                        <div className="app-form-summary-card">
+                          <div className="app-form-summary-label">Tema</div>
+                          <div className="app-form-summary-value">{selectedTema?.nombre || 'Pendiente'}</div>
+                        </div>
+                      </div>
+                      <div className="app-form-note">
+                        <div className="app-form-summary-label">Subtema asignado</div>
+                        <div className="app-form-summary-value">{selectedSubtema?.nombre || 'Selecciona un subtema'}</div>
+                        <div className="app-form-summary-help">Avance del formulario: {contentCompletion}/6 campos clave completos.</div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="app-form-section">
+                    <h4 className="app-form-section-title">Antes de guardar</h4>
+                    <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                      <p>Comprueba que la URL realmente abre el recurso esperado y no una página temporal.</p>
+                      <p>Escribe una descripción útil: luego servirá de contexto para docentes y para la organización académica.</p>
+                      <p>Ubica el recurso en el subtema correcto para que después la secuencia no quede desordenada.</p>
+                    </div>
+                  </section>
+                </aside>
               </div>
-            </form>
+            </div>
+
+            <div className="app-form-footer">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                disabled={isLoading}
+                className="app-btn app-btn-secondary px-6 py-3 text-slate-700 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                form="content-form"
+                disabled={isLoading}
+                className="app-btn app-btn-success rounded-xl px-6 py-3 text-white disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    <span>{isEditMode ? 'Actualizando...' : 'Creando...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    <span>{isEditMode ? 'Actualizar Contenido' : 'Crear Contenido'}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

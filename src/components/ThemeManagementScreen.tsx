@@ -634,33 +634,33 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
               <span>Agregar Nuevo Tema</span>
             </button>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="app-filter-row items-center">
               <button
                 onClick={() => setStateFilter('all')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`app-filter-chip ${
                   stateFilter === 'all'
-                    ? 'bg-slate-800 text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
+                    ? 'app-filter-chip--blue'
+                    : ''
                 }`}
               >
                 Todos ({temas.length})
               </button>
               <button
                 onClick={() => setStateFilter('active')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`app-filter-chip ${
                   stateFilter === 'active'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
+                    ? 'app-filter-chip--green'
+                    : ''
                 }`}
               >
                 Activos ({temas.filter((tema) => tema.estado !== false).length})
               </button>
               <button
                 onClick={() => setStateFilter('inactive')}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`app-filter-chip ${
                   stateFilter === 'inactive'
-                    ? 'bg-amber-600 text-white shadow-md'
-                    : 'app-btn-secondary text-gray-700'
+                    ? 'app-filter-chip--amber'
+                    : ''
                 }`}
               >
                 Inactivos ({temas.filter((tema) => tema.estado === false).length})
@@ -844,116 +844,112 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
 
       {/* Modal para crear/editar tema */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Header del modal */}
-            <div 
-              className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl"
-              style={{ backgroundColor: `${currentColor.primary}10` }}
-            >
-              <h3 className="text-2xl font-semibold text-[#3A4A5B]">
-                {editingTema ? 'Editar Tema' : 'Crear Nuevo Tema'}
-              </h3>
+        <div className="app-modal-overlay app-modal-overlay--top">
+          <div className="app-modal-card app-modal-card--lg">
+            <div className="app-modal-header">
+              <div>
+                <div className="app-modal-kicker">Temas</div>
+                <h3 className="app-modal-title">{editingTema ? 'Editar tema' : 'Crear nuevo tema'}</h3>
+                <p className="app-modal-description">Organiza la información temática con el mismo patrón visual del resto de formularios administrativos.</p>
+              </div>
               <button
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="app-modal-close"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Contenido del modal */}
-            <div className="p-6 space-y-6">
-              {/* Nombre */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre del Tema <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.nombre}
-                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
-                  placeholder="Ej: Variables y Tipos de Datos"
-                  required
-                />
-              </div>
+            <div className="app-modal-scroll">
+              <div className="app-form-layout">
+                <section className="app-form-section app-form-section--muted">
+                  <div className="app-form-field">
+                    <label className="app-form-label">
+                      Nombre del Tema <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.nombre}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      className="app-form-input"
+                      placeholder="Ej: Variables y Tipos de Datos"
+                      required
+                    />
+                  </div>
 
-              {/* Descripción */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descripción
-                </label>
-                <textarea
-                  value={formData.descripcion}
-                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all resize-none"
-                  placeholder="Descripción breve del tema..."
-                  rows={4}
-                />
-              </div>
+                  <div className="app-form-field">
+                    <label className="app-form-label">
+                      Descripción
+                    </label>
+                    <textarea
+                      value={formData.descripcion}
+                      onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                      className="app-form-textarea"
+                      placeholder="Descripción breve del tema..."
+                      rows={4}
+                    />
+                  </div>
 
-              {/* Estado */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estado del Tema
-                  </label>
-                  <p className="text-xs text-gray-500">
-                    Define si el tema estará disponible para los estudiantes
-                  </p>
-                </div>
-                <button
-                  onClick={() => setFormData({ ...formData, estado: !formData.estado })}
-                  className="flex items-center gap-2 group"
-                >
-                  {formData.estado ? (
-                    <>
-                      <span className="text-sm text-[#7ED6A7] font-medium">Habilitado</span>
-                      <ToggleRight 
-                        className="w-12 h-12 transition-colors" 
-                        style={{ color: currentColor.primary }}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm text-gray-400 font-medium">Deshabilitado</span>
-                      <ToggleLeft className="w-12 h-12 text-gray-400 group-hover:text-gray-500 transition-colors" />
-                    </>
-                  )}
-                </button>
-              </div>
+                  <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div>
+                      <label className="app-form-label mb-1 block">
+                        Estado del Tema
+                      </label>
+                      <p className="text-xs text-gray-500">
+                        Define si el tema estará disponible para los estudiantes
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, estado: !formData.estado })}
+                      className="flex items-center gap-2 group"
+                    >
+                      {formData.estado ? (
+                        <>
+                          <span className="text-sm text-[#7ED6A7] font-medium">Habilitado</span>
+                          <ToggleRight
+                            className="w-12 h-12 transition-colors"
+                            style={{ color: currentColor.primary }}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm text-gray-400 font-medium">Deshabilitado</span>
+                          <ToggleLeft className="w-12 h-12 text-gray-400 group-hover:text-gray-500 transition-colors" />
+                        </>
+                      )}
+                    </button>
+                  </div>
 
-              {/* Área (solo mostrar, no editable si está editando) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Área Asociada
-                </label>
-                <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
-                  <p className="text-gray-700 font-medium">
-                    {areas.find(a => a.id === formData.area_id)?.nombre || 'Área no encontrada'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {areas.find(a => a.id === formData.area_id)?.descripcion}
-                  </p>
-                </div>
+                  <div className="app-form-field">
+                    <label className="app-form-label">
+                      Área Asociada
+                    </label>
+                    <div className="app-form-static">
+                      <p className="text-gray-700 font-medium">
+                        {areas.find(a => a.id === formData.area_id)?.nombre || 'Área no encontrada'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {areas.find(a => a.id === formData.area_id)?.descripcion}
+                      </p>
+                    </div>
+                  </div>
+                </section>
               </div>
             </div>
 
-            {/* Footer del modal */}
-            <div className="p-6 border-t border-gray-200 flex gap-4 justify-end bg-gray-50 rounded-b-2xl">
+            <div className="app-form-footer">
               <button
                 onClick={handleCloseModal}
                 disabled={submitting}
-                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="app-btn app-btn-secondary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSaveTema}
                 disabled={submitting || !formData.nombre.trim()}
-                className="px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                style={{ backgroundColor: currentColor.primary }}
+                className="app-btn app-primary-btn px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <>

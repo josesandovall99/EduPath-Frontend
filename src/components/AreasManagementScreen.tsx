@@ -273,33 +273,33 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
             />
           </div>
 
-          <div className="mt-4 flex gap-2 flex-wrap">
+          <div className="app-filter-row mt-4">
             <button
               onClick={() => setStateFilter('all')}
-              className={`px-4 py-2 rounded-lg transition-all ${
+              className={`app-filter-chip ${
                 stateFilter === 'all'
-                  ? 'bg-slate-800 text-white shadow-md'
-                  : 'app-btn-secondary text-gray-700'
+                  ? 'app-filter-chip--blue'
+                  : ''
               }`}
             >
               Todas ({areas.length})
             </button>
             <button
               onClick={() => setStateFilter('active')}
-              className={`px-4 py-2 rounded-lg transition-all ${
+              className={`app-filter-chip ${
                 stateFilter === 'active'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'app-btn-secondary text-gray-700'
+                  ? 'app-filter-chip--green'
+                  : ''
               }`}
             >
               Activas ({activeAreas})
             </button>
             <button
               onClick={() => setStateFilter('inactive')}
-              className={`px-4 py-2 rounded-lg transition-all ${
+              className={`app-filter-chip ${
                 stateFilter === 'inactive'
-                  ? 'bg-amber-600 text-white shadow-md'
-                  : 'app-btn-secondary text-gray-700'
+                  ? 'app-filter-chip--amber'
+                  : ''
               }`}
             >
               Inactivas ({inactiveAreas})
@@ -424,54 +424,62 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
       </main>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-md w-full max-h-[85vh] overflow-y-auto">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-              <h3 className="text-lg font-semibold text-[#3A4A5B]">{editingAreaId !== null ? 'Editar Area' : 'Crear Nueva Area'}</h3>
+        <div className="app-modal-overlay app-modal-overlay--center">
+          <div className="app-modal-card app-modal-card--sm">
+            <div className="app-modal-header">
+              <div>
+                <div className="app-modal-kicker">Áreas</div>
+                <h3 className="app-modal-title">{editingAreaId !== null ? 'Editar área' : 'Crear nueva área'}</h3>
+                <p className="app-modal-description">Define el nombre y la descripción del área con el mismo patrón visual de los formularios administrativos.</p>
+              </div>
               <button
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="app-modal-close"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="app-modal-scroll">
+            <div className="app-form-layout">
               {formError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                   {formError}
                 </div>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
+              <section className="app-form-section app-form-section--muted">
+              <div className="app-form-field">
+                <label className="app-form-label">Nombre *</label>
                 <input
                   type="text"
                   value={formData.nombre}
                   onChange={(event) => setFormData({ ...formData, nombre: event.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
+                  className="app-form-input"
                   placeholder="Ej: Programacion"
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Descripcion</label>
+              <div className="app-form-field">
+                <label className="app-form-label">Descripción</label>
                 <textarea
                   value={formData.descripcion}
                   onChange={(event) => setFormData({ ...formData, descripcion: event.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all resize-none"
+                  className="app-form-textarea"
                   placeholder="Descripcion breve del area"
                   rows={3}
                 />
               </div>
+              </section>
+            </div>
             </div>
 
-            <div className="p-4 border-t border-gray-200 flex gap-3 justify-end bg-gray-50 rounded-b-2xl">
+            <div className="app-form-footer">
               <button
                 onClick={handleCloseModal}
                 disabled={submitting}
-                className="px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="app-btn app-btn-secondary px-4 py-2.5 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>

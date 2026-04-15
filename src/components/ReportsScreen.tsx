@@ -1119,13 +1119,13 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-md mb-6 overflow-hidden">
-          <div className="flex border-b border-gray-200">
+          <div className="app-filter-tab-row">
             <button
               onClick={() => setActiveTab('student')}
-              className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-all ${
+              className={`app-filter-tab ${
                 activeTab === 'student'
-                  ? 'bg-[#4A90E2] text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'app-filter-tab--blue'
+                  : ''
               }`}
             >
               <User className="w-5 h-5" />
@@ -1134,10 +1134,10 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             {!isDocenteMode && (
               <button
                 onClick={() => setActiveTab('date')}
-                className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-all ${
+                className={`app-filter-tab ${
                   activeTab === 'date'
-                    ? 'bg-[#7ED6A7] text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                    ? 'app-filter-tab--green'
+                    : ''
                 }`}
               >
                 <Calendar className="w-5 h-5" />
@@ -1147,10 +1147,10 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             {!isDocenteMode && (
               <button
                 onClick={() => setActiveTab('activity')}
-                className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-all ${
+                className={`app-filter-tab ${
                   activeTab === 'activity'
-                    ? 'bg-[#F5A97F] text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                    ? 'app-filter-tab--amber'
+                    : ''
                 }`}
               >
                 <Activity className="w-5 h-5" />
@@ -1159,11 +1159,10 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             )}
             <button
               onClick={() => setActiveTab('failures')}
-              style={activeTab === 'failures' ? { backgroundColor: '#DC2626', color: '#FFFFFF' } : undefined}
-              className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-all ${
+              className={`app-filter-tab ${
                 activeTab === 'failures'
-                  ? 'text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'app-filter-tab--red'
+                  : ''
               }`}
             >
               <AlertTriangle className="w-5 h-5" />

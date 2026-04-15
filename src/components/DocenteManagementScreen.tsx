@@ -45,26 +45,25 @@ const emptyForm: DocenteFormData = {
 };
 
 const accentColor = '#14B8A6';
-const inputClassName =
-  'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition-all placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-teal-500/25';
+const inputClassName = 'app-form-input';
 
 const areaFilterButtonClass = (selected: boolean) =>
-  `inline-flex items-center rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+  `app-filter-chip app-filter-chip--multiline ${
     selected
-      ? 'border-[#4A90E2] bg-[#4A90E2] text-white shadow-md shadow-blue-200'
-      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+      ? 'app-filter-chip--blue'
+      : ''
   }`;
 
 const stateFilterButtonClass = (tone: 'all' | 'active' | 'inactive', selected: boolean) => {
   if (selected) {
-    if (tone === 'active') return 'inline-flex items-center gap-2 rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-md shadow-emerald-200 transition-all';
-    if (tone === 'inactive') return 'inline-flex items-center gap-2 rounded-xl border border-amber-500 bg-amber-500 px-4 py-2.5 text-sm font-medium text-white shadow-md shadow-amber-200 transition-all';
-    return 'inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-800 px-4 py-2.5 text-sm font-medium text-white shadow-md transition-all';
+    if (tone === 'active') return 'app-filter-chip app-filter-chip--green';
+    if (tone === 'inactive') return 'app-filter-chip app-filter-chip--amber';
+    return 'app-filter-chip app-filter-chip--blue';
   }
 
-  if (tone === 'active') return 'inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-all hover:border-emerald-200 hover:bg-emerald-100';
-  if (tone === 'inactive') return 'inline-flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700 transition-all hover:border-amber-200 hover:bg-amber-100';
-  return 'inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-100';
+  if (tone === 'active') return 'app-filter-chip';
+  if (tone === 'inactive') return 'app-filter-chip';
+  return 'app-filter-chip';
 };
 
 export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps) {
@@ -428,18 +427,18 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1.35fr)_340px]">
             <div className="space-y-5 p-6">
               <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Filtrar por área</p>
                     <p className="mt-1 text-sm text-slate-600">Muestra docentes por su área asignada.</p>
                   </div>
-                  <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
+                  <div className="max-w-full truncate rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
                     {selectedAreaFilter === 'all'
                       ? 'Todas'
                       : areas.find((area) => String(area.id) === selectedAreaFilter)?.nombre || 'Área'}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="app-filter-row items-start">
                   <button
                     onClick={() => setSelectedAreaFilter('all')}
                     className={areaFilterButtonClass(selectedAreaFilter === 'all')}
@@ -471,21 +470,21 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                     onClick={() => setSelectedStateFilter('all')}
                     className={stateFilterButtonClass('all', selectedStateFilter === 'all')}
                   >
-                    <Users className="h-4 w-4" />
+                    <Users className="h-4 w-4 shrink-0" />
                     <span>Todos</span>
                   </button>
                   <button
                     onClick={() => setSelectedStateFilter('active')}
                     className={stateFilterButtonClass('active', selectedStateFilter === 'active')}
                   >
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-4 w-4 shrink-0" />
                     <span>Activos ({stats.activos})</span>
                   </button>
                   <button
                     onClick={() => setSelectedStateFilter('inactive')}
                     className={stateFilterButtonClass('inactive', selectedStateFilter === 'inactive')}
                   >
-                    <EyeOff className="h-4 w-4" />
+                    <EyeOff className="h-4 w-4 shrink-0" />
                     <span>Inactivos ({stats.inactivos})</span>
                   </button>
                 </div>
@@ -546,7 +545,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Área</th>
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Código</th>
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Acciones</th>
+                    <th className="px-6 py-4 text-center text-[#3A4A5B]">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -586,8 +585,8 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                           {docenteIsActive ? 'Activo' : 'Inhabilitado'}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 flex-wrap">
+                      <td className="px-6 py-4 align-middle">
+                        <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                           <button
                             onClick={() => handleOpenEdit(docente)}
                             className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
@@ -619,25 +618,30 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
       </main>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[28px] border border-slate-200 bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 border-b border-slate-200 bg-gradient-to-r from-teal-50 via-white to-cyan-50 px-6 py-5 rounded-t-[28px] lg:px-8">
+        <div className="app-modal-overlay app-modal-overlay--top">
+          <div
+            className="app-modal-card app-modal-card--xl"
+            style={{
+              height: 'min(860px, calc(100vh - 2rem))'
+            }}
+          >
+            <div className="app-modal-header">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="mb-3 inline-flex rounded-full bg-teal-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
+                  <div className="app-modal-kicker">
                     Gestión docente
                   </div>
-                  <h3 className="text-2xl font-semibold text-[#3A4A5B]">{modalTitle}</h3>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{modalDescription}</p>
+                  <h3 className="app-modal-title">{modalTitle}</h3>
+                  <p className="app-modal-description">{modalDescription}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="hidden rounded-2xl border border-teal-100 bg-white/80 px-4 py-3 text-right shadow-sm sm:block">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Estado</div>
-                    <div className="mt-1 text-sm font-semibold text-[#3A4A5B]">{editingDocente ? 'Edición activa' : 'Nuevo registro'}</div>
+                  <div className="app-modal-meta hidden sm:block">
+                    <div className="app-modal-meta-label">Estado</div>
+                    <div className="app-modal-meta-value">{editingDocente ? 'Edición activa' : 'Nuevo registro'}</div>
                   </div>
                   <button
                     onClick={handleCloseModal}
-                    className="rounded-full border border-slate-200 p-2 text-slate-400 transition-colors hover:text-slate-600"
+                    className="app-modal-close"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -645,23 +649,24 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
               </div>
             </div>
 
-            <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.85fr)] lg:px-8 lg:py-7">
-              <div className="space-y-6">
+            <div className="app-modal-scroll">
+              <div className="app-form-layout app-form-layout--with-aside lg:px-8 lg:py-7">
+              <div className="app-form-main app-form-stack">
                 {!editingDocente && (
-                  <div className="rounded-2xl border border-teal-100 bg-teal-50/70 px-5 py-4 text-sm leading-6 text-teal-800 shadow-sm">
+                  <div className="app-form-note">
                     El alta del docente mantiene el flujo del panel y enviará las credenciales automáticamente al correo registrado.
                   </div>
                 )}
 
-                <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 shadow-sm">
-                  <div className="mb-4">
-                    <h4 className="text-base font-semibold text-[#3A4A5B]">Información personal</h4>
-                    <p className="mt-1 text-sm text-slate-500">Datos base para identificar al docente dentro de la plataforma.</p>
+                <section className="app-form-section app-form-section--muted">
+                  <div className="mb-4 space-y-1.5">
+                    <h4 className="app-form-section-title">Información personal</h4>
+                    <p className="app-form-section-description">Datos base para identificar al docente dentro de la plataforma.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Nombre *</label>
+                  <div className="app-form-grid app-form-grid-2">
+                    <div className="app-form-field">
+                      <label className="app-form-label">Nombre *</label>
                       <input
                         type="text"
                         value={formData.nombre}
@@ -671,8 +676,8 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                         required
                       />
                     </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Email *</label>
+                    <div className="app-form-field">
+                      <label className="app-form-label">Email *</label>
                       <input
                         type="email"
                         value={formData.email}
@@ -685,15 +690,15 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                   </div>
                 </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-4">
-                    <h4 className="text-base font-semibold text-[#3A4A5B]">Perfil académico</h4>
-                    <p className="mt-1 text-sm text-slate-500">Relaciona el código de acceso, la especialidad y el área que usará el docente.</p>
+                <section className="app-form-section">
+                  <div className="mb-4 space-y-1.5">
+                    <h4 className="app-form-section-title">Perfil académico</h4>
+                    <p className="app-form-section-description">Relaciona el código de acceso, la especialidad y el área que usará el docente.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Código de acceso *</label>
+                  <div className="app-form-grid app-form-grid-2">
+                    <div className="app-form-field">
+                      <label className="app-form-label">Código de acceso *</label>
                       <input
                         type="text"
                         value={formData.codigoAcceso}
@@ -703,8 +708,8 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                         required
                       />
                     </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Especialidad *</label>
+                    <div className="app-form-field">
+                      <label className="app-form-label">Especialidad *</label>
                       <input
                         type="text"
                         value={formData.especialidad}
@@ -714,12 +719,12 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                         required
                       />
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Área *</label>
+                    <div className="app-form-field md:col-span-2">
+                      <label className="app-form-label">Área *</label>
                       <select
                         value={formData.areaId}
                         onChange={(event) => updateField('areaId', event.target.value)}
-                        className={`${inputClassName} bg-white`}
+                        className="app-form-select"
                         required
                       >
                         <option value="">Selecciona un area</option>
@@ -734,34 +739,34 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                 </section>
               </div>
 
-              <aside className="space-y-5">
-                <section className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 via-white to-cyan-50 p-5 shadow-sm">
-                  <h4 className="text-base font-semibold text-[#3A4A5B]">Resumen del registro</h4>
-                  <div className="mt-4 space-y-4 text-sm">
-                    <div className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
-                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Docente</div>
-                      <div className="mt-2 font-semibold text-slate-800">{formData.nombre.trim() || 'Sin nombre definido'}</div>
-                      <div className="mt-1 break-all text-slate-500">{formData.email.trim() || 'Correo pendiente'}</div>
+              <aside className="app-form-aside app-form-stack md:self-start">
+                <section className="app-form-section app-form-section--accent">
+                  <h4 className="app-form-section-title">Resumen del registro</h4>
+                  <div className="mt-4 space-y-3 text-sm">
+                    <div className="app-form-summary-card">
+                      <div className="app-form-summary-label">Docente</div>
+                      <div className="app-form-summary-value">{formData.nombre.trim() || 'Sin nombre definido'}</div>
+                      <div className="app-form-summary-help break-all">{formData.email.trim() || 'Correo pendiente'}</div>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                      <div className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
-                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Código</div>
-                        <div className="mt-2 font-semibold text-slate-800">{formData.codigoAcceso.trim() || 'Pendiente'}</div>
+                      <div className="app-form-summary-card">
+                        <div className="app-form-summary-label">Código</div>
+                        <div className="app-form-summary-value">{formData.codigoAcceso.trim() || 'Pendiente'}</div>
                       </div>
-                      <div className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
-                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Especialidad</div>
-                        <div className="mt-2 font-semibold text-slate-800">{formData.especialidad.trim() || 'Pendiente'}</div>
+                      <div className="app-form-summary-card">
+                        <div className="app-form-summary-label">Especialidad</div>
+                        <div className="app-form-summary-value">{formData.especialidad.trim() || 'Pendiente'}</div>
                       </div>
                     </div>
-                    <div className="rounded-xl border border-dashed border-teal-200 bg-teal-50/70 p-4 text-teal-800">
-                      <div className="text-xs font-semibold uppercase tracking-[0.18em]">Área asignada</div>
-                      <div className="mt-2 font-semibold">{areas.find((area) => String(area.id) === formData.areaId)?.nombre || 'Selecciona un area'}</div>
+                    <div className="app-form-note">
+                      <div className="app-form-summary-label">Área asignada</div>
+                      <div className="app-form-summary-value">{areas.find((area) => String(area.id) === formData.areaId)?.nombre || 'Selecciona un area'}</div>
                     </div>
                   </div>
                 </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h4 className="text-base font-semibold text-[#3A4A5B]">Antes de guardar</h4>
+                <section className="app-form-section">
+                  <h4 className="app-form-section-title">Antes de guardar</h4>
                   <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
                     <p>Verifica el correo porque ahí llegarán las credenciales iniciales.</p>
                     <p>Usa un código de acceso fácil de comunicar pero suficientemente claro para el equipo docente.</p>
@@ -769,20 +774,21 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                   </div>
                 </section>
               </aside>
+              </div>
             </div>
 
-            <div className="sticky bottom-0 flex gap-4 justify-end rounded-b-[28px] border-t border-slate-200 bg-white/95 px-6 py-5 backdrop-blur lg:px-8">
+            <div className="app-form-footer">
               <button
                 onClick={handleCloseModal}
                 disabled={submitting}
-                className="rounded-xl border-2 border-slate-300 px-6 py-3 text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-btn app-btn-secondary px-6 py-3 text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSave}
                 disabled={submitting || !isFormValid}
-                className="flex items-center gap-2 rounded-xl px-6 py-3 text-white shadow-md transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-btn rounded-xl px-6 py-3 text-white shadow-md transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ backgroundColor: accentColor }}
               >
                 {submitting ? (

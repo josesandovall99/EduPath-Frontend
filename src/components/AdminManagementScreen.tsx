@@ -186,83 +186,98 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
       </main>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-              <h3 className="text-2xl font-semibold text-[#3A4A5B]">Crear Administrador</h3>
+        <div className="app-modal-overlay app-modal-overlay--top">
+          <div className="app-modal-card app-modal-card--lg">
+            <div className="app-modal-header">
+              <div>
+                <div className="app-modal-kicker">Administración</div>
+                <h3 className="app-modal-title">Crear administrador</h3>
+                <p className="app-modal-description">Registra un nuevo administrador manteniendo el mismo lenguaje visual del panel general.</p>
+              </div>
               <button
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="app-modal-close"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
+            <div className="app-modal-scroll">
+            <div className="app-form-layout">
               {formError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                   {formError}
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
+              <section className="app-form-section app-form-section--muted">
+                <div className="mb-4">
+                  <h4 className="app-form-section-title">Información personal</h4>
+                  <p className="app-form-section-description">Datos base para crear la cuenta administrativa.</p>
+                </div>
+                <div className="app-form-grid app-form-grid-2">
+                <div className="app-form-field">
+                  <label className="app-form-label">Nombre *</label>
                   <input
                     type="text"
                     value={formData.nombre}
                     onChange={(event) => setFormData({ ...formData, nombre: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
+                    className="app-form-input"
                     placeholder="Ej: Juan Perez"
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                <div className="app-form-field">
+                  <label className="app-form-label">Email *</label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(event) => setFormData({ ...formData, email: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
+                    className="app-form-input"
                     placeholder="juan@demo.com"
                     required
                   />
                 </div>
               </div>
+              </section>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Codigo de acceso *</label>
+              <section className="app-form-section">
+                <div className="mb-4">
+                  <h4 className="app-form-section-title">Acceso</h4>
+                  <p className="app-form-section-description">Configura el código inicial y confirma el envío automático de credenciales.</p>
+                </div>
+                <div className="app-form-grid app-form-grid-2">
+                <div className="app-form-field">
+                  <label className="app-form-label">Código de acceso *</label>
                   <input
                     type="text"
                     value={formData.codigoAcceso}
                     onChange={(event) => setFormData({ ...formData, codigoAcceso: event.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
+                    className="app-form-input"
                     placeholder="ADM001"
                     required
                   />
                 </div>
-                <div>
-                  <div className="h-full rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 flex items-center">
+                <div className="app-form-note flex items-center">
                     La contrasena se genera automaticamente y se envia al correo del administrador.
-                  </div>
                 </div>
               </div>
-
+              </section>
+            </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex gap-4 justify-end bg-gray-50 rounded-b-2xl">
+            <div className="app-form-footer">
               <button
                 onClick={handleCloseModal}
                 disabled={submitting}
-                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="app-btn app-btn-secondary px-6 py-3 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreateAdmin}
                 disabled={submitting || !formData.nombre.trim() || !formData.email.trim() || !formData.codigoAcceso.trim()}
-                className="px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="app-btn px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: '#4A90E2' }}
               >
                 {submitting ? (

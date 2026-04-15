@@ -124,15 +124,16 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Crea una contraseña segura"
-                    className="w-full border border-gray-300 rounded-lg p-3 pl-11 pr-12 bg-white focus:outline-none focus:ring-2 focus:ring-[#4A90E2] transition-all placeholder:text-gray-300"
+                    className="w-full appearance-none border border-gray-300 rounded-lg p-3 pl-11 pr-14 bg-white focus:outline-none focus:ring-2 focus:ring-[#4A90E2] transition-all placeholder:text-gray-300"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowNew(!showNew)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="z-10 text-gray-400 hover:text-gray-600"
+                    style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}
                   >
-                    {showNew ? <EyeOff size={20} /> : <Eye size={20} />}
+                    {showNew ? <EyeOff size={22} /> : <Eye size={22} />}
                   </button>
                 </div>
 
@@ -164,7 +165,7 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Repite la nueva contraseña"
-                    className={`w-full border rounded-lg p-3 pl-11 pr-12 bg-white outline-none transition-all ${
+                    className={`w-full appearance-none border rounded-lg p-3 pl-11 pr-14 bg-white outline-none transition-all ${
                         passwordsMatch && confirmPassword 
                         ? 'border-[#7ED6A7] focus:ring-2 focus:ring-[#7ED6A7]' 
                         : 'border-gray-300 focus:ring-2 focus:ring-[#4A90E2]'
@@ -174,9 +175,10 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
                   <button
                     type="button"
                     onClick={() => setShowConfirm(!showConfirm)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="z-10 text-gray-400 hover:text-gray-600"
+                    style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}
                   >
-                    {showConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
+                    {showConfirm ? <EyeOff size={22} /> : <Eye size={22} />}
                   </button>
                 </div>
                 

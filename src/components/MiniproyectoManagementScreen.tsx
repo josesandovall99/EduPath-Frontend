@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ClipboardList, RefreshCw, Save, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
+import { createQuillModules, loadQuill } from '../utils/quill';
 
 interface MiniproyectoManagementScreenProps {
   onBack: () => void;
@@ -108,41 +109,19 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   useEffect(() => {
     if (!isProgrammingMiniproyecto) return;
 
-    const ensureQuill = () => {
+    let cancelled = false;
+
+    const ensureQuill = async () => {
       if (!editorRef.current) return;
-      if (!(window as any).Quill) return;
+      const Quill = await loadQuill();
+      if (cancelled || !editorRef.current) return;
       if (!quillRef.current) {
-        try {
-          const SizeStyle = (window as any).Quill.import('attributors/style/size');
-          SizeStyle.whitelist = ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'];
-          (window as any).Quill.register(SizeStyle, true);
-
-          const FontStyle = (window as any).Quill.import('attributors/style/font');
-          FontStyle.whitelist = ['Arial', 'Monospace', 'Algerian'];
-          (window as any).Quill.register(FontStyle, true);
-        } catch (err) {
-          console.warn('Quill format registration failed', err);
-        }
-
         editorRef.current.innerHTML = '';
-        quillRef.current = new (window as any).Quill(editorRef.current, {
+        quillRef.current = new Quill(editorRef.current, {
           theme: 'snow',
           placeholder: 'Ingrese la descripcion del miniproyecto',
-          modules: {
-            toolbar: [
-              [{ font: ['Arial', 'Monospace', 'Algerian'] }],
-              [{ size: ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '32px'] }],
-              ['bold', 'italic', 'underline', 'strike'],
-              [{ color: [] }, { background: [] }],
-              [{ list: 'ordered' }, { list: 'bullet' }],
-              [{ align: [] }],
-              ['link', 'image', 'video'],
-              ['clean']
-            ]
-          }
+          modules: createQuillModules()
         });
-
-        quillRef.current.format('size', '14px');
         quillRef.current.on('text-change', () => {
           setFormData((prev) => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
         });
@@ -154,6 +133,10 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     if (quillRef.current) {
       quillRef.current.root.innerHTML = formData.descripcion || '';
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [selected, formData.descripcion, isProgrammingMiniproyecto]);
 
   const lenguajesDisponibles = [

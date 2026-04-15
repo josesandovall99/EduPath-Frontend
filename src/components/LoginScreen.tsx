@@ -1,4 +1,4 @@
-import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { applyAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
@@ -17,6 +17,7 @@ interface LoginScreenProps {
 export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, onAdminLogin, onShowRegister, onShowForgotPassword }: LoginScreenProps) {
   const [codigoEstudiantil, setCodigoEstudiantil] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const invalidCredentialsMessage = 'Credenciales inválidas. Verifica tu código y contraseña e inténtalo de nuevo.';
@@ -232,9 +233,9 @@ return (
           )}
 
           <div className="space-y-4">
-            {/* Código Estudiantil */}
+            {/* Usuario */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Código Estudiantil</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -254,13 +255,22 @@ return (
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full rounded-lg p-3 pl-11 bg-white focus:outline-none focus:ring-2 focus:border-transparent transition-all ${hasAuthError ? 'border border-red-300 focus:ring-red-300' : 'border border-gray-300 focus:ring-[#4A90E2]'}`}
+                  className={`w-full appearance-none rounded-lg p-3 pl-11 pr-14 bg-white focus:outline-none focus:ring-2 focus:border-transparent transition-all ${hasAuthError ? 'border border-red-300 focus:ring-red-300' : 'border border-gray-300 focus:ring-[#4A90E2]'}`}
                   style={hasAuthError ? { borderColor: '#f87171', color: '#991b1b' } : undefined}
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="z-10 text-gray-400 hover:text-gray-600"
+                  style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
+                </button>
               </div>
             </div>
 

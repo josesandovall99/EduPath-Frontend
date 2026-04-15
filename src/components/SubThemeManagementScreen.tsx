@@ -708,33 +708,33 @@ export function SubThemeManagementScreen({
                 />
               </div>
 
-              <div className="mt-4 flex gap-2 flex-wrap">
+              <div className="app-filter-row mt-4">
                 <button
                   onClick={() => setStateFilter('all')}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`app-filter-chip ${
                     stateFilter === 'all'
-                      ? 'bg-slate-800 text-white shadow-md'
-                      : 'app-btn-secondary text-gray-700'
+                      ? 'app-filter-chip--blue'
+                      : ''
                   }`}
                 >
                   Todos ({subtemas.length})
                 </button>
                 <button
                   onClick={() => setStateFilter('active')}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`app-filter-chip ${
                     stateFilter === 'active'
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'app-btn-secondary text-gray-700'
+                      ? 'app-filter-chip--green'
+                      : ''
                   }`}
                 >
                   Activos ({subtemas.filter((subtema) => isSubtemaActive(subtema)).length})
                 </button>
                 <button
                   onClick={() => setStateFilter('inactive')}
-                  className={`px-4 py-2 rounded-lg transition-all ${
+                  className={`app-filter-chip ${
                     stateFilter === 'inactive'
-                      ? 'bg-amber-600 text-white shadow-md'
-                      : 'app-btn-secondary text-gray-700'
+                      ? 'app-filter-chip--amber'
+                      : ''
                   }`}
                 >
                   Inactivos ({subtemas.filter((subtema) => !isSubtemaActive(subtema)).length})
@@ -829,62 +829,60 @@ export function SubThemeManagementScreen({
 
       {/* Modal para crear/editar subtema */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Header del modal */}
-            <div 
-              className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl"
-              style={{ backgroundColor: `${currentColor.primary}10` }}
-            >
-              <h3 className="text-2xl font-semibold text-[#3A4A5B]">
-                {editingSubtema ? 'Editar Subtema' : 'Crear Nuevo Subtema'}
-              </h3>
+        <div className="app-modal-overlay app-modal-overlay--top">
+          <div className="app-modal-card app-modal-card--lg">
+            <div className="app-modal-header">
+              <div>
+                <div className="app-modal-kicker">Subtemas</div>
+                <h3 className="app-modal-title">{editingSubtema ? 'Editar subtema' : 'Crear nuevo subtema'}</h3>
+                <p className="app-modal-description">Mantén la estructura temática con el mismo diseño base que el resto de la gestión académica.</p>
+              </div>
               <button
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="app-modal-close"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Contenido del modal */}
-            <div className="p-6 space-y-6">
+            <div className="app-modal-scroll">
+              <div className="app-form-layout">
+                <section className="app-form-section app-form-section--muted">
               {/* Nombre */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="app-form-field">
+                <label className="app-form-label">
                   Nombre del Subtema <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.nombre}
                   onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all"
-                  style={{ focusRing: currentColor.primary }}
+                  className="app-form-input"
                   placeholder="Ej: Variables locales y globales"
                   required
                 />
               </div>
 
               {/* Descripción */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="app-form-field">
+                <label className="app-form-label">
                   Descripción
                 </label>
                 <textarea
                   value={formData.descripcion}
                   onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 focus:border-transparent transition-all resize-none"
+                  className="app-form-textarea"
                   placeholder="Descripción breve del subtema..."
                   rows={4}
                 />
               </div>
 
               {/* Tema Asociado (solo mostrar, no editable) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="app-form-field">
+                <label className="app-form-label">
                   Tema Asociado
                 </label>
-                <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="app-form-static">
                   <p className="text-gray-700 font-medium">
                     {temas.find(t => t.id === formData.tema_id)?.nombre || 'Tema no encontrado'}
                   </p>
@@ -893,10 +891,11 @@ export function SubThemeManagementScreen({
                   </p>
                 </div>
               </div>
+                </section>
+              </div>
             </div>
 
-            {/* Footer del modal */}
-            <div className="p-6 border-t border-gray-200 flex gap-4 justify-end bg-gray-50 rounded-b-2xl">
+            <div className="app-form-footer">
               <button
                 onClick={handleCloseModal}
                 disabled={submitting}

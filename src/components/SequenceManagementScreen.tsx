@@ -1610,15 +1610,16 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
       {/* Modal Crear/Editar Secuencia */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
+        <div className="app-modal-overlay app-modal-overlay--top">
+          <div className="app-modal-card app-modal-card--lg">
+            <div className="app-modal-header">
               <div>
-                <h2 className="text-2xl font-bold text-[#3A4A5B]">
+                <div className="app-modal-kicker">Secuencias</div>
+                <h2 className="app-modal-title">
                   {isEditMode ? 'Editar Secuencia' : insertAfterSequenceId ? 'Insertar Contenido en Secuencia' : 'Crear Nueva Secuencia'}
                 </h2>
                 {insertAfterSequenceId && (
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="app-modal-description">
                     Se insertará en el medio de la secuencia seleccionada
                   </p>
                 )}
@@ -1636,14 +1637,16 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   setModalSubtemas([]);
                   setModalContents([]);
                 }}
-                className="text-gray-400 hover:text-gray-600 text-2xl"
+                className="app-modal-close"
               >
                 ✕
               </button>
             </div>
 
+            <div className="app-modal-scroll">
+            <div className="app-form-layout">
             {/* Helper Message */}
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="app-form-note mb-6">
               <p className="text-sm text-blue-800">
                 <span className="font-semibold">💡 Consejo:</span> Selecciona un contenido origen y el destino que debe completarse después. 
                 Esto crea un flujo educativo que los estudiantes deben seguir.
@@ -1805,7 +1808,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
               </div>
 
               {/* Botones */}
-              <div className="flex gap-4 justify-end mt-6">
+              <div className="app-form-footer mt-6 border-t-0 px-0 pb-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -1842,6 +1845,8 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 </button>
               </div>
             </form>
+            </div>
+            </div>
           </div>
         </div>
       )}

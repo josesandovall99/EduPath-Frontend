@@ -1098,6 +1098,33 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     setShowModal(true);
   };
 
+  const selectedContenido = contenidosOptions.find(
+    (contenido) => String(contenido.id) === String(formData.ejercicio.contenido_id)
+  );
+  const selectedTipoActividad = tiposActividad.find(
+    (tipo) => String(tipo.id) === String(formData.actividad.tipo_actividad_id)
+  );
+  const exerciseTypeDescription =
+    formData.ejercicio.tipo_ejercicio === 'Compilador'
+      ? 'Ejercicio de programación con ejecución de código.'
+      : formData.ejercicio.tipo_ejercicio === 'Diagramas UML'
+        ? 'Ejercicio de construcción y validación de diagramas UML.'
+        : formData.ejercicio.tipo_ejercicio === 'Preguntas'
+          ? 'Cuestionario estructurado con preguntas y respuestas.'
+          : formData.ejercicio.tipo_ejercicio === 'Opción única'
+            ? 'Pregunta con una sola respuesta correcta.'
+            : formData.ejercicio.tipo_ejercicio === 'Ordenar'
+              ? 'Actividad para organizar elementos en el orden correcto.'
+              : 'Actividad para relacionar conceptos entre sí.';
+  const exerciseCompletion = [
+    formData.actividad.titulo.trim(),
+    formData.actividad.descripcion.trim(),
+    formData.actividad.tipo_actividad_id,
+    formData.ejercicio.tipo_ejercicio,
+    formData.ejercicio.contenido_id,
+    formData.ejercicio.puntos
+  ].filter(Boolean).length;
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -1372,37 +1399,37 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del ejercicio</p>
                   <p className="mt-1 text-sm text-slate-600">Muestra ejercicios activos, inactivos o todos los registros.</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="app-filter-row">
                   <button
                     onClick={() => setStateFilter('all')}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+                    className={`app-filter-chip ${
                       stateFilter === 'all'
-                        ? 'border-slate-800 bg-slate-800 text-white shadow-md'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                        ? 'app-filter-chip--blue'
+                        : ''
                     }`}
                   >
                     <span>Todos ({ejercicios.length})</span>
                   </button>
                   <button
                     onClick={() => setStateFilter('active')}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+                    className={`app-filter-chip ${
                       stateFilter === 'active'
-                        ? 'border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-200'
-                        : 'border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        ? 'app-filter-chip--green'
+                        : ''
                     }`}
                   >
-                    <Eye className="w-4 h-4" />
+                    <Eye className="h-4 w-4 shrink-0" />
                     <span>Activos ({ejercicios.filter((ejercicio) => isEjercicioActivo(ejercicio)).length})</span>
                   </button>
                   <button
                     onClick={() => setStateFilter('inactive')}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+                    className={`app-filter-chip ${
                       stateFilter === 'inactive'
-                        ? 'border-amber-500 bg-amber-500 text-white shadow-md shadow-amber-200'
-                        : 'border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                        ? 'app-filter-chip--amber'
+                        : ''
                     }`}
                   >
-                    <EyeOff className="w-4 h-4" />
+                    <EyeOff className="h-4 w-4 shrink-0" />
                     <span>Inactivos ({ejercicios.filter((ejercicio) => !isEjercicioActivo(ejercicio)).length})</span>
                   </button>
                 </div>
@@ -1455,7 +1482,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Puntos</th>
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Dificultad</th>
                     <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Acciones</th>
+                    <th className="px-6 py-4 text-center text-[#3A4A5B]">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -1486,8 +1513,8 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                           {ejercicioActivo ? 'Activo' : 'Inhabilitado'}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 flex-wrap">
+                      <td className="px-6 py-4 align-middle">
+                        <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                           <button
                             onClick={() => openEdit(e)}
                             className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
@@ -1520,226 +1547,293 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
 
       {/* Modal Crear/Editar */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-3 lg:p-4 overflow-auto">
-          <div className="bg-white rounded-2xl shadow-xl p-5 lg:p-6 w-[min(1800px,99vw)] max-h-[96vh] overflow-auto relative">
-            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl" style={{ background: 'linear-gradient(90deg, rgba(74,144,226,0.12), rgba(74,144,226,0.06))' }} />
-            <div className="flex items-center justify-between mb-6 pt-2">
-              <h2 className="text-2xl font-bold text-[#3A4A5B]">{isEditMode ? 'Editar Ejercicio' : 'Crear Nuevo Ejercicio'}</h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-[#4A90E2] text-2xl"
-              >
-                ✕
-              </button>
+        <div className="app-modal-overlay app-modal-overlay--top">
+          <div
+            className="app-modal-card app-modal-card--xl"
+            style={{ height: 'min(900px, calc(100vh - 1.5rem))', maxWidth: 'min(1800px, 99vw)' }}
+          >
+            <div className="app-modal-header">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="app-modal-kicker">Ejercicios</div>
+                  <h2 className="app-modal-title">{isEditMode ? 'Editar ejercicio' : 'Crear nuevo ejercicio'}</h2>
+                  <p className="app-modal-description">Configura la actividad base y luego completa la estructura específica según el tipo de ejercicio seleccionado.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="app-modal-meta hidden sm:block">
+                    <div className="app-modal-meta-label">Tipo actual</div>
+                    <div className="app-modal-meta-value">{formData.ejercicio.tipo_ejercicio}</div>
+                  </div>
+                  <button
+                    onClick={() => setShowModal(false)}
+                    className="app-modal-close"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] gap-5 items-start">
-                <div className="space-y-6 min-w-0">
-              {/* Actividad */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Título *</label>
-                  <input
-                    type="text"
-                    name="actividad.titulo"
-                    value={formData.actividad.titulo}
-                    onChange={handleChange}
-                    placeholder="Ingrese el título"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Nivel de dificultad *</label>
-                  <select
-                    name="actividad.nivel_dificultad"
-                    value={formData.actividad.nivel_dificultad}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                  >
-                    <option value="facil">Fácil</option>
-                    <option value="medio">Medio</option>
-                    <option value="dificil">Difícil</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Descripción *</label>
-                <textarea
-                  name="actividad.descripcion"
-                  value={formData.actividad.descripcion}
-                  onChange={handleChange}
-                  placeholder="Ingrese la descripción"
-                  className="w-full min-h-20 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                  required
-                />
-              </div>
-
-                </div>
-
-                <div className="space-y-6 min-w-0">
-
-              {/* Tipo de actividad */}
-              <div>
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                  Tipo de Actividad *
-                  {validationErrors['actividad.tipo_actividad_id'] && (
-                    <span className="ml-2 text-red-500 text-xs flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {validationErrors['actividad.tipo_actividad_id']}
-                    </span>
+            <div className="app-modal-scroll">
+              <div className="app-form-layout app-form-layout--with-aside lg:px-8 lg:py-7">
+                <form id="exercise-form" onSubmit={handleSubmit} className="app-form-main app-form-stack">
+                  {!isEditMode && (
+                    <div className="app-form-note">
+                      Primero define los datos comunes del ejercicio. Después podrás completar la configuración específica del tipo seleccionado en este mismo flujo.
+                    </div>
                   )}
-                </label>
-                <select
-                  name="actividad.tipo_actividad_id"
-                  value={formData.actividad.tipo_actividad_id}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent ${
-                    validationErrors['actividad.tipo_actividad_id'] ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  required
-                  disabled={isLoadingTipos}
-                >
-                  <option value="">-- Seleccione un tipo de actividad --</option>
-                  {tiposActividad.map(tipo => (
-                    <option key={tipo.id} value={tipo.id}>
-                      {tipo.nombre}
-                    </option>
-                  ))}
-                </select>
-                {isLoadingTipos && (
-                  <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                    <Loader className="w-3 h-3 animate-spin" />
-                    Cargando tipos de actividad...
-                  </p>
+
+                  <section className="app-form-section app-form-section--muted">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Actividad base</h4>
+                      <p className="app-form-section-description">Estos datos identifican la actividad dentro del catálogo general del panel administrativo.</p>
+                    </div>
+
+                    <div className="app-form-grid app-form-grid-2">
+                      <div className="app-form-field">
+                        <label className="app-form-label">Título *</label>
+                        <input
+                          type="text"
+                          name="actividad.titulo"
+                          value={formData.actividad.titulo}
+                          onChange={handleChange}
+                          placeholder="Ingrese el título"
+                          className="app-form-input"
+                          required
+                        />
+                      </div>
+                      <div className="app-form-field">
+                        <label className="app-form-label">Nivel de dificultad *</label>
+                        <select
+                          name="actividad.nivel_dificultad"
+                          value={formData.actividad.nivel_dificultad}
+                          onChange={handleChange}
+                          className="app-form-select"
+                        >
+                          <option value="facil">Fácil</option>
+                          <option value="medio">Medio</option>
+                          <option value="dificil">Difícil</option>
+                        </select>
+                      </div>
+                      <div className="app-form-field md:col-span-2">
+                        <label className="app-form-label">Descripción *</label>
+                        <textarea
+                          name="actividad.descripcion"
+                          value={formData.actividad.descripcion}
+                          onChange={handleChange}
+                          placeholder="Ingrese la descripción"
+                          className="app-form-textarea"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="app-form-section">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Configuración general</h4>
+                      <p className="app-form-section-description">Selecciona el tipo de actividad, el contenido asociado y la mecánica general del ejercicio.</p>
+                    </div>
+
+                    <div className="app-form-grid app-form-grid-2">
+                      <div className="app-form-field">
+                        <label className="app-form-label">Tipo de actividad *</label>
+                        <select
+                          name="actividad.tipo_actividad_id"
+                          value={formData.actividad.tipo_actividad_id}
+                          onChange={handleChange}
+                          className={`app-form-select ${validationErrors['actividad.tipo_actividad_id'] ? 'border-red-500' : ''}`}
+                          required
+                          disabled={isLoadingTipos}
+                        >
+                          <option value="">-- Seleccione un tipo de actividad --</option>
+                          {tiposActividad.map((tipo) => (
+                            <option key={tipo.id} value={tipo.id}>
+                              {tipo.nombre}
+                            </option>
+                          ))}
+                        </select>
+                        {validationErrors['actividad.tipo_actividad_id'] && (
+                          <p className="text-xs text-red-500 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            {validationErrors['actividad.tipo_actividad_id']}
+                          </p>
+                        )}
+                        {isLoadingTipos && (
+                          <p className="text-xs text-gray-500 flex items-center gap-1">
+                            <Loader className="w-3 h-3 animate-spin" />
+                            Cargando tipos de actividad...
+                          </p>
+                        )}
+                        {!isLoadingTipos && tiposActividad.length === 0 && (
+                          <p className="text-xs text-amber-600">No se pudieron cargar los tipos de actividad. Recarga la página.</p>
+                        )}
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Tipo de ejercicio *</label>
+                        <select
+                          name="ejercicio.tipo_ejercicio"
+                          value={formData.ejercicio.tipo_ejercicio}
+                          onChange={handleChange}
+                          className="app-form-select"
+                          required
+                        >
+                          <option value="Compilador">Compilador</option>
+                          <option value="Diagramas UML">Diagramas UML</option>
+                          <option value="Preguntas">Preguntas</option>
+                          <option value="Opción única">Opción única</option>
+                          <option value="Ordenar">Ordenar</option>
+                          <option value="Relacionar">Relacionar</option>
+                        </select>
+                        <p className="text-xs text-gray-500">{exerciseTypeDescription}</p>
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Contenido *</label>
+                        <select
+                          name="ejercicio.contenido_id"
+                          value={formData.ejercicio.contenido_id === '' ? '' : String(formData.ejercicio.contenido_id)}
+                          onChange={handleChange}
+                          className={`app-form-select ${validationErrors['ejercicio.contenido_id'] ? 'border-red-500' : ''}`}
+                          required
+                          disabled={isLoadingContenidos}
+                        >
+                          <option value="" disabled>
+                            {isLoadingContenidos ? 'Cargando contenidos...' : 'Seleccione un contenido'}
+                          </option>
+                          {contenidosOptions.map((contenido) => (
+                            <option key={contenido.id} value={String(contenido.id)}>
+                              {contenido.titulo} (ID {contenido.id})
+                            </option>
+                          ))}
+                        </select>
+                        {validationErrors['ejercicio.contenido_id'] && (
+                          <p className="text-xs text-red-500 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            {validationErrors['ejercicio.contenido_id']}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Puntos *</label>
+                        <input
+                          type="number"
+                          name="ejercicio.puntos"
+                          value={formData.ejercicio.puntos}
+                          onChange={handleChange}
+                          min={0}
+                          className="app-form-input"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="app-form-section">
+                    <div className="mb-4 space-y-1.5">
+                      <h4 className="app-form-section-title">Configuración específica</h4>
+                      <p className="app-form-section-description">Completa los parámetros que solo aplican al tipo de ejercicio seleccionado actualmente.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {formData.ejercicio.tipo_ejercicio === 'Compilador' && (
+                        <CompiladorConfig formData={formData} setFormData={setFormData} />
+                      )}
+
+                      {formData.ejercicio.tipo_ejercicio === 'Diagramas UML' && (
+                        <UMLConfig formData={formData} setFormData={setFormData} />
+                      )}
+
+                      {formData.ejercicio.tipo_ejercicio === 'Preguntas' && (
+                        <PreguntasConfig formData={formData} setFormData={setFormData} />
+                      )}
+
+                      {formData.ejercicio.tipo_ejercicio === 'Opción única' && (
+                        <MultipleChoiceConfig formData={formData} setFormData={setFormData} />
+                      )}
+
+                      {formData.ejercicio.tipo_ejercicio === 'Ordenar' && (
+                        <OrderingConfig formData={formData} setFormData={setFormData} />
+                      )}
+
+                      {formData.ejercicio.tipo_ejercicio === 'Relacionar' && (
+                        <MatchingConfig formData={formData} setFormData={setFormData} />
+                      )}
+                    </div>
+                  </section>
+                </form>
+
+                <aside className="app-form-aside app-form-stack md:self-start">
+                  <section className="app-form-section app-form-section--accent">
+                    <h4 className="app-form-section-title">Resumen del ejercicio</h4>
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div className="app-form-summary-card">
+                        <div className="app-form-summary-label">Actividad</div>
+                        <div className="app-form-summary-value">{formData.actividad.titulo.trim() || 'Sin título definido'}</div>
+                        <div className="app-form-summary-help">{formData.actividad.descripcion.trim() || 'Descripción pendiente'}</div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                        <div className="app-form-summary-card">
+                          <div className="app-form-summary-label">Tipo</div>
+                          <div className="app-form-summary-value">{formData.ejercicio.tipo_ejercicio}</div>
+                          <div className="app-form-summary-help">{selectedTipoActividad?.nombre || 'Tipo de actividad pendiente'}</div>
+                        </div>
+                        <div className="app-form-summary-card">
+                          <div className="app-form-summary-label">Puntaje</div>
+                          <div className="app-form-summary-value">{formData.ejercicio.puntos || 'Pendiente'}</div>
+                          <div className="app-form-summary-help">Dificultad: {formData.actividad.nivel_dificultad}</div>
+                        </div>
+                      </div>
+                      <div className="app-form-note">
+                        <div className="app-form-summary-label">Contenido vinculado</div>
+                        <div className="app-form-summary-value">{selectedContenido?.titulo || 'Selecciona un contenido'}</div>
+                        <div className="app-form-summary-help">Avance del formulario: {exerciseCompletion}/6 campos generales completos.</div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="app-form-section">
+                    <h4 className="app-form-section-title">Antes de guardar</h4>
+                    <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                      <p>Verifica que el tipo de ejercicio sí coincida con la interacción esperada para el estudiante.</p>
+                      <p>Comprueba que el contenido asociado sea correcto, porque desde ahí se contextualiza la actividad.</p>
+                      <p>Completa la configuración específica antes de guardar para evitar ejercicios incompletos en producción.</p>
+                    </div>
+                  </section>
+                </aside>
+              </div>
+            </div>
+
+            <div className="app-form-footer">
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                disabled={isSaving}
+                className="app-btn app-btn-secondary px-6 py-3 text-slate-700 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                form="exercise-form"
+                disabled={isSaving}
+                className="app-btn app-btn-success rounded-xl px-6 py-3 text-white disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    <span>Guardando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    <span>{isEditMode ? 'Actualizar Ejercicio' : 'Crear Ejercicio'}</span>
+                  </>
                 )}
-                {!isLoadingTipos && tiposActividad.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    ⚠️ No se pudieron cargar los tipos de actividad. Por favor, recarga la página.
-                  </p>
-                )}
-              </div>
-
-              {/* Ejercicio - Tipo */}
-              <div>
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Tipo de Ejercicio *</label>
-                <select
-                  name="ejercicio.tipo_ejercicio"
-                  value={formData.ejercicio.tipo_ejercicio}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                  required
-                >
-                  <option value="Compilador">Compilador</option>
-                  <option value="Diagramas UML">Diagramas UML</option>
-                  <option value="Preguntas">Preguntas</option>
-                  <option value="Opción única">Opción única</option>
-                  <option value="Ordenar">Ordenar</option>
-                  <option value="Relacionar">Relacionar</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {formData.ejercicio.tipo_ejercicio === 'Compilador' && 'Ejercicio de programación con ejecución de código'}
-                  {formData.ejercicio.tipo_ejercicio === 'Diagramas UML' && 'Ejercicio de creación de diagramas UML'}
-                  {formData.ejercicio.tipo_ejercicio === 'Preguntas' && 'Cuestionario con preguntas y respuestas'}
-                  {formData.ejercicio.tipo_ejercicio === 'Opción única' && 'Pregunta de opción única (una correcta)'}
-                  {formData.ejercicio.tipo_ejercicio === 'Ordenar' && 'Ordenar ítems para formar la secuencia correcta'}
-                  {formData.ejercicio.tipo_ejercicio === 'Relacionar' && 'Relacionar conceptos con definiciones'}
-                </p>
-              </div>
-
-              {/* Ejercicio - Campos comunes */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                    Contenido *
-                    {validationErrors['ejercicio.contenido_id'] && (
-                      <span className="ml-2 text-red-500 text-xs flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {validationErrors['ejercicio.contenido_id']}
-                      </span>
-                    )}
-                  </label>
-                  <select
-                    name="ejercicio.contenido_id"
-                    value={formData.ejercicio.contenido_id === '' ? '' : String(formData.ejercicio.contenido_id)}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent ${
-                      validationErrors['ejercicio.contenido_id'] ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    required
-                    disabled={isLoadingContenidos}
-                  >
-                    <option value="" disabled>
-                      {isLoadingContenidos ? 'Cargando contenidos...' : 'Seleccione un contenido'}
-                    </option>
-                    {contenidosOptions.map((c) => (
-                      <option key={c.id} value={String(c.id)}>
-                        {c.titulo} (ID {c.id})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Puntos *</label>
-                  <input
-                    type="number"
-                    name="ejercicio.puntos"
-                    value={formData.ejercicio.puntos}
-                    onChange={handleChange}
-                    min={0}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                    required
-                  />
-                </div>
-              </div>
-                </div>
-              </div>
-
-              {/* Configuración específica por tipo */}
-              {formData.ejercicio.tipo_ejercicio === 'Compilador' && (
-                <CompiladorConfig formData={formData} setFormData={setFormData} />
-              )}
-
-              {formData.ejercicio.tipo_ejercicio === 'Diagramas UML' && (
-                <UMLConfig formData={formData} setFormData={setFormData} />
-              )}
-
-              {formData.ejercicio.tipo_ejercicio === 'Preguntas' && (
-                <PreguntasConfig formData={formData} setFormData={setFormData} />
-              )}
-
-              {formData.ejercicio.tipo_ejercicio === 'Opción única' && (
-                <MultipleChoiceConfig formData={formData} setFormData={setFormData} />
-              )}
-
-              {formData.ejercicio.tipo_ejercicio === 'Ordenar' && (
-                <OrderingConfig formData={formData} setFormData={setFormData} />
-              )}
-
-              {formData.ejercicio.tipo_ejercicio === 'Relacionar' && (
-                <MatchingConfig formData={formData} setFormData={setFormData} />
-              )}
-
-              <div className="mt-6 flex gap-3 justify-end border-t border-slate-200 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  disabled={isSaving}
-                  className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-6 py-2 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isSaving ? (<><Loader className="w-4 h-4 animate-spin" /> Guardando...</>) : (<><Plus className="w-4 h-4" /> {isEditMode ? 'Actualizar' : 'Crear'} Ejercicio</>)}
-                </button>
-              </div>
-            </form>
+              </button>
+            </div>
           </div>
         </div>
       )}
