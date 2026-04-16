@@ -44,6 +44,11 @@ interface EditFormData {
   respuesta_miniproyecto: string;
 }
 
+type ScheduleRow = { milestone: string; start: string; end: string };
+type CostRow = { deliverable: string; unitMeasure: string; quantity: string; unitPrice: string };
+
+const UNIT_MEASURE_OPTIONS = ['Unidad', 'Hora', 'Día', 'Semana', 'Mes', 'Licencia', 'Documento', 'Paquete'];
+
 type ExpectedSnapshot =
   | {
       mode: 'analysis';
@@ -53,9 +58,12 @@ type ExpectedSnapshot =
     }
   | {
       mode: 'management';
-      alcance: string[];
+      objetivoPrincipal: string[];
+      objetivosEspecificos: string[];
+      entregables: string[];
       cronograma: string[];
       costos: string[];
+      supuestos: string[];
     };
 
 const normalizeAreaName = (value?: string | null) =>
@@ -90,13 +98,18 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const [stakeholderInput, setStakeholderInput] = useState('');
   const [functionalInput, setFunctionalInput] = useState('');
   const [nonFunctionalInput, setNonFunctionalInput] = useState('');
+  const [projectObjective, setProjectObjective] = useState('');
+  const [specificObjectivesList, setSpecificObjectivesList] = useState<string[]>([]);
+  const [specificObjectiveInput, setSpecificObjectiveInput] = useState('');
   const [scopeList, setScopeList] = useState<string[]>([]);
-  const [scheduleRows, setScheduleRows] = useState<Array<{ activity: string; start: string; end: string }>>([
-    { activity: '', start: '', end: '' }
+  const [scheduleRows, setScheduleRows] = useState<ScheduleRow[]>([
+    { milestone: '', start: '', end: '' }
   ]);
-  const [costRows, setCostRows] = useState<
-    Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }>
-  >([{ concept: '', type: 'Humano', quantity: '', unitCost: '' }]);
+  const [costRows, setCostRows] = useState<CostRow[]>([]);
+  const [contingencyPercentage, setContingencyPercentage] = useState('5');
+  const [utilityPercentage, setUtilityPercentage] = useState('10');
+  const [assumptionsList, setAssumptionsList] = useState<string[]>([]);
+  const [assumptionInput, setAssumptionInput] = useState('');
   const [scopeInput, setScopeInput] = useState('');
   const [showExpectedModal, setShowExpectedModal] = useState(false);
   const [expectedSnapshot, setExpectedSnapshot] = useState<ExpectedSnapshot | null>(null);
@@ -192,26 +205,61 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const formatCurrency = (value: number) =>
     value.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
-  const buildScheduleList = (rows: Array<{ activity: string; start: string; end: string }>) =>
+  const buildScheduleList = (rows: ScheduleRow[]) =>
     rows
-      .filter((row) => row.activity || row.start || row.end)
+      .filter((row) => row.milestone || row.start || row.end)
       .map((row, index) =>
-        `Actividad ${index + 1}: ${row.activity || '-'} | Inicio: ${row.start || '-'} | Fin: ${row.end || '-'}`
+        `Hito ${index + 1}: ${row.milestone || '-'} | Inicio: ${row.start || '-'} | Fin: ${row.end || '-'}`
       );
 
-  const calculateRowTotal = (row: { quantity: string; unitCost: string }) =>
-    parseNumber(row.quantity) * parseNumber(row.unitCost);
+  const calculateRowTotal = (row: CostRow) =>
+    parseNumber(row.quantity) * parseNumber(row.unitPrice);
 
-  const buildCostList = (
-    rows: Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }>
-  ) => {
+  const totalCost = costRows.reduce((sum, row) => sum + calculateRowTotal(row), 0);
+  const contingencyValue = totalCost * (parseNumber(contingencyPercentage) / 100);
+  const utilityValue = totalCost * (parseNumber(utilityPercentage) / 100);
+  const projectTotal = totalCost + contingencyValue + utilityValue;
+
+  const createDefaultCostRow = (deliverable: string): CostRow => ({
+    deliverable,
+    unitMeasure: UNIT_MEASURE_OPTIONS[0],
+    quantity: '',
+    unitPrice: ''
+  });
+
+  const parseAssumptionsList = (value: unknown) => {
+    if (Array.isArray(value)) {
+      return value.map((item) => item?.toString?.().trim?.() ?? '').filter(Boolean);
+    }
+
+    if (typeof value !== 'string') return [];
+
+    const normalized = value
+      .split(/\r?\n+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (normalized.length > 1) return normalized;
+
+    return value
+      .split(/[.;]\s+/)
+      .map((item) => item.trim().replace(/[.;]+$/g, ''))
+      .filter(Boolean);
+  };
+
+  const buildCostList = (rows: CostRow[]) => {
     const lines = rows
-      .filter((row) => row.concept || row.quantity || row.unitCost)
+      .filter((row) => row.deliverable || row.quantity || row.unitPrice)
       .map((row, index) =>
-        `Costo ${index + 1}: ${row.concept || '-'} | Tipo: ${row.type} | Cantidad: ${row.quantity || '-'} | Costo unitario: ${row.unitCost || '-'} | Subtotal: ${formatCurrency(calculateRowTotal(row))}`
+        `Entregable ${index + 1}: ${row.deliverable || '-'} | Unidad de medida: ${row.unitMeasure || '-'} | Cantidad: ${row.quantity || '-'} | Precio unitario: ${row.unitPrice || '-'} | Subtotal: ${formatCurrency(calculateRowTotal(row))}`
       );
-    const total = rows.reduce((sum, row) => sum + calculateRowTotal(row), 0);
-    return [...lines, `Total general: ${formatCurrency(total)}`];
+    return [
+      ...lines,
+      `Total: ${formatCurrency(totalCost)}`,
+      `Imprevistos: ${contingencyPercentage || '0'}% | Valor: ${formatCurrency(contingencyValue)}`,
+      `Utilidad: ${utilityPercentage || '0'}% | Valor: ${formatCurrency(utilityValue)}`,
+      `Total proyecto: ${formatCurrency(projectTotal)}`
+    ];
   };
 
   const handleSelect = (item: MiniproyectoItem) => {
@@ -219,9 +267,12 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     let parsedStakeholders: string[] = [];
     let parsedFunctional: string[] = [];
     let parsedNonFunctional: string[] = [];
+    let parsedObjective = '';
+    let parsedSpecificObjectives: string[] = [];
     let parsedScope: string[] = [];
-    let parsedSchedule: Array<{ activity: string; start: string; end: string }> = [];
-    let parsedCosts: Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }> = [];
+    let parsedAssumptions: string[] = [];
+    let parsedSchedule: ScheduleRow[] = [];
+    let parsedCosts: CostRow[] = [];
     let parsedEsperado = '';
     let parsedSintaxis: string[] = [];
     let parsedLenguajes: number[] = [];
@@ -232,7 +283,26 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
         parsedStakeholders = Array.isArray(parsed?.stakeholders) ? parsed.stakeholders : [];
         parsedFunctional = Array.isArray(parsed?.requisitosFuncionales) ? parsed.requisitosFuncionales : [];
         parsedNonFunctional = Array.isArray(parsed?.requisitosNoFuncionales) ? parsed.requisitosNoFuncionales : [];
-        parsedScope = Array.isArray(parsed?.alcance) ? parsed.alcance : [];
+        parsedObjective = Array.isArray(parsed?.objetivoPrincipal)
+          ? parsed.objetivoPrincipal[0]?.toString?.().trim?.() ?? ''
+          : Array.isArray(parsed?.objetivo)
+            ? parsed.objetivo[0]?.toString?.().trim?.() ?? ''
+            : typeof parsed?.objetivoPrincipal === 'string'
+              ? parsed.objetivoPrincipal.trim()
+              : typeof parsed?.objetivo === 'string'
+                ? parsed.objetivo.trim()
+                : '';
+        parsedSpecificObjectives = Array.isArray(parsed?.objetivosEspecificos)
+          ? parsed.objetivosEspecificos.map((item: unknown) => item?.toString?.().trim?.() ?? '').filter(Boolean)
+          : [];
+        parsedScope = Array.isArray(parsed?.entregables)
+          ? parsed.entregables
+          : Array.isArray(parsed?.alcance)
+            ? parsed.alcance
+            : [];
+        parsedAssumptions = parseAssumptionsList(
+          parsed?.supuestos ?? parsed?.justificacionGestion ?? parsed?.justificacion ?? parsed?.notas
+        );
         if (parsed?.tipo === 'programacion') {
           parsedEsperado = parsed?.esperado || '';
           parsedSintaxis = Array.isArray(parsed?.sintaxis) ? parsed.sintaxis : [];
@@ -242,16 +312,17 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
         parsedSchedule = cronogramaRaw.map((entry: any) => {
           if (entry && typeof entry === 'object') {
             return {
-              activity: (entry.activity ?? entry.actividad ?? entry.tarea ?? '').toString(),
-              start: (entry.start ?? entry.inicio ?? '').toString(),
-              end: (entry.end ?? entry.fin ?? '').toString()
+              milestone: (entry.milestone ?? entry.hito ?? entry.activity ?? entry.actividad ?? entry.tarea ?? '').toString(),
+              start: (entry.start ?? entry.inicio ?? entry.date ?? entry.fecha ?? '').toString(),
+              end: (entry.end ?? entry.fin ?? entry.date ?? entry.fecha ?? '').toString()
             };
           }
 
           const text = entry?.toString?.() ?? '';
-          const activityMatch = text.match(/Actividad\s*\d*:?\s*([^|]+)\|/i);
+          const activityMatch = text.match(/(?:Hito|Actividad)\s*\d*:?\s*([^|]+)\|/i);
           const startMatch = text.match(/Inicio\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/[0-9]{2}\/[0-9]{4})/i);
           const endMatch = text.match(/Fin\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/[0-9]{2}\/[0-9]{4})/i);
+          const dateMatch = text.match(/Fecha\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/[0-9]{2}\/[0-9]{4})/i);
           const normalizeDate = (value?: string) => {
             if (!value) return '';
             if (/\d{4}-\d{2}-\d{2}/.test(value)) return value;
@@ -263,9 +334,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
           };
 
           return {
-            activity: activityMatch ? activityMatch[1].trim() : text,
-            start: normalizeDate(startMatch?.[1]),
-            end: normalizeDate(endMatch?.[1])
+            milestone: activityMatch ? activityMatch[1].trim() : text,
+            start: normalizeDate(startMatch?.[1] || dateMatch?.[1]),
+            end: normalizeDate(endMatch?.[1] || dateMatch?.[1])
           };
         });
 
@@ -273,31 +344,48 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
         parsedCosts = costosRaw.map((entry: any) => {
           if (entry && typeof entry === 'object') {
             return {
-              concept: (entry.concept ?? entry.concepto ?? '').toString(),
-              type: entry.type === 'Material' ? 'Material' : 'Humano',
+              deliverable: (entry.deliverable ?? entry.entregable ?? entry.concept ?? entry.concepto ?? '').toString(),
+              unitMeasure: (entry.unitMeasure ?? entry.unidadMedida ?? UNIT_MEASURE_OPTIONS[0]).toString(),
               quantity: (entry.quantity ?? entry.cantidad ?? '').toString(),
-              unitCost: (entry.unitCost ?? entry.costoUnitario ?? '').toString()
+              unitPrice: (entry.unitPrice ?? entry.precioUnitario ?? entry.unitCost ?? entry.costoUnitario ?? '').toString()
             };
           }
 
           const text = entry?.toString?.() ?? '';
-          const conceptMatch = text.match(/Costo\s*\d*:?\s*([^|]+)\|/i);
-          const typeMatch = text.match(/Tipo\s*:?\s*(Humano|Material)/i);
+          if (/imprevistos/i.test(text)) {
+            const percentageMatch = text.match(/([0-9]+(?:[.,][0-9]+)?)\s*%/);
+            setContingencyPercentage(percentageMatch?.[1]?.replace(',', '.') || '5');
+            return null;
+          }
+
+          if (/utilidad/i.test(text)) {
+            const percentageMatch = text.match(/([0-9]+(?:[.,][0-9]+)?)\s*%/);
+            setUtilityPercentage(percentageMatch?.[1]?.replace(',', '.') || '10');
+            return null;
+          }
+
+          if (/total\s+general|total\s*:|total proyecto/i.test(text)) return null;
+
+          const conceptMatch = text.match(/(?:Entregable|Costo|Concepto)\s*\d*:?\s*([^|]+)\|/i);
+          const unitMeasureMatch = text.match(/Unidad\s+de\s+medida\s*:?\s*([^|]+)/i);
           const qtyMatch = text.match(/Cantidad\s*:?\s*([0-9.,]+)/i);
-          const unitMatch = text.match(/Costo\s*unitario\s*:?\s*([0-9.,]+)/i);
+          const unitMatch = text.match(/(?:Precio|Costo)\s*unitario\s*:?\s*([0-9.,]+)/i);
 
           return {
-            concept: conceptMatch ? conceptMatch[1].trim() : text,
-            type: typeMatch && typeMatch[1]?.toLowerCase() === 'material' ? 'Material' : 'Humano',
+            deliverable: conceptMatch ? conceptMatch[1].trim() : text,
+            unitMeasure: unitMeasureMatch ? unitMeasureMatch[1].trim() : UNIT_MEASURE_OPTIONS[0],
             quantity: qtyMatch?.[1] ?? '',
-            unitCost: unitMatch?.[1] ?? ''
+            unitPrice: unitMatch?.[1] ?? ''
           };
-        });
+        }).filter(Boolean);
       } catch (err) {
         parsedStakeholders = [];
         parsedFunctional = [];
         parsedNonFunctional = [];
+        parsedObjective = '';
+        parsedSpecificObjectives = [];
         parsedScope = [];
+        parsedAssumptions = [];
         parsedSchedule = [];
         parsedCosts = [];
       }
@@ -313,12 +401,16 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setStakeholdersList(parsedStakeholders);
     setFunctionalList(parsedFunctional);
     setNonFunctionalList(parsedNonFunctional);
+    setProjectObjective(parsedObjective);
+    setSpecificObjectivesList(parsedSpecificObjectives);
+    setAssumptionsList(parsedAssumptions);
     setStakeholderInput('');
     setFunctionalInput('');
     setNonFunctionalInput('');
     setScopeList(parsedScope);
-    setScheduleRows(parsedSchedule.length > 0 ? parsedSchedule : [{ activity: '', start: '', end: '' }]);
-    setCostRows(parsedCosts.length > 0 ? parsedCosts : [{ concept: '', type: 'Humano', quantity: '', unitCost: '' }]);
+    setScheduleRows(parsedSchedule.length > 0 ? parsedSchedule : [{ milestone: '', start: '', end: '' }]);
+    setCostRows(parsedCosts);
+    setAssumptionInput('');
     setScopeInput('');
     const normalizedItemAreaName = normalizeAreaName(item.Area?.nombre);
     const isProgrammingItem = normalizedItemAreaName.includes('programacion');
@@ -360,6 +452,20 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     );
   };
 
+  useEffect(() => {
+    if (!isManagementMiniproyecto) return;
+
+    setCostRows((prev) => {
+      const deliverables = scopeList.map((item) => item.trim()).filter(Boolean);
+      if (deliverables.length === 0) return [];
+
+      return deliverables.map((deliverable) => {
+        const existing = prev.find((row) => normalizeAreaName(row.deliverable) === normalizeAreaName(deliverable));
+        return existing ? { ...existing, deliverable } : createDefaultCostRow(deliverable);
+      });
+    });
+  }, [scopeList, isManagementMiniproyecto]);
+
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selected) return;
@@ -395,9 +501,12 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
               })
             : isManagementMiniproyecto
               ? JSON.stringify({
-                  alcance: scopeList,
+                  objetivoPrincipal: projectObjective.trim() ? [projectObjective.trim()] : [],
+                  objetivosEspecificos: specificObjectivesList,
+                  entregables: scopeList,
                   cronograma: scheduleList,
-                  costos: costsList
+                  costos: costsList,
+                  supuestos: assumptionsList
                 })
               : JSON.stringify({
                   stakeholders: stakeholdersList,
@@ -427,9 +536,12 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 })
               : isManagementMiniproyecto
                 ? JSON.stringify({
-                    alcance: scopeList,
+                    objetivoPrincipal: projectObjective.trim() ? [projectObjective.trim()] : [],
+                    objetivosEspecificos: specificObjectivesList,
+                    entregables: scopeList,
                     cronograma: scheduleList,
-                    costos: costsList
+                    costos: costsList,
+                    supuestos: assumptionsList
                   })
                 : JSON.stringify({
                     stakeholders: stakeholdersList,
@@ -450,9 +562,12 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
         if (isManagementMiniproyecto) {
           setExpectedSnapshot({
             mode: 'management',
-            alcance: scopeList,
+            objetivoPrincipal: projectObjective.trim() ? [projectObjective.trim()] : [],
+            objetivosEspecificos: specificObjectivesList,
+            entregables: scopeList,
             cronograma: scheduleList,
-            costos: costsList
+            costos: costsList,
+            supuestos: assumptionsList
           });
         } else {
           setExpectedSnapshot({
@@ -737,12 +852,50 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                     {isManagementMiniproyecto ? (
                       <>
                         <div>
-                          <label className="text-sm text-gray-600">Alcance del proyecto</label>
+                          <label className="text-sm text-gray-600">Objetivo principal</label>
+                          <textarea
+                            value={projectObjective}
+                            onChange={(event) => setProjectObjective(event.target.value)}
+                            rows={3}
+                            placeholder="Resume el propósito central del proyecto según el charter."
+                            className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-sm text-gray-600">Objetivos específicos</label>
+                          <div className="mt-2 flex gap-2">
+                            <input
+                              value={specificObjectiveInput}
+                              onChange={(event) => setSpecificObjectiveInput(event.target.value)}
+                              placeholder="Agregar objetivo específico"
+                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => addListItem(specificObjectiveInput, setSpecificObjectivesList, () => setSpecificObjectiveInput(''))}
+                              className="px-4 py-2 rounded-lg bg-[#4A90E2] text-white text-sm"
+                            >
+                              Agregar
+                            </button>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {specificObjectivesList.map((item, index) => (
+                              <span key={`${item}-${index}`} className="inline-flex items-center gap-2 bg-cyan-50 text-cyan-700 px-3 py-1 rounded-full text-xs">
+                                {item}
+                                <button type="button" onClick={() => removeListItem(index, setSpecificObjectivesList)} className="text-cyan-600">×</button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-sm text-gray-600">Entregables clave</label>
                           <div className="mt-2 flex gap-2">
                             <input
                               value={scopeInput}
                               onChange={(event) => setScopeInput(event.target.value)}
-                              placeholder="Agregar alcance"
+                              placeholder="Agregar entregable"
                               className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                             />
                             <button
@@ -764,13 +917,13 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                         </div>
 
                         <div>
-                          <label className="text-sm text-gray-600">Cronograma del proyecto</label>
+                          <label className="text-sm text-gray-600">Hitos del proyecto</label>
                           <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
                             <div
                               className="bg-gray-50 text-[11px] text-gray-500"
-                              style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr auto' }}
+                              style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr auto' }}
                             >
-                              <div className="px-3 py-2">Actividad</div>
+                              <div className="px-3 py-2">Hito</div>
                               <div className="px-3 py-2">Inicio</div>
                               <div className="px-3 py-2">Fin</div>
                               <div className="px-3 py-2"></div>
@@ -780,16 +933,16 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                                 <div
                                   key={index}
                                   className="px-3 py-2"
-                                  style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr auto', gap: '8px', alignItems: 'center' }}
+                                  style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr auto', gap: '8px', alignItems: 'center' }}
                                 >
                                   <input
-                                    value={row.activity}
+                                    value={row.milestone}
                                     onChange={(event) => {
                                       const updated = [...scheduleRows];
-                                      updated[index] = { ...updated[index], activity: event.target.value };
+                                      updated[index] = { ...updated[index], milestone: event.target.value };
                                       setScheduleRows(updated);
                                     }}
-                                    placeholder="Actividad"
+                                    placeholder="Hito"
                                     className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                                   />
                                   <input
@@ -818,7 +971,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                                     type="button"
                                     onClick={() => {
                                       if (scheduleRows.length === 1) {
-                                        setScheduleRows([{ activity: '', start: '', end: '' }]);
+                                        setScheduleRows([{ milestone: '', start: '', end: '' }]);
                                         return;
                                       }
                                       setScheduleRows(scheduleRows.filter((_, rowIndex) => rowIndex !== index));
@@ -834,7 +987,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                           <div className="mt-3 flex justify-end">
                             <button
                               type="button"
-                              onClick={() => setScheduleRows([...scheduleRows, { activity: '', start: '', end: '' }])}
+                              onClick={() => setScheduleRows([...scheduleRows, { milestone: '', start: '', end: '' }])}
                               className="text-xs text-blue-600 hover:text-blue-700"
                             >
                               + Agregar fila
@@ -843,46 +996,42 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                         </div>
 
                         <div>
-                          <label className="text-sm text-gray-600">Costos y recursos</label>
+                          <label className="text-sm text-gray-600">Costos por entregable</label>
                           <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
                             <div
                               className="bg-gray-50 text-[11px] text-gray-500"
-                              style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr 1.2fr auto' }}
+                              style={{ display: 'grid', gridTemplateColumns: '2.2fr 1.2fr 0.9fr 1.2fr 1fr' }}
                             >
-                              <div className="px-3 py-2">Concepto</div>
-                              <div className="px-3 py-2">Tipo</div>
+                              <div className="px-3 py-2">Entregable</div>
+                              <div className="px-3 py-2">Unidad de medida</div>
                               <div className="px-3 py-2">Cantidad</div>
-                              <div className="px-3 py-2">Costo unitario</div>
-                              <div className="px-3 py-2"></div>
+                              <div className="px-3 py-2">Precio unitario</div>
+                              <div className="px-3 py-2 text-right">Subtotal</div>
                             </div>
                             <div className="divide-y divide-gray-100">
                               {costRows.map((row, index) => (
                                 <div
                                   key={index}
                                   className="px-3 py-2"
-                                  style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr 1.2fr auto', gap: '8px', alignItems: 'center' }}
+                                  style={{ display: 'grid', gridTemplateColumns: '2.2fr 1.2fr 0.9fr 1.2fr 1fr', gap: '8px', alignItems: 'center' }}
                                 >
                                   <input
-                                    value={row.concept}
-                                    onChange={(event) => {
-                                      const updated = [...costRows];
-                                      updated[index] = { ...updated[index], concept: event.target.value };
-                                      setCostRows(updated);
-                                    }}
-                                    placeholder="Concepto"
-                                    className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                                    value={row.deliverable}
+                                    readOnly
+                                    className="rounded-lg border border-gray-100 bg-gray-50 px-2 py-2 text-xs text-gray-600"
                                   />
                                   <select
-                                    value={row.type}
+                                    value={row.unitMeasure}
                                     onChange={(event) => {
                                       const updated = [...costRows];
-                                      updated[index] = { ...updated[index], type: event.target.value as 'Humano' | 'Material' };
+                                      updated[index] = { ...updated[index], unitMeasure: event.target.value };
                                       setCostRows(updated);
                                     }}
                                     className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                                   >
-                                    <option value="Humano">Humano</option>
-                                    <option value="Material">Material</option>
+                                    {UNIT_MEASURE_OPTIONS.map((option) => (
+                                      <option key={option} value={option}>{option}</option>
+                                    ))}
                                   </select>
                                   <input
                                     type="number"
@@ -903,51 +1052,80 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                                     inputMode="decimal"
                                     min={0}
                                     step="0.01"
-                                    value={row.unitCost}
+                                    value={row.unitPrice}
                                     onChange={(event) => {
                                       const updated = [...costRows];
-                                      updated[index] = { ...updated[index], unitCost: event.target.value };
+                                      updated[index] = { ...updated[index], unitPrice: event.target.value };
                                       setCostRows(updated);
                                     }}
-                                    placeholder="Costo unitario"
+                                    placeholder="Precio unitario"
                                     className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                                   />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (costRows.length === 1) {
-                                        setCostRows([{ concept: '', type: 'Humano', quantity: '', unitCost: '' }]);
-                                        return;
-                                      }
-                                      setCostRows(costRows.filter((_, rowIndex) => rowIndex !== index));
-                                    }}
-                                    className="text-xs text-red-500 hover:text-red-600"
-                                  >
-                                    Quitar
-                                  </button>
+                                  <div className="text-right text-xs font-semibold text-gray-700">
+                                    {formatCurrency(calculateRowTotal(row))}
+                                  </div>
                                 </div>
                               ))}
                             </div>
-                            <div className="flex items-center justify-between px-3 py-2 text-xs text-gray-600">
-                              <span>Subtotal fila calculado automáticamente</span>
-                              <span className="font-semibold">
-                                Total: {formatCurrency(costRows.reduce((sum, row) => sum + calculateRowTotal(row), 0))}
-                              </span>
+                            <div className="grid gap-3 border-t border-gray-200 px-3 py-3 text-xs text-gray-600 md:grid-cols-[1fr_auto] md:items-center">
+                              <div className="grid gap-2 md:grid-cols-2">
+                                <label className="flex items-center gap-2">
+                                  <span>Imprevistos (%)</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    value={contingencyPercentage}
+                                    onChange={(event) => setContingencyPercentage(event.target.value)}
+                                    className="w-20 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+                                  />
+                                </label>
+                                <label className="flex items-center gap-2">
+                                  <span>Utilidad (%)</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    value={utilityPercentage}
+                                    onChange={(event) => setUtilityPercentage(event.target.value)}
+                                    className="w-20 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+                                  />
+                                </label>
+                              </div>
+                              <div className="space-y-1 text-right">
+                                <div>Total: <span className="font-semibold">{formatCurrency(totalCost)}</span></div>
+                                <div>Imprevistos: <span className="font-semibold">{formatCurrency(contingencyValue)}</span></div>
+                                <div>Utilidad: <span className="font-semibold">{formatCurrency(utilityValue)}</span></div>
+                                <div>Total proyecto: <span className="font-semibold">{formatCurrency(projectTotal)}</span></div>
+                              </div>
                             </div>
                           </div>
-                          <div className="mt-3 flex justify-end">
+                        </div>
+
+                        <div>
+                          <label className="text-sm text-gray-600">Supuestos cuantificables</label>
+                          <div className="mt-2 flex gap-2">
+                            <input
+                              value={assumptionInput}
+                              onChange={(event) => setAssumptionInput(event.target.value)}
+                              placeholder="Agregar supuesto verificable"
+                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                            />
                             <button
                               type="button"
-                              onClick={() =>
-                                setCostRows([
-                                  ...costRows,
-                                  { concept: '', type: 'Humano', quantity: '', unitCost: '' }
-                                ])
-                              }
-                              className="text-xs text-blue-600 hover:text-blue-700"
+                              onClick={() => addListItem(assumptionInput, setAssumptionsList, () => setAssumptionInput(''))}
+                              className="px-4 py-2 rounded-lg bg-[#4A90E2] text-white text-sm"
                             >
-                              + Agregar fila
+                              Agregar
                             </button>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {assumptionsList.map((item, index) => (
+                              <span key={`${item}-${index}`} className="inline-flex items-center gap-2 bg-slate-50 text-slate-700 px-3 py-1 rounded-full text-xs">
+                                {item}
+                                <button type="button" onClick={() => removeListItem(index, setAssumptionsList)} className="text-slate-600">×</button>
+                              </span>
+                            ))}
                           </div>
                         </div>
                       </>
@@ -1069,28 +1247,54 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
               </button>
             </div>
             {expectedSnapshot.mode === 'management' ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                  <h4 className="text-sm font-semibold text-blue-700 mb-2">Alcance</h4>
+              <div className="space-y-4">
+                <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-cyan-700 mb-2">Objetivo principal</h4>
+                  <ul className="text-xs text-cyan-700 space-y-1">
+                    {expectedSnapshot.objetivoPrincipal.map((item, index) => (
+                      <li key={`objective-${index}`}>• {item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="bg-sky-50 border border-sky-100 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-sky-700 mb-2">Objetivos específicos</h4>
+                  <ul className="text-xs text-sky-700 space-y-1">
+                    {expectedSnapshot.objetivosEspecificos.map((item, index) => (
+                      <li key={`specific-objective-${index}`}>• {item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-blue-700 mb-2">Entregables clave</h4>
                   <ul className="text-xs text-blue-700 space-y-1">
-                    {expectedSnapshot.alcance.map((item, index) => (
+                    {expectedSnapshot.entregables.map((item, index) => (
                       <li key={`scope-${index}`}>• {item}</li>
                     ))}
                   </ul>
+                  </div>
+                  <div className="bg-green-50 border border-green-100 rounded-xl p-4">
+                    <h4 className="text-sm font-semibold text-green-700 mb-2">Cronograma</h4>
+                    <ul className="text-xs text-green-700 space-y-1">
+                      {expectedSnapshot.cronograma.map((item, index) => (
+                        <li key={`schedule-${index}`}>• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
+                    <h4 className="text-sm font-semibold text-orange-700 mb-2">Costos</h4>
+                    <ul className="text-xs text-orange-700 space-y-1">
+                      {expectedSnapshot.costos.map((item, index) => (
+                        <li key={`cost-${index}`}>• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-                <div className="bg-green-50 border border-green-100 rounded-xl p-4">
-                  <h4 className="text-sm font-semibold text-green-700 mb-2">Cronograma</h4>
-                  <ul className="text-xs text-green-700 space-y-1">
-                    {expectedSnapshot.cronograma.map((item, index) => (
-                      <li key={`schedule-${index}`}>• {item}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
-                  <h4 className="text-sm font-semibold text-orange-700 mb-2">Costos</h4>
-                  <ul className="text-xs text-orange-700 space-y-1">
-                    {expectedSnapshot.costos.map((item, index) => (
-                      <li key={`cost-${index}`}>• {item}</li>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Supuestos</h4>
+                  <ul className="text-xs text-slate-700 space-y-1">
+                    {expectedSnapshot.supuestos.map((item, index) => (
+                      <li key={`assumption-${index}`}>• {item}</li>
                     ))}
                   </ul>
                 </div>
