@@ -231,6 +231,10 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
     return (
       <MiniproyectoManagementScreen
         onBack={() => setCurrentScreen('dashboard')}
+        mode="docente"
+        docenteId={docente?.id}
+        docentePersonaId={docente?.personaId}
+        docenteAreaId={docente?.areaId}
       />
     );
   }

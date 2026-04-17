@@ -11,6 +11,12 @@ interface UMLDiagramViewProps {
     title: string;
   };
   onBack: () => void;
+  configurableMode?: boolean;
+  configurableResponse?: any;
+  onConfigurableResponseChange?: (response: any) => void;
+  resolvePath?: string;
+  submitPath?: string;
+  feedbackPath?: string;
 }
 
 type RelationType = 'association' | 'inheritance' | 'aggregation' | 'composition' | null;
@@ -54,7 +60,7 @@ interface MultiplicityDialog {
   targetMultiplicity: string;
 }
 
-export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
+export function UMLDiagramView({ activity, onBack, configurableMode = false, configurableResponse, onConfigurableResponseChange, resolvePath, submitPath, feedbackPath }: UMLDiagramViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<joint.dia.Graph | null>(null);
   const paperRef = useRef<joint.dia.Paper | null>(null);
@@ -187,6 +193,28 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
       paperRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!graphRef.current) return;
+    const serialized = configurableResponse?.respuesta?.diagram;
+    if (serialized && typeof serialized === 'object' && graphRef.current.getCells().length === 0) {
+      graphRef.current.fromJSON(serialized);
+    }
+  }, [configurableResponse]);
+
+  useEffect(() => {
+    if (!graphRef.current || !configurableMode || !onConfigurableResponseChange) return;
+
+    const emitDiagram = () => {
+      onConfigurableResponseChange({ respuesta: { diagram: graphRef.current?.toJSON() } });
+    };
+
+    emitDiagram();
+    graphRef.current.on('add remove change', emitDiagram);
+    return () => {
+      graphRef.current?.off('add remove change', emitDiagram);
+    };
+  }, [configurableMode, onConfigurableResponseChange]);
 
   const saveToUndoStack = () => {
     const json = graphRef.current?.toJSON();
@@ -333,7 +361,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     console.log('Validando diagrama (preview):', json);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/ejercicios/${activity.id}/resolver`, {
+      const response = await fetch(`${API_BASE_URL}${resolvePath || `/ejercicios/${activity.id}/resolver`}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ respuesta: { diagrama: json } })
@@ -392,7 +420,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/ejercicios/${activity.id}/enviar`, {
+      const response = await fetch(`${API_BASE_URL}${submitPath || `/ejercicios/${activity.id}/enviar`}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ estudiante_id: estudianteId, respuesta: { diagram: json } })
@@ -474,7 +502,7 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
   // Ver retroalimentación del ejercicio
   const verRetroalimentacion = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/ejercicios/${activity.id}/retroalimentacion`);
+      const response = await fetch(`${API_BASE_URL}${feedbackPath || `/ejercicios/${activity.id}/retroalimentacion`}`);
       
       if (!response.ok) {
         alert('No se pudo obtener la retroalimentación.');
@@ -905,23 +933,31 @@ export function UMLDiagramView({ activity, onBack }: UMLDiagramViewProps) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button 
-            onClick={validateDiagram}
-            disabled={isValidating || ejercicioAprobado}
-            className="px-5 py-2 rounded-lg bg-white/90 text-[#7ED6A7] shadow-md hover:shadow-lg hover:bg-white transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-          >
-            <BookOpen className="w-4 h-4" />
-            {isValidating ? 'Validando...' : 'Preview'}
-          </button>
-          <button 
-            onClick={submitDiagram}
-            disabled={isValidating || ejercicioAprobado}
-            className="px-6 py-2 rounded-lg bg-white text-[#7ED6A7] shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-            title={ejercicioAprobado ? 'Ejercicio ya aprobado' : 'Enviar y calificar'}
-          >
-            <Send className="w-4 h-4" />
-            {ejercicioAprobado ? 'Aprobado' : isValidating ? 'Enviando...' : 'Enviar y Calificar'}
-          </button>
+          {configurableMode ? (
+            <div className="rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-[#4F6B5B] shadow-sm">
+              El diagrama actual se evaluará con el botón principal del miniproyecto.
+            </div>
+          ) : (
+            <>
+              <button 
+                onClick={validateDiagram}
+                disabled={isValidating || ejercicioAprobado}
+                className="px-5 py-2 rounded-lg bg-white/90 text-[#7ED6A7] shadow-md hover:shadow-lg hover:bg-white transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+              >
+                <BookOpen className="w-4 h-4" />
+                {isValidating ? 'Validando...' : 'Preview'}
+              </button>
+              <button 
+                onClick={submitDiagram}
+                disabled={isValidating || ejercicioAprobado}
+                className="px-6 py-2 rounded-lg bg-white text-[#7ED6A7] shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                title={ejercicioAprobado ? 'Ejercicio ya aprobado' : 'Enviar y calificar'}
+              >
+                <Send className="w-4 h-4" />
+                {ejercicioAprobado ? 'Aprobado' : isValidating ? 'Enviando...' : 'Enviar y Calificar'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 

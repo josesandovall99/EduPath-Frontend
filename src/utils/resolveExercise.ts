@@ -12,10 +12,12 @@ export interface ResolveResult<T = any> {
  */
 export async function resolveExercise(
   ejercicioId: string | number,
-  body: any
+  body: any,
+  endpointPath?: string
 ): Promise<ResolveResult> {
   try {
-    const res = await fetch(`${API_BASE_URL}/ejercicios/${ejercicioId}/resolver`, {
+    const targetPath = endpointPath || `/ejercicios/${ejercicioId}/resolver`;
+    const res = await fetch(`${API_BASE_URL}${targetPath}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)

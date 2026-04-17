@@ -25,7 +25,9 @@ function getApiBaseUrl() {
 export async function submitExercise(
   ejercicioId: string | number,
   respuesta: any,
-  estudianteId?: string | number
+  estudianteId?: string | number,
+  endpointPath?: string,
+  extraBody?: Record<string, unknown>
 ): Promise<SubmitResult> {
   try {
     const resolvedEstudianteId =
@@ -41,10 +43,11 @@ export async function submitExercise(
       };
     }
 
-    const body = { estudiante_id: resolvedEstudianteId, respuesta, lenguaje_id: 62 };
+    const body = { estudiante_id: resolvedEstudianteId, respuesta, lenguaje_id: 62, ...(extraBody || {}) };
     const API_BASE_URL = getApiBaseUrl();
     console.log('Enviando ejercicio:', ejercicioId, 'Body:', JSON.stringify(body, null, 2));
-    const res = await fetch(`${API_BASE_URL}/ejercicios/${ejercicioId}/enviar`, {
+    const targetPath = endpointPath || `/ejercicios/${ejercicioId}/enviar`;
+    const res = await fetch(`${API_BASE_URL}${targetPath}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -66,18 +69,25 @@ export async function submitExercise(
 export async function executeExercise(
   ejercicioId: string | number,
   respuesta: any,
-  lenguajeId: number = 62
+  lenguajeId: number = 62,
+  endpointPath?: string,
+  extraBody?: Record<string, unknown>
 ): Promise<SubmitResult> {
   try {
     const API_BASE_URL = getApiBaseUrl();
-    const res = await fetch(`${API_BASE_URL}/evaluaciones/compilador/ejecutar`, {
+    const targetPath = endpointPath || '/evaluaciones/compilador/ejecutar';
+    const payload = endpointPath
+      ? { lenguaje_id: lenguajeId, codigo: respuesta, ...(extraBody || {}) }
+      : {
+          ejercicio_id: ejercicioId,
+          lenguaje_id: lenguajeId,
+          respuesta,
+          ...(extraBody || {}),
+        };
+    const res = await fetch(`${API_BASE_URL}${targetPath}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ejercicio_id: ejercicioId,
-        lenguaje_id: lenguajeId,
-        respuesta
-      })
+      body: JSON.stringify(payload)
     });
 
     let data: any = null;

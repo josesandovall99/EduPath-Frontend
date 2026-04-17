@@ -1,12 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ClipboardList, RefreshCw, Save, Search } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Plus, RefreshCw, Save, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
-import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 import { createQuillModules, loadQuill } from '../utils/quill';
+import { ConfigurableEmbeddedExerciseEditor } from './ConfigurableEmbeddedExerciseEditor';
+import { CreateConfigurableMiniproyectoWorkspace, CreateConfigurableFormData } from './CreateConfigurableMiniproyectoWorkspace';
+import {
+  CompilerCase,
+  EmbeddedExercise,
+  createDefaultCompilerConfig,
+  emptyCompilerCase,
+  parseConfigurableMiniproyecto,
+  parseMethodTemplate,
+  formatJavaLikeTemplate,
+} from './configurableEmbeddedExercises';
 
 interface MiniproyectoManagementScreenProps {
   onBack: () => void;
+  mode?: 'admin' | 'docente';
+  docenteId?: number;
+  docentePersonaId?: number;
+  docenteAreaId?: number;
 }
 
 interface AreaInfo {
@@ -25,7 +39,17 @@ interface ActividadInfo {
   descripcion?: string;
   nivel_dificultad?: string;
   fecha_creacion?: string;
+  estado?: boolean;
   tipo?: TipoActividadInfo;
+}
+
+interface ChatbotInfo {
+  id: number;
+  nombre: string;
+  tipo: 'GENERAL' | 'MINIPROYECTO';
+  estado?: boolean;
+  area_id?: number | null;
+  miniproyecto_id?: number | null;
 }
 
 interface MiniproyectoItem {
@@ -35,6 +59,7 @@ interface MiniproyectoItem {
   respuesta_miniproyecto?: string;
   Area?: AreaInfo;
   Actividad?: ActividadInfo;
+  chatbots?: ChatbotInfo[];
 }
 
 interface EditFormData {
@@ -45,6 +70,11 @@ interface EditFormData {
   respuesta_miniproyecto: string;
 }
 
+type ScheduleRow = { milestone: string; start: string; end: string };
+type CostRow = { deliverable: string; unitMeasure: string; quantity: string; unitPrice: string };
+
+const UNIT_MEASURE_OPTIONS = ['Unidad', 'Hora', 'Día', 'Semana', 'Mes', 'Licencia', 'Documento', 'Paquete'];
+
 type ExpectedSnapshot =
   | {
       mode: 'analysis';
@@ -54,9 +84,12 @@ type ExpectedSnapshot =
     }
   | {
       mode: 'management';
-      alcance: string[];
+      objetivoPrincipal: string[];
+      objetivosEspecificos: string[];
+      entregables: string[];
       cronograma: string[];
       costos: string[];
+      supuestos: string[];
     };
 
 const normalizeAreaName = (value?: string | null) =>
@@ -66,10 +99,47 @@ const normalizeAreaName = (value?: string | null) =>
     .trim()
     .toLowerCase();
 
-export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementScreenProps) {
+const JAVA_LANGUAGE_ID = 62;
+
+const createEmptyConfigurableForm = (): CreateConfigurableFormData => ({
+  titulo: '',
+  descripcion: '',
+  nivel_dificultad: 'media',
+  entregable: '',
+  areaId: '',
+  exercises: [],
+  useChatbot: false,
+  chatbotId: '',
+});
+
+function normalizeCompilerCases(rawCases: unknown, fallbackOutput = ''): CompilerCase[] {
+  if (Array.isArray(rawCases) && rawCases.length === 3) {
+    return rawCases.map((caseItem: any) => ({
+      inputs: (caseItem?.inputs || caseItem?.input || caseItem?.entrada || '').toString(),
+      output: (caseItem?.output || caseItem?.esperado || caseItem?.salida || '').toString(),
+    }));
+  }
+
+  return [
+    { inputs: '', output: fallbackOutput },
+    emptyCompilerCase(),
+    emptyCompilerCase(),
+  ];
+}
+
+export function MiniproyectoManagementScreen({
+  onBack,
+  mode = 'admin',
+  docenteId,
+  docentePersonaId,
+  docenteAreaId,
+}: MiniproyectoManagementScreenProps) {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
+  const isDocenteMode = mode === 'docente';
   const [miniproyectos, setMiniproyectos] = useState<MiniproyectoItem[]>([]);
+  const [areas, setAreas] = useState<AreaInfo[]>([]);
+  const [chatbots, setChatbots] = useState<ChatbotInfo[]>([]);
   const [selected, setSelected] = useState<MiniproyectoItem | null>(null);
   const [formData, setFormData] = useState<EditFormData>({
     titulo: '',
@@ -82,33 +152,97 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [expectedOutput, setExpectedOutput] = useState('');
+  const [compilerTemplate, setCompilerTemplate] = useState('');
+  const [compilerCases, setCompilerCases] = useState<CompilerCase[]>(createDefaultCompilerConfig().casos_prueba);
   const [sintaxisRequerida, setSintaxisRequerida] = useState<string[]>([]);
-  const [lenguajesPermitidos, setLenguajesPermitidos] = useState<number[]>([]);
   const [stakeholdersList, setStakeholdersList] = useState<string[]>([]);
   const [functionalList, setFunctionalList] = useState<string[]>([]);
   const [nonFunctionalList, setNonFunctionalList] = useState<string[]>([]);
   const [stakeholderInput, setStakeholderInput] = useState('');
   const [functionalInput, setFunctionalInput] = useState('');
   const [nonFunctionalInput, setNonFunctionalInput] = useState('');
+  const [projectObjective, setProjectObjective] = useState('');
+  const [specificObjectivesList, setSpecificObjectivesList] = useState<string[]>([]);
+  const [specificObjectiveInput, setSpecificObjectiveInput] = useState('');
   const [scopeList, setScopeList] = useState<string[]>([]);
-  const [scheduleRows, setScheduleRows] = useState<Array<{ activity: string; start: string; end: string }>>([
-    { activity: '', start: '', end: '' }
+  const [scheduleRows, setScheduleRows] = useState<ScheduleRow[]>([
+    { milestone: '', start: '', end: '' }
   ]);
-  const [costRows, setCostRows] = useState<
-    Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }>
-  >([{ concept: '', type: 'Humano', quantity: '', unitCost: '' }]);
+  const [costRows, setCostRows] = useState<CostRow[]>([]);
+  const [contingencyPercentage, setContingencyPercentage] = useState('5');
+  const [utilityPercentage, setUtilityPercentage] = useState('10');
+  const [assumptionsList, setAssumptionsList] = useState<string[]>([]);
+  const [assumptionInput, setAssumptionInput] = useState('');
   const [scopeInput, setScopeInput] = useState('');
   const [showExpectedModal, setShowExpectedModal] = useState(false);
   const [expectedSnapshot, setExpectedSnapshot] = useState<ExpectedSnapshot | null>(null);
+  const [selectedEmbeddedExercises, setSelectedEmbeddedExercises] = useState<EmbeddedExercise[]>([]);
+  const [selectedUseChatbot, setSelectedUseChatbot] = useState(false);
+  const [selectedChatbotId, setSelectedChatbotId] = useState<string>('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateConfigurableFormData>(createEmptyConfigurableForm());
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+
+  const requestHeaders = useMemo(() => {
+    const authToken = localStorage.getItem('authToken');
+    const personaId = docentePersonaId || Number(localStorage.getItem('personaId'));
+    const headers: Record<string, string> = {};
+
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
+    if (isDocenteMode && Number.isFinite(Number(docenteId))) {
+      headers['x-docente-id'] = String(Number(docenteId));
+    }
+
+    if (isDocenteMode && Number.isFinite(Number(docenteAreaId))) {
+      headers['x-area-id'] = String(Number(docenteAreaId));
+    }
+
+    if (Number.isFinite(personaId)) {
+      headers['x-persona-id'] = String(personaId);
+    }
+
+    return headers;
+  }, [docenteAreaId, docenteId, docentePersonaId, isDocenteMode]);
+
+  function apiFetch(path: string, init: RequestInit = {}, areaIdOverride?: number | null) {
+    const nextHeaders = new Headers(init.headers || {});
+
+    Object.entries(requestHeaders).forEach(([key, value]) => {
+      if (!nextHeaders.has(key)) {
+        nextHeaders.set(key, value);
+      }
+    });
+
+    if (Number.isFinite(Number(areaIdOverride))) {
+      nextHeaders.set('x-area-id', String(Number(areaIdOverride)));
+    }
+
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: nextHeaders,
+    });
+  }
 
   // El tipo de editor depende del area del miniproyecto, no del id de la actividad.
   const selectedAreaName = normalizeAreaName(selected?.Area?.nombre);
   const isProgrammingMiniproyecto = selectedAreaName.includes('programacion');
   const isManagementMiniproyecto = selectedAreaName.includes('alcance') || selectedAreaName.includes('gestion');
+  const selectedConfigurablePayload = parseConfigurableMiniproyecto(selected?.respuesta_miniproyecto);
+  const isConfigurableMiniproyecto = Boolean(selectedConfigurablePayload);
+  const usesRichDescriptionEditor = isConfigurableMiniproyecto || (isProgrammingMiniproyecto && !isConfigurableMiniproyecto);
 
   useEffect(() => {
-    if (!isProgrammingMiniproyecto) return;
+    if (!usesRichDescriptionEditor) {
+      quillRef.current = null;
+      if (editorRef.current) {
+        editorRef.current.innerHTML = '';
+      }
+      return;
+    }
 
     let cancelled = false;
 
@@ -116,53 +250,87 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
       if (!editorRef.current) return;
       const Quill = await loadQuill();
       if (cancelled || !editorRef.current) return;
-      if (!quillRef.current) {
-        editorRef.current.innerHTML = '';
-        quillRef.current = new Quill(editorRef.current, {
-          theme: 'snow',
-          placeholder: 'Ingrese la descripcion del miniproyecto',
-          modules: createQuillModules()
-        });
-        quillRef.current.on('text-change', () => {
-          setFormData((prev) => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
-        });
+      editorRef.current.innerHTML = '';
+      const quill = new Quill(editorRef.current, {
+        theme: 'snow',
+        placeholder: 'Ingrese la descripcion del miniproyecto',
+        modules: createQuillModules()
+      });
+
+      const nextHtml = formData.descripcion || '';
+      if (quill.root.innerHTML !== nextHtml) {
+        quill.root.innerHTML = nextHtml;
       }
+
+      quill.on('text-change', () => {
+        const nextDescription = quill.root.innerHTML;
+        setFormData((prev) => prev.descripcion === nextDescription ? prev : { ...prev, descripcion: nextDescription });
+      });
+
+      quillRef.current = quill;
     };
 
     ensureQuill();
 
-    if (quillRef.current) {
-      quillRef.current.root.innerHTML = formData.descripcion || '';
-    }
-
     return () => {
       cancelled = true;
+      quillRef.current = null;
+      if (editorRef.current) {
+        editorRef.current.innerHTML = '';
+      }
     };
-  }, [selected, formData.descripcion, isProgrammingMiniproyecto]);
+  }, [formData.descripcion, selected?.id, usesRichDescriptionEditor]);
 
-  const lenguajesDisponibles = [
-    { id: 62, nombre: 'Java', extension: '.java', ejemplo: 'public class Main {\n  public static void main(String[] args) {\n    System.out.println("Hola Mundo");\n  }\n}' },
-    { id: 71, nombre: 'Python', extension: '.py', ejemplo: '# Escribe tu código aquí\nprint("Hola Mundo")' },
-    { id: 63, nombre: 'JavaScript', extension: '.js', ejemplo: '// Escribe tu código aquí\nconsole.log("Hola Mundo");' },
-    { id: 50, nombre: 'C', extension: '.c', ejemplo: '#include <stdio.h>\n\nint main() {\n  printf("Hola Mundo\\n");\n  return 0;\n}' },
-    { id: 54, nombre: 'C++', extension: '.cpp', ejemplo: '#include <iostream>\nusing namespace std;\n\nint main() {\n  cout << "Hola Mundo" << endl;\n  return 0;\n}' },
-    { id: 51, nombre: 'C#', extension: '.cs', ejemplo: 'using System;\n\nclass Program {\n  static void Main() {\n    Console.WriteLine("Hola Mundo");\n  }\n}' }
-  ];
+  useEffect(() => {
+    if (!usesRichDescriptionEditor || !quillRef.current) return;
+
+    const nextHtml = formData.descripcion || '';
+    if (quillRef.current.root.innerHTML !== nextHtml) {
+      quillRef.current.root.innerHTML = nextHtml;
+    }
+  }, [formData.descripcion, usesRichDescriptionEditor]);
 
   const sintaxisDisponibles = ['while', 'for', 'if', 'switch'];
 
   useEffect(() => {
     loadMiniproyectos();
+    loadSupportingData();
   }, []);
+
+  const loadSupportingData = async () => {
+    try {
+      const areasEndpoint = isDocenteMode ? '/areas/mis-areas' : '/areas';
+      const [areasResponse, chatbotsResponse] = await Promise.all([
+        apiFetch(areasEndpoint),
+        apiFetch('/chatbots'),
+      ]);
+
+      if (!areasResponse.ok) {
+        throw new Error('No se pudieron cargar las áreas disponibles');
+      }
+
+      if (!chatbotsResponse.ok) {
+        throw new Error('No se pudieron cargar los chatbots disponibles');
+      }
+
+      const [areasData, chatbotsData] = await Promise.all([
+        areasResponse.json(),
+        chatbotsResponse.json(),
+      ]);
+
+      setAreas(Array.isArray(areasData) ? areasData : []);
+      setChatbots(Array.isArray(chatbotsData) ? chatbotsData : []);
+    } catch (err) {
+      console.error('Error cargando datos auxiliares de miniproyectos:', err);
+      setError((previousError) => previousError || (err instanceof Error ? err.message : 'Error al cargar áreas y chatbots'));
+    }
+  };
 
   const loadMiniproyectos = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/miniproyectos`, {
-        headers: buildAuthHeaders({ Accept: 'application/json' }),
-        credentials: 'include'
-      });
+      const response = await apiFetch('/miniproyectos', {}, docenteAreaId ?? null);
       if (!response.ok) {
         throw new Error('No se pudieron cargar los miniproyectos');
       }
@@ -187,6 +355,53 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     });
   }, [miniproyectos, query]);
 
+  const activeMiniproyectoAreaIds = useMemo(() => {
+    return new Set(
+      miniproyectos
+        .filter((item) => item.Actividad?.estado !== false)
+        .map((item) => Number(item.Area?.id ?? item.Area?.id))
+        .filter((item) => Number.isInteger(item) && item > 0)
+    );
+  }, [miniproyectos]);
+
+  const freeAreas = useMemo(() => {
+    return areas
+      .filter((area) => !activeMiniproyectoAreaIds.has(Number(area.id)))
+      .sort((left, right) => left.nombre.localeCompare(right.nombre));
+  }, [areas, activeMiniproyectoAreaIds]);
+
+  const selectedCreateAreaId = Number(createForm.areaId);
+
+  const createEligibleChatbots = useMemo(() => {
+    if (!Number.isInteger(selectedCreateAreaId) || selectedCreateAreaId <= 0) return [];
+
+    return chatbots
+      .filter((chatbot) => (
+        chatbot.estado !== false &&
+        (chatbot.miniproyecto_id === null || chatbot.miniproyecto_id === undefined) &&
+        Number(chatbot.area_id) === selectedCreateAreaId
+      ))
+      .sort((left, right) => left.nombre.localeCompare(right.nombre));
+  }, [chatbots, selectedCreateAreaId]);
+
+  const selectedEligibleChatbots = useMemo(() => {
+    const selectedAreaId = Number(selected?.Area?.id);
+    if (!isConfigurableMiniproyecto || !Number.isInteger(selectedAreaId) || selectedAreaId <= 0) return [];
+
+    return chatbots
+      .filter((chatbot) => (
+        chatbot.estado !== false &&
+        (chatbot.miniproyecto_id === null || chatbot.miniproyecto_id === undefined || Number(chatbot.miniproyecto_id) === Number(selected?.id)) &&
+        Number(chatbot.area_id) === selectedAreaId
+      ))
+      .sort((left, right) => left.nombre.localeCompare(right.nombre));
+  }, [chatbots, selected?.Area?.id, selected?.id, isConfigurableMiniproyecto]);
+
+  const miniproyectoActivityTypeId = useMemo(() => {
+    const typeId = miniproyectos.find((item) => Number(item.Actividad?.tipo?.id))?.Actividad?.tipo?.id;
+    return Number(typeId) || null;
+  }, [miniproyectos]);
+
   const parseNumber = (value: string) => {
     const normalized = value.replace(/[^0-9.,]/g, '').replace(',', '.');
     const parsed = Number(normalized);
@@ -196,39 +411,78 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const formatCurrency = (value: number) =>
     value.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
-  const buildScheduleList = (rows: Array<{ activity: string; start: string; end: string }>) =>
+  const buildScheduleList = (rows: ScheduleRow[]) =>
     rows
-      .filter((row) => row.activity || row.start || row.end)
+      .filter((row) => row.milestone || row.start || row.end)
       .map((row, index) =>
-        `Actividad ${index + 1}: ${row.activity || '-'} | Inicio: ${row.start || '-'} | Fin: ${row.end || '-'}`
+        `Hito ${index + 1}: ${row.milestone || '-'} | Inicio: ${row.start || '-'} | Fin: ${row.end || '-'}`
       );
 
-  const calculateRowTotal = (row: { quantity: string; unitCost: string }) =>
-    parseNumber(row.quantity) * parseNumber(row.unitCost);
+  const calculateRowTotal = (row: CostRow) =>
+    parseNumber(row.quantity) * parseNumber(row.unitPrice);
 
-  const buildCostList = (
-    rows: Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }>
-  ) => {
+  const totalCost = costRows.reduce((sum, row) => sum + calculateRowTotal(row), 0);
+  const contingencyValue = totalCost * (parseNumber(contingencyPercentage) / 100);
+  const utilityValue = totalCost * (parseNumber(utilityPercentage) / 100);
+  const projectTotal = totalCost + contingencyValue + utilityValue;
+
+  const createDefaultCostRow = (deliverable: string): CostRow => ({
+    deliverable,
+    unitMeasure: UNIT_MEASURE_OPTIONS[0],
+    quantity: '',
+    unitPrice: ''
+  });
+
+  const parseAssumptionsList = (value: unknown) => {
+    if (Array.isArray(value)) {
+      return value.map((item) => item?.toString?.().trim?.() ?? '').filter(Boolean);
+    }
+
+    if (typeof value !== 'string') return [];
+
+    const normalized = value
+      .split(/\r?\n+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (normalized.length > 1) return normalized;
+
+    return value
+      .split(/[.;]\s+/)
+      .map((item) => item.trim().replace(/[.;]+$/g, ''))
+      .filter(Boolean);
+  };
+
+  const buildCostList = (rows: CostRow[]) => {
     const lines = rows
-      .filter((row) => row.concept || row.quantity || row.unitCost)
+      .filter((row) => row.deliverable || row.quantity || row.unitPrice)
       .map((row, index) =>
-        `Costo ${index + 1}: ${row.concept || '-'} | Tipo: ${row.type} | Cantidad: ${row.quantity || '-'} | Costo unitario: ${row.unitCost || '-'} | Subtotal: ${formatCurrency(calculateRowTotal(row))}`
+        `Entregable ${index + 1}: ${row.deliverable || '-'} | Unidad de medida: ${row.unitMeasure || '-'} | Cantidad: ${row.quantity || '-'} | Precio unitario: ${row.unitPrice || '-'} | Subtotal: ${formatCurrency(calculateRowTotal(row))}`
       );
-    const total = rows.reduce((sum, row) => sum + calculateRowTotal(row), 0);
-    return [...lines, `Total general: ${formatCurrency(total)}`];
+    return [
+      ...lines,
+      `Total: ${formatCurrency(totalCost)}`,
+      `Imprevistos: ${contingencyPercentage || '0'}% | Valor: ${formatCurrency(contingencyValue)}`,
+      `Utilidad: ${utilityPercentage || '0'}% | Valor: ${formatCurrency(utilityValue)}`,
+      `Total proyecto: ${formatCurrency(projectTotal)}`
+    ];
   };
 
   const handleSelect = (item: MiniproyectoItem) => {
     setSelected(item);
+    const configurablePayload = parseConfigurableMiniproyecto(item.respuesta_miniproyecto);
     let parsedStakeholders: string[] = [];
     let parsedFunctional: string[] = [];
     let parsedNonFunctional: string[] = [];
+    let parsedObjective = '';
+    let parsedSpecificObjectives: string[] = [];
     let parsedScope: string[] = [];
-    let parsedSchedule: Array<{ activity: string; start: string; end: string }> = [];
-    let parsedCosts: Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }> = [];
-    let parsedEsperado = '';
+    let parsedAssumptions: string[] = [];
+    let parsedSchedule: ScheduleRow[] = [];
+    let parsedCosts: CostRow[] = [];
+    let parsedTemplate = '';
+    let parsedCases = createDefaultCompilerConfig().casos_prueba;
     let parsedSintaxis: string[] = [];
-    let parsedLenguajes: number[] = [];
 
     if (item.respuesta_miniproyecto) {
       try {
@@ -236,26 +490,50 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
         parsedStakeholders = Array.isArray(parsed?.stakeholders) ? parsed.stakeholders : [];
         parsedFunctional = Array.isArray(parsed?.requisitosFuncionales) ? parsed.requisitosFuncionales : [];
         parsedNonFunctional = Array.isArray(parsed?.requisitosNoFuncionales) ? parsed.requisitosNoFuncionales : [];
-        parsedScope = Array.isArray(parsed?.alcance) ? parsed.alcance : [];
+        parsedObjective = Array.isArray(parsed?.objetivoPrincipal)
+          ? parsed.objetivoPrincipal[0]?.toString?.().trim?.() ?? ''
+          : Array.isArray(parsed?.objetivo)
+            ? parsed.objetivo[0]?.toString?.().trim?.() ?? ''
+            : typeof parsed?.objetivoPrincipal === 'string'
+              ? parsed.objetivoPrincipal.trim()
+              : typeof parsed?.objetivo === 'string'
+                ? parsed.objetivo.trim()
+                : '';
+        parsedSpecificObjectives = Array.isArray(parsed?.objetivosEspecificos)
+          ? parsed.objetivosEspecificos.map((item: unknown) => item?.toString?.().trim?.() ?? '').filter(Boolean)
+          : [];
+        parsedScope = Array.isArray(parsed?.entregables)
+          ? parsed.entregables
+          : Array.isArray(parsed?.alcance)
+            ? parsed.alcance
+            : [];
+        parsedAssumptions = parseAssumptionsList(
+          parsed?.supuestos ?? parsed?.justificacionGestion ?? parsed?.justificacion ?? parsed?.notas
+        );
         if (parsed?.tipo === 'programacion') {
-          parsedEsperado = parsed?.esperado || '';
+          parsedTemplate = typeof parsed?.metodo?.plantilla === 'string'
+            ? parsed.metodo.plantilla
+            : typeof parsed?.plantillaMetodo === 'string'
+              ? parsed.plantillaMetodo
+              : '';
+          parsedCases = normalizeCompilerCases(parsed?.casos_prueba, parsed?.esperado || '');
           parsedSintaxis = Array.isArray(parsed?.sintaxis) ? parsed.sintaxis : [];
-          parsedLenguajes = Array.isArray(parsed?.lenguajesPermitidos) ? parsed.lenguajesPermitidos : [];
         }
         const cronogramaRaw = Array.isArray(parsed?.cronograma) ? parsed.cronograma : [];
         parsedSchedule = cronogramaRaw.map((entry: any) => {
           if (entry && typeof entry === 'object') {
             return {
-              activity: (entry.activity ?? entry.actividad ?? entry.tarea ?? '').toString(),
-              start: (entry.start ?? entry.inicio ?? '').toString(),
-              end: (entry.end ?? entry.fin ?? '').toString()
+              milestone: (entry.milestone ?? entry.hito ?? entry.activity ?? entry.actividad ?? entry.tarea ?? '').toString(),
+              start: (entry.start ?? entry.inicio ?? entry.date ?? entry.fecha ?? '').toString(),
+              end: (entry.end ?? entry.fin ?? entry.date ?? entry.fecha ?? '').toString()
             };
           }
 
           const text = entry?.toString?.() ?? '';
-          const activityMatch = text.match(/Actividad\s*\d*:?\s*([^|]+)\|/i);
+          const activityMatch = text.match(/(?:Hito|Actividad)\s*\d*:?\s*([^|]+)\|/i);
           const startMatch = text.match(/Inicio\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/[0-9]{2}\/[0-9]{4})/i);
           const endMatch = text.match(/Fin\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/[0-9]{2}\/[0-9]{4})/i);
+          const dateMatch = text.match(/Fecha\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/[0-9]{2}\/[0-9]{4})/i);
           const normalizeDate = (value?: string) => {
             if (!value) return '';
             if (/\d{4}-\d{2}-\d{2}/.test(value)) return value;
@@ -267,9 +545,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
           };
 
           return {
-            activity: activityMatch ? activityMatch[1].trim() : text,
-            start: normalizeDate(startMatch?.[1]),
-            end: normalizeDate(endMatch?.[1])
+            milestone: activityMatch ? activityMatch[1].trim() : text,
+            start: normalizeDate(startMatch?.[1] || dateMatch?.[1]),
+            end: normalizeDate(endMatch?.[1] || dateMatch?.[1])
           };
         });
 
@@ -277,31 +555,48 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
         parsedCosts = costosRaw.map((entry: any) => {
           if (entry && typeof entry === 'object') {
             return {
-              concept: (entry.concept ?? entry.concepto ?? '').toString(),
-              type: entry.type === 'Material' ? 'Material' : 'Humano',
+              deliverable: (entry.deliverable ?? entry.entregable ?? entry.concept ?? entry.concepto ?? '').toString(),
+              unitMeasure: (entry.unitMeasure ?? entry.unidadMedida ?? UNIT_MEASURE_OPTIONS[0]).toString(),
               quantity: (entry.quantity ?? entry.cantidad ?? '').toString(),
-              unitCost: (entry.unitCost ?? entry.costoUnitario ?? '').toString()
+              unitPrice: (entry.unitPrice ?? entry.precioUnitario ?? entry.unitCost ?? entry.costoUnitario ?? '').toString()
             };
           }
 
           const text = entry?.toString?.() ?? '';
-          const conceptMatch = text.match(/Costo\s*\d*:?\s*([^|]+)\|/i);
-          const typeMatch = text.match(/Tipo\s*:?\s*(Humano|Material)/i);
+          if (/imprevistos/i.test(text)) {
+            const percentageMatch = text.match(/([0-9]+(?:[.,][0-9]+)?)\s*%/);
+            setContingencyPercentage(percentageMatch?.[1]?.replace(',', '.') || '5');
+            return null;
+          }
+
+          if (/utilidad/i.test(text)) {
+            const percentageMatch = text.match(/([0-9]+(?:[.,][0-9]+)?)\s*%/);
+            setUtilityPercentage(percentageMatch?.[1]?.replace(',', '.') || '10');
+            return null;
+          }
+
+          if (/total\s+general|total\s*:|total proyecto/i.test(text)) return null;
+
+          const conceptMatch = text.match(/(?:Entregable|Costo|Concepto)\s*\d*:?\s*([^|]+)\|/i);
+          const unitMeasureMatch = text.match(/Unidad\s+de\s+medida\s*:?\s*([^|]+)/i);
           const qtyMatch = text.match(/Cantidad\s*:?\s*([0-9.,]+)/i);
-          const unitMatch = text.match(/Costo\s*unitario\s*:?\s*([0-9.,]+)/i);
+          const unitMatch = text.match(/(?:Precio|Costo)\s*unitario\s*:?\s*([0-9.,]+)/i);
 
           return {
-            concept: conceptMatch ? conceptMatch[1].trim() : text,
-            type: typeMatch && typeMatch[1]?.toLowerCase() === 'material' ? 'Material' : 'Humano',
+            deliverable: conceptMatch ? conceptMatch[1].trim() : text,
+            unitMeasure: unitMeasureMatch ? unitMeasureMatch[1].trim() : UNIT_MEASURE_OPTIONS[0],
             quantity: qtyMatch?.[1] ?? '',
-            unitCost: unitMatch?.[1] ?? ''
+            unitPrice: unitMatch?.[1] ?? ''
           };
-        });
+        }).filter(Boolean);
       } catch (err) {
         parsedStakeholders = [];
         parsedFunctional = [];
         parsedNonFunctional = [];
+        parsedObjective = '';
+        parsedSpecificObjectives = [];
         parsedScope = [];
+        parsedAssumptions = [];
         parsedSchedule = [];
         parsedCosts = [];
       }
@@ -317,24 +612,32 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setStakeholdersList(parsedStakeholders);
     setFunctionalList(parsedFunctional);
     setNonFunctionalList(parsedNonFunctional);
+    setProjectObjective(parsedObjective);
+    setSpecificObjectivesList(parsedSpecificObjectives);
+    setAssumptionsList(parsedAssumptions);
     setStakeholderInput('');
     setFunctionalInput('');
     setNonFunctionalInput('');
     setScopeList(parsedScope);
-    setScheduleRows(parsedSchedule.length > 0 ? parsedSchedule : [{ activity: '', start: '', end: '' }]);
-    setCostRows(parsedCosts.length > 0 ? parsedCosts : [{ concept: '', type: 'Humano', quantity: '', unitCost: '' }]);
+    setScheduleRows(parsedSchedule.length > 0 ? parsedSchedule : [{ milestone: '', start: '', end: '' }]);
+    setCostRows(parsedCosts);
+    setAssumptionInput('');
     setScopeInput('');
     const normalizedItemAreaName = normalizeAreaName(item.Area?.nombre);
     const isProgrammingItem = normalizedItemAreaName.includes('programacion');
     if (isProgrammingItem) {
-      setExpectedOutput(parsedEsperado || item.respuesta_miniproyecto || '');
+      setCompilerTemplate(parsedTemplate);
+      setCompilerCases(parsedCases);
       setSintaxisRequerida(parsedSintaxis);
-      setLenguajesPermitidos(parsedLenguajes);
     } else {
-      setExpectedOutput('');
+      setCompilerTemplate('');
+      setCompilerCases(createDefaultCompilerConfig().casos_prueba);
       setSintaxisRequerida([]);
-      setLenguajesPermitidos([]);
     }
+
+    setSelectedEmbeddedExercises(configurablePayload?.exercises || []);
+    setSelectedUseChatbot(Boolean(configurablePayload?.chatbot?.enabled));
+    setSelectedChatbotId(configurablePayload?.chatbot?.chatbotId ? String(configurablePayload.chatbot.chatbotId) : '');
   };
 
   const addListItem = (value: string, setter: React.Dispatch<React.SetStateAction<string[]>>, reset: () => void) => {
@@ -358,19 +661,185 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     );
   };
 
-  const toggleLenguajePermitido = (lenguajeId: number) => {
-    setLenguajesPermitidos((prev) =>
-      prev.includes(lenguajeId) ? prev.filter((id) => id !== lenguajeId) : [...prev, lenguajeId]
-    );
+  const compilerMethod = parseMethodTemplate(compilerTemplate);
+
+  const handleCompilerTemplateChange = (value: string) => {
+    setCompilerTemplate(value);
   };
+
+  const handleFormatCompilerTemplate = () => {
+    setCompilerTemplate((prev) => formatJavaLikeTemplate(prev || ''));
+  };
+
+  const handleCompilerCaseChange = (index: number, field: keyof CompilerCase, value: string) => {
+    setCompilerCases((prev) => prev.map((caseItem, caseIndex) => (
+      caseIndex === index ? { ...caseItem, [field]: value } : caseItem
+    )));
+  };
+
+  const openCreateModal = () => {
+    setCreateError(null);
+    setCreateForm({
+      ...createEmptyConfigurableForm(),
+      areaId: freeAreas.length === 1 ? String(freeAreas[0].id) : '',
+    });
+    setShowCreateModal(true);
+  };
+
+  const closeCreateModal = () => {
+    if (isCreating) return;
+    setShowCreateModal(false);
+    setCreateError(null);
+  };
+
+  const handleCreateConfigurableMiniproyecto = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!createForm.titulo.trim()) {
+      setCreateError('El título es obligatorio.');
+      return;
+    }
+
+    if (!createForm.areaId) {
+      setCreateError('Debes seleccionar un área libre.');
+      return;
+    }
+
+    if (createForm.exercises.length === 0) {
+      setCreateError('Crea al menos un ejercicio para el nuevo miniproyecto.');
+      return;
+    }
+
+    if (createForm.useChatbot && !createForm.chatbotId) {
+      setCreateError('Selecciona un chatbot si deseas usar simulación de cliente.');
+      return;
+    }
+
+    if (!miniproyectoActivityTypeId) {
+      setCreateError('No se pudo identificar el tipo de actividad para miniproyectos.');
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateError(null);
+
+    try {
+      const payload = {
+        titulo: createForm.titulo.trim(),
+        descripcion: createForm.descripcion.trim(),
+        nivel_dificultad: createForm.nivel_dificultad.trim() || 'media',
+        entregable: createForm.entregable.trim(),
+        area_id: Number(createForm.areaId),
+        tipo_actividad_id: miniproyectoActivityTypeId,
+        respuesta_miniproyecto: {
+          tipo: 'configurable',
+          modo: 'ejercicios',
+          exercises: createForm.exercises,
+          chatbot: {
+            enabled: createForm.useChatbot,
+            chatbotId: createForm.useChatbot && createForm.chatbotId ? Number(createForm.chatbotId) : null,
+          },
+        },
+      };
+
+      const response = await apiFetch('/miniproyectos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }, Number(createForm.areaId));
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'No fue posible crear el miniproyecto configurable');
+      }
+
+      await Promise.all([loadMiniproyectos(), loadSupportingData()]);
+      setShowCreateModal(false);
+      setCreateForm(createEmptyConfigurableForm());
+    } catch (err) {
+      console.error('Error creando miniproyecto configurable:', err);
+      setCreateError(err instanceof Error ? err.message : 'Error al crear el miniproyecto configurable');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isManagementMiniproyecto) return;
+
+    setCostRows((prev) => {
+      const deliverables = scopeList.map((item) => item.trim()).filter(Boolean);
+      if (deliverables.length === 0) return [];
+
+      return deliverables.map((deliverable) => {
+        const existing = prev.find((row) => normalizeAreaName(row.deliverable) === normalizeAreaName(deliverable));
+        return existing ? { ...existing, deliverable } : createDefaultCostRow(deliverable);
+      });
+    });
+  }, [scopeList, isManagementMiniproyecto]);
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selected) return;
 
-    if (isProgrammingMiniproyecto) {
-      if (!expectedOutput.trim()) {
-        setError('Define la salida esperada antes de guardar.');
+    let programmingPayload: string | null = null;
+    let configurablePayload: string | null = null;
+
+    if (isConfigurableMiniproyecto) {
+      if (selectedEmbeddedExercises.length === 0) {
+        setError('Debes crear al menos un ejercicio para el miniproyecto configurable.');
+        return;
+      }
+
+      if (selectedUseChatbot && !selectedChatbotId) {
+        setError('Selecciona un chatbot para activar la simulación del cliente.');
+        return;
+      }
+
+      configurablePayload = JSON.stringify({
+        tipo: 'configurable',
+        modo: 'ejercicios',
+        exercises: selectedEmbeddedExercises,
+        chatbot: {
+          enabled: selectedUseChatbot,
+          chatbotId: selectedUseChatbot && selectedChatbotId ? Number(selectedChatbotId) : null,
+        },
+      });
+    } else if (isProgrammingMiniproyecto) {
+      const plantilla = compilerTemplate.trim();
+      const metodoDerivado = parseMethodTemplate(plantilla);
+
+      if (!plantilla || !metodoDerivado) {
+        setError('La plantilla del método es obligatoria y debe incluir una firma Java válida.');
+        return;
+      }
+
+      if (compilerCases.length !== 3) {
+        setError('Debes definir exactamente 3 casos de prueba para el miniproyecto.');
+        return;
+      }
+
+      for (let index = 0; index < compilerCases.length; index += 1) {
+        if (!compilerCases[index]?.output?.trim()) {
+          setError(`El caso ${index + 1} debe tener output esperado.`);
+          return;
+        }
+      }
+
+      programmingPayload = JSON.stringify({
+        ...createDefaultCompilerConfig(),
+        sintaxis: sintaxisRequerida,
+        lenguajesPermitidos: [JAVA_LANGUAGE_ID],
+        metodo: { ...metodoDerivado, plantilla },
+        casos_prueba: compilerCases.map((caseItem) => ({
+          inputs: (caseItem.inputs || '').trim(),
+          output: (caseItem.output || '').trim(),
+        })),
+        esperado: (compilerCases[0]?.output || '').trim(),
+      });
+
+      if (!JSON.parse(programmingPayload).esperado) {
+        setError('El primer caso debe tener un output esperado para sincronizar la evaluación.');
         return;
       }
     }
@@ -384,25 +853,24 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
 
       const response = await fetch(`${API_BASE_URL}/miniproyectos/${selected.id}`, {
         method: 'PUT',
-        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           titulo: formData.titulo,
           descripcion: formData.descripcion,
           nivel_dificultad: formData.nivel_dificultad,
           entregable: formData.entregable,
-          respuesta_miniproyecto: isProgrammingMiniproyecto
-            ? JSON.stringify({
-                tipo: 'programacion',
-                esperado: expectedOutput.trim(),
-                sintaxis: sintaxisRequerida,
-                lenguajesPermitidos
-              })
+          respuesta_miniproyecto: isConfigurableMiniproyecto
+            ? configurablePayload
+            : isProgrammingMiniproyecto
+            ? programmingPayload
             : isManagementMiniproyecto
               ? JSON.stringify({
-                  alcance: scopeList,
+                  objetivoPrincipal: projectObjective.trim() ? [projectObjective.trim()] : [],
+                  objetivosEspecificos: specificObjectivesList,
+                  entregables: scopeList,
                   cronograma: scheduleList,
-                  costos: costsList
+                  costos: costsList,
+                  supuestos: assumptionsList
                 })
               : JSON.stringify({
                   stakeholders: stakeholdersList,
@@ -417,47 +885,18 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
         throw new Error(errorData.error || 'Error al actualizar el miniproyecto');
       }
 
-      setMiniproyectos((prev) =>
-        prev.map((item) => {
-          if (item.id !== selected.id) return item;
-          return {
-            ...item,
-            entregable: formData.entregable,
-            respuesta_miniproyecto: isProgrammingMiniproyecto
-              ? JSON.stringify({
-                  tipo: 'programacion',
-                  esperado: expectedOutput.trim(),
-                  sintaxis: sintaxisRequerida,
-                  lenguajesPermitidos
-                })
-              : isManagementMiniproyecto
-                ? JSON.stringify({
-                    alcance: scopeList,
-                    cronograma: scheduleList,
-                    costos: costsList
-                  })
-                : JSON.stringify({
-                    stakeholders: stakeholdersList,
-                    requisitosFuncionales: functionalList,
-                    requisitosNoFuncionales: nonFunctionalList
-                  }),
-            Actividad: {
-              ...(item.Actividad || {}),
-              titulo: formData.titulo,
-              descripcion: formData.descripcion,
-              nivel_dificultad: formData.nivel_dificultad
-            }
-          };
-        })
-      );
+      await Promise.all([loadMiniproyectos(), loadSupportingData()]);
 
-      if (!isProgrammingMiniproyecto) {
+      if (!isProgrammingMiniproyecto && !isConfigurableMiniproyecto) {
         if (isManagementMiniproyecto) {
           setExpectedSnapshot({
             mode: 'management',
-            alcance: scopeList,
+            objetivoPrincipal: projectObjective.trim() ? [projectObjective.trim()] : [],
+            objetivosEspecificos: specificObjectivesList,
+            entregables: scopeList,
             cronograma: scheduleList,
-            costos: costsList
+            costos: costsList,
+            supuestos: assumptionsList
           });
         } else {
           setExpectedSnapshot({
@@ -471,6 +910,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
       }
 
       setSelected(null);
+      setSelectedEmbeddedExercises([]);
+      setSelectedUseChatbot(false);
+      setSelectedChatbotId('');
     } catch (err) {
       console.error('Error actualizando miniproyecto:', err);
       setError(err instanceof Error ? err.message : 'Error al actualizar el miniproyecto');
@@ -513,24 +955,35 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="app-main py-4">
-          <div className="app-page-header">
-            <div className="app-brand-block">
-              <div className="app-brand-icon">
+        <div className="max-w-7xl mx-auto px-8 py-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Miniproyectos</h1>
-                <p className="text-gray-500 text-sm">Edición docente bajo el mismo sistema de tarjetas, filtros y bloques compartidos.</p>
+                <p className="text-gray-500 text-sm">Panel de Docente - EduPath</p>
               </div>
             </div>
-            <div className="app-action-row">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={openCreateModal}
+                className="app-btn px-4 py-2 bg-[#4A90E2] text-white hover:bg-[#3A7ED1]"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-sm">Crear configurable</span>
+              </button>
+              <div className="hidden md:flex items-center gap-2 text-xs text-gray-500 bg-gray-100 px-3 py-2 rounded-full">
+                <span>Total:</span>
+                <span className="font-semibold text-gray-700">{totalMiniproyectos}</span>
+              </div>
               <button
                 onClick={loadMiniproyectos}
-                className="app-btn app-btn-secondary"
+                className="app-btn app-btn-secondary px-4 py-2 text-gray-600 hover:text-[#4A90E2]"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>Actualizar</span>
+                <span className="text-sm">Actualizar</span>
               </button>
             </div>
           </div>
@@ -546,75 +999,52 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
           <span>Volver al Panel</span>
         </button>
 
-        <section className="app-page-hero mb-6">
-          <div className="app-page-hero__content">
-            <div className="app-page-hero__copy">
-              <div className="app-page-hero__eyebrow">Edición docente</div>
-              <h2 className="app-page-hero__title">Gestión de miniproyectos</h2>
-              <p className="app-page-hero__description">
-                Consulta y administra miniproyectos.
-              </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {kpiCards.map((card) => (
+            <div
+              key={card.label}
+              className="rounded-xl shadow-md p-4 text-white"
+              style={{ backgroundColor: card.bg }}
+            >
+              <p className="text-xs text-white/90">{card.label}</p>
+              <p className="text-2xl font-semibold text-white truncate">{card.value}</p>
             </div>
+          ))}
+        </div>
 
-            <div className="app-hero-metrics">
-              {kpiCards.map((card) => (
-                <div key={card.label} className="app-hero-metric">
-                  <div className="app-hero-metric__label">{card.label}</div>
-                  <div className="app-hero-metric__value truncate">{card.value}</div>
-                  <div className="app-hero-metric__help">{card.label === 'Seleccionado' ? 'Elemento activo para editar.' : 'Indicador operativo del listado.'}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_320px]">
-            <div className="app-toolbar-card">
-              <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Catálogo visible</p>
-                <p className="mt-1 text-sm text-slate-600">Usa la búsqueda para recortar el listado por título, área o nivel antes de editar.</p>
+        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-8">
+          <section className="bg-white rounded-2xl shadow-md p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-[#3A4A5B] text-lg font-semibold">Listado de Miniproyectos</h2>
+                <p className="text-sm text-gray-500">Selecciona un miniproyecto para editarlo.</p>
               </div>
-              <div className="app-search-field">
-                <Search className="app-search-field__icon" />
+              <div className="relative w-full sm:w-auto">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Buscar por título, área o nivel"
-                  className="app-form-input"
+                  className="w-full sm:w-80 h-11 pl-10 pr-4 border border-gray-300 rounded-lg text-sm leading-5 focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
                 />
               </div>
             </div>
 
-            <div className="app-soft-card app-soft-card--blue">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del editor</p>
-              <p className="mt-2 text-lg font-semibold text-[#3A4A5B]">{selected ? 'Edición activa' : 'Sin selección'}</p>
-              <p className="mt-2 text-sm text-slate-600">{selected ? 'El formulario refleja el miniproyecto seleccionado.' : 'Selecciona un miniproyecto del listado para cargar su editor.'}</p>
-            </div>
-          </div>
-        </section>
-
-        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-8">
-          <section className="app-table-card">
-            <div className="app-table-card__header app-table-card__header--blue">
-              <div>
-                <div className="app-table-card__title">Listado de miniproyectos</div>
-                <p className="app-table-card__description">Selecciona un miniproyecto del listado para cargarlo en el editor lateral.</p>
-              </div>
-            </div>
-            <div className="app-table-card__body">
-
             {isLoading ? (
-              <div className="app-empty-panel py-10">Cargando miniproyectos...</div>
+              <div className="py-10 text-center text-gray-500">Cargando miniproyectos...</div>
             ) : error ? (
-              <div className="app-alert app-alert--error">{error}</div>
+              <div className="py-10 text-center text-red-600">{error}</div>
             ) : filteredMiniproyectos.length === 0 ? (
-              <div className="app-empty-panel py-10">No hay miniproyectos que coincidan con la búsqueda.</div>
+              <div className="py-10 text-center text-gray-500">
+                No hay miniproyectos que coincidan con la búsqueda.
+              </div>
             ) : (
               <div className="space-y-4">
                 {filteredMiniproyectos.map((item, index) => (
                   <button
                     key={item.id}
                     onClick={() => handleSelect(item)}
-                    className={`app-list-card w-full border transition-all hover:shadow-lg ${
+                    className={`w-full text-left border rounded-2xl p-5 transition-all hover:shadow-lg ${
                       selected?.id === item.id ? 'shadow-md' : ''
                     }`}
                     style={
@@ -629,9 +1059,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                           }
                     }
                   >
-                        <div className="app-list-card__head">
+                    <div className="flex items-start justify-between gap-4">
                       <div>
-                            <h3 className="app-list-card__title">
+                        <h3 className="text-lg font-semibold text-[#3A4A5B]">
                           {item.Actividad?.titulo || 'Sin título'}
                         </h3>
                         <div className="flex flex-wrap gap-2 mt-2">
@@ -652,19 +1082,12 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 ))}
               </div>
             )}
-            </div>
           </section>
 
-          <section className="app-table-card">
-            <div className="app-table-card__header app-table-card__header--green">
-              <div>
-                <div className="app-table-card__title">Editar miniproyecto</div>
-                <p className="app-table-card__description">Completa la ficha del elemento seleccionado y guarda sus cambios desde este panel lateral.</p>
-              </div>
-            </div>
-            <div className="app-table-card__body">
+          <section className="bg-white rounded-2xl shadow-md p-6">
+            <h2 className="text-[#3A4A5B] text-lg font-semibold mb-4">Editar Miniproyecto</h2>
             {!selected ? (
-              <div className="app-empty-panel py-12">
+              <div className="py-12 text-center text-gray-500">
                 Selecciona un miniproyecto para editar sus datos.
               </div>
             ) : (
@@ -679,8 +1102,8 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1.5">Descripción</label>
-                  {isProgrammingMiniproyecto ? (
-                    <div className="quill-editor-container">
+                  {usesRichDescriptionEditor ? (
+                    <div className="quill-editor-container app-rich-text-editor" key={`rich-description-${selected?.id || 'none'}`}>
                       <div
                         ref={editorRef}
                         className="w-full"
@@ -712,14 +1135,114 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                     className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                   />
                 </div>
-                {isProgrammingMiniproyecto ? (
-                  <div className="space-y-4">
-                    <div className="space-y-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+                {isConfigurableMiniproyecto ? (
+                  <div className="space-y-5 rounded-2xl border border-[#4A90E2]/20 bg-[#F8FBFF] p-5">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <label className="text-sm text-gray-600">Sintaxis requerida</label>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
+                        <h3 className="text-sm font-semibold text-[#3A4A5B]">Miniproyecto configurable por ejercicios</h3>
+                        <p className="text-xs text-gray-500">Este miniproyecto contiene ejercicios creados dentro del mismo flujo y puede usar un chatbot como cliente simulado.</p>
+                      </div>
+                      <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-semibold text-blue-700">
+                        Área: {selected?.Area?.nombre || 'Sin área'}
+                      </span>
+                    </div>
+
+                    <ConfigurableEmbeddedExerciseEditor
+                      exercises={selectedEmbeddedExercises}
+                      onChange={setSelectedEmbeddedExercises}
+                    />
+
+                    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+                      <label className="flex items-center gap-3 text-sm font-medium text-[#3A4A5B]">
+                        <input
+                          type="checkbox"
+                          checked={selectedUseChatbot}
+                          onChange={(event) => {
+                            const enabled = event.target.checked;
+                            setSelectedUseChatbot(enabled);
+                            if (!enabled) {
+                              setSelectedChatbotId('');
+                            }
+                          }}
+                          className="h-4 w-4"
+                        />
+                        Usar chatbot como simulación del cliente
+                      </label>
+
+                      {selectedUseChatbot ? (
+                        <select
+                          value={selectedChatbotId}
+                          onChange={(event) => setSelectedChatbotId(event.target.value)}
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                        >
+                          <option value="">Selecciona un chatbot</option>
+                          {selectedEligibleChatbots.map((chatbot) => (
+                            <option key={chatbot.id} value={String(chatbot.id)}>
+                              {chatbot.nombre} {chatbot.tipo === 'GENERAL' ? '(general)' : '(miniproyecto)'}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : isProgrammingMiniproyecto ? (
+                  <div className="space-y-4">
+                    <div className="space-y-4 rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-[#3A4A5B]">Configuración de compilador</label>
+                          <p className="mt-1 text-xs text-gray-500">Este miniproyecto se editará como ejercicio de programación: método Java, restricciones y 3 casos de prueba.</p>
+                        </div>
+                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                          Java
+                        </span>
+                      </div>
+
+                      <div>
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <label className="block text-sm font-medium text-[#3A4A5B]">Plantilla del método *</label>
+                          <button
+                            type="button"
+                            onClick={handleFormatCompilerTemplate}
+                            className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+                          >
+                            Dar formato
+                          </button>
+                        </div>
+                        <textarea
+                          value={compilerTemplate}
+                          onChange={(event) => handleCompilerTemplateChange(event.target.value)}
+                          placeholder={"public static int sumar(int a, int b) {\n    // TODO\n}"}
+                          rows={10}
+                          className="w-full min-h-64 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono text-sm leading-7 bg-white resize-y"
+                        />
+                        <p className="mt-2 text-xs text-gray-500">El backend envolverá este método y ejecutará automáticamente los 3 casos de prueba, igual que en ejercicios.</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
+                          <div className="text-xs text-gray-500 mb-1">Método derivado</div>
+                          <div className="text-sm font-semibold text-[#3A4A5B]">{compilerMethod?.nombre || 'Pendiente de derivar'}</div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
+                          <div className="text-xs text-gray-500 mb-1">Retorno</div>
+                          <div className="text-sm font-semibold text-[#3A4A5B]">{compilerMethod?.retorno || 'Pendiente de derivar'}</div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
+                          <div className="text-xs text-gray-500 mb-1">Parámetros</div>
+                          <div className="text-sm font-semibold text-[#3A4A5B] break-words">
+                            {compilerMethod?.parametros?.length
+                              ? compilerMethod.parametros.map((param) => `${param.tipo} ${param.nombre}`).join(', ')
+                              : 'Pendiente de derivar'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-sm text-gray-600">Restricciones técnicas (opcionales)</label>
+                        <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
                           {sintaxisDisponibles.map((sintaxis) => (
-                            <label key={sintaxis} className="flex items-center gap-2 text-xs text-gray-700">
+                            <label key={sintaxis} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-gray-700">
                               <input
                                 type="checkbox"
                                 checked={sintaxisRequerida.includes(sintaxis)}
@@ -730,36 +1253,39 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                             </label>
                           ))}
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">Define estructuras obligatorias para validar el codigo.</p>
+                        <p className="text-xs text-gray-500 mt-2">Si no defines restricciones, la evaluación validará únicamente los casos de prueba.</p>
                       </div>
 
                       <div>
-                        <label className="text-sm text-gray-600">Lenguajes permitidos</label>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          {lenguajesDisponibles.map((lenguaje) => (
-                            <label key={lenguaje.id} className="flex items-center gap-2 text-xs text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={lenguajesPermitidos.includes(lenguaje.id)}
-                                onChange={() => toggleLenguajePermitido(lenguaje.id)}
-                                className="h-4 w-4"
-                              />
-                              <span>{lenguaje.nombre}</span>
-                            </label>
+                        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Casos de prueba obligatorios *</label>
+                        <p className="text-xs text-gray-500 mb-3">Los inputs aceptan valores separados por comas. El output del caso 1 también se usa como referencia resumida del esperado.</p>
+                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+                          {compilerCases.map((caseItem, index) => (
+                            <div key={index} className="space-y-3 bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
+                              <div className="text-xs font-semibold uppercase tracking-wide text-[#3A4A5B]">Caso {index + 1}</div>
+                              <div>
+                                <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Inputs</label>
+                                <input
+                                  type="text"
+                                  value={caseItem.inputs}
+                                  onChange={(event) => handleCompilerCaseChange(index, 'inputs', event.target.value)}
+                                  placeholder="Ej: 5,3"
+                                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Output esperado *</label>
+                                <input
+                                  type="text"
+                                  value={caseItem.output}
+                                  onChange={(event) => handleCompilerCaseChange(index, 'output', event.target.value)}
+                                  placeholder="Resultado esperado"
+                                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
+                                />
+                              </div>
+                            </div>
                           ))}
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">Si no seleccionas ninguno, se permiten todos.</p>
-                      </div>
-
-                      <div>
-                        <label className="text-sm text-gray-600">Salida esperada</label>
-                        <textarea
-                          value={expectedOutput}
-                          onChange={(event) => setExpectedOutput(event.target.value)}
-                          rows={4}
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                          placeholder="Ejemplo: 1 2 3"
-                        />
                       </div>
                     </div>
                   </div>
@@ -768,12 +1294,50 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                     {isManagementMiniproyecto ? (
                       <>
                         <div>
-                          <label className="text-sm text-gray-600">Alcance del proyecto</label>
+                          <label className="text-sm text-gray-600">Objetivo principal</label>
+                          <textarea
+                            value={projectObjective}
+                            onChange={(event) => setProjectObjective(event.target.value)}
+                            rows={3}
+                            placeholder="Resume el propósito central del proyecto según el charter."
+                            className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-sm text-gray-600">Objetivos específicos</label>
+                          <div className="mt-2 flex gap-2">
+                            <input
+                              value={specificObjectiveInput}
+                              onChange={(event) => setSpecificObjectiveInput(event.target.value)}
+                              placeholder="Agregar objetivo específico"
+                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => addListItem(specificObjectiveInput, setSpecificObjectivesList, () => setSpecificObjectiveInput(''))}
+                              className="px-4 py-2 rounded-lg bg-[#4A90E2] text-white text-sm"
+                            >
+                              Agregar
+                            </button>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {specificObjectivesList.map((item, index) => (
+                              <span key={`${item}-${index}`} className="inline-flex items-center gap-2 bg-cyan-50 text-cyan-700 px-3 py-1 rounded-full text-xs">
+                                {item}
+                                <button type="button" onClick={() => removeListItem(index, setSpecificObjectivesList)} className="text-cyan-600">×</button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-sm text-gray-600">Entregables clave</label>
                           <div className="mt-2 flex gap-2">
                             <input
                               value={scopeInput}
                               onChange={(event) => setScopeInput(event.target.value)}
-                              placeholder="Agregar alcance"
+                              placeholder="Agregar entregable"
                               className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                             />
                             <button
@@ -795,13 +1359,13 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                         </div>
 
                         <div>
-                          <label className="text-sm text-gray-600">Cronograma del proyecto</label>
+                          <label className="text-sm text-gray-600">Hitos del proyecto</label>
                           <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
                             <div
                               className="bg-gray-50 text-[11px] text-gray-500"
-                              style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr auto' }}
+                              style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr auto' }}
                             >
-                              <div className="px-3 py-2">Actividad</div>
+                              <div className="px-3 py-2">Hito</div>
                               <div className="px-3 py-2">Inicio</div>
                               <div className="px-3 py-2">Fin</div>
                               <div className="px-3 py-2"></div>
@@ -811,16 +1375,16 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                                 <div
                                   key={index}
                                   className="px-3 py-2"
-                                  style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr auto', gap: '8px', alignItems: 'center' }}
+                                  style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr auto', gap: '8px', alignItems: 'center' }}
                                 >
                                   <input
-                                    value={row.activity}
+                                    value={row.milestone}
                                     onChange={(event) => {
                                       const updated = [...scheduleRows];
-                                      updated[index] = { ...updated[index], activity: event.target.value };
+                                      updated[index] = { ...updated[index], milestone: event.target.value };
                                       setScheduleRows(updated);
                                     }}
-                                    placeholder="Actividad"
+                                    placeholder="Hito"
                                     className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                                   />
                                   <input
@@ -849,7 +1413,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                                     type="button"
                                     onClick={() => {
                                       if (scheduleRows.length === 1) {
-                                        setScheduleRows([{ activity: '', start: '', end: '' }]);
+                                        setScheduleRows([{ milestone: '', start: '', end: '' }]);
                                         return;
                                       }
                                       setScheduleRows(scheduleRows.filter((_, rowIndex) => rowIndex !== index));
@@ -865,7 +1429,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                           <div className="mt-3 flex justify-end">
                             <button
                               type="button"
-                              onClick={() => setScheduleRows([...scheduleRows, { activity: '', start: '', end: '' }])}
+                              onClick={() => setScheduleRows([...scheduleRows, { milestone: '', start: '', end: '' }])}
                               className="text-xs text-blue-600 hover:text-blue-700"
                             >
                               + Agregar fila
@@ -874,46 +1438,42 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                         </div>
 
                         <div>
-                          <label className="text-sm text-gray-600">Costos y recursos</label>
+                          <label className="text-sm text-gray-600">Costos por entregable</label>
                           <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
                             <div
                               className="bg-gray-50 text-[11px] text-gray-500"
-                              style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr 1.2fr auto' }}
+                              style={{ display: 'grid', gridTemplateColumns: '2.2fr 1.2fr 0.9fr 1.2fr 1fr' }}
                             >
-                              <div className="px-3 py-2">Concepto</div>
-                              <div className="px-3 py-2">Tipo</div>
+                              <div className="px-3 py-2">Entregable</div>
+                              <div className="px-3 py-2">Unidad de medida</div>
                               <div className="px-3 py-2">Cantidad</div>
-                              <div className="px-3 py-2">Costo unitario</div>
-                              <div className="px-3 py-2"></div>
+                              <div className="px-3 py-2">Precio unitario</div>
+                              <div className="px-3 py-2 text-right">Subtotal</div>
                             </div>
                             <div className="divide-y divide-gray-100">
                               {costRows.map((row, index) => (
                                 <div
                                   key={index}
                                   className="px-3 py-2"
-                                  style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr 1.2fr auto', gap: '8px', alignItems: 'center' }}
+                                  style={{ display: 'grid', gridTemplateColumns: '2.2fr 1.2fr 0.9fr 1.2fr 1fr', gap: '8px', alignItems: 'center' }}
                                 >
                                   <input
-                                    value={row.concept}
-                                    onChange={(event) => {
-                                      const updated = [...costRows];
-                                      updated[index] = { ...updated[index], concept: event.target.value };
-                                      setCostRows(updated);
-                                    }}
-                                    placeholder="Concepto"
-                                    className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                                    value={row.deliverable}
+                                    readOnly
+                                    className="rounded-lg border border-gray-100 bg-gray-50 px-2 py-2 text-xs text-gray-600"
                                   />
                                   <select
-                                    value={row.type}
+                                    value={row.unitMeasure}
                                     onChange={(event) => {
                                       const updated = [...costRows];
-                                      updated[index] = { ...updated[index], type: event.target.value as 'Humano' | 'Material' };
+                                      updated[index] = { ...updated[index], unitMeasure: event.target.value };
                                       setCostRows(updated);
                                     }}
                                     className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                                   >
-                                    <option value="Humano">Humano</option>
-                                    <option value="Material">Material</option>
+                                    {UNIT_MEASURE_OPTIONS.map((option) => (
+                                      <option key={option} value={option}>{option}</option>
+                                    ))}
                                   </select>
                                   <input
                                     type="number"
@@ -934,51 +1494,80 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                                     inputMode="decimal"
                                     min={0}
                                     step="0.01"
-                                    value={row.unitCost}
+                                    value={row.unitPrice}
                                     onChange={(event) => {
                                       const updated = [...costRows];
-                                      updated[index] = { ...updated[index], unitCost: event.target.value };
+                                      updated[index] = { ...updated[index], unitPrice: event.target.value };
                                       setCostRows(updated);
                                     }}
-                                    placeholder="Costo unitario"
+                                    placeholder="Precio unitario"
                                     className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                                   />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (costRows.length === 1) {
-                                        setCostRows([{ concept: '', type: 'Humano', quantity: '', unitCost: '' }]);
-                                        return;
-                                      }
-                                      setCostRows(costRows.filter((_, rowIndex) => rowIndex !== index));
-                                    }}
-                                    className="text-xs text-red-500 hover:text-red-600"
-                                  >
-                                    Quitar
-                                  </button>
+                                  <div className="text-right text-xs font-semibold text-gray-700">
+                                    {formatCurrency(calculateRowTotal(row))}
+                                  </div>
                                 </div>
                               ))}
                             </div>
-                            <div className="flex items-center justify-between px-3 py-2 text-xs text-gray-600">
-                              <span>Subtotal fila calculado automáticamente</span>
-                              <span className="font-semibold">
-                                Total: {formatCurrency(costRows.reduce((sum, row) => sum + calculateRowTotal(row), 0))}
-                              </span>
+                            <div className="grid gap-3 border-t border-gray-200 px-3 py-3 text-xs text-gray-600 md:grid-cols-[1fr_auto] md:items-center">
+                              <div className="grid gap-2 md:grid-cols-2">
+                                <label className="flex items-center gap-2">
+                                  <span>Imprevistos (%)</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    value={contingencyPercentage}
+                                    onChange={(event) => setContingencyPercentage(event.target.value)}
+                                    className="w-20 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+                                  />
+                                </label>
+                                <label className="flex items-center gap-2">
+                                  <span>Utilidad (%)</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    value={utilityPercentage}
+                                    onChange={(event) => setUtilityPercentage(event.target.value)}
+                                    className="w-20 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+                                  />
+                                </label>
+                              </div>
+                              <div className="space-y-1 text-right">
+                                <div>Total: <span className="font-semibold">{formatCurrency(totalCost)}</span></div>
+                                <div>Imprevistos: <span className="font-semibold">{formatCurrency(contingencyValue)}</span></div>
+                                <div>Utilidad: <span className="font-semibold">{formatCurrency(utilityValue)}</span></div>
+                                <div>Total proyecto: <span className="font-semibold">{formatCurrency(projectTotal)}</span></div>
+                              </div>
                             </div>
                           </div>
-                          <div className="mt-3 flex justify-end">
+                        </div>
+
+                        <div>
+                          <label className="text-sm text-gray-600">Supuestos cuantificables</label>
+                          <div className="mt-2 flex gap-2">
+                            <input
+                              value={assumptionInput}
+                              onChange={(event) => setAssumptionInput(event.target.value)}
+                              placeholder="Agregar supuesto verificable"
+                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                            />
                             <button
                               type="button"
-                              onClick={() =>
-                                setCostRows([
-                                  ...costRows,
-                                  { concept: '', type: 'Humano', quantity: '', unitCost: '' }
-                                ])
-                              }
-                              className="text-xs text-blue-600 hover:text-blue-700"
+                              onClick={() => addListItem(assumptionInput, setAssumptionsList, () => setAssumptionInput(''))}
+                              className="px-4 py-2 rounded-lg bg-[#4A90E2] text-white text-sm"
                             >
-                              + Agregar fila
+                              Agregar
                             </button>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {assumptionsList.map((item, index) => (
+                              <span key={`${item}-${index}`} className="inline-flex items-center gap-2 bg-slate-50 text-slate-700 px-3 py-1 rounded-full text-xs">
+                                {item}
+                                <button type="button" onClick={() => removeListItem(index, setAssumptionsList)} className="text-slate-600">×</button>
+                              </span>
+                            ))}
                           </div>
                         </div>
                       </>
@@ -1083,10 +1672,22 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 </button>
               </form>
             )}
-            </div>
           </section>
         </div>
       </main>
+
+      {showCreateModal ? (
+        <CreateConfigurableMiniproyectoWorkspace
+          formData={createForm}
+          freeAreas={freeAreas}
+          eligibleChatbots={createEligibleChatbots}
+          error={createError}
+          isCreating={isCreating}
+          onClose={closeCreateModal}
+          onSubmit={handleCreateConfigurableMiniproyecto}
+          onUpdate={setCreateForm}
+        />
+      ) : null}
 
       {showExpectedModal && expectedSnapshot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -1101,28 +1702,54 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
               </button>
             </div>
             {expectedSnapshot.mode === 'management' ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                  <h4 className="text-sm font-semibold text-blue-700 mb-2">Alcance</h4>
+              <div className="space-y-4">
+                <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-cyan-700 mb-2">Objetivo principal</h4>
+                  <ul className="text-xs text-cyan-700 space-y-1">
+                    {expectedSnapshot.objetivoPrincipal.map((item, index) => (
+                      <li key={`objective-${index}`}>• {item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="bg-sky-50 border border-sky-100 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-sky-700 mb-2">Objetivos específicos</h4>
+                  <ul className="text-xs text-sky-700 space-y-1">
+                    {expectedSnapshot.objetivosEspecificos.map((item, index) => (
+                      <li key={`specific-objective-${index}`}>• {item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-blue-700 mb-2">Entregables clave</h4>
                   <ul className="text-xs text-blue-700 space-y-1">
-                    {expectedSnapshot.alcance.map((item, index) => (
+                    {expectedSnapshot.entregables.map((item, index) => (
                       <li key={`scope-${index}`}>• {item}</li>
                     ))}
                   </ul>
+                  </div>
+                  <div className="bg-green-50 border border-green-100 rounded-xl p-4">
+                    <h4 className="text-sm font-semibold text-green-700 mb-2">Cronograma</h4>
+                    <ul className="text-xs text-green-700 space-y-1">
+                      {expectedSnapshot.cronograma.map((item, index) => (
+                        <li key={`schedule-${index}`}>• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
+                    <h4 className="text-sm font-semibold text-orange-700 mb-2">Costos</h4>
+                    <ul className="text-xs text-orange-700 space-y-1">
+                      {expectedSnapshot.costos.map((item, index) => (
+                        <li key={`cost-${index}`}>• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-                <div className="bg-green-50 border border-green-100 rounded-xl p-4">
-                  <h4 className="text-sm font-semibold text-green-700 mb-2">Cronograma</h4>
-                  <ul className="text-xs text-green-700 space-y-1">
-                    {expectedSnapshot.cronograma.map((item, index) => (
-                      <li key={`schedule-${index}`}>• {item}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
-                  <h4 className="text-sm font-semibold text-orange-700 mb-2">Costos</h4>
-                  <ul className="text-xs text-orange-700 space-y-1">
-                    {expectedSnapshot.costos.map((item, index) => (
-                      <li key={`cost-${index}`}>• {item}</li>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Supuestos</h4>
+                  <ul className="text-xs text-slate-700 space-y-1">
+                    {expectedSnapshot.supuestos.map((item, index) => (
+                      <li key={`assumption-${index}`}>• {item}</li>
                     ))}
                   </ul>
                 </div>
