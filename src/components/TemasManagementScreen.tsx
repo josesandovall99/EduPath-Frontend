@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Edit2, Loader, Search } from 'lucide-react';
+import { ArrowLeft, Edit2, Eye, Loader, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ThemeManagementScreen } from './ThemeManagementScreen';
+import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 
 interface Tema {
@@ -46,7 +47,10 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/temas/por-area/${areaId}`);
+      const response = await fetch(`${API_BASE_URL}/temas/por-area/${areaId}`, {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
+      });
       if (!response.ok) throw new Error('Error cargando temas');
       const data = await response.json();
       setTemas(data);
@@ -58,16 +62,6 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
     }
   };
 
-  // Colores de gradiente para las tarjetas
-  const colors = [
-    { bg: '#4A90E2', text: 'text-blue-600' },
-    { bg: '#7ED6A7', text: 'text-green-600' },
-    { bg: '#F5A97F', text: 'text-orange-600' },
-    { bg: '#A78BFA', text: 'text-purple-600' },
-    { bg: '#8B5CF6', text: 'text-indigo-600' },
-    { bg: '#F472B6', text: 'text-pink-600' },
-  ];
-
   const handleOpenThemeManager = async (tema?: Tema) => {
     if (!tema) {
       setEditingTema(null);
@@ -78,7 +72,10 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
     let temaToEdit = tema;
     if (tema.estado === undefined) {
       try {
-        const response = await fetch(`${API_BASE_URL}/temas/${tema.id}`);
+        const response = await fetch(`${API_BASE_URL}/temas/${tema.id}`, {
+          headers: buildAuthHeaders({ Accept: 'application/json' }),
+          credentials: 'include'
+        });
         if (response.ok) {
           temaToEdit = await response.json();
         }
@@ -99,6 +96,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
   const filteredTemas = temas.filter((tema) =>
     tema.nombre.toLowerCase().includes(searchTerm.toLowerCase().trim())
   );
+  const activeTemas = temas.filter((tema) => tema.estado !== false).length;
 
   if (showThemeManager) {
     return (
@@ -113,29 +111,27 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
 
   return (
     <div className="app-shell">
-      {/* Header */}
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
               <button
                 type="button"
                 onClick={onHome}
-                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                className="app-brand-icon"
                 title="Ir al panel principal"
               >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </button>
               <div>
-                <h1 className="text-[#3A4A5B]">Seleccionar Tema</h1>
-                <p className="text-gray-500 text-sm">Área: {areaName}</p>
+                <h1 className="text-[#3A4A5B]">Temas del área</h1>
+                <p className="text-gray-500 text-sm">Área seleccionada: {areaName}</p>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="app-main">
         <button
           onClick={onBack}
@@ -145,85 +141,107 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
           <span>Volver</span>
         </button>
 
-        {/* Informational Message */}
-        <div className="app-info-banner mb-8 p-6">
-          <h2 className="text-lg font-bold mb-2">Selecciona un Tema</h2>
-          <p className="text-sm opacity-95">
-            Elige un tema para gestionar sus subtemas y contenidos asociados. 
-            Aquí podrás organizar la estructura de aprendizaje para este área.
-          </p>
-        </div>
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Estructura temática</div>
+              <h2 className="app-page-hero__title">Gestión de temas</h2>
+              <p className="app-page-hero__description">
+                Revisa, edita y abre el detalle de cada tema.
+              </p>
+            </div>
 
-        <div className="mb-6 flex justify-end">
-          <button
-            onClick={() => handleOpenThemeManager()}
-            className="app-btn app-primary-btn px-5 py-2.5"
-          >
-            Gestionar Temas
-          </button>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-md p-4 mb-6">
-          <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-            Filtrar por nombre de tema
-          </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Escribe el nombre del tema..."
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-            />
+            <div className="app-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Temas</div>
+                <div className="app-hero-metric__value">{temas.length}</div>
+                <div className="app-hero-metric__help">Registros asociados al área actual.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Activos</div>
+                <div className="app-hero-metric__value">{activeTemas}</div>
+                <div className="app-hero-metric__help">Disponibles para continuar la estructura.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Resultados</div>
+                <div className="app-hero-metric__value">{filteredTemas.length}</div>
+                <div className="app-hero-metric__help">Coincidencias según la búsqueda actual.</div>
+              </div>
+              <div className="app-hero-metric app-hero-metric--wide">
+                <div className="app-hero-metric__label">Área</div>
+                <div className="app-hero-metric__value app-hero-metric__value--text">{areaName}</div>
+                <div className="app-hero-metric__help">Contexto activo de trabajo.</div>
+              </div>
+            </div>
           </div>
-        </div>
+
+          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(280px,0.75fr)]">
+            <div className="app-toolbar-card">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda</p>
+                  <p className="mt-1 text-sm text-slate-600">Filtra por nombre para localizar un tema dentro del área seleccionada.</p>
+                </div>
+                <button onClick={() => handleOpenThemeManager()} className="app-btn app-primary-btn">
+                  <Edit2 className="w-4 h-4" />
+                  <span>Gestionar temas</span>
+                </button>
+              </div>
+              <div className="app-toolbar-card__search app-search-field">
+                <Search className="app-search-field__icon" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Buscar tema"
+                  className="app-form-input"
+                />
+              </div>
+            </div>
+
+            <div className="app-soft-card app-soft-card--blue app-context-card">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
+              <p className="app-context-card__title">{areaName}</p>
+              <p className="app-context-card__text">Selecciona un tema para continuar con subtemas y contenidos.</p>
+            </div>
+          </div>
+        </section>
 
         {loading ? (
-          <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
+          <div className="app-empty-panel py-12">
             <div className="flex flex-col items-center gap-4">
               <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
               <p className="text-gray-600">Cargando temas...</p>
             </div>
           </div>
         ) : error ? (
-          <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <p className="text-red-600">{error}</p>
+          <div className="app-alert app-alert--error mb-6">
+            <p>{error}</p>
             <button
               onClick={loadTemas}
-              className="mt-4 px-4 py-2 bg-[#4A90E2] text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="app-btn app-primary-btn"
             >
               Reintentar
             </button>
           </div>
         ) : temas.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <div className="mb-4 flex justify-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-[#4A90E2] to-[#357abd] rounded-full flex items-center justify-center opacity-10"></div>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">No hay temas disponibles</h3>
-            <p className="text-gray-600 mb-4">
-              No se encontraron temas en esta área. Crea un nuevo tema para comenzar a organizar contenidos.
-            </p>
-            <p className="text-sm text-gray-500 mb-4">
-              Los temas son las categorías principales de aprendizaje dentro de cada área.
-            </p>
+          <div className="app-empty-panel py-12">
+            <p className="text-base text-slate-600">No hay temas registrados para esta área.</p>
+            <p className="mt-2 text-sm text-slate-500">Crea un tema para continuar con la estructura académica.</p>
           </div>
         ) : filteredTemas.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Sin resultados</h3>
-            <p className="text-gray-600">No se encontraron temas con el nombre ingresado.</p>
+          <div className="app-empty-panel py-12">
+            <p className="text-base text-slate-600">No hay coincidencias para la búsqueda actual.</p>
+            <p className="mt-2 text-sm text-slate-500">Ajusta el texto ingresado para volver a listar temas.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredTemas.map((tema, index) => {
-              const colorStyle = colors[index % colors.length];
+          <div className="app-card-grid">
+            {filteredTemas.map((tema) => {
               return (
                 <div
                   key={tema.id}
                   onClick={() => onSelectTema(tema.id, tema.nombre)}
-                  className="rounded-xl p-8 text-white shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-left cursor-pointer"
-                  style={{ backgroundColor: colorStyle.bg }}
+                  className="app-list-card cursor-pointer"
                   role="button"
                   tabIndex={0}
                   onKeyDown={(event) => {
@@ -233,28 +251,38 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
                     }
                   }}
                 >
-                  <div className="flex items-start gap-6">
-                    <div className="flex flex-col h-full flex-1">
-                      <h3 className="text-xl font-bold mb-2">{tema.nombre}</h3>
-                      {tema.descripcion && (
-                        <p className="text-sm opacity-90 flex-grow">{tema.descripcion}</p>
-                      )}
-                      <div className="text-xs opacity-75 mt-4">
-                        Haz clic para seleccionar este tema
+                  <div className="app-list-card__head">
+                    <div className="flex-1 min-w-0">
+                      <div className="mb-3 flex items-center gap-2">
+                        <span className={`app-badge ${tema.estado !== false ? 'app-badge--blue' : 'bg-amber-100 text-amber-700'}`}>
+                          {tema.estado !== false ? 'Activo' : 'Inhabilitado'}
+                        </span>
                       </div>
+                      <h3 className="app-list-card__title">{tema.nombre}</h3>
+                      {tema.descripcion && (
+                        <p className="app-list-card__description mt-2">{tema.descripcion}</p>
+                      )}
+                      {!tema.descripcion && <p className="app-list-card__description mt-2">Sin descripción registrada.</p>}
                     </div>
                     <button
                       onClick={(event) => {
                         event.stopPropagation();
                         handleOpenThemeManager(tema);
                       }}
-                      className="app-btn flex-shrink-0 px-3 py-2 rounded-lg bg-white/20 text-white hover:bg-white/30 cursor-pointer"
+                      className="app-btn app-btn-ghost app-btn-sm"
                       title="Editar tema"
                       aria-label="Editar tema"
                     >
                       <Edit2 className="w-4 h-4" />
-                      <span className="text-sm font-semibold">Editar</span>
+                      <span>Editar</span>
                     </button>
+                  </div>
+                  <div className="app-list-card__footer">
+                    <span className="app-list-card__meta">Abrir detalle del tema</span>
+                    <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#4A90E2]">
+                      <Eye className="w-4 h-4" />
+                      <span>Ver subtemas</span>
+                    </div>
                   </div>
                 </div>
               );

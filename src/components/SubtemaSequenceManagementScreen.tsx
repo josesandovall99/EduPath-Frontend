@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight, ArrowDownUp } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 
 interface Area {
@@ -89,6 +90,18 @@ export function SubtemaSequenceManagementScreen({
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
   const [insertAfterSequenceId, setInsertAfterSequenceId] = useState<number | null>(null);
+  const incomingAreaValue = areaId !== undefined ? areaId.toString() : '';
+  const incomingTemaValue = temaId !== undefined ? temaId.toString() : '';
+  const effectiveSelectedArea = selectedArea || incomingAreaValue;
+  const effectiveSelectedTema = selectedTema || incomingTemaValue;
+  const effectiveModalSelectedArea = modalSelectedArea || incomingAreaValue || effectiveSelectedArea;
+  const effectiveModalSelectedTema = modalSelectedTema || incomingTemaValue || effectiveSelectedTema;
+  const currentModalTema = temas.find((tema) => Number(tema.id) === Number(effectiveModalSelectedTema));
+  const effectiveModalTemas = modalTemas.length > 0
+    ? modalTemas
+    : currentModalTema
+      ? [currentModalTema]
+      : [];
 
   // Cargar datos al montar
   useEffect(() => {
@@ -108,6 +121,25 @@ export function SubtemaSequenceManagementScreen({
       setSelectedTema(temaId.toString());
     }
   }, [temaId]);
+
+  useEffect(() => {
+    if (!temas.length || temaId === undefined) {
+      return;
+    }
+
+    const currentTema = temas.find((tema) => Number(tema.id) === Number(temaId));
+    if (!currentTema) {
+      return;
+    }
+
+    if (!selectedTema) {
+      setSelectedTema(String(currentTema.id));
+    }
+
+    if (!selectedArea) {
+      setSelectedArea(String(currentTema.area_id));
+    }
+  }, [temas, temaId, selectedTema, selectedArea]);
 
   const loadData = async () => {
     setIsLoadingData(true);
@@ -142,8 +174,8 @@ export function SubtemaSequenceManagementScreen({
 
   // Obtener temas filtrados por área
   const getFilteredTemas = () => {
-    if (!selectedArea) return temas.filter(isTemaActive);
-    return temas.filter((t) => Number(t.area_id) === Number(selectedArea) && isTemaActive(t));
+    if (!effectiveSelectedArea) return temas.filter(isTemaActive);
+    return temas.filter((t) => Number(t.area_id) === Number(effectiveSelectedArea) && isTemaActive(t));
   };
 
   // Obtener subtemas filtrados por tema
@@ -151,16 +183,16 @@ export function SubtemaSequenceManagementScreen({
     let filtered = subtemas;
     
     // Filter by area if areaId is provided
-    if (areaId !== undefined) {
+    if (effectiveSelectedArea) {
       const allowedTemaIds = temas
-        .filter((t) => Number(t.area_id) === Number(areaId) && isTemaActive(t))
+        .filter((t) => Number(t.area_id) === Number(effectiveSelectedArea) && isTemaActive(t))
         .map(t => Number(t.id));
       filtered = filtered.filter((s) => allowedTemaIds.includes(Number(s.tema_id)) && isSubtemaActive(s));
     }
     
     // Filter by tema if selected
-    if (selectedTema) {
-      filtered = filtered.filter((s) => Number(s.tema_id) === Number(selectedTema) && isSubtemaActive(s));
+    if (effectiveSelectedTema) {
+      filtered = filtered.filter((s) => Number(s.tema_id) === Number(effectiveSelectedTema) && isSubtemaActive(s));
     }
 
     return filtered.filter(isSubtemaActive);
@@ -191,7 +223,7 @@ export function SubtemaSequenceManagementScreen({
   const getModalTemaId = () => {
     if (modalSelectedTema) return Number(modalSelectedTema);
     if (temaId !== undefined) return Number(temaId);
-    if (selectedTema) return Number(selectedTema);
+    if (effectiveSelectedTema) return Number(effectiveSelectedTema);
     return null;
   };
 
@@ -345,6 +377,27 @@ export function SubtemaSequenceManagementScreen({
       subtema_destino_id: prev.subtema_destino_id === String(lockedOriginId) ? '' : prev.subtema_destino_id
     }));
   }, [showCreateModal, isEditMode, modalSelectedTema, selectedTema, temaId, sequences, subtemas]);
+
+  useEffect(() => {
+    if (!showCreateModal || isEditMode) {
+      return;
+    }
+
+    if (temaId !== undefined && !modalSelectedTema) {
+      setModalSelectedTema(String(temaId));
+    }
+
+    if (areaId !== undefined && !modalSelectedArea) {
+      setModalSelectedArea(String(areaId));
+    }
+
+    if (temaId !== undefined && temas.length > 0 && modalTemas.length === 0) {
+      const temaActual = temas.find((tema) => Number(tema.id) === Number(temaId));
+      if (temaActual) {
+        setModalTemas([temaActual]);
+      }
+    }
+  }, [showCreateModal, isEditMode, temaId, areaId, modalSelectedTema, modalSelectedArea, temas, modalTemas]);
 
   const handleModalFilterChange = async (filterType: string, value: string) => {
     if (filterType === 'area') {
@@ -511,7 +564,7 @@ export function SubtemaSequenceManagementScreen({
         setSequences(sequencesData);
       }
 
-      setSuccess('Secuencia creada exitosamente');
+      setSuccess('Secuencia registrada correctamente.');
       resetForm();
       setInsertAfterSequenceId(null);
       setTimeout(() => setShowCreateModal(false), 1500);
@@ -582,7 +635,7 @@ export function SubtemaSequenceManagementScreen({
         setSequences(sequencesData);
       }
 
-      setSuccess('Secuencia actualizada exitosamente');
+      setSuccess('Secuencia actualizada correctamente.');
       resetForm();
       setTimeout(() => setShowCreateModal(false), 1500);
     } catch (err) {
@@ -666,7 +719,7 @@ export function SubtemaSequenceManagementScreen({
 
       setSuccess(prevSeq && nextSeq
         ? 'Secuencia eliminada y cadena reorganizada automáticamente'
-        : 'Secuencia eliminada exitosamente'
+        : 'Secuencia eliminada correctamente.'
       );
       setTimeout(() => setSuccess(null), 2000);
     } catch (err) {
@@ -687,27 +740,32 @@ export function SubtemaSequenceManagementScreen({
     setSelectedSequence(null);
   };
 
-  const filteredSequences = sequences.filter(seq => {
+  const scopedSequences = sequences.filter(seq => {
     const origen = subtemas.find(s => s.id === seq.subtema_origen_id);
     const destino = subtemas.find(s => s.id === seq.subtema_destino_id);
     
     if (!origen || !destino) return false;
     
-    // Filter by tema if temaId is provided (prioridad: solo mostrar secuencias de este tema)
-    if (temaId !== undefined) {
-      const matchesTema = Number(origen.tema_id) === Number(temaId) && Number(destino.tema_id) === Number(temaId);
+    if (effectiveSelectedTema) {
+      const matchesTema = Number(origen.tema_id) === Number(effectiveSelectedTema) && Number(destino.tema_id) === Number(effectiveSelectedTema);
       if (!matchesTema) return false;
     }
     
-    // Filter by area if areaId is provided
-    if (areaId !== undefined) {
+    if (effectiveSelectedArea) {
       const allowedTemaIds = temas
-        .filter(t => Number(t.area_id) === Number(areaId))
+        .filter(t => Number(t.area_id) === Number(effectiveSelectedArea))
         .map(t => Number(t.id));
       if (!allowedTemaIds.includes(Number(origen.tema_id)) || !allowedTemaIds.includes(Number(destino.tema_id))) {
         return false;
       }
     }
+
+    return true;
+  });
+
+  const filteredSequences = scopedSequences.filter(seq => {
+    const origen = subtemas.find(s => s.id === seq.subtema_origen_id);
+    const destino = subtemas.find(s => s.id === seq.subtema_destino_id);
     
     const origenName = origen?.nombre || '';
     const destinoName = destino?.nombre || '';
@@ -717,34 +775,11 @@ export function SubtemaSequenceManagementScreen({
 
   // Construir secuencia ordenada
   const buildOrderedSequence = () => {
-    if (sequences.length === 0) return [];
+    if (scopedSequences.length === 0) return [];
 
     const sequenceMap = new Map<number, number>();
     const destinos = new Set<number>();
-    
-    // Filter sequences by tema if temaId is provided (prioridad)
-    let secuenciasActivas = sequences.filter(s => s.estado);
-    if (temaId !== undefined) {
-      secuenciasActivas = secuenciasActivas.filter(seq => {
-        const origen = subtemas.find(s => s.id === seq.subtema_origen_id);
-        const destino = subtemas.find(s => s.id === seq.subtema_destino_id);
-        return origen && destino && 
-               Number(origen.tema_id) === Number(temaId) && 
-               Number(destino.tema_id) === Number(temaId);
-      });
-    } else if (areaId !== undefined) {
-      // Filter sequences by area if areaId is provided
-      const allowedTemaIds = temas
-        .filter(t => Number(t.area_id) === Number(areaId))
-        .map(t => Number(t.id));
-      secuenciasActivas = secuenciasActivas.filter(seq => {
-        const origen = subtemas.find(s => s.id === seq.subtema_origen_id);
-        const destino = subtemas.find(s => s.id === seq.subtema_destino_id);
-        return origen && destino && 
-               allowedTemaIds.includes(Number(origen.tema_id)) && 
-               allowedTemaIds.includes(Number(destino.tema_id));
-      });
-    }
+    const secuenciasActivas = scopedSequences.filter(s => s.estado);
 
     secuenciasActivas.forEach(seq => {
       sequenceMap.set(seq.subtema_origen_id, seq.subtema_destino_id);
@@ -817,6 +852,9 @@ export function SubtemaSequenceManagementScreen({
   };
 
   const orderedSequence = buildOrderedSequence();
+  const activeSequencesCount = scopedSequences.filter((sequence) => sequence.estado).length;
+  const inactiveSequencesCount = scopedSequences.filter((sequence) => !sequence.estado).length;
+  const currentScopeLabel = temaName || 'Todos los temas';
 
   const handleSaveOrder = async (newOrder: Array<{ subtema_id: number; sequence_id?: number }>) => {
     setIsLoading(true);
@@ -825,7 +863,7 @@ export function SubtemaSequenceManagementScreen({
 
       const response = await fetch(`${API_BASE_URL}/secuencias-subtema/reorder`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           subtemas: subtemasOrdenados
         })
@@ -838,7 +876,9 @@ export function SubtemaSequenceManagementScreen({
 
       const result = await response.json();
 
-      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-subtema`);
+      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-subtema`, {
+        headers: buildAuthHeaders()
+      });
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
@@ -853,15 +893,14 @@ export function SubtemaSequenceManagementScreen({
 
   return (
     <div className="app-shell">
-      {/* Header */}
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
               <button
                 type="button"
                 onClick={onHome}
-                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                className="app-brand-icon"
                 title="Ir al panel principal"
               >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
@@ -879,58 +918,11 @@ export function SubtemaSequenceManagementScreen({
                 )}
               </div>
             </div>
-            <button
-              onClick={() => {
-                resetForm();
-                setInsertAfterSequenceId(null);
-                
-                // Pre-fill filters if area and tema are provided
-                if (areaId !== undefined && temaId !== undefined) {
-                  setModalSelectedArea(areaId.toString());
-                  setModalSelectedTema(temaId.toString());
-                  
-                  // Cargar subtemas del tema seleccionado
-                  const subtemaFilter = subtemas.filter(s => Number(s.tema_id) === Number(temaId));
-                  setModalSubtemas(subtemaFilter);
-                  
-                  const temaFilter = temas.find(t => t.id === temaId);
-                  if (temaFilter) {
-                    setModalTemas([temaFilter]);
-                  }
-                } else if (areaId !== undefined) {
-                  setModalSelectedArea(areaId.toString());
-                  setModalSelectedTema('');
-                  
-                  // Cargar temas del área
-                  const temasArea = temas.filter(t => Number(t.area_id) === Number(areaId));
-                  setModalTemas(temasArea);
-                  
-                  // Cargar subtemas de temas del área
-                  const subtemasArea = subtemas.filter(s => 
-                    temasArea.some(t => Number(t.id) === Number(s.tema_id))
-                  );
-                  setModalSubtemas(subtemasArea);
-                } else {
-                  setModalSelectedArea('');
-                  setModalSelectedTema('');
-                  setModalTemas([]);
-                  setModalSubtemas(subtemas);
-                }
-                
-                setShowCreateModal(true);
-              }}
-              className="app-btn app-btn-success px-6 py-3"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Crear Secuencia</span>
-            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="app-main">
-        {/* Back Button */}
         <button
           onClick={onBack}
           className="app-back-button mb-6"
@@ -939,53 +931,96 @@ export function SubtemaSequenceManagementScreen({
           <span>{temaId ? 'Volver a Temas' : 'Volver al Panel'}</span>
         </button>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <ArrowRight className="w-6 h-6 text-[#4A90E2]" />
-              </div>
-              <span className="text-3xl text-[#4A90E2]">{sequences.length}</span>
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Orden académico</div>
+              <h2 className="app-page-hero__title">Secuencia de subtemas</h2>
+              <p className="app-page-hero__description">
+                Consulta, ajusta y organiza la secuencia del tema seleccionado.
+              </p>
             </div>
-            <p className="text-gray-600 text-sm">Total Secuencias</p>
+
+            <div className="app-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Secuencias</div>
+                <div className="app-hero-metric__value">{sequences.length}</div>
+                <div className="app-hero-metric__help">Total registrado en el módulo.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Activas</div>
+                <div className="app-hero-metric__value">{activeSequencesCount}</div>
+                <div className="app-hero-metric__help">Secuencias dentro del flujo actual.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Inactivas</div>
+                <div className="app-hero-metric__value">{inactiveSequencesCount}</div>
+                <div className="app-hero-metric__help">Registros fuera del flujo activo.</div>
+              </div>
+              <div className="app-hero-metric app-hero-metric--wide">
+                <div className="app-hero-metric__label">Contexto</div>
+                <div className="app-hero-metric__value app-hero-metric__value--text">{currentScopeLabel}</div>
+                <div className="app-hero-metric__help">Tema activo para la edición.</div>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Eye className="w-6 h-6 text-[#7ED6A7]" />
-              </div>
-              <span className="text-3xl text-[#7ED6A7]">
-                {sequences.filter(s => s.estado).length}
-              </span>
-            </div>
-            <p className="text-gray-600 text-sm">Activas</p>
-          </div>
+          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.75fr)]">
+            <div className="app-toolbar-card">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Filtros</p>
+                  <p className="mt-1 text-sm text-slate-600">Ajusta el listado por área o tema antes de revisar el orden y las relaciones activas.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setInsertAfterSequenceId(null);
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <EyeOff className="w-6 h-6 text-gray-500" />
-              </div>
-              <span className="text-3xl text-gray-500">
-                {filteredSequences.filter(s => !s.estado).length}
-              </span>
-            </div>
-            <p className="text-gray-600 text-sm">Inactivas</p>
-          </div>
-        </div>
+                    if (areaId !== undefined && temaId !== undefined) {
+                      setModalSelectedArea(areaId.toString());
+                      setModalSelectedTema(temaId.toString());
 
-        {/* Filtros */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#3A4A5B] mb-4">Filtrar por:</h3>
-          <div className="grid grid-cols-2 gap-4">
+                      const subtemaFilter = subtemas.filter(s => Number(s.tema_id) === Number(temaId));
+                      setModalSubtemas(subtemaFilter);
+
+                      const temaFilter = temas.find(t => t.id === temaId);
+                      if (temaFilter) {
+                        setModalTemas([temaFilter]);
+                      }
+                    } else if (areaId !== undefined) {
+                      setModalSelectedArea(areaId.toString());
+                      setModalSelectedTema('');
+
+                      const temasArea = temas.filter(t => Number(t.area_id) === Number(areaId));
+                      setModalTemas(temasArea);
+
+                      const subtemasArea = subtemas.filter(s =>
+                        temasArea.some(t => Number(t.id) === Number(s.tema_id))
+                      );
+                      setModalSubtemas(subtemasArea);
+                    } else {
+                      setModalSelectedArea('');
+                      setModalSelectedTema('');
+                      setModalTemas([]);
+                      setModalSubtemas(subtemas);
+                    }
+
+                    setShowCreateModal(true);
+                  }}
+                  className="app-btn app-btn-success"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Crear secuencia</span>
+                </button>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
                 Área
               </label>
               <select
-                value={selectedArea}
+                value={effectiveSelectedArea}
                 onChange={(e) => handleFilterChange('area', e.target.value)}
                 disabled={areaId !== undefined}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -1004,9 +1039,9 @@ export function SubtemaSequenceManagementScreen({
                 Tema
               </label>
               <select
-                value={selectedTema}
+                value={effectiveSelectedTema}
                 onChange={(e) => handleFilterChange('tema', e.target.value)}
-                disabled={!selectedArea || temaId !== undefined}
+                disabled={!effectiveSelectedArea || temaId !== undefined}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">Todos los temas</option>
@@ -1017,38 +1052,49 @@ export function SubtemaSequenceManagementScreen({
                 ))}
               </select>
             </div>
-          </div>
-        </div>
+              </div>
+            </div>
 
-        {/* Search */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Buscar secuencias..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-            />
-          </div>
-        </div>
+            <div className="app-sidebar-stack">
+              <div className="app-soft-card app-soft-card--blue">
+                <div className="mb-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda</p>
+                  <p className="mt-1 text-sm text-slate-600">Busca por origen, destino o descripción.</p>
+                </div>
+                <div className="app-toolbar-card__search app-search-field">
+                  <Search className="app-search-field__icon" />
+                  <input
+                    type="text"
+                    placeholder="Buscar secuencias"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="app-form-input"
+                  />
+                </div>
+              </div>
 
-        {/* Messages */}
+              <div className="app-soft-card app-context-card">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contexto activo</p>
+                <p className="app-context-card__title">{temaName || 'Tema no definido'}</p>
+                <p className="app-context-card__text">Área: {areaName || 'Sin área activa'}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
+          <div className="app-alert app-alert--error mb-6">
+            <p>{error}</p>
           </div>
         )}
         {success && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-            {success}
+          <div className="app-alert app-alert--success mb-6">
+            <p>{success}</p>
           </div>
         )}
 
-        {/* Loading State */}
         {isLoadingData ? (
-          <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
+          <div className="app-empty-panel py-12">
             <div className="flex flex-col items-center gap-4">
               <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
               <p className="text-gray-600">Cargando secuencias...</p>
@@ -1056,13 +1102,20 @@ export function SubtemaSequenceManagementScreen({
           </div>
         ) : (
           <>
-            {/* Vista de Secuencias Ordenadas */}
             {orderedSequence.length > 0 ? (
-              <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-[#3A4A5B]">Secuencia Ordenada</h3>
+              <div className="app-table-card mb-6">
+                <div className="app-table-card__header">
+                  <div>
+                    <div className="app-table-card__title">Secuencia ordenada</div>
+                    <p className="app-table-card__description">Vista resumida del orden actual entre subtemas activos.</p>
+                  </div>
+                  <div className="app-sequence-reorder-note">
+                    <ArrowDownUp className="w-4 h-4" />
+                    <span>Arrastra para reordenar</span>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 rounded-lg overflow-x-auto">
+                <div className="app-table-card__body">
+                <div className="app-sequence-chain">
                   {orderedSequence.map((item, index) => {
                     const subtema = subtemas.find(s => s.id === item.subtema_id);
                     const isLast = index === orderedSequence.length - 1;
@@ -1072,7 +1125,7 @@ export function SubtemaSequenceManagementScreen({
                     return (
                       <div
                         key={`${item.subtema_id}-${index}`}
-                        className="flex items-center gap-2"
+                        className="app-sequence-chain__item"
                       >
                         <button
                           onClick={() => {
@@ -1080,7 +1133,7 @@ export function SubtemaSequenceManagementScreen({
                               onSelectSubtema(subtema.id, subtema.tema_id, subtema.nombre);
                             }
                           }}
-                          className="relative"
+                          className="app-sequence-node-shell"
                           draggable
                           onDragStart={(e) => {
                             setDraggedItem(index);
@@ -1106,31 +1159,39 @@ export function SubtemaSequenceManagementScreen({
                           style={{background: 'none', border: 'none', padding: 0, cursor: 'pointer'}}
                         >
                           <div
-                            className={`px-4 py-2 rounded-lg text-white font-semibold min-w-[150px] text-center cursor-move hover:opacity-90 transition-opacity bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] ${
+                            className={`app-sequence-node ${
                               isDragging ? 'opacity-50 scale-95' : ''
                             } ${
                               isDraggedOver ? 'ring-2 ring-[#4A90E2] ring-offset-2' : ''
                             }`}
-                            title={`Click para gestionar contenidos de ${subtema?.nombre}`}
+                            title={`Gestionar contenidos de ${subtema?.nombre}`}
                           >
-                            {subtema?.nombre || 'N/A'}
+                            <span className="app-sequence-node__type" style={{ backgroundColor: '#7ED6A7' }}>
+                              Subtema
+                            </span>
+                            <span className="app-sequence-node__title">{subtema?.nombre || 'N/A'}</span>
                           </div>
                         </button>
                         {!isLast && (
-                          <ArrowRight className="w-5 h-5 text-gray-400" />
+                          <div className="app-sequence-connector">
+                            <div className="app-sequence-connector__arrow">
+                              <ArrowRight className="w-4 h-4" />
+                            </div>
+                          </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
+                </div>
               </div>
             ) : null}
 
-            {/* Lista Completa de Secuencias */}
             <div className="space-y-4">
               {filteredSequences.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-md p-12 text-center">
-                  <p className="text-gray-600">No hay secuencias. Crea una nueva para empezar.</p>
+                <div className="app-empty-panel py-12">
+                  <p className="text-base text-slate-600">No hay secuencias registradas para la vista actual.</p>
+                  <p className="mt-2 text-sm text-slate-500">Crea una secuencia para establecer el orden entre subtemas.</p>
                 </div>
               ) : (
                 filteredSequences.map((sequence) => {
@@ -1138,21 +1199,27 @@ export function SubtemaSequenceManagementScreen({
                   const destino = subtemas.find(s => s.id === sequence.subtema_destino_id);
 
                   return (
-                    <div key={sequence.id} className="bg-white rounded-xl shadow-md p-6 flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1">
+                    <div key={sequence.id} className="app-flow-card app-flow-card--sequence">
+                      <div className="app-flow-card__path app-flow-card__path--sequence flex-1">
                         <button
                           onClick={() => {
                             if (origen && onSelectSubtema) {
                               onSelectSubtema(origen.id, origen.tema_id, origen.nombre);
                             }
                           }}
-                          className="px-4 py-2 rounded-lg text-white font-semibold bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] hover:shadow-lg transition-all hover:scale-105 cursor-pointer"
-                          title={`Click para gestionar contenidos de ${origen?.nombre}`}
+                          className="app-sequence-card"
+                          style={{ borderColor: '#7ED6A733' }}
+                          title={`Gestionar contenidos de ${origen?.nombre}`}
                         >
-                          {origen?.nombre || 'N/A'}
+                          <span className="app-sequence-card__label" style={{ backgroundColor: '#7ED6A7' }}>
+                            Origen
+                          </span>
+                          <div className="app-sequence-card__title">{origen?.nombre || 'N/A'}</div>
                         </button>
 
-                        <ArrowRight className="w-5 h-5 text-gray-400" />
+                        <div className="app-sequence-card__arrow">
+                          <ArrowRight className="w-4 h-4" />
+                        </div>
 
                         <button
                           onClick={() => {
@@ -1160,29 +1227,26 @@ export function SubtemaSequenceManagementScreen({
                               onSelectSubtema(destino.id, destino.tema_id, destino.nombre);
                             }
                           }}
-                          className="px-4 py-2 rounded-lg text-white font-semibold bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] hover:shadow-lg transition-all hover:scale-105 cursor-pointer"
-                          title={`Click para gestionar contenidos de ${destino?.nombre}`}
+                          className="app-sequence-card"
+                          style={{ borderColor: '#7ED6A733' }}
+                          title={`Gestionar contenidos de ${destino?.nombre}`}
                         >
-                          {destino?.nombre || 'N/A'}
+                          <span className="app-sequence-card__label" style={{ backgroundColor: '#7ED6A7' }}>
+                            Destino
+                          </span>
+                          <div className="app-sequence-card__title">{destino?.nombre || 'N/A'}</div>
                         </button>
 
                         {sequence.descripcion && (
-                          <div className="ml-4 text-sm text-gray-600 italic">
-                            ({sequence.descripcion})
-                          </div>
+                          <div className="app-sequence-card__meta">{sequence.descripcion}</div>
                         )}
                       </div>
 
-                      {/* Acciones */}
-                      <div className="flex items-center gap-4">
+                      <div className="app-action-row">
                         <button
                           onClick={() => handleToggleEstado(sequence.id, sequence.estado)}
                           disabled={isLoading}
-                          className={`p-2 rounded-lg transition-colors ${
-                            sequence.estado
-                              ? 'text-green-600 bg-green-50 hover:bg-green-100'
-                              : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
-                          }`}
+                          className={`app-btn app-btn-icon app-btn-sm ${sequence.estado ? 'app-btn-secondary' : 'app-btn-success'}`}
                           title={sequence.estado ? 'Desactivar' : 'Activar'}
                         >
                           {sequence.estado ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
@@ -1190,7 +1254,7 @@ export function SubtemaSequenceManagementScreen({
 
                         <button
                           onClick={() => handleEditSequence(sequence)}
-                          className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
+                          className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
                           title="Editar"
                         >
                           <Edit className="w-4 h-4" />
@@ -1199,7 +1263,7 @@ export function SubtemaSequenceManagementScreen({
                         <button
                           onClick={() => handleDeleteSequence(sequence.id)}
                           disabled={isLoading}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          className="app-btn app-btn-danger app-btn-icon app-btn-sm disabled:opacity-50"
                           title="Eliminar"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1223,7 +1287,7 @@ export function SubtemaSequenceManagementScreen({
               <div>
               <div className="app-modal-kicker">Secuencias</div>
               <h2 className="app-modal-title">
-                {isEditMode ? 'Editar Secuencia' : 'Crear Nueva Secuencia'}
+                {isEditMode ? 'Editar secuencia' : 'Crear secuencia'}
               </h2>
               </div>
               <button
@@ -1247,14 +1311,14 @@ export function SubtemaSequenceManagementScreen({
             <form onSubmit={isEditMode ? handleUpdateSequence : handleCreateSequence} className="space-y-4">
               {/* Filtros en Modal */}
               <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                <h4 className="text-sm font-medium text-[#3A4A5B] mb-3">Filtrar subtemas:</h4>
+                <h4 className="text-sm font-medium text-[#3A4A5B] mb-3">Filtrar subtemas</h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
                       Área
                     </label>
                     <select
-                      value={modalSelectedArea}
+                      value={effectiveModalSelectedArea}
                       onChange={(e) => handleModalFilterChange('area', e.target.value)}
                       disabled={areaId !== undefined}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -1273,13 +1337,13 @@ export function SubtemaSequenceManagementScreen({
                       Tema
                     </label>
                     <select
-                      value={modalSelectedTema}
+                      value={effectiveModalSelectedTema}
                       onChange={(e) => handleModalFilterChange('tema', e.target.value)}
-                      disabled={!modalSelectedArea || temaId !== undefined}
+                      disabled={!effectiveModalSelectedArea || temaId !== undefined}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Todos los temas</option>
-                      {modalTemas.map(tema => (
+                      {effectiveModalTemas.map(tema => (
                         <option key={tema.id} value={tema.id}>
                           {tema.nombre}
                         </option>
@@ -1306,7 +1370,7 @@ export function SubtemaSequenceManagementScreen({
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                   required
                 >
-                  <option value="">Seleccionar subtema origen</option>
+                  <option value="">Seleccionar subtema de origen</option>
                   {getAvailableOriginModalSubtemas().map(s => (
                     <option key={s.id} value={s.id}>
                       {s.nombre}
@@ -1317,7 +1381,7 @@ export function SubtemaSequenceManagementScreen({
                 })()}
                 {!isEditMode && getModalChainContext().lockedOriginId && (
                   <p className="mt-2 text-xs text-gray-500">
-                    Origen fijado al último destino de la cadena.
+                    El origen se definió con base en la secuencia actual.
                   </p>
                 )}
               </div>
@@ -1334,7 +1398,7 @@ export function SubtemaSequenceManagementScreen({
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                   required
                 >
-                  <option value="">Seleccionar subtema destino</option>
+                  <option value="">Seleccionar subtema de destino</option>
                   {getAvailableDestinationModalSubtemas().map(s => (
                     <option key={s.id} value={s.id}>
                       {s.nombre}
@@ -1343,7 +1407,7 @@ export function SubtemaSequenceManagementScreen({
                 </select>
                 {isEditMode && selectedSequence && formData.subtema_origen_id && Number(formData.subtema_origen_id) !== Number(selectedSequence.subtema_origen_id) && (
                   <p className="mt-2 text-xs text-gray-500">
-                    Destino fijado para mantener la cadena ordenada.
+                    El destino se mantiene para conservar la continuidad de la cadena.
                   </p>
                 )}
               </div>
@@ -1357,7 +1421,7 @@ export function SubtemaSequenceManagementScreen({
                   name="descripcion"
                   value={formData.descripcion}
                   onChange={handleInputChange}
-                  placeholder="Describe la relación entre estos subtemas"
+                  placeholder="Descripción de la relación"
                   rows={3}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                 />
@@ -1409,7 +1473,7 @@ export function SubtemaSequenceManagementScreen({
                   ) : (
                     <>
                       <Plus className="w-4 h-4" />
-                      <span>{isEditMode ? 'Actualizar Secuencia' : 'Crear Secuencia'}</span>
+                      <span>{isEditMode ? 'Actualizar secuencia' : 'Crear secuencia'}</span>
                     </>
                   )}
                 </button>

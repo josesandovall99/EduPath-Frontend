@@ -31,6 +31,11 @@ export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, on
     localStorage.removeItem('adminId');
     localStorage.removeItem('personaId');
     localStorage.removeItem('authToken');
+    localStorage.removeItem('adminSession');
+    localStorage.removeItem('docenteSession');
+    localStorage.removeItem('appActiveRole');
+    localStorage.removeItem('appNavigationState');
+    localStorage.removeItem('adminDashboardState');
     applyAuthHeaders();
   };
 

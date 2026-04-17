@@ -229,7 +229,7 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
               <button
                 type="button"
                 onClick={handleFormatTemplate}
-                className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+                className="app-btn app-btn-secondary app-btn-sm text-violet-700"
               >
                 Dar formato
               </button>
@@ -462,12 +462,12 @@ function OrderingConfig({ formData, setFormData }: { formData: ExerciseFormData;
               placeholder={`Ítem ${idx + 1}`}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
             />
-            <button type="button" className="px-2 py-1 border rounded" onClick={() => moveItem(idx, -1)}>↑</button>
-            <button type="button" className="px-2 py-1 border rounded" onClick={() => moveItem(idx, 1)}>↓</button>
-            <button type="button" className="px-2 py-1 text-red-600 border rounded" onClick={() => removeItem(idx)}>✕</button>
+            <button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={() => moveItem(idx, -1)}>↑</button>
+            <button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={() => moveItem(idx, 1)}>↓</button>
+            <button type="button" className="app-btn app-btn-danger app-btn-sm" onClick={() => removeItem(idx)}>✕</button>
           </div>
         ))}
-        <button type="button" className="mt-2 px-3 py-1 bg-[#7ED6A7] text-white rounded" onClick={addItem}>Agregar ítem</button>
+        <button type="button" className="app-btn app-btn-success app-btn-sm mt-2" onClick={addItem}>Agregar ítem</button>
       </div>
     </div>
   );
@@ -531,11 +531,11 @@ function MatchingConfig({ formData, setFormData }: { formData: ExerciseFormData;
                 placeholder={`Definición ${idx + 1}`}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm"
               />
-              <button type="button" className="px-2 py-1 text-red-600 border rounded" onClick={() => removePair(idx)}>✕</button>
+              <button type="button" className="app-btn app-btn-danger app-btn-sm" onClick={() => removePair(idx)}>✕</button>
             </div>
           </div>
         ))}
-        <button type="button" className="mt-2 px-3 py-1 bg-[#7ED6A7] text-white rounded" onClick={addPair}>Agregar par</button>
+        <button type="button" className="app-btn app-btn-success app-btn-sm mt-2" onClick={addPair}>Agregar par</button>
       </div>
     </div>
   );
@@ -690,7 +690,7 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
         <button
           type="button"
           onClick={agregarPregunta}
-          className="flex items-center gap-1 px-3 py-1 bg-[#7ED6A7] text-white rounded-lg hover:bg-[#6BC598] transition-colors text-sm"
+          className="app-btn app-btn-success app-btn-sm"
         >
           <Plus className="w-4 h-4" />
           Agregar Pregunta
@@ -708,7 +708,7 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
                 <button
                   type="button"
                   onClick={() => eliminarPregunta(pregunta.id)}
-                  className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                  className="app-btn app-btn-danger app-btn-sm"
                   title="Eliminar pregunta"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -1124,6 +1124,14 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     formData.ejercicio.contenido_id,
     formData.ejercicio.puntos
   ].filter(Boolean).length;
+  const activeExercisesCount = ejercicios.filter((ejercicio) => isEjercicioActivo(ejercicio)).length;
+  const inactiveExercisesCount = Math.max(0, ejercicios.length - activeExercisesCount);
+  const exerciseTypesCount = new Set(ejercicios.map((ejercicio) => ejercicio.tipo_ejercicio).filter(Boolean)).size;
+  const currentStateLabel = stateFilter === 'all'
+    ? 'Catalogo completo'
+    : stateFilter === 'active'
+      ? 'Solo activos'
+      : 'Solo inhabilitados';
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -1356,143 +1364,166 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-[#3A4A5B]">Gestión de Ejercicios</h1>
-                <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                <h1 className="text-[#3A4A5B]">Gestión de ejercicios</h1>
+                <p className="text-sm text-slate-500">Catálogo, estado y edición dentro del mismo entorno administrativo.</p>
               </div>
             </div>
-            <button
-              onClick={openCreate}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] text-white rounded-lg hover:shadow-lg transition-all duration-300"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Crear Nuevo Ejercicio</span>
-            </button>
+            <div className="app-user-chip">
+              <div className="app-user-chip__meta">
+                <p>Panel de administrador</p>
+                <p>{currentStateLabel}</p>
+              </div>
+              <div className="app-user-avatar">
+                <Eye className="h-5 w-5" />
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
-        <button
-          onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
-        >
+      <main className="app-main">
+        <button onClick={onBack} className="app-back-button mb-6">
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
         </button>
 
-        <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md">
-          <div className="grid gap-0 lg:grid-cols-[minmax(0,1.25fr)_320px]">
-            <div className="space-y-4 p-6">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                <div className="mb-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del ejercicio</p>
-                  <p className="mt-1 text-sm text-slate-600">Muestra ejercicios activos, inactivos o todos los registros.</p>
-                </div>
-                <div className="app-filter-row">
-                  <button
-                    onClick={() => setStateFilter('all')}
-                    className={`app-filter-chip ${
-                      stateFilter === 'all'
-                        ? 'app-filter-chip--blue'
-                        : ''
-                    }`}
-                  >
-                    <span>Todos ({ejercicios.length})</span>
-                  </button>
-                  <button
-                    onClick={() => setStateFilter('active')}
-                    className={`app-filter-chip ${
-                      stateFilter === 'active'
-                        ? 'app-filter-chip--green'
-                        : ''
-                    }`}
-                  >
-                    <Eye className="h-4 w-4 shrink-0" />
-                    <span>Activos ({ejercicios.filter((ejercicio) => isEjercicioActivo(ejercicio)).length})</span>
-                  </button>
-                  <button
-                    onClick={() => setStateFilter('inactive')}
-                    className={`app-filter-chip ${
-                      stateFilter === 'inactive'
-                        ? 'app-filter-chip--amber'
-                        : ''
-                    }`}
-                  >
-                    <EyeOff className="h-4 w-4 shrink-0" />
-                    <span>Inactivos ({ejercicios.filter((ejercicio) => !isEjercicioActivo(ejercicio)).length})</span>
-                  </button>
-                </div>
-              </div>
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Gestión Generalizada</div>
+              <h2 className="app-page-hero__title">Gestión de ejercicios</h2>
+              <p className="app-page-hero__description">
+                Consulta, filtra y actualiza ejercicios.
+              </p>
             </div>
 
-            <div className="border-t border-slate-200 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-6 lg:border-l lg:border-t-0">
-              <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda rápida</p>
-                <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Buscar ejercicio</h3>
-                <p className="mt-1 text-sm text-slate-600">Busca por título, contenido, tipo o puntaje.</p>
+            <div className="app-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Catálogo</div>
+                <div className="app-hero-metric__value">{ejercicios.length}</div>
+                <div className="app-hero-metric__help">Registros totales disponibles.</div>
               </div>
-
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Ej: compilador, UML, 10 puntos"
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-700 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/25"
-                />
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Visibles</div>
+                <div className="app-hero-metric__value">{filteredEjercicios.length}</div>
+                <div className="app-hero-metric__help">Resultados según búsqueda y estado.</div>
               </div>
-
-              <div className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resultados visibles</p>
-                <p className="mt-2 text-2xl font-semibold text-[#3A4A5B]">{filteredEjercicios.length}</p>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Activos</div>
+                <div className="app-hero-metric__value">{activeExercisesCount}</div>
+                <div className="app-hero-metric__help">Ejercicios habilitados actualmente.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Cobertura</div>
+                <div className="app-hero-metric__value">{exerciseTypesCount}</div>
+                <div className="app-hero-metric__help">Tipos distintos presentes en el catálogo.</div>
               </div>
             </div>
           </div>
-        </div>
+
+          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.78fr)]">
+            <div className="app-toolbar-card">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Catálogo</p>
+                  <p className="mt-1 text-sm text-slate-600">Filtra por estado.</p>
+                </div>
+                <button onClick={openCreate} className="app-btn app-btn-success">
+                  <Plus className="w-4 h-4" />
+                  <span>Nuevo ejercicio</span>
+                </button>
+              </div>
+              <div className="mb-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del ejercicio</p>
+              </div>
+              <div className="app-filter-row">
+                <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
+                  <span>Todos ({ejercicios.length})</span>
+                </button>
+                <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>
+                  <Eye className="h-4 w-4 shrink-0" />
+                  <span>Activos ({activeExercisesCount})</span>
+                </button>
+                <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>
+                  <EyeOff className="h-4 w-4 shrink-0" />
+                  <span>Inactivos ({inactiveExercisesCount})</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="app-sidebar-stack">
+              <div className="app-soft-card app-soft-card--blue">
+                <div className="mb-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda</p>
+                  <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Buscar ejercicio</h3>
+                  <p className="mt-1 text-sm text-slate-600">Busca por título, tipo o contenido.</p>
+                </div>
+                <div className="app-search-field">
+                  <Search className="app-search-field__icon" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Buscar ejercicios"
+                    className="app-form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="app-soft-card app-context-card">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
+                <p className="app-context-card__title">{filteredEjercicios.length}</p>
+                <p className="app-context-card__text">{currentStateLabel}</p>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* Loading */}
         {isLoadingData ? (
-          <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
+          <div className="app-empty-panel py-12">
             <div className="flex flex-col items-center gap-4">
               <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
               <p className="text-gray-600">Cargando ejercicios...</p>
             </div>
           </div>
+        ) : filteredEjercicios.length === 0 ? (
+          <div className="app-empty-panel py-12">
+            <p className="text-base text-slate-600">No hay ejercicios que coincidan con la vista actual.</p>
+            <p className="mt-2 text-sm text-slate-500">Prueba con otro estado o ajusta la búsqueda para recuperar resultados.</p>
+          </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          <div className="app-table-card">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+              <table className="app-data-table">
+                <thead>
                   <tr>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Título</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Tipo</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Contenido</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Puntos</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Dificultad</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
-                    <th className="px-6 py-4 text-center text-[#3A4A5B]">Acciones</th>
+                    <th>Título</th>
+                    <th>Tipo</th>
+                    <th>Contenido</th>
+                    <th>Puntos</th>
+                    <th>Dificultad</th>
+                    <th>Estado</th>
+                    <th className="text-center">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {filteredEjercicios.map((e) => {
                     const ejercicioActivo = isEjercicioActivo(e);
 
                     return (
-                    <tr key={e.id} className={`transition-colors ${ejercicioActivo ? 'hover:bg-gray-50' : 'bg-slate-50/70 text-slate-500'}`}>
-                      <td className="px-6 py-4 text-[#3A4A5B]">{e.actividad?.titulo || `Ejercicio #${e.id}`}</td>
-                      <td className="px-6 py-4">
+                    <tr key={e.id} className={ejercicioActivo ? '' : 'bg-slate-50/80'}>
+                      <td className="text-[#3A4A5B]">{e.actividad?.titulo || `Ejercicio #${e.id}`}</td>
+                      <td>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           e.tipo_ejercicio === 'Compilador' ? 'bg-blue-100 text-blue-700' :
                           e.tipo_ejercicio === 'Diagramas UML' ? 'bg-purple-100 text-purple-700' :
@@ -1501,10 +1532,10 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                           {e.tipo_ejercicio || 'Compilador'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">{e.contenido?.titulo || e.Contenido?.titulo || `Contenido ID ${e.contenido_id}`}</td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">{e.puntos}</td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">{e.actividad?.nivel_dificultad || '-'}</td>
-                      <td className="px-6 py-4">
+                      <td>{e.contenido?.titulo || e.Contenido?.titulo || `Contenido ID ${e.contenido_id}`}</td>
+                      <td>{e.puntos}</td>
+                      <td>{e.actividad?.nivel_dificultad || '-'}</td>
+                      <td>
                         <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
                           ejercicioActivo
                             ? 'bg-emerald-100 text-emerald-700'
@@ -1513,21 +1544,21 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                           {ejercicioActivo ? 'Activo' : 'Inhabilitado'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 align-middle">
+                      <td className="align-middle">
                         <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                           <button
                             onClick={() => openEdit(e)}
-                            className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
+                            className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
                             title="Editar"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleToggleEstado(e)}
-                            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                            className={`app-btn app-btn-secondary app-btn-sm ${
                               ejercicioActivo
-                                ? 'text-amber-700 hover:bg-amber-50'
-                                : 'text-emerald-700 hover:bg-emerald-50'
+                                ? 'text-amber-700'
+                                : 'text-emerald-700'
                             }`}
                             title={ejercicioActivo ? 'Inhabilitar ejercicio' : 'Habilitar ejercicio'}
                           >

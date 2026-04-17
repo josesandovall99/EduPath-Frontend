@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, X, ArrowLeft, Users, Download } from 'lucide-react';
 // Asegúrate de que la ruta de la imagen sea correcta en tu proyecto
-import logoImage from '../assets/logo.png'; 
 import { API_BASE_URL } from '../utils/constants';
 
 interface StudentUploadScreenProps {
@@ -109,24 +108,16 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+    <div className="app-shell">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={onBack}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
-              </button>
-              <div className="w-12 h-12 bg-gradient-to-br from-[#A78BFA] to-[#B79BFA] rounded-xl flex items-center justify-center p-2 shadow-md">
-                 {/* Reemplaza con tu componente de imagen o img tag */}
-                 <span className="text-white font-bold text-xl">E</span>
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
+                <span className="text-[#4A90E2] font-bold text-xl">E</span>
               </div>
               <div>
-                <h1 className="text-[#3A4A5B] font-bold text-lg">Carga Masiva de Estudiantes</h1>
+                <h1 className="text-[#3A4A5B] font-bold text-lg">Carga masiva de estudiantes</h1>
                 <p className="text-gray-500 text-sm">Importar estudiantes desde archivo Excel</p>
               </div>
             </div>
@@ -134,10 +125,27 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-8 py-8">
-        {/* Instructions Card */}
-        <div className="bg-white rounded-2xl shadow-md p-8 mb-6">
+      <main className="app-main" style={{ maxWidth: '72rem' }}>
+        <button onClick={onBack} className="app-back-button mb-6">
+          <ArrowLeft className="w-4 h-4" />
+          <span>Volver al Panel</span>
+        </button>
+
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Importación</div>
+              <h2 className="app-page-hero__title">Carga masiva de estudiantes</h2>
+              <p className="app-page-hero__description">
+                Descarga la plantilla, prepara el archivo y carga el lote completo dentro del mismo estilo visual del panel principal.
+              </p>
+            </div>
+            <Users className="app-page-hero__icon w-16 h-16" />
+          </div>
+        </section>
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="app-panel p-8">
           <div className="flex items-start gap-4 mb-6">
             <div className="p-3 bg-blue-100 rounded-lg">
               <AlertCircle className="w-6 h-6 text-[#4A90E2]" />
@@ -163,20 +171,18 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
 
           <button
             onClick={handleDownloadTemplate}
-            className="flex items-center gap-2 px-6 py-3 bg-[#7ED6A7] text-white rounded-lg hover:bg-[#6EC597] transition-all duration-300 shadow-md hover:shadow-lg"
+            className="app-btn app-btn-success px-6 py-3"
           >
             <Download className="w-5 h-5" />
             <span>Descargar Plantilla (.csv)</span>
           </button>
         </div>
 
-        {/* Upload Area */}
-        <div className="bg-white rounded-2xl shadow-md p-8 mb-6">
+        <div className="app-panel p-8">
           <h2 className="text-[#3A4A5B] text-xl mb-6 font-semibold">Cargar archivo</h2>
           
-          {/* Mensaje de Error del Servidor (si falla todo el proceso) */}
           {serverError && (
-             <div className="mb-4 bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex items-center gap-2">
+             <div className="app-alert app-alert--error mb-4">
                 <AlertCircle className="w-5 h-5" />
                 <span>{serverError}</span>
              </div>
@@ -245,10 +251,10 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
             <button
               onClick={handleUpload}
               disabled={uploading}
-              className={`w-full mt-6 py-4 rounded-lg text-white font-bold transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-3 ${
+              className={`app-btn w-full mt-6 py-4 justify-center gap-3 text-white ${
                 uploading
                   ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-[#4A90E2] hover:bg-[#3A7BC8]'
+                  : 'app-primary-btn'
               }`}
             >
               {uploading ? (
@@ -265,10 +271,10 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
             </button>
           )}
         </div>
+        </div>
 
-        {/* Results */}
         {result && (
-          <div className="bg-white rounded-2xl shadow-md p-8 animate-fade-in">
+          <div className="app-panel p-8 animate-fade-in mt-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-[#3A4A5B] text-xl font-semibold">Resultado de la carga</h2>
               <button
@@ -283,20 +289,29 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
             </div>
 
             {/* Summary Stats */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-green-50 rounded-lg p-4 text-center border border-green-100">
-                <p className="text-gray-600 text-sm mb-1 font-medium">Registrados con éxito</p>
-                <p className="text-3xl font-bold text-[#7ED6A7]">{result.success}</p>
+            <div className="app-metric-grid mb-6">
+              <div className="app-metric-card">
+                <div className="app-metric-icon app-metric-icon--green">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="app-metric-value">{result.success}</p>
+                  <p className="app-metric-label">Registrados con éxito</p>
+                </div>
               </div>
-              <div className="bg-red-50 rounded-lg p-4 text-center border border-red-100">
-                <p className="text-gray-600 text-sm mb-1 font-medium">Errores</p>
-                <p className="text-3xl font-bold text-red-500">{result.errors.length > 0 ? "Falló todo" : 0}</p>
+              <div className="app-metric-card">
+                <div className="app-metric-icon app-metric-icon--amber">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="app-metric-value">{result.errors.length > 0 ? 'Falló todo' : 0}</p>
+                  <p className="app-metric-label">Errores</p>
+                </div>
               </div>
             </div>
 
-            {/* Success Message */}
             {result.success > 0 && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 flex items-start gap-3">
+              <div className="app-alert app-alert--success mb-4">
                 <CheckCircle className="w-5 h-5 text-[#7ED6A7] flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-[#3A4A5B] mb-1 font-medium">

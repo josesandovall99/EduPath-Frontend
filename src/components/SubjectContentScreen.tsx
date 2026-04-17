@@ -131,11 +131,11 @@ const getTypeLabel = (content: Content) => {
 const getStatusBadge = (status: Content['status']) => {
   switch (status) {
     case 'completed':
-      return <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs">Completado</span>;
+      return <span className="app-badge app-badge--green">Completado</span>;
     case 'in-progress':
-      return <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">En progreso</span>;
+      return <span className="app-badge app-badge--blue">En progreso</span>;
     case 'not-started':
-      return <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">No iniciado</span>;
+      return <span className="app-badge app-badge--slate">No iniciado</span>;
   }
 };
 
@@ -411,13 +411,12 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
   }, [subject.id, estudianteId]);
   
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+    <div className="app-shell">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
@@ -426,12 +425,12 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
               </div>
             </div>
             
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-[#3A4A5B]">Juan Estudiante</p>
-                <p className="text-gray-500 text-sm">Ingeniería de Sistemas</p>
+            <div className="app-user-chip">
+              <div className="app-user-chip__meta">
+                <p>Juan Estudiante</p>
+                <p>Ingeniería de Sistemas</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-[#4A90E2] to-[#5B9FED] rounded-full flex items-center justify-center text-white shadow-md">
+              <div className="app-user-avatar">
                 <User className="h-5 w-5" />
               </div>
             </div>
@@ -439,21 +438,15 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
-        {/* Back Button */}
-        <button 
-          onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
-        >
+      <main className="app-main">
+        <button onClick={onBack} className="app-back-button mb-6">
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Dashboard</span>
         </button>
 
-        {/* Subject Header Card */}
-        <div 
-          className="rounded-2xl p-8 mb-8 shadow-lg text-white"
-          style={{ background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primary}dd 100%)` }}
+        <section 
+          className="app-page-hero app-page-hero--solid mb-8"
+          style={{ background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primary}dd 100%)`, borderColor: `${colors.primary}55` }}
         >
           <div className="flex items-center justify-between">
             <div className="flex-1">
@@ -477,38 +470,39 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Progress Bar */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[#3A4A5B]">Tu Progreso</h3>
+        <div className="app-progress-card mb-8">
+          <div className="app-progress-head">
+            <h3 className="text-[#3A4A5B]">Tu progreso</h3>
             <span className="text-2xl" style={{ color: colors.primary }}>
               {loadingProgress ? '...' : `${currentProgress}%`}
             </span>
           </div>
-          <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+          <div className="app-progress-track" style={{ height: '0.75rem' }}>
             <div 
-              className="h-full rounded-full transition-all duration-500"
+              className="app-progress-bar"
               style={{ width: `${currentProgress}%`, backgroundColor: colors.primary }}
             ></div>
           </div>
         </div>
 
-        {/* Content List */}
-        <div className="mb-6">
-          <h3 className="text-[#3A4A5B] mb-4 text-xl">Contenidos del Curso</h3>
+        <div className="app-section-head">
+          <div>
+            <h3 className="app-section-title">Contenidos del curso</h3>
+            <p className="app-section-description">Recorre los temas del área dentro del mismo lenguaje visual de la plataforma.</p>
+          </div>
         </div>
 
         {error && (
-          <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+          <div className="app-alert app-alert--warning mb-6">
             <p className="text-yellow-700 text-sm">{error}</p>
           </div>
         )}
 
         {miniproyectoNotice && (
           <div
-            className="fixed top-24 right-8 z-50 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl shadow-lg"
+            className="fixed top-24 right-8 z-50 app-alert app-alert--success"
             role="alert"
           >
             <div className="flex items-center gap-2">
@@ -520,12 +514,12 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
 
         <div className="space-y-3">
           {loading ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">Cargando contenidos...</p>
+            <div className="app-empty-panel">
+              <p>Cargando contenidos...</p>
             </div>
           ) : contentList.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No hay contenidos disponibles</p>
+            <div className="app-empty-panel">
+              <p>No hay contenidos disponibles</p>
             </div>
           ) : (
           contentList.map((content) => {
@@ -537,7 +531,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
             return (
               <button
                 key={`${content.id}-${content.isMiniproyecto ? 'miniproyecto' : 'tema'}`}
-                className={`w-full bg-white rounded-xl shadow-md transition-all duration-300 p-5 text-left group ${
+                className={`app-list-card w-full group ${
                   isLocked 
                     ? 'opacity-60 cursor-not-allowed' 
                     : 'hover:shadow-lg'
@@ -566,9 +560,8 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 }}
               >
                 <div className="flex items-center gap-4">
-                  {/* Type Icon */}
                   <div 
-                    className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
+                    className="app-list-card__icon w-14 h-14 flex-shrink-0"
                     style={{ backgroundColor: `${colors.primary}15` }}
                   >
                     {isLockedByProgress ? (
@@ -580,13 +573,12 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                     )}
                   </div>
 
-                  {/* Content Info */}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
                       <h4 className={`transition-colors ${
                         isLocked 
                           ? 'text-gray-400' 
-                          : 'text-[#3A4A5B] group-hover:text-[#4A90E2]'
+                          : 'app-list-card__title group-hover:text-[#4A90E2]'
                       }`}>
                         {content.title}
                       </h4>
@@ -614,7 +606,6 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                     </div>
                   </div>
 
-                  {/* Status Badge */}
                   <div className="flex items-center gap-3 flex-shrink-0">
                     {getStatusBadge(content.status)}
                     <div className="text-gray-400 group-hover:text-[#4A90E2] transition-colors">
@@ -630,30 +621,29 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           )}
         </div>
 
-        {/* Additional Resources */}
-        <div className="mt-8 bg-white rounded-2xl shadow-md p-6">
-          <h4 className="text-[#3A4A5B] mb-4 text-xl">Recursos Adicionales</h4>
-          <div className="grid grid-cols-3 gap-4">
+        <div className="app-panel p-6 mt-8">
+          <h4 className="text-[#3A4A5B] mb-4 text-xl">Recursos adicionales</h4>
+          <div className="app-link-grid">
             <a 
               href="#" 
-              className="p-4 border-2 border-gray-200 rounded-xl hover:border-[#4A90E2] hover:bg-blue-50 transition-all group"
+              className="app-link-card group"
             >
-              <FileText className="w-6 h-6 text-gray-400 group-hover:text-[#4A90E2] mb-2" />
-              <p className="text-[#3A4A5B] text-sm">Bibliografía del curso</p>
+              <FileText className="app-link-card__icon w-6 h-6 group-hover:text-[#4A90E2]" />
+              <p className="app-link-card__title">Bibliografía del curso</p>
             </a>
             <a 
               href="#" 
-              className="p-4 border-2 border-gray-200 rounded-xl hover:border-[#4A90E2] hover:bg-blue-50 transition-all group"
+              className="app-link-card group"
             >
-              <Share2 className="w-6 h-6 text-gray-400 group-hover:text-[#4A90E2] mb-2" />
-              <p className="text-[#3A4A5B] text-sm">Material complementario</p>
+              <Share2 className="app-link-card__icon w-6 h-6 group-hover:text-[#4A90E2]" />
+              <p className="app-link-card__title">Material complementario</p>
             </a>
             <a 
               href="#" 
-              className="p-4 border-2 border-gray-200 rounded-xl hover:border-[#4A90E2] hover:bg-blue-50 transition-all group"
+              className="app-link-card group"
             >
-              <FileText className="w-6 h-6 text-gray-400 group-hover:text-[#4A90E2] mb-2" />
-              <p className="text-[#3A4A5B] text-sm">Enlaces de interés</p>
+              <FileText className="app-link-card__icon w-6 h-6 group-hover:text-[#4A90E2]" />
+              <p className="app-link-card__title">Enlaces de interés</p>
             </a>
           </div>
         </div>

@@ -674,7 +674,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         setSequences(sequencesData);
       }
 
-      setSuccess('Secuencia creada exitosamente');
+      setSuccess('Secuencia registrada correctamente.');
       resetForm();
       setInsertAfterSequenceId(null);
       setTimeout(() => setShowCreateModal(false), 1500);
@@ -757,7 +757,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       const updatedSequence = data.secuencia || data;
       setSequences(sequences.map(s => s.id === selectedSequence.id ? updatedSequence : s));
 
-      setSuccess('Secuencia actualizada exitosamente');
+      setSuccess('Secuencia actualizada correctamente.');
       console.log('Validaciones completadas:', data.validacionesRealizadas);
       resetForm();
       setTimeout(() => setShowCreateModal(false), 1500);
@@ -848,7 +848,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
       setSuccess(prevSeq && nextSeq 
         ? 'Secuencia eliminada y cadena reorganizada automáticamente' 
-        : 'Secuencia eliminada exitosamente'
+        : 'Secuencia eliminada correctamente.'
       );
       setTimeout(() => setSuccess(null), 2000);
     } catch (err) {
@@ -869,19 +869,40 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
     setSelectedSequence(null);
   };
 
-  const filteredSequences = sequences.filter(seq => {
+  const scopedSequences = sequences.filter(seq => {
     const origenContent = contents.find(c => c.id === seq.contenido_origen_id);
     const destinoContent = contents.find(c => c.id === seq.contenido_destino_id);
-    
-    // Si se proporciona subtemaId, solo mostrar secuencias de contenidos de ese subtema
-    if (subtemaId !== undefined) {
-      if (!origenContent || !destinoContent) return false;
-      if (origenContent.subtema_id !== subtemaId || destinoContent.subtema_id !== subtemaId) {
-        return false;
-      }
+
+    if (!origenContent || !destinoContent) return false;
+
+    if (effectiveSelectedArea) {
+      const matchesArea =
+        Number(origenContent.area_id) === Number(effectiveSelectedArea) &&
+        Number(destinoContent.area_id) === Number(effectiveSelectedArea);
+      if (!matchesArea) return false;
     }
-    
-    // Filtrar por término de búsqueda
+
+    if (effectiveSelectedTema) {
+      const matchesTema =
+        Number(origenContent.tema_id) === Number(effectiveSelectedTema) &&
+        Number(destinoContent.tema_id) === Number(effectiveSelectedTema);
+      if (!matchesTema) return false;
+    }
+
+    if (effectiveSelectedSubtema) {
+      const matchesSubtema =
+        Number(origenContent.subtema_id) === Number(effectiveSelectedSubtema) &&
+        Number(destinoContent.subtema_id) === Number(effectiveSelectedSubtema);
+      if (!matchesSubtema) return false;
+    }
+
+    return true;
+  });
+
+  const filteredSequences = scopedSequences.filter(seq => {
+    const origenContent = contents.find(c => c.id === seq.contenido_origen_id);
+    const destinoContent = contents.find(c => c.id === seq.contenido_destino_id);
+
     const origen = origenContent?.titulo || '';
     const destino = destinoContent?.titulo || '';
     const term = searchTerm.toLowerCase();
@@ -890,11 +911,11 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
   // Construir secuencia ordenada visualmente (cadena de contenidos)
   const buildOrderedSequence = () => {
-    if (sequences.length === 0) return [];
+    if (scopedSequences.length === 0) return [];
 
     const sequenceMap = new Map<number, number>(); // origen_id -> destino_id
     const destinos = new Set<number>();
-    const secuenciasActivas = sequences.filter(s => s.estado);
+    const secuenciasActivas = scopedSequences.filter(s => s.estado);
 
     // Construir mapa de secuencias
     secuenciasActivas.forEach(seq => {
@@ -975,6 +996,9 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   };
 
   const orderedSequence = buildOrderedSequence();
+  const activeSequencesCount = scopedSequences.filter((sequence) => sequence.estado).length;
+  const inactiveSequencesCount = scopedSequences.filter((sequence) => !sequence.estado).length;
+  const currentScopeLabel = subtemaNombre || 'Todos los subtemas';
 
   // Función para guardar el nuevo orden después de drag and drop
   const handleSaveOrder = async (newOrder: Array<{ contenido_id: number; sequence_id?: number }>) => {
@@ -1066,7 +1090,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
-        setSuccess('Secuencia reorganizada exitosamente');
+        setSuccess('Secuencia reorganizada correctamente.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al reorganizar');
@@ -1128,7 +1152,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       if (sequencesRes.ok) {
         const sequencesData = await sequencesRes.json();
         setSequences(sequencesData);
-        setSuccess('Secuencia reorganizada exitosamente');
+        setSuccess('Secuencia reorganizada correctamente.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al reorganizar');
@@ -1143,6 +1167,12 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   // Estado para drag and drop
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
+  const incomingAreaValue = areaId !== undefined ? areaId.toString() : '';
+  const incomingTemaValue = temaId !== undefined ? temaId.toString() : '';
+  const incomingSubtemaValue = subtemaId !== undefined ? subtemaId.toString() : '';
+  const effectiveSelectedArea = selectedArea || incomingAreaValue;
+  const effectiveSelectedTema = selectedTema || incomingTemaValue;
+  const effectiveSelectedSubtema = selectedSubtema || incomingSubtemaValue;
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -1153,17 +1183,45 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
     }
   };
 
+  const openCreateSequenceModal = () => {
+    resetForm();
+    setInsertAfterSequenceId(null);
+
+    if (areaId !== undefined && temaId && subtemaId) {
+      setModalSelectedArea(areaId.toString());
+      setModalSelectedTema(temaId.toString());
+      setModalSelectedSubtema(subtemaId.toString());
+
+      const temasArea = temas.filter(t => Number(t.area_id) === Number(areaId));
+      setModalTemas(temasArea);
+
+      const filtered = subtemas.filter(s => s.tema_id === temaId);
+      setModalSubtemas(filtered);
+
+      const contenidosFiltered = contents.filter(c => c.subtema_id === subtemaId);
+      setModalContents(contenidosFiltered);
+    } else {
+      setModalSelectedArea('');
+      setModalSelectedTema('');
+      setModalSelectedSubtema('');
+      setModalTemas([]);
+      setModalSubtemas([]);
+      setModalContents(contents);
+    }
+
+    setShowCreateModal(true);
+  };
+
   return (
     <div className="app-shell">
-      {/* Header */}
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
               <button
                 type="button"
                 onClick={onHome}
-                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                className="app-brand-icon"
                 title="Ir al panel principal"
               >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
@@ -1187,47 +1245,12 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 )}
               </div>
             </div>
-            <button
-              onClick={() => {
-                resetForm();
-                setInsertAfterSequenceId(null);
-                // Pre-fill filters if all context is provided
-                if (areaId !== undefined && temaId && subtemaId) {
-                  setModalSelectedArea(areaId.toString());
-                  setModalSelectedTema(temaId.toString());
-                  setModalSelectedSubtema(subtemaId.toString());
-                  
-                  const temasArea = temas.filter(t => Number(t.area_id) === Number(areaId));
-                  setModalTemas(temasArea);
-                  
-                  const filtered = subtemas.filter(s => s.tema_id === temaId);
-                  setModalSubtemas(filtered);
-                  
-                  const contenidosFiltered = contents.filter(c => c.subtema_id === subtemaId);
-                  setModalContents(contenidosFiltered);
-                } else {
-                  setModalSelectedArea('');
-                  setModalSelectedTema('');
-                  setModalSelectedSubtema('');
-                  setModalTemas([]);
-                  setModalSubtemas([]);
-                  setModalContents(contents);
-                }
-                setShowCreateModal(true);
-              }}
-              className="app-btn app-btn-success px-6 py-3"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Crear Secuencia</span>
-            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="app-main">
-        {/* Navigation Actions */}
-        <div className="mb-6 flex items-center justify-between gap-3">
+        <div className="mb-6">
           <button 
             onClick={onBack}
             className="app-back-button"
@@ -1235,81 +1258,69 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
             <ArrowLeft className="w-4 h-4" />
             <span>{subtemaId ? 'Volver a Secuencias de Subtemas' : 'Volver al Panel'}</span>
           </button>
-
-          {onGoToContentManagement && (
-            <button
-              onClick={onGoToContentManagement}
-              className="app-btn app-btn-ghost px-4 py-2.5"
-            >
-              <span>Gestionar Contenidos</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
-        {/* Informational Message */}
-        <div className="app-info-banner mb-8 p-6">
-          <h2 className="text-lg font-bold mb-2">Gestión de Secuencias de Contenidos</h2>
-          <p className="text-sm opacity-95">
-            Define el orden en que los estudiantes deben completar cada contenido dentro de un subtema.
-            Establece dependencias entre contenidos para crear una ruta de aprendizaje progresiva y estructurada.
-          </p>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <ArrowRight className="w-6 h-6 text-[#4A90E2]" />
-              </div>
-              <span className="text-3xl text-[#4A90E2]">{filteredSequences.length}</span>
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Secuencia de contenidos</div>
+              <h2 className="app-page-hero__title">Secuencia de contenidos</h2>
+              <p className="app-page-hero__description">
+                Consulta, ajusta y organiza la secuencia del subtema seleccionado.
+              </p>
             </div>
-            <p className="text-gray-600 text-sm">Total Secuencias</p>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Eye className="w-6 h-6 text-[#7ED6A7]" />
+            <div className="app-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Secuencias</div>
+                <div className="app-hero-metric__value">{filteredSequences.length}</div>
+                <div className="app-hero-metric__help">Total visible en la consulta actual.</div>
               </div>
-              <span className="text-3xl text-[#7ED6A7]">
-                {filteredSequences.filter(s => s.estado).length}
-              </span>
-            </div>
-            <p className="text-gray-600 text-sm">Activas</p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <EyeOff className="w-6 h-6 text-gray-500" />
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Activas</div>
+                <div className="app-hero-metric__value">{activeSequencesCount}</div>
+                <div className="app-hero-metric__help">Secuencias dentro del flujo activo.</div>
               </div>
-              <span className="text-3xl text-gray-500">
-                {sequences.filter(s => !s.estado).length}
-              </span>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Inactivas</div>
+                <div className="app-hero-metric__value">{inactiveSequencesCount}</div>
+                <div className="app-hero-metric__help">Registros fuera del flujo actual.</div>
+              </div>
+              <div className="app-hero-metric app-hero-metric--wide">
+                <div className="app-hero-metric__label">Contexto</div>
+                <div className="app-hero-metric__value app-hero-metric__value--text">{currentScopeLabel}</div>
+                <div className="app-hero-metric__help">Subtema activo para edición.</div>
+              </div>
             </div>
-            <p className="text-gray-600 text-sm">Inactivas</p>
           </div>
-        </div>
 
-        {/* Stats Helper Message */}
-        <div className="mb-6 p-4 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] rounded-xl text-white">
-          <p className="text-sm">
-            <span className="font-semibold">Estado de tus secuencias:</span> Supervisa el total de secuencias de contenidos, 
-            cuántas están activas guiando el flujo de aprendizaje, y cuántas están inactivas.
-          </p>
-        </div>
-
-        {/* Filtros */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="mb-4 pb-4 border-b border-gray-200">
-            <p className="text-sm text-gray-600">
-              📋 <span className="font-medium">Utiliza los filtros</span> para buscar secuencias específicas por área, tema o contenido.
-            </p>
-          </div>
-          <h3 className="text-lg font-semibold text-[#3A4A5B] mb-4">Filtrar por:</h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(280px,0.78fr)]">
+            <div className="app-toolbar-card">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Filtros</p>
+                  <p className="mt-1 text-sm text-slate-600">Limita la vista por área, tema o subtema antes de revisar el orden de contenidos.</p>
+                </div>
+                <div className="app-action-row justify-start">
+                  {onGoToContentManagement && (
+                    <button
+                      onClick={onGoToContentManagement}
+                      className="app-btn app-btn-ghost"
+                    >
+                      <span>Gestionar contenidos</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={openCreateSequenceModal}
+                    className="app-btn app-btn-success"
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span>Crear secuencia</span>
+                  </button>
+                </div>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
                 Área
@@ -1366,38 +1377,49 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 ))}
               </select>
             </div>
-          </div>
-        </div>
+              </div>
+            </div>
 
-        {/* Search */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Buscar secuencias..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-            />
-          </div>
-        </div>
+            <div className="app-sidebar-stack">
+              <div className="app-soft-card app-soft-card--blue">
+                <div className="mb-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda</p>
+                  <p className="mt-1 text-sm text-slate-600">Busca por título, descripción o relación entre contenidos.</p>
+                </div>
+                <div className="app-toolbar-card__search app-search-field">
+                  <Search className="app-search-field__icon" />
+                  <input
+                    type="text"
+                    placeholder="Buscar secuencias"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="app-form-input"
+                  />
+                </div>
+              </div>
 
-        {/* Messages */}
+              <div className="app-soft-card app-context-card">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contexto activo</p>
+                <p className="app-context-card__title">{subtemaNombre || 'Subtema no definido'}</p>
+                <p className="app-context-card__text">Tema: {temaName || 'Sin tema activo'}{areaName ? ` · Área: ${areaName}` : ''}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
+          <div className="app-alert app-alert--error mb-6">
+            <p>{error}</p>
           </div>
         )}
         {success && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-            {success}
+          <div className="app-alert app-alert--success mb-6">
+            <p>{success}</p>
           </div>
         )}
 
-        {/* Loading State */}
         {isLoadingData ? (
-          <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
+          <div className="app-empty-panel py-12">
             <div className="flex flex-col items-center gap-4">
               <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
               <p className="text-gray-600">Cargando secuencias...</p>
@@ -1405,22 +1427,30 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           </div>
         ) : (
           <>
-            {/* Vista de Secuencias Ordenadas */}
             {orderedSequence.length > 0 ? (
-              <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-[#3A4A5B]">Secuencia Ordenada</h3>
-                  <button
-                    onClick={() => setInsertAfterSequenceId(null)}
-                    className="text-sm text-gray-600 hover:text-[#4A90E2]"
-                  >
-                    {insertAfterSequenceId ? 'Cancelar inserción' : 'Vista completa'}
-                  </button>
+              <div className="app-table-card mb-6">
+                <div className="app-table-card__header">
+                  <div>
+                    <div className="app-table-card__title">Secuencia ordenada</div>
+                    <p className="app-table-card__description">Vista resumida del orden actual entre contenidos.</p>
+                  </div>
+                  <div className="app-action-row justify-start">
+                    <div className="app-sequence-reorder-note">
+                      <ArrowDownUp className="w-4 h-4" />
+                      <span>Arrastra para reordenar</span>
+                    </div>
+                    <button
+                      onClick={() => setInsertAfterSequenceId(null)}
+                      className="app-btn app-btn-ghost app-btn-sm"
+                    >
+                      {insertAfterSequenceId ? 'Cancelar inserción' : 'Vista completa'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 rounded-lg overflow-x-auto">
+                <div className="app-table-card__body">
+                <div className="app-sequence-chain">
                   {orderedSequence.map((item, index) => {
                     const contenido = contents.find(c => c.id === item.contenido_id);
-                    const sequence = item.sequence_id ? sequences.find(s => s.id === item.sequence_id) : null;
                     const isLast = index === orderedSequence.length - 1;
                     const isDragging = draggedItem === index;
                     const isDraggedOver = draggedOverIndex === index;
@@ -1428,11 +1458,11 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                     return (
                       <div 
                         key={`${item.contenido_id}-${index}`} 
-                        className="flex items-center gap-2"
+                        className="app-sequence-chain__item"
                       >
-                        <div className="flex flex-col items-center gap-2">
+                        <div className="app-sequence-node-stack">
                           <div 
-                            className="relative"
+                            className="app-sequence-node-shell"
                             draggable
                             onDragStart={(e) => {
                               setDraggedItem(index);
@@ -1467,26 +1497,34 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                             }}
                           >
                             <div
-                              className={`px-4 py-2 rounded-lg text-white font-semibold min-w-[150px] text-center cursor-move hover:opacity-90 transition-opacity ${
+                              className={`app-sequence-node ${
                                 isDragging ? 'opacity-50 scale-95' : ''
                               } ${
                                 isDraggedOver ? 'ring-2 ring-[#4A90E2] ring-offset-2' : ''
                               }`}
-                              style={{ backgroundColor: getTypeColor(contenido?.tipo || '') }}
-                              title={`${contenido?.titulo || 'N/A'} - Arrastra para reorganizar`}
+                              style={{ borderColor: `${getTypeColor(contenido?.tipo || '')}33` }}
+                              title={`${contenido?.titulo || 'N/A'} - Reordenar`}
                             >
-                              {contenido?.titulo || 'N/A'}
+                              <span
+                                className="app-sequence-node__type"
+                                style={{ backgroundColor: getTypeColor(contenido?.tipo || '') }}
+                              >
+                                {contenido?.tipo === 'video' ? 'Video' : contenido?.tipo === 'document' ? 'Documento' : contenido?.tipo === 'activity' ? 'Actividad' : 'Contenido'}
+                              </span>
+                              <span className="app-sequence-node__title">{contenido?.titulo || 'N/A'}</span>
                             </div>
                           </div>
                           {insertAfterSequenceId === item.sequence_id && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              ↓ Insertar aquí
+                            <div className="app-sequence-node-stack__hint">
+                              Punto de inserción
                             </div>
                           )}
                         </div>
                         {!isLast && (
-                          <div className="flex flex-col items-center">
-                            <ArrowRight className="w-5 h-5 text-gray-400" />
+                          <div className="app-sequence-connector">
+                            <div className="app-sequence-connector__arrow">
+                              <ArrowRight className="w-4 h-4" />
+                            </div>
                             {item.sequence_id && (
                               <button
                                 onClick={() => {
@@ -1497,10 +1535,10 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                                     setInsertAfterSequenceId(item.sequence_id || null);
                                   }
                                 }}
-                                className="mt-1 text-xs text-[#4A90E2] hover:underline"
+                                className="app-sequence-connector__action"
                                 title="Insertar contenido aquí"
                               >
-                                + Insertar
+                                Insertar
                               </button>
                             )}
                           </div>
@@ -1509,23 +1547,15 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                     );
                   })}
                 </div>
+                </div>
               </div>
             ) : null}
 
-            {/* Lista Completa de Secuencias */}
             <div className="space-y-4">
               {filteredSequences.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-md p-12 text-center">
-                  <div className="mb-4 flex justify-center">
-                    <div className="w-16 h-16 bg-gradient-to-br from-[#4A90E2] to-[#357abd] rounded-full flex items-center justify-center opacity-10"></div>
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-700 mb-2">No hay secuencias disponibles</h3>
-                  <p className="text-gray-600 mb-4">
-                    Crea tu primera secuencia para establecer el orden de aprendizaje de los contenidos.
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Una secuencia define qué contenido debe completarse después de otro, creando un flujo educativo cohesivo.
-                  </p>
+                <div className="app-empty-panel py-12">
+                  <p className="text-base text-slate-600">No hay secuencias disponibles para la vista actual.</p>
+                  <p className="mt-2 text-sm text-slate-500">Registra una secuencia para definir el orden entre contenidos.</p>
                 </div>
               ) : (
                 filteredSequences.map((sequence) => {
@@ -1533,49 +1563,36 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   const destino = contents.find(c => c.id === sequence.contenido_destino_id);
 
                   return (
-                    <div key={sequence.id} className="bg-white rounded-xl shadow-md p-6 flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1">
-                        {/* Bloque Origen */}
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="px-4 py-2 rounded-lg text-white font-semibold"
-                            style={{ backgroundColor: getTypeColor(origen?.tipo || '') }}
-                          >
-                            {origen?.titulo || 'N/A'}
-                          </div>
+                    <div key={sequence.id} className="app-flow-card app-flow-card--sequence">
+                      <div className="app-flow-card__path app-flow-card__path--sequence flex-1">
+                        <div className="app-sequence-card" style={{ borderColor: `${getTypeColor(origen?.tipo || '')}33` }}>
+                          <span className="app-sequence-card__label" style={{ backgroundColor: getTypeColor(origen?.tipo || '') }}>
+                            Origen
+                          </span>
+                          <div className="app-sequence-card__title">{origen?.titulo || 'N/A'}</div>
                         </div>
 
-                        {/* Flecha */}
-                        <ArrowRight className="w-5 h-5 text-gray-400" />
-
-                        {/* Bloque Destino */}
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="px-4 py-2 rounded-lg text-white font-semibold"
-                            style={{ backgroundColor: getTypeColor(destino?.tipo || '') }}
-                          >
-                            {destino?.titulo || 'N/A'}
-                          </div>
+                        <div className="app-sequence-card__arrow">
+                          <ArrowRight className="w-4 h-4" />
                         </div>
 
-                        {/* Descripción */}
+                        <div className="app-sequence-card" style={{ borderColor: `${getTypeColor(destino?.tipo || '')}33` }}>
+                          <span className="app-sequence-card__label" style={{ backgroundColor: getTypeColor(destino?.tipo || '') }}>
+                            Destino
+                          </span>
+                          <div className="app-sequence-card__title">{destino?.titulo || 'N/A'}</div>
+                        </div>
+
                         {sequence.descripcion && (
-                          <div className="ml-4 text-sm text-gray-600 italic">
-                            ({sequence.descripcion})
-                          </div>
+                          <div className="app-sequence-card__meta">{sequence.descripcion}</div>
                         )}
                       </div>
 
-                      {/* Estado y Acciones */}
-                      <div className="flex items-center gap-4">
+                      <div className="app-action-row">
                         <button
                           onClick={() => handleToggleEstado(sequence.id, sequence.estado)}
                           disabled={isLoading}
-                          className={`p-2 rounded-lg transition-colors ${
-                            sequence.estado
-                              ? 'text-green-600 bg-green-50 hover:bg-green-100'
-                              : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
-                          }`}
+                          className={`app-btn app-btn-icon app-btn-sm ${sequence.estado ? 'app-btn-secondary' : 'app-btn-success'}`}
                           title={sequence.estado ? 'Desactivar' : 'Activar'}
                         >
                           {sequence.estado ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
@@ -1583,7 +1600,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
                         <button
                           onClick={() => handleEditSequence(sequence)}
-                          className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
+                          className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
                           title="Editar"
                         >
                           <Edit className="w-4 h-4" />
@@ -1592,7 +1609,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                         <button
                           onClick={() => handleDeleteSequence(sequence.id)}
                           disabled={isLoading}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          className="app-btn app-btn-danger app-btn-icon app-btn-sm disabled:opacity-50"
                           title="Eliminar"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1616,11 +1633,11 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
               <div>
                 <div className="app-modal-kicker">Secuencias</div>
                 <h2 className="app-modal-title">
-                  {isEditMode ? 'Editar Secuencia' : insertAfterSequenceId ? 'Insertar Contenido en Secuencia' : 'Crear Nueva Secuencia'}
+                  {isEditMode ? 'Editar secuencia' : insertAfterSequenceId ? 'Insertar contenido en secuencia' : 'Crear secuencia'}
                 </h2>
                 {insertAfterSequenceId && (
                   <p className="app-modal-description">
-                    Se insertará en el medio de la secuencia seleccionada
+                    El nuevo contenido se insertará dentro de la secuencia seleccionada.
                   </p>
                 )}
               </div>
@@ -1645,18 +1662,16 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
             <div className="app-modal-scroll">
             <div className="app-form-layout">
-            {/* Helper Message */}
             <div className="app-form-note mb-6">
               <p className="text-sm text-blue-800">
-                <span className="font-semibold">Consejo:</span> Selecciona un contenido origen y el destino que debe completarse después. 
-                Esto crea un flujo educativo que los estudiantes deben seguir.
+                Selecciona un contenido de origen y el contenido que debe continuar en la secuencia.
               </p>
             </div>
 
             <form onSubmit={isEditMode ? handleUpdateSequence : handleCreateSequence} className="space-y-4">
               {/* Filtros en Modal */}
               <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                <h4 className="text-sm font-medium text-[#3A4A5B] mb-3">Filtrar contenidos:</h4>
+                <h4 className="text-sm font-medium text-[#3A4A5B] mb-3">Filtrar contenidos</h4>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1734,7 +1749,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                   required
                 >
-                  <option value="">Seleccionar contenido origen</option>
+                  <option value="">Seleccionar contenido de origen</option>
                   {getAvailableOriginModalContents().map(c => (
                     <option key={c.id} value={c.id}>
                       {c.titulo} ({c.tipo})
@@ -1745,7 +1760,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 })()}
                 {!isEditMode && getModalChainContext().lockedOriginId && (
                   <p className="mt-2 text-xs text-gray-500">
-                    Origen fijado al último destino de la cadena.
+                    El origen se definió con base en la secuencia actual.
                   </p>
                 )}
               </div>
@@ -1762,7 +1777,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                   required
                 >
-                  <option value="">Seleccionar contenido destino</option>
+                  <option value="">Seleccionar contenido de destino</option>
                   {getAvailableDestinationModalContents().map(c => (
                     <option key={c.id} value={c.id}>
                       {c.titulo} ({c.tipo})
@@ -1771,7 +1786,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 </select>
                 {isEditMode && selectedSequence && formData.contenido_origen_id && Number(formData.contenido_origen_id) !== Number(selectedSequence.contenido_origen_id) && (
                   <p className="mt-2 text-xs text-gray-500">
-                    Destino fijado para mantener la cadena ordenada.
+                    El destino se mantiene para conservar la continuidad de la cadena.
                   </p>
                 )}
               </div>
@@ -1785,7 +1800,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   name="descripcion"
                   value={formData.descripcion}
                   onChange={handleInputChange}
-                  placeholder="Describe la relación entre estos contenidos"
+                  placeholder="Descripción de la relación"
                   rows={3}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
                 />
@@ -1839,7 +1854,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   ) : (
                     <>
                       <Plus className="w-4 h-4" />
-                      <span>{isEditMode ? 'Actualizar Secuencia' : 'Crear Secuencia'}</span>
+                      <span>{isEditMode ? 'Actualizar secuencia' : 'Crear secuencia'}</span>
                     </>
                   )}
                 </button>

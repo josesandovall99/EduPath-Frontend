@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ClipboardList, RefreshCw, Save, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 import { createQuillModules, loadQuill } from '../utils/quill';
 
@@ -158,7 +159,10 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/miniproyectos`);
+      const response = await fetch(`${API_BASE_URL}/miniproyectos`, {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
+      });
       if (!response.ok) {
         throw new Error('No se pudieron cargar los miniproyectos');
       }
@@ -380,7 +384,8 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
 
       const response = await fetch(`${API_BASE_URL}/miniproyectos/${selected.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include',
         body: JSON.stringify({
           titulo: formData.titulo,
           descripcion: formData.descripcion,
@@ -508,28 +513,24 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Miniproyectos</h1>
-                <p className="text-gray-500 text-sm">Panel de Docente - EduPath</p>
+                <p className="text-gray-500 text-sm">Edición docente bajo el mismo sistema de tarjetas, filtros y bloques compartidos.</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="hidden md:flex items-center gap-2 text-xs text-gray-500 bg-gray-100 px-3 py-2 rounded-full">
-                <span>Total:</span>
-                <span className="font-semibold text-gray-700">{totalMiniproyectos}</span>
-              </div>
+            <div className="app-action-row">
               <button
                 onClick={loadMiniproyectos}
-                className="app-btn app-btn-secondary px-4 py-2 text-gray-600 hover:text-[#4A90E2]"
+                className="app-btn app-btn-secondary"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span className="text-sm">Actualizar</span>
+                <span>Actualizar</span>
               </button>
             </div>
           </div>
@@ -545,52 +546,75 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
           <span>Volver al Panel</span>
         </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {kpiCards.map((card) => (
-            <div
-              key={card.label}
-              className="rounded-xl shadow-md p-4 text-white"
-              style={{ backgroundColor: card.bg }}
-            >
-              <p className="text-xs text-white/90">{card.label}</p>
-              <p className="text-2xl font-semibold text-white truncate">{card.value}</p>
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Edición docente</div>
+              <h2 className="app-page-hero__title">Gestión de miniproyectos</h2>
+              <p className="app-page-hero__description">
+                Consulta y administra miniproyectos.
+              </p>
             </div>
-          ))}
-        </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-8">
-          <section className="bg-white rounded-2xl shadow-md p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-              <div>
-                <h2 className="text-[#3A4A5B] text-lg font-semibold">Listado de Miniproyectos</h2>
-                <p className="text-sm text-gray-500">Selecciona un miniproyecto para editarlo.</p>
+            <div className="app-hero-metrics">
+              {kpiCards.map((card) => (
+                <div key={card.label} className="app-hero-metric">
+                  <div className="app-hero-metric__label">{card.label}</div>
+                  <div className="app-hero-metric__value truncate">{card.value}</div>
+                  <div className="app-hero-metric__help">{card.label === 'Seleccionado' ? 'Elemento activo para editar.' : 'Indicador operativo del listado.'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_320px]">
+            <div className="app-toolbar-card">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Catálogo visible</p>
+                <p className="mt-1 text-sm text-slate-600">Usa la búsqueda para recortar el listado por título, área o nivel antes de editar.</p>
               </div>
-              <div className="relative w-full sm:w-auto">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="app-search-field">
+                <Search className="app-search-field__icon" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Buscar por título, área o nivel"
-                  className="w-full sm:w-80 h-11 pl-10 pr-4 border border-gray-300 rounded-lg text-sm leading-5 focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  className="app-form-input"
                 />
               </div>
             </div>
 
-            {isLoading ? (
-              <div className="py-10 text-center text-gray-500">Cargando miniproyectos...</div>
-            ) : error ? (
-              <div className="py-10 text-center text-red-600">{error}</div>
-            ) : filteredMiniproyectos.length === 0 ? (
-              <div className="py-10 text-center text-gray-500">
-                No hay miniproyectos que coincidan con la búsqueda.
+            <div className="app-soft-card app-soft-card--blue">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del editor</p>
+              <p className="mt-2 text-lg font-semibold text-[#3A4A5B]">{selected ? 'Edición activa' : 'Sin selección'}</p>
+              <p className="mt-2 text-sm text-slate-600">{selected ? 'El formulario refleja el miniproyecto seleccionado.' : 'Selecciona un miniproyecto del listado para cargar su editor.'}</p>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-8">
+          <section className="app-table-card">
+            <div className="app-table-card__header app-table-card__header--blue">
+              <div>
+                <div className="app-table-card__title">Listado de miniproyectos</div>
+                <p className="app-table-card__description">Selecciona un miniproyecto del listado para cargarlo en el editor lateral.</p>
               </div>
+            </div>
+            <div className="app-table-card__body">
+
+            {isLoading ? (
+              <div className="app-empty-panel py-10">Cargando miniproyectos...</div>
+            ) : error ? (
+              <div className="app-alert app-alert--error">{error}</div>
+            ) : filteredMiniproyectos.length === 0 ? (
+              <div className="app-empty-panel py-10">No hay miniproyectos que coincidan con la búsqueda.</div>
             ) : (
               <div className="space-y-4">
                 {filteredMiniproyectos.map((item, index) => (
                   <button
                     key={item.id}
                     onClick={() => handleSelect(item)}
-                    className={`w-full text-left border rounded-2xl p-5 transition-all hover:shadow-lg ${
+                    className={`app-list-card w-full border transition-all hover:shadow-lg ${
                       selected?.id === item.id ? 'shadow-md' : ''
                     }`}
                     style={
@@ -605,9 +629,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                           }
                     }
                   >
-                    <div className="flex items-start justify-between gap-4">
+                        <div className="app-list-card__head">
                       <div>
-                        <h3 className="text-lg font-semibold text-[#3A4A5B]">
+                            <h3 className="app-list-card__title">
                           {item.Actividad?.titulo || 'Sin título'}
                         </h3>
                         <div className="flex flex-wrap gap-2 mt-2">
@@ -628,12 +652,19 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 ))}
               </div>
             )}
+            </div>
           </section>
 
-          <section className="bg-white rounded-2xl shadow-md p-6">
-            <h2 className="text-[#3A4A5B] text-lg font-semibold mb-4">Editar Miniproyecto</h2>
+          <section className="app-table-card">
+            <div className="app-table-card__header app-table-card__header--green">
+              <div>
+                <div className="app-table-card__title">Editar miniproyecto</div>
+                <p className="app-table-card__description">Completa la ficha del elemento seleccionado y guarda sus cambios desde este panel lateral.</p>
+              </div>
+            </div>
+            <div className="app-table-card__body">
             {!selected ? (
-              <div className="py-12 text-center text-gray-500">
+              <div className="app-empty-panel py-12">
                 Selecciona un miniproyecto para editar sus datos.
               </div>
             ) : (
@@ -1052,6 +1083,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 </button>
               </form>
             )}
+            </div>
           </section>
         </div>
       </main>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Building2, Eye, EyeOff, GraduationCap, Mail, Pencil, Plus, Search, Users, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 
 interface DocenteManagementScreenProps {
@@ -91,7 +92,10 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
 
   const loadAreas = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/areas`);
+      const response = await fetch(`${API_BASE_URL}/areas`, {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
+      });
       if (!response.ok) {
         throw new Error('Error al cargar areas');
       }
@@ -107,7 +111,10 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/docente`);
+      const response = await fetch(`${API_BASE_URL}/docente`, {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
+      });
       if (!response.ok) {
         throw new Error('Error al cargar docentes');
       }
@@ -179,7 +186,9 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
 
     try {
       const response = await fetch(`${API_BASE_URL}/docente/${docente.id}/toggle-estado`, {
-        method: 'PUT'
+        method: 'PUT',
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -245,6 +254,16 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
     });
   }, [docentes, searchTerm, selectedAreaFilter, selectedStateFilter]);
 
+  const currentViewLabel = useMemo(
+    () =>
+      selectedStateFilter === 'all'
+        ? 'Vista completa'
+        : selectedStateFilter === 'active'
+          ? 'Solo activos'
+          : 'Solo inactivos',
+    [selectedStateFilter]
+  );
+
   const stats = useMemo(() => {
     const docentesConCorreo = docentes.filter((docente) => docente.persona?.email?.trim()).length;
     const especialidades = new Set(
@@ -270,7 +289,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
     };
   }, [docentes]);
 
-  const visibleAreas = useMemo(() => areas.slice(0, 4), [areas]);
+  const visibleAreas = useMemo(() => areas, [areas]);
 
   const handleSave = async () => {
     if (!isFormValid) {
@@ -298,9 +317,10 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
         `${API_BASE_URL}/docente${editingDocente ? `/${editingDocente.id}` : ''}`,
         {
           method: editingDocente ? 'PUT' : 'POST',
-          headers: {
+          headers: buildAuthHeaders({
             'Content-Type': 'application/json'
-          },
+          }),
+          credentials: 'include',
           body: JSON.stringify(payload)
         }
       );
@@ -338,24 +358,17 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="mx-auto max-w-7xl px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Docentes</h1>
-                <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                <p className="text-gray-500 text-sm">Equipo docente, áreas y estado operativo bajo el mismo lenguaje del panel.</p>
               </div>
             </div>
-            <button
-              onClick={handleOpenCreate}
-              className="app-btn app-btn-success px-6 py-3"
-            >
-              <Plus className="h-5 w-5" />
-              <span>Crear Nuevo Docente</span>
-            </button>
           </div>
         </div>
       </header>
@@ -369,47 +382,142 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
           <span>Volver al Panel</span>
         </button>
 
-        <div className="grid grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Users className="h-6 w-6" />
-              </div>
-              <span className="text-3xl text-[#4A90E2]">{stats.total}</span>
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Equipo académico</div>
+              <h2 className="app-page-hero__title">Gestión de docentes</h2>
+              <p className="app-page-hero__description">
+                Consulta, filtra y registra docentes.
+              </p>
             </div>
-            <p className="text-gray-600 text-sm">Total Docentes</p>
+
+            <div className="app-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Docentes</div>
+                <div className="app-hero-metric__value">{stats.total}</div>
+                <div className="app-hero-metric__help">Registros totales cargados.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Con correo</div>
+                <div className="app-hero-metric__value">{stats.docentesConCorreo}</div>
+                <div className="app-hero-metric__help">Listos para el envío de credenciales.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Áreas</div>
+                <div className="app-hero-metric__value">{stats.areasCubiertas}</div>
+                <div className="app-hero-metric__help">Cobertura académica actual.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Especialidades</div>
+                <div className="app-hero-metric__value">{stats.especialidades}</div>
+                <div className="app-hero-metric__help">Perfiles distintos presentes en el equipo.</div>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Mail className="h-6 w-6" />
+          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.8fr)]">
+            <div className="app-toolbar-card">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Equipo docente</p>
+                  <p className="mt-1 text-sm text-slate-600">Filtra por área y estado.</p>
+                </div>
+                <button onClick={handleOpenCreate} className="app-btn app-btn-success">
+                  <Plus className="h-5 w-5" />
+                  <span>Nuevo docente</span>
+                </button>
               </div>
-              <span className="text-3xl text-[#7ED6A7]">{stats.docentesConCorreo}</span>
-            </div>
-            <p className="text-gray-600 text-sm">Con correo</p>
-          </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="app-soft-card app-soft-card--blue">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Filtrar por área</p>
+                      <p className="mt-1 text-sm text-slate-600">Mantén el foco por área sin cambiar de pantalla.</p>
+                    </div>
+                    <div className="max-w-full truncate rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
+                      {selectedAreaFilter === 'all' ? 'Todas' : areas.find((area) => String(area.id) === selectedAreaFilter)?.nombre || 'Área'}
+                    </div>
+                  </div>
+                  <div className="app-filter-row items-start">
+                    <button onClick={() => setSelectedAreaFilter('all')} className={areaFilterButtonClass(selectedAreaFilter === 'all')}>
+                      Todas las áreas
+                    </button>
+                    {visibleAreas.map((area) => {
+                      const isActive = selectedAreaFilter === String(area.id);
+                      return (
+                        <button key={area.id} onClick={() => setSelectedAreaFilter(String(area.id))} className={areaFilterButtonClass(isActive)}>
+                          {area.nombre}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <Building2 className="h-6 w-6" />
+                <div className="app-soft-card app-soft-card--green">
+                  <div className="mb-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del registro</p>
+                    <p className="mt-1 text-sm text-slate-600">Alterna entre docentes activos, inactivos o la vista completa.</p>
+                  </div>
+                  <div className="app-filter-row">
+                    <button onClick={() => setSelectedStateFilter('all')} className={stateFilterButtonClass('all', selectedStateFilter === 'all')}>
+                      <Users className="h-4 w-4 shrink-0" />
+                      <span>Todos</span>
+                    </button>
+                    <button onClick={() => setSelectedStateFilter('active')} className={stateFilterButtonClass('active', selectedStateFilter === 'active')}>
+                      <Eye className="h-4 w-4 shrink-0" />
+                      <span>Activos ({stats.activos})</span>
+                    </button>
+                    <button onClick={() => setSelectedStateFilter('inactive')} className={stateFilterButtonClass('inactive', selectedStateFilter === 'inactive')}>
+                      <EyeOff className="h-4 w-4 shrink-0" />
+                      <span>Inactivos ({stats.inactivos})</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <span className="text-3xl text-gray-500">{stats.areasCubiertas}</span>
             </div>
-            <p className="text-gray-600 text-sm">Áreas cubiertas</p>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <GraduationCap className="h-6 w-6" />
+            <div className="app-sidebar-stack">
+              <div className="app-soft-card app-soft-card--blue">
+                <div className="mb-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda rápida</p>
+                  <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Buscar docente</h3>
+                  <p className="mt-1 text-sm text-slate-600">Busca por nombre, correo, código, especialidad o área.</p>
+                </div>
+                <div className="app-toolbar-card__search app-search-field mb-4">
+                  <Search className="app-search-field__icon" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Ej: Ana, Programación o DOC123"
+                    className="app-form-input"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="app-soft-card bg-white/85">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resultados</p>
+                    <p className="mt-2 text-2xl font-semibold text-[#3A4A5B]">{filteredDocentes.length}</p>
+                  </div>
+                  <div className="app-soft-card bg-white/85">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-700">{currentViewLabel}</p>
+                  </div>
+                </div>
               </div>
-              <span className="text-3xl text-[#4A90E2]">{stats.especialidades}</span>
+
+              <div className="app-soft-card app-context-card">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Flujo sugerido</p>
+                <p className="app-context-card__title">Orden recomendado</p>
+                <div className="mt-3 space-y-2 text-sm text-slate-600">
+                  <p>1. Filtra por área o estado.</p>
+                  <p>2. Busca el docente por nombre, correo o código.</p>
+                  <p>3. Edita o cambia el estado desde la tabla.</p>
+                </div>
+              </div>
             </div>
-            <p className="text-gray-600 text-sm">Especialidades</p>
           </div>
-        </div>
+        </section>
 
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
@@ -423,132 +531,38 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
           </div>
         )}
 
-        <div className="mb-6 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-md">
-          <div className="grid gap-0 lg:grid-cols-[minmax(0,1.35fr)_340px]">
-            <div className="space-y-5 p-6">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Filtrar por área</p>
-                    <p className="mt-1 text-sm text-slate-600">Muestra docentes por su área asignada.</p>
-                  </div>
-                  <div className="max-w-full truncate rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
-                    {selectedAreaFilter === 'all'
-                      ? 'Todas'
-                      : areas.find((area) => String(area.id) === selectedAreaFilter)?.nombre || 'Área'}
-                  </div>
-                </div>
-                <div className="app-filter-row items-start">
-                  <button
-                    onClick={() => setSelectedAreaFilter('all')}
-                    className={areaFilterButtonClass(selectedAreaFilter === 'all')}
-                  >
-                    Todas las áreas
-                  </button>
-                  {visibleAreas.map((area) => {
-                    const isActive = selectedAreaFilter === String(area.id);
-                    return (
-                      <button
-                        key={area.id}
-                        onClick={() => setSelectedAreaFilter(String(area.id))}
-                        className={areaFilterButtonClass(isActive)}
-                      >
-                        {area.nombre}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="mb-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del registro</p>
-                  <p className="mt-1 text-sm text-slate-600">Alterna entre docentes activos, inactivos o la vista completa.</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setSelectedStateFilter('all')}
-                    className={stateFilterButtonClass('all', selectedStateFilter === 'all')}
-                  >
-                    <Users className="h-4 w-4 shrink-0" />
-                    <span>Todos</span>
-                  </button>
-                  <button
-                    onClick={() => setSelectedStateFilter('active')}
-                    className={stateFilterButtonClass('active', selectedStateFilter === 'active')}
-                  >
-                    <Eye className="h-4 w-4 shrink-0" />
-                    <span>Activos ({stats.activos})</span>
-                  </button>
-                  <button
-                    onClick={() => setSelectedStateFilter('inactive')}
-                    className={stateFilterButtonClass('inactive', selectedStateFilter === 'inactive')}
-                  >
-                    <EyeOff className="h-4 w-4 shrink-0" />
-                    <span>Inactivos ({stats.inactivos})</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-slate-200 bg-gradient-to-br from-teal-50 via-white to-cyan-50 p-6 lg:border-l lg:border-t-0">
-              <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda rápida</p>
-                <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Buscar docente</h3>
-                <p className="mt-1 text-sm text-slate-600">Busca por nombre, correo, código, especialidad o área.</p>
-              </div>
-
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Ej: Ana, matemáticas o Programación"
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-700 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/25"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resultados</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#3A4A5B]">{filteredDocentes.length}</p>
-                </div>
-                <div className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-700">
-                    {selectedStateFilter === 'all' ? 'Combinada' : selectedStateFilter === 'active' ? 'Solo activos' : 'Solo inactivos'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {loading ? (
-          <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
+          <div className="app-empty-panel py-12">
             <p className="text-gray-600">Cargando docentes...</p>
           </div>
         ) : filteredDocentes.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <p className="text-gray-600">No hay docentes registrados.</p>
+          <div className="app-empty-panel py-12">
+            <p className="text-base text-slate-600">No hay docentes para la vista actual.</p>
+            <p className="mt-2 text-sm text-slate-500">Cambia los filtros o registra un nuevo docente para poblar el listado.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          <div className="app-table-card">
+            <div className="app-table-card__header app-table-card__header--green">
+              <div>
+                <div className="app-table-card__title">Listado docente</div>
+                <p className="app-table-card__description">Consulta el equipo completo, revisa su área asignada y aplica acciones rápidas sobre cada registro.</p>
+              </div>
+            </div>
+            <div className="app-table-card__body p-0">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+              <table className="app-data-table">
+                <thead>
                   <tr>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Nombre</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Email</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Especialidad</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Área</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Código</th>
-                    <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
-                    <th className="px-6 py-4 text-center text-[#3A4A5B]">Acciones</th>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Especialidad</th>
+                    <th>Área</th>
+                    <th>Código</th>
+                    <th>Estado</th>
+                    <th className="text-center">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {filteredDocentes.map((docente) => {
                     const docenteIsActive = isDocenteActive(docente);
 
@@ -559,7 +573,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                         docenteIsActive ? 'hover:bg-gray-50' : 'bg-slate-50/70 text-slate-500'
                       }`}
                     >
-                      <td className="px-6 py-4">
+                      <td>
                         <div className="flex items-center gap-3">
                           <div className={`p-2 rounded-lg ${docenteIsActive ? 'bg-blue-100' : 'bg-slate-200'}`}>
                             <Users className={`w-5 h-5 ${docenteIsActive ? 'text-[#4A90E2]' : 'text-slate-500'}`} />
@@ -570,11 +584,11 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-600 text-sm break-all">{docente.persona?.email || '-'}</td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">{docente.especialidad || '-'}</td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">{docente.area?.nombre || '-'}</td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">{docente.persona?.codigoAcceso || docente.codigoAcceso || '-'}</td>
-                      <td className="px-6 py-4">
+                      <td>{docente.persona?.email || '-'}</td>
+                      <td>{docente.especialidad || '-'}</td>
+                      <td>{docente.area?.nombre || '-'}</td>
+                      <td>{docente.persona?.codigoAcceso || docente.codigoAcceso || '-'}</td>
+                      <td>
                         <span
                           className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
                             docenteIsActive
@@ -585,22 +599,18 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                           {docenteIsActive ? 'Activo' : 'Inhabilitado'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 align-middle">
+                      <td className="text-center">
                         <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                           <button
                             onClick={() => handleOpenEdit(docente)}
-                            className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
+                            className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
                             title="Editar"
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleToggleEstado(docente)}
-                            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                              docenteIsActive
-                                ? 'text-amber-700 hover:bg-amber-50'
-                                : 'text-emerald-700 hover:bg-emerald-50'
-                            }`}
+                            className={`app-btn app-btn-sm ${docenteIsActive ? 'app-btn-secondary' : 'app-btn-success'}`}
                             title={docenteIsActive ? 'Inhabilitar docente' : 'Habilitar docente'}
                           >
                             {docenteIsActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -612,6 +622,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                   );})}
                 </tbody>
               </table>
+            </div>
             </div>
           </div>
         )}
@@ -654,14 +665,14 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
               <div className="app-form-main app-form-stack">
                 {!editingDocente && (
                   <div className="app-form-note">
-                    El alta del docente mantiene el flujo del panel y enviará las credenciales automáticamente al correo registrado.
+                    Al guardar, EduPath enviará las credenciales al correo registrado.
                   </div>
                 )}
 
                 <section className="app-form-section app-form-section--muted">
                   <div className="mb-4 space-y-1.5">
                     <h4 className="app-form-section-title">Información personal</h4>
-                    <p className="app-form-section-description">Datos base para identificar al docente dentro de la plataforma.</p>
+                    <p className="app-form-section-description">Datos básicos del docente.</p>
                   </div>
 
                   <div className="app-form-grid app-form-grid-2">
@@ -693,7 +704,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                 <section className="app-form-section">
                   <div className="mb-4 space-y-1.5">
                     <h4 className="app-form-section-title">Perfil académico</h4>
-                    <p className="app-form-section-description">Relaciona el código de acceso, la especialidad y el área que usará el docente.</p>
+                    <p className="app-form-section-description">Define código, especialidad y área.</p>
                   </div>
 
                   <div className="app-form-grid app-form-grid-2">
@@ -766,11 +777,11 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                 </section>
 
                 <section className="app-form-section">
-                  <h4 className="app-form-section-title">Antes de guardar</h4>
+                  <h4 className="app-form-section-title">Verificación</h4>
                   <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                    <p>Verifica el correo porque ahí llegarán las credenciales iniciales.</p>
-                    <p>Usa un código de acceso fácil de comunicar pero suficientemente claro para el equipo docente.</p>
-                    <p>Asigna el área correcta para mantener consistencia con contenidos y permisos.</p>
+                    <p>Verifica el correo antes de guardar.</p>
+                    <p>Confirma el código de acceso y la especialidad.</p>
+                    <p>Asigna el área correcta para mantener consistencia operativa.</p>
                   </div>
                 </section>
               </aside>
@@ -809,7 +820,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[26px] border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-teal-50 via-white to-cyan-50 p-6 rounded-t-[26px]">
-              <h3 className="text-xl font-semibold text-[#3A4A5B]">Confirmar creacion</h3>
+              <h3 className="text-xl font-semibold text-[#3A4A5B]">Confirmar creación</h3>
               <button
                 onClick={handleCloseConfirm}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -819,7 +830,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
             </div>
             <div className="space-y-3 p-6 text-sm leading-6 text-slate-600">
               <p>Verifica que los datos del docente sean correctos.</p>
-              <p>Se enviaran las credenciales al correo proporcionado.</p>
+              <p>Se enviarán las credenciales al correo proporcionado.</p>
             </div>
             <div className="flex gap-3 justify-end rounded-b-[26px] border-t border-slate-200 bg-white p-6">
               <button

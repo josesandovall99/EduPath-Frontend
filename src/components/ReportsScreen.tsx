@@ -281,7 +281,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     activityType: 'all'
   });
   const [appliedSearch, setAppliedSearch] = useState('');
-  const [hasAppliedFilters, setHasAppliedFilters] = useState(false);
+  const [hasAppliedFilters, setHasAppliedFilters] = useState(true);
 
   // Estado para estudiantes (se carga desde backend). Si falla, usamos fallbackMockStudents
   const [studentsData, setStudentsData] = useState<StudentProgress[]>([]);
@@ -674,7 +674,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
       dateTo: '',
       activityType: 'all'
     });
-    setHasAppliedFilters(false);
+    setHasAppliedFilters(true);
   };
 
   const applyFilters = () => {
@@ -1044,35 +1044,63 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   const failuresStudentsDisplay = appliedFilters.student === 'all'
     ? failuresStudentsSorted.slice(0, 20)
     : failuresStudentsSorted;
+  const appliedFilterCount = Object.values(appliedFilters).filter((value) => value && value !== 'all').length + (appliedSearch ? 1 : 0);
+  const globalAverageProgress = studentsData.length
+    ? studentsData.reduce((sum, student) => {
+        const average = student.subjects.length
+          ? student.subjects.reduce((acc, subject) => acc + subject.progress, 0) / student.subjects.length
+          : 0;
+        return sum + average;
+      }, 0) / studentsData.length
+    : 0;
+  const reportViewLabel = activeTab === 'student'
+    ? 'Progreso por estudiante'
+    : activeTab === 'date'
+      ? 'Comparativo por cohorte'
+      : activeTab === 'activity'
+        ? 'Desempeño por actividad'
+        : 'Fallos por actividad';
+  const reportViewDescription = activeTab === 'student'
+    ? 'Sigue el avance individual y detecta rezagos con mayor claridad.'
+    : activeTab === 'date'
+      ? 'Compara cohortes y fechas de ingreso bajo la misma lectura visual.'
+      : activeTab === 'activity'
+        ? 'Concentra uso, completitud y rendimiento por actividad o área.'
+        : 'Prioriza fallos, intentos y focos de atención por estudiante y actividad.';
+  const reportVisibleCount = activeTab === 'student'
+    ? studentTabStudents.length
+    : activeTab === 'date'
+      ? dateDataVisible.length
+      : activeTab === 'activity'
+        ? activityTabStudents.length
+        : failuresItemsDisplay.length;
+  const reportVisibleLabel = activeTab === 'date'
+    ? 'Cohortes visibles'
+    : activeTab === 'failures'
+      ? 'Registros visibles'
+      : 'Estudiantes visibles';
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-[#3A4A5B]">Generación de Informes Académicos</h1>
-                <p className="text-gray-500 text-sm">{isDocenteMode ? 'Panel de Docente - EduPath' : 'Panel de Administrador - EduPath'}</p>
+                <h1 className="text-[#3A4A5B]">Reportes académicos</h1>
+                <p className="text-sm text-slate-500">{isDocenteMode ? 'Lectura docente del rendimiento y avance' : 'Centro analítico del panel administrativo'}</p>
               </div>
             </div>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => handleExport('excel')}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-[#7ED6A7] text-[#7ED6A7] rounded-lg hover:bg-[#7ED6A7] hover:text-white transition-all duration-300"
-              >
-                <FileSpreadsheet className="w-5 h-5" />
+            <div className="app-action-row">
+              <button onClick={() => handleExport('excel')} className="app-btn app-btn-secondary text-emerald-700">
+                <FileSpreadsheet className="w-4 h-4" />
                 <span>Excel</span>
               </button>
-              <button 
-                onClick={() => handleExport('pdf')}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#F5A97F] to-[#F7B98F] text-white rounded-lg hover:shadow-lg transition-all duration-300"
-              >
-                <Download className="w-5 h-5" />
+              <button onClick={() => handleExport('pdf')} className="app-btn app-primary-btn">
+                <Download className="w-4 h-4" />
                 <span>Exportar PDF</span>
               </button>
             </div>
@@ -1080,16 +1108,44 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
-        {/* Back Button */}
-        <button 
-          onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
-        >
+      <main className="app-main">
+        <button onClick={onBack} className="app-back-button mb-6">
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
         </button>
+
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Analítica Generalizada</div>
+              <h2 className="app-page-hero__title">{reportViewLabel}</h2>
+              <p className="app-page-hero__description">{reportViewDescription}</p>
+            </div>
+
+            <div className="app-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Estudiantes</div>
+                <div className="app-hero-metric__value">{studentsData.length}</div>
+                <div className="app-hero-metric__help">Base actual disponible para análisis.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Áreas</div>
+                <div className="app-hero-metric__value">{areasCatalog.length}</div>
+                <div className="app-hero-metric__help">Cobertura temática con seguimiento activo.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">{reportVisibleLabel}</div>
+                <div className="app-hero-metric__value">{reportVisibleCount}</div>
+                <div className="app-hero-metric__help">Resultados en la vista seleccionada.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Avance global</div>
+                <div className="app-hero-metric__value">{formatPercent(globalAverageProgress)}%</div>
+                <div className="app-hero-metric__help">Promedio consolidado del entorno.</div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {pdfLoading && (
           <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
@@ -1101,7 +1157,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         )}
 
         {loadingStudents && (
-          <div className="bg-white rounded-xl shadow-md mb-6 p-6">
+          <div className="app-panel mb-6 p-6">
             <div className="flex items-center gap-4">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
               <div className="flex-1 space-y-2">
@@ -1118,7 +1174,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         )}
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-md mb-6 overflow-hidden">
+        <div className="app-panel mb-6 overflow-hidden">
           <div className="app-filter-tab-row">
             <button
               onClick={() => setActiveTab('student')}
@@ -1173,41 +1229,45 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         {/* Filtros */}
         {showFilters && (
-          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Filter className="w-5 h-5 text-[#3A4A5B]" />
-                <h3 className="text-[#3A4A5B]">Filtros Avanzados</h3>
+          <div className="app-toolbar-card mb-6">
+            <div className="app-section-head mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Filter className="w-5 h-5 text-[#3A4A5B]" />
+                  <h3 className="app-section-title">Filtros avanzados</h3>
+                </div>
+                <p className="app-section-description">Usa un solo punto de control para buscar, acotar y aplicar la lectura actual.</p>
               </div>
               <button
                 onClick={() => setShowFilters(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="app-btn app-btn-secondary app-btn-sm text-slate-500"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-xs text-gray-500 mb-4">
-              La información se muestra solo cuando se aplican los filtros.
-            </p>
+            <div className="app-alert app-alert--warning mb-4">
+              <span className="text-sm">La información se muestra cuando confirmas la combinación actual de filtros.</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em]">{appliedFilterCount} activos</span>
+            </div>
             
             <div className="grid grid-cols-3 gap-4 mb-4">
-              <div>
-                <label className="block text-[#3A4A5B] mb-2 text-sm">Buscar estudiante</label>
+              <div className="app-form-field">
+                <label className="app-form-label">Buscar estudiante</label>
                 <input
                   type="text"
                   value={studentSearch}
                   onChange={(e) => setStudentSearch(e.target.value)}
                   placeholder="Escribe un nombre..."
-                  className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  className="app-form-input"
                 />
               </div>
 
-              <div>
-                <label className="block text-[#3A4A5B] mb-2 text-sm">Estudiante</label>
+              <div className="app-form-field">
+                <label className="app-form-label">Estudiante</label>
                 <select 
                   value={filters.student}
                   onChange={(e) => setFilters({...filters, student: e.target.value})}
-                  className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  className="app-form-select"
                 >
                   <option value="all">Todos los estudiantes</option>
                   {studentsData.map(student => (
@@ -1216,12 +1276,12 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                 </select>
               </div>
 
-              <div>
-                <label className="block text-[#3A4A5B] mb-2 text-sm">Semestre</label>
+              <div className="app-form-field">
+                <label className="app-form-label">Semestre</label>
                 <select
                   value={filters.semester}
                   onChange={(e) => setFilters({ ...filters, semester: e.target.value })}
-                  className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                  className="app-form-select"
                 >
                   <option value="all">Todos los semestres</option>
                   {semesterOptions.map((semester) => (
@@ -1233,8 +1293,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             {activeTab === 'student' && (
               <div className="grid grid-cols-1 gap-4 mb-4">
-                <div>
-                  <label className="flex items-center gap-2 text-[#3A4A5B] mb-2 text-sm">
+                <div className="app-form-field">
+                  <label className="flex items-center gap-2 app-form-label">
                     <span>Estado de Avance</span>
                     <button
                       type="button"
@@ -1248,7 +1308,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                   <select 
                     value={filters.status}
                     onChange={(e) => setFilters({...filters, status: e.target.value})}
-                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                    className="app-form-select"
                   >
                     <option value="all">Todos</option>
                     <option value="completed">Completado</option>
@@ -1261,22 +1321,22 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             {activeTab === 'date' && (
               <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-[#3A4A5B] mb-2 text-sm">Fecha desde</label>
+                <div className="app-form-field">
+                  <label className="app-form-label">Fecha desde</label>
                   <input
                     type="date"
                     value={filters.dateFrom}
                     onChange={(e) => setFilters({...filters, dateFrom: e.target.value})}
-                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                    className="app-form-input"
                   />
                 </div>
-                <div>
-                  <label className="block text-[#3A4A5B] mb-2 text-sm">Fecha hasta</label>
+                <div className="app-form-field">
+                  <label className="app-form-label">Fecha hasta</label>
                   <input
                     type="date"
                     value={filters.dateTo}
                     onChange={(e) => setFilters({...filters, dateTo: e.target.value})}
-                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                    className="app-form-input"
                   />
                 </div>
               </div>
@@ -1284,12 +1344,12 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             {activeTab === 'activity' && (
               <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-[#3A4A5B] mb-2 text-sm">Tipo de Actividad</label>
+                <div className="app-form-field">
+                  <label className="app-form-label">Tipo de Actividad</label>
                   <select 
                     value={filters.activityType}
                     onChange={(e) => setFilters({...filters, activityType: e.target.value})}
-                    className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
+                    className="app-form-select"
                   >
                     <option value="all">Todas</option>
                     <option value="content">Contenidos</option>
@@ -1302,22 +1362,22 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             {activeTab === 'failures' && (
               <div className="grid grid-cols-1 gap-4 mb-4">
-                <div className="bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-lg p-3 text-sm text-[#3A4A5B]">
+                <div className="app-alert app-alert--warning">
                   Este informe usa el filtro de estudiante. Si seleccionas "Todos", se mostrara el top 20 de actividades con mas fallos. Si necesitas ver los intentos, aciertos o fallos de ejercicios y miniproyectos de un estudiante en especifico, seleccionalo en el filtro "Estudiante" y aplica los filtros.
                 </div>
               </div>
             )}
 
-            <div className="flex gap-3">
+            <div className="app-action-row justify-start">
               <button 
                 onClick={clearFilters}
-                className="px-5 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all text-sm"
+                className="app-btn app-btn-secondary"
               >
                 Limpiar Filtros
               </button>
               <button
                 onClick={applyFilters}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#4A90E2] to-[#5B9FED] text-white rounded-lg hover:shadow-lg transition-all text-sm"
+                className="app-btn app-primary-btn"
               >
                 Aplicar Filtros
               </button>
@@ -1328,7 +1388,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         {!showFilters && (
           <button
             onClick={() => setShowFilters(true)}
-            className="mb-6 flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-md hover:shadow-lg transition-all text-[#3A4A5B]"
+            className="app-btn app-btn-secondary mb-6"
           >
             <Filter className="w-4 h-4" />
             <span className="text-sm">Mostrar Filtros</span>
@@ -1337,7 +1397,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         {/* Content by Tab */}
         {!hasAppliedFilters && (
-          <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">
+          <div className="app-empty-panel">
             La información se muestra solo cuando se aplican los filtros.
           </div>
         )}
@@ -1345,77 +1405,87 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         {hasAppliedFilters && activeTab === 'student' && (
           <div className="space-y-6">
             {/* Resumen Cards */}
-            <div className="grid grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-600 text-sm">Total Estudiantes</span>
-                  <User className="w-5 h-5 text-[#4A90E2]" />
+            <div className="app-metric-grid">
+              <div className="app-metric-card">
+                <div className="app-metric-icon app-metric-icon--blue">
+                  <User className="w-5 h-5" />
                 </div>
-                <div className="text-3xl text-[#3A4A5B] mb-1">{studentTabStudents.length}</div>
-                <div className="text-xs text-gray-500">Activos en el sistema</div>
+                <div>
+                  <div className="app-metric-value">{studentTabStudents.length}</div>
+                  <div className="app-metric-label">Total estudiantes</div>
+                  <div className="mt-1 text-xs text-slate-500">Activos en el sistema.</div>
+                </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-600 text-sm">Progreso Promedio</span>
-                  <TrendingUp className="w-5 h-5 text-[#7ED6A7]" />
+              <div className="app-metric-card">
+                <div className="app-metric-icon app-metric-icon--green">
+                  <TrendingUp className="w-5 h-5" />
                 </div>
-                <div className="text-3xl text-[#3A4A5B] mb-1">
-                  {formatPercent(
-                    studentTabStudents.length
-                      ? studentTabStudents.reduce((sum, s) => {
-                          const avg = s.subjects.length
-                            ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
-                            : 0;
-                          return sum + avg;
-                        }, 0) / studentTabStudents.length
-                      : 0
-                  )}%
+                <div>
+                  <div className="app-metric-value">
+                    {formatPercent(
+                      studentTabStudents.length
+                        ? studentTabStudents.reduce((sum, s) => {
+                            const avg = s.subjects.length
+                              ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
+                              : 0;
+                            return sum + avg;
+                          }, 0) / studentTabStudents.length
+                        : 0
+                    )}%
+                  </div>
+                  <div className="app-metric-label">Progreso promedio</div>
+                  <div className="mt-1 text-xs text-slate-500">En todas las materias.</div>
                 </div>
-                <div className="text-xs text-gray-500">En todas las materias</div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-600 text-sm">Estudiantes al Día</span>
-                  <CheckCircle2 className="w-5 h-5 text-[#7ED6A7]" />
+              <div className="app-metric-card">
+                <div className="app-metric-icon app-metric-icon--green">
+                  <CheckCircle2 className="w-5 h-5" />
                 </div>
-                <div className="text-3xl text-[#3A4A5B] mb-1">
-                  {studentTabStudents.filter(s => {
-                    const avg = s.subjects.length
-                      ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
-                      : 0;
-                    return avg >= 70;
-                  }).length}
+                <div>
+                  <div className="app-metric-value">
+                    {studentTabStudents.filter(s => {
+                      const avg = s.subjects.length
+                        ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
+                        : 0;
+                      return avg >= 70;
+                    }).length}
+                  </div>
+                  <div className="app-metric-label">Estudiantes al día</div>
+                  <div className="mt-1 text-xs text-slate-500">Con 70% o más de progreso.</div>
                 </div>
-                <div className="text-xs text-gray-500">≥ 70% de progreso</div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-600 text-sm">Estudiantes Rezagados</span>
-                  <AlertCircle className="w-5 h-5 text-[#F5A97F]" />
+              <div className="app-metric-card">
+                <div className="app-metric-icon app-metric-icon--amber">
+                  <AlertCircle className="w-5 h-5" />
                 </div>
-                <div className="text-3xl text-[#3A4A5B] mb-1">
-                  {studentTabStudents.filter(s => {
-                    const avg = s.subjects.length
-                      ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
-                      : 0;
-                    return avg < 50;
-                  }).length}
+                <div>
+                  <div className="app-metric-value">
+                    {studentTabStudents.filter(s => {
+                      const avg = s.subjects.length
+                        ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
+                        : 0;
+                      return avg < 50;
+                    }).length}
+                  </div>
+                  <div className="app-metric-label">Estudiantes rezagados</div>
+                  <div className="mt-1 text-xs text-slate-500">Por debajo del 50%.</div>
                 </div>
-                <div className="text-xs text-gray-500">{'<'} 50% de progreso</div>
               </div>
             </div>
 
             {/* Tabla detallada por estudiante */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden">
-              <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-[#4A90E2] to-[#5B9FED]">
-                <h3 className="text-white text-lg">Progreso Detallado por Estudiante</h3>
-                <p className="text-white/90 text-sm mt-1">Avance en áreas, temas y actividades</p>
+            <div className="app-table-card">
+              <div className="app-table-card__header app-table-card__header--blue">
+                <div>
+                  <h3 className="app-table-card__title">Progreso detallado por estudiante</h3>
+                  <p className="app-table-card__description">Avance en áreas, temas y actividades con una lectura más homogénea.</p>
+                </div>
               </div>
               
-              <div className="p-6">
+              <div className="app-table-card__body">
                 {studentTabStudents.map((student) => (
                   <div key={student.id} className="mb-8 last:mb-0 border-b border-gray-200 last:border-0 pb-8 last:pb-0">
                     <div className="flex items-center justify-between mb-4">
@@ -1542,7 +1612,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         {hasAppliedFilters && activeTab === 'date' && (
           <div className="space-y-6">
             {hiddenCohortsCount > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+              <div className="app-alert app-alert--warning">
                 Mostrando {dateDataVisible.length} cohortes con mayor avance. Hay {hiddenCohortsCount} cohortes adicionales ocultas para mejorar legibilidad y rendimiento.
               </div>
             )}
@@ -1612,13 +1682,15 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             </div>
 
             {/* Tabla por cohorte */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden">
-              <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-[#7ED6A7] to-[#8FE0B7]">
-                <h3 className="text-white text-lg">Análisis por Fecha de Creación</h3>
-                <p className="text-white/90 text-sm mt-1">Comparación de cohortes y estudiantes rezagados</p>
+            <div className="app-table-card">
+              <div className="app-table-card__header app-table-card__header--green">
+                <div>
+                  <h3 className="app-table-card__title">Análisis por fecha de creación</h3>
+                  <p className="app-table-card__description">Comparación de cohortes y detección temprana de rezago.</p>
+                </div>
               </div>
               
-              <div className="p-6">
+              <div className="app-table-card__body">
                 {dateDataVisible.map((dateGroup) => (
                   <div key={dateGroup.date} className="mb-8 last:mb-0 border-b border-gray-200 last:border-0 pb-8 last:pb-0">
                     <div className="flex items-center justify-between mb-4">
@@ -1633,8 +1705,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                     </div>
 
                     <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                      <table className="app-data-table">
+                        <thead>
                           <tr>
                             <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
                             <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Gestion de Proyectos</th>
@@ -1644,7 +1716,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                             <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estado</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody>
                           {dateGroup.students.map((student) => {
                             const avgProgress = student.subjects.length
                               ? student.subjects.reduce((acc, s) => acc + s.progress, 0) / student.subjects.length
@@ -1743,55 +1815,37 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         {hasAppliedFilters && activeTab === 'activity' && (
           <div className="space-y-6">
             {/* Resumen de actividades */}
-            <div className="grid grid-cols-3 gap-6">
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-[#4A90E2]/10 rounded-lg flex items-center justify-center">
-                    <Activity className="w-6 h-6 text-[#4A90E2]" />
-                  </div>
-                  <div>
-                    <div className="text-2xl text-[#3A4A5B]">
-                      {activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0)}
-                    </div>
-                    <div className="text-sm text-gray-600">Contenidos Visualizados</div>
-                  </div>
+            <div className="app-metric-grid">
+              <div className="app-metric-card">
+                <div className="app-metric-icon app-metric-icon--blue">
+                  <Activity className="w-5 h-5" />
                 </div>
-                <div className="text-xs text-gray-500">
-                    Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0) / activityTabStudents.length) : 0} por estudiante
+                <div>
+                  <div className="app-metric-value">{activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0)}</div>
+                  <div className="app-metric-label">Contenidos visualizados</div>
+                  <div className="mt-1 text-xs text-slate-500">Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0) / activityTabStudents.length) : 0} por estudiante.</div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-[#7ED6A7]/10 rounded-lg flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6 text-[#7ED6A7]" />
-                  </div>
-                  <div>
-                    <div className="text-2xl text-[#3A4A5B]">
-                      {activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0)}
-                    </div>
-                    <div className="text-sm text-gray-600">Ejercicios Completados</div>
-                  </div>
+              <div className="app-metric-card">
+                <div className="app-metric-icon app-metric-icon--green">
+                  <CheckCircle2 className="w-5 h-5" />
                 </div>
-                <div className="text-xs text-gray-500">
-                  Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0) / activityTabStudents.length) : 0} por estudiante
+                <div>
+                  <div className="app-metric-value">{activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0)}</div>
+                  <div className="app-metric-label">Ejercicios completados</div>
+                  <div className="mt-1 text-xs text-slate-500">Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0) / activityTabStudents.length) : 0} por estudiante.</div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-[#F5A97F]/10 rounded-lg flex items-center justify-center">
-                    <Award className="w-6 h-6 text-[#F5A97F]" />
-                  </div>
-                  <div>
-                    <div className="text-2xl text-[#3A4A5B]">
-                      {activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0)}
-                    </div>
-                    <div className="text-sm text-gray-600">Miniproyectos Entregados</div>
-                  </div>
+              <div className="app-metric-card">
+                <div className="app-metric-icon app-metric-icon--amber">
+                  <Award className="w-5 h-5" />
                 </div>
-                <div className="text-xs text-gray-500">
-                  Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0) / activityTabStudents.length) : 0} por estudiante
+                <div>
+                  <div className="app-metric-value">{activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0)}</div>
+                  <div className="app-metric-label">Miniproyectos entregados</div>
+                  <div className="mt-1 text-xs text-slate-500">Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0) / activityTabStudents.length) : 0} por estudiante.</div>
                 </div>
               </div>
             </div>
@@ -1854,13 +1908,15 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             </div>
 
             {/* Tabla detallada de actividades por materia */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden">
-              <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-[#F5A97F] to-[#F7B98F]">
-                <h3 className="text-white text-lg">Desempeño Detallado por Actividad</h3>
-                <p className="text-white/90 text-sm mt-1">Análisis de completitud y calificaciones</p>
+            <div className="app-table-card">
+              <div className="app-table-card__header app-table-card__header--amber">
+                <div>
+                  <h3 className="app-table-card__title">Desempeño detallado por actividad</h3>
+                  <p className="app-table-card__description">Análisis de completitud, volumen de uso y calificación estimada.</p>
+                </div>
               </div>
               
-              <div className="p-6">
+              <div className="app-table-card__body">
                 {subjectProgressData.map((subject) => {
                   const subjectName = subject.name;
                   const color = subject.color;
@@ -1952,8 +2008,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                       </div>
 
                       <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gray-50 border-b border-gray-200">
+                        <table className="app-data-table">
+                          <thead>
                             <tr>
                               <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
                               <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Contenidos</th>
@@ -1963,7 +2019,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                               <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Calificación Est.</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-gray-200">
+                          <tbody>
                             {activityTabStudents.map((student) => {
                               const subject = student.subjects.find(s => s.name === subjectName);
                               if (!subject) return null;
@@ -2052,14 +2108,14 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             )}
 
             {!failuresLoading && !failuresData && (
-              <div className="bg-white rounded-xl shadow-md p-6 text-center text-gray-500">
+              <div className="app-empty-panel">
                 No hay datos disponibles para el reporte de fallos.
               </div>
             )}
 
             {!failuresLoading && failuresData && (
               <>
-                <div className="grid grid-cols-4 gap-6">
+                <div className="app-metric-grid">
                   <div className="bg-white rounded-xl shadow-md p-6">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-12 h-12 bg-[#FEE2E2] rounded-lg flex items-center justify-center">
@@ -2206,14 +2262,16 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                  <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-[#B91C1C] to-[#F87171]">
-                    <h3 className="text-[#1F2937] text-lg">Resumen de Fallos por Área</h3>
-                    <p className="text-[#374151] text-sm mt-1">Intentos y fallos acumulados</p>
+                <div className="app-table-card">
+                  <div className="app-table-card__header app-table-card__header--red">
+                    <div>
+                      <h3 className="app-table-card__title">Resumen de fallos por área</h3>
+                      <p className="app-table-card__description">Intentos y fallos acumulados.</p>
+                    </div>
                   </div>
-                  <div className="p-6 overflow-x-auto">
-                    <table className="w-full text-[#111827]">
-                      <thead className="bg-gray-50 border-b border-gray-200 text-[#111827]">
+                  <div className="app-table-card__body overflow-x-auto">
+                    <table className="app-data-table text-[#111827]">
+                      <thead>
                         <tr>
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Área</th>
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Intentos</th>
@@ -2223,7 +2281,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Miniproyectos</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody>
                         {failuresByArea.length === 0 && (
                           <tr>
                             <td className="px-4 py-3 text-sm text-gray-500" colSpan={6}>Sin datos</td>
@@ -2253,16 +2311,18 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                  <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-[#B91C1C] to-[#F87171]">
-                    <h3 className="text-[#1F2937] text-lg">Fallos por Estudiante</h3>
-                    <p className="text-[#374151] text-sm mt-1">
+                <div className="app-table-card">
+                  <div className="app-table-card__header app-table-card__header--red">
+                    <div>
+                    <h3 className="app-table-card__title">Fallos por estudiante</h3>
+                    <p className="app-table-card__description">
                       {appliedFilters.student === 'all' ? 'Top 20 estudiantes con mas fallos' : 'Resumen del estudiante'}
                     </p>
+                    </div>
                   </div>
-                  <div className="p-6 overflow-x-auto">
-                    <table className="w-full text-[#111827]">
-                      <thead className="bg-gray-50 border-b border-gray-200 text-[#111827]">
+                  <div className="app-table-card__body overflow-x-auto">
+                    <table className="app-data-table text-[#111827]">
+                      <thead>
                         <tr>
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Correo</th>
@@ -2273,7 +2333,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Miniproyectos</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody>
                         {failuresStudentsDisplay.length === 0 && (
                           <tr>
                             <td className="px-4 py-3 text-sm text-gray-500" colSpan={7}>Sin datos</td>
@@ -2295,16 +2355,18 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                  <div className="border-b border-gray-200 p-6 bg-gradient-to-r from-[#B91C1C] to-[#F87171]">
-                    <h3 className="text-[#1F2937] text-lg">Detalle de Fallos por Actividad</h3>
-                    <p className="text-[#374151] text-sm mt-1">
+                <div className="app-table-card">
+                  <div className="app-table-card__header app-table-card__header--red">
+                    <div>
+                    <h3 className="app-table-card__title">Detalle de fallos por actividad</h3>
+                    <p className="app-table-card__description">
                       {appliedFilters.student === 'all' ? 'Top 20 de actividades con mas fallos' : 'Actividades del estudiante'}
                     </p>
+                    </div>
                   </div>
-                  <div className="p-6 overflow-x-auto">
-                    <table className="w-full text-[#111827]">
-                      <thead className="bg-gray-50 border-b border-gray-200 text-[#111827]">
+                  <div className="app-table-card__body overflow-x-auto">
+                    <table className="app-data-table text-[#111827]">
+                      <thead>
                         <tr>
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Tipo</th>
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Actividad</th>
@@ -2315,7 +2377,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aprobado</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody>
                         {failuresItemsDisplay.length === 0 && (
                           <tr>
                             <td className="px-4 py-3 text-sm text-gray-500" colSpan={7}>Sin datos</td>

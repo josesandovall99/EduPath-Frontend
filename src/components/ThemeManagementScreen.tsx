@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Code, Database, BarChart3, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Plus, Edit2, ChevronUp, X } from 'lucide-react';
+import { ArrowLeft, Code, Database, BarChart3, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Plus, Edit2, ChevronUp, X, Search } from 'lucide-react';
 import axios from 'axios';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
@@ -102,6 +102,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   const [showModal, setShowModal] = useState(false);
   const [editingTema, setEditingTema] = useState<Tema | null>(null);
   const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -421,6 +422,14 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   };
 
   const filteredTemas = temas.filter((tema) => {
+    const matchesSearch = `${tema.nombre} ${tema.descripcion || ''}`
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase().trim());
+
+    if (!matchesSearch) {
+      return false;
+    }
+
     if (stateFilter === 'active') {
       return tema.estado !== false;
     }
@@ -487,7 +496,9 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   const currentColorKey = areaIndex >= 0 ? getColorByIndex(areaIndex) : Object.keys(subjectColors)[0];
   const currentColor = subjectColors[currentColorKey];
   const currentSubject = areas.find(s => s.id === selectedSubject);
-  const SubjectIcon = currentColor.icon;
+  const hasFixedAreaContext = Boolean(initialAreaIdValue || initialEditTema?.area_id);
+  const activeTemasCount = temas.filter((tema) => tema.estado !== false).length;
+  const inactiveTemasCount = temas.filter((tema) => tema.estado === false).length;
 
   // Mostrar estado de carga
   if (loading) {
@@ -514,19 +525,23 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
-      {/* Header */}
+    <div className="app-shell">
       {!embedded && (
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+        <header className="app-header">
+          <div className="app-main py-4">
+            <div className="app-page-header">
+              <div className="app-brand-block">
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="app-brand-icon"
+                  title="Volver"
+                >
                   <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-                </div>
+                </button>
                 <div>
-                  <h1 className="text-[#3A4A5B]">Gestión de Temas</h1>
-                  <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                  <h1 className="text-[#3A4A5B]">Gestión de temas</h1>
+                  <p className="text-gray-500 text-sm">{currentSubject ? `Área activa: ${currentSubject.nombre}` : 'Panel de administrador - EduPath'}</p>
                 </div>
               </div>
             </div>
@@ -534,160 +549,176 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
         </header>
       )}
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
-        {/* Back Button */}
+      <main className="app-main">
         {!embedded && (
           <button 
             onClick={onBack}
-            className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
+            className="app-back-button mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>{backLabel || 'Volver al Panel'}</span>
           </button>
         )}
 
-        {/* Subject Selector */}
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
-          <h3 className="text-[#3A4A5B] mb-4">Seleccionar Materia</h3>
-          {areas.length === 0 ? (
-            <p className="text-gray-500 text-center">No hay áreas disponibles</p>
-          ) : (
-            <div className={`grid gap-4 ${areas.length >= 3 ? 'grid-cols-3' : `grid-cols-${areas.length}`}`}>
-              {areas.map((area, index) => {
-                const colorKey = getColorByIndex(index);
-                const Icon = subjectColors[colorKey].icon;
-                const color = subjectColors[colorKey].primary;
-                const isSelected = selectedSubject === area.id;
-                
-                return (
-                  <button
-                    key={area.id}
-                    onClick={() => setSelectedSubject(area.id)}
-                    className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                      isSelected
-                        ? 'border-current shadow-lg transform scale-105'
-                        : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-                    }`}
-                    style={{
-                      borderColor: isSelected ? color : undefined,
-                      backgroundColor: isSelected ? `${color}10` : 'white'
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="p-2 rounded-lg"
-                        style={{ backgroundColor: `${color}15` }}
-                      >
-                        <Icon className="w-6 h-6" style={{ color }} />
-                      </div>
-                      <div className="text-left">
-                        <div className="text-[#3A4A5B] text-sm font-semibold">{area.nombre}</div>
-                        <div className="text-gray-500 text-xs">{area.descripcion}</div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Estructura temática</div>
+              <h2 className="app-page-hero__title">Gestión de temas</h2>
+              <p className="app-page-hero__description">
+                Ordena, edita y revisa los temas del área activa sin salir del flujo actual.
+              </p>
             </div>
-          )}
-        </div>
 
-        {/* Theme List */}
-        <div 
-          className="rounded-2xl p-8 mb-6 text-white shadow-lg"
-          style={{ background: `linear-gradient(135deg, ${currentColor.primary} 0%, ${currentColor.primary}dd 100%)` }}
-        >
-          <div className="flex items-center gap-4 mb-2">
-            <SubjectIcon className="w-8 h-8" />
-            <h2 className="text-2xl">{currentSubject?.nombre || 'Selecciona una materia'}</h2>
-          </div>
-          <p className="text-white/90">
-            {currentSubject?.descripcion || 'Administra qué temas y subtemas están disponibles para los estudiantes'}
-          </p>
-        </div>
-
-        {/* Mensaje de éxito */}
-        {successMessage && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-[10px]">OK</span>
+            <div className="app-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Temas</div>
+                <div className="app-hero-metric__value">{temas.length}</div>
+                <div className="app-hero-metric__help">Registros del área actual.</div>
               </div>
-              <p className="text-green-700 font-medium">{successMessage}</p>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Activos</div>
+                <div className="app-hero-metric__value">{activeTemasCount}</div>
+                <div className="app-hero-metric__help">Disponibles en la estructura.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Inactivos</div>
+                <div className="app-hero-metric__value">{inactiveTemasCount}</div>
+                <div className="app-hero-metric__help">Fuera del flujo activo.</div>
+              </div>
+              <div className="app-hero-metric app-hero-metric--wide">
+                <div className="app-hero-metric__label">Área</div>
+                <div className="app-hero-metric__value app-hero-metric__value--text">{currentSubject?.nombre || 'Sin área activa'}</div>
+                <div className="app-hero-metric__help">Contexto actual de trabajo.</div>
+              </div>
             </div>
-            <button onClick={() => setSuccessMessage(null)} className="text-green-500 hover:text-green-700">
+          </div>
+
+          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.74fr)]">
+            <div className="app-toolbar-card">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Área y filtros</p>
+                  <p className="mt-1 text-sm text-slate-600">{hasFixedAreaContext ? 'El área se mantiene fija por el flujo de navegación actual.' : 'Selecciona el área activa antes de crear, ordenar o editar temas.'}</p>
+                </div>
+                <button
+                  onClick={handleCreateTema}
+                  className="app-btn app-primary-btn"
+                  disabled={!selectedSubject}
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Nuevo tema</span>
+                </button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="app-form-field">
+                  <label className="app-form-label">Área</label>
+                  {hasFixedAreaContext ? (
+                    <div className="app-form-static">
+                      <p className="text-gray-700 font-medium">{currentSubject?.nombre || 'Área no encontrada'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{currentSubject?.descripcion || 'Contexto fijado por la pantalla anterior.'}</p>
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedSubject}
+                      onChange={(e) => setSelectedSubject(e.target.value)}
+                      className="app-form-input"
+                    >
+                      <option value="">Seleccionar área</option>
+                      {areas.map((area) => (
+                        <option key={area.id} value={area.id}>{area.nombre}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div className="app-form-field">
+                  <label className="app-form-label">Buscar tema</label>
+                  <div className="app-toolbar-card__search app-search-field max-w-none">
+                    <Search className="app-search-field__icon" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por nombre o descripción"
+                      className="app-form-input"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="app-filter-row mt-4">
+                <button
+                  onClick={() => setStateFilter('all')}
+                  className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}
+                >
+                  Todos ({temas.length})
+                </button>
+                <button
+                  onClick={() => setStateFilter('active')}
+                  className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}
+                >
+                  Activos ({activeTemasCount})
+                </button>
+                <button
+                  onClick={() => setStateFilter('inactive')}
+                  className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}
+                >
+                  Inactivos ({inactiveTemasCount})
+                </button>
+              </div>
+            </div>
+
+            <div className="app-sidebar-stack">
+              <div className="app-soft-card app-soft-card--blue app-context-card">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
+                <p className="app-context-card__title">{currentSubject?.nombre || 'Sin área activa'}</p>
+                <p className="app-context-card__text">{currentSubject?.descripcion || 'Selecciona un área para cargar los temas asociados.'}</p>
+              </div>
+
+              <div className="app-soft-card app-context-card">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Flujo</p>
+                <p className="app-context-card__title">Ordena y expande</p>
+                <p className="app-context-card__text">Reordena desde las flechas laterales y expande cada tema para revisar sus subtemas.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {successMessage && (
+          <div className="app-alert app-alert--success mb-6">
+            <p>{successMessage}</p>
+            <button onClick={() => setSuccessMessage(null)} className="text-green-600 hover:text-green-800">
               <X className="w-5 h-5" />
             </button>
           </div>
         )}
 
-        {/* Botón para agregar nuevo tema */}
-        {selectedSubject && (
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <button
-              onClick={handleCreateTema}
-              className="flex items-center gap-2 px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all font-medium"
-              style={{ backgroundColor: currentColor.primary }}
-            >
-              <Plus className="w-5 h-5" />
-              <span>Agregar Nuevo Tema</span>
-            </button>
-
-            <div className="app-filter-row items-center">
-              <button
-                onClick={() => setStateFilter('all')}
-                className={`app-filter-chip ${
-                  stateFilter === 'all'
-                    ? 'app-filter-chip--blue'
-                    : ''
-                }`}
-              >
-                Todos ({temas.length})
-              </button>
-              <button
-                onClick={() => setStateFilter('active')}
-                className={`app-filter-chip ${
-                  stateFilter === 'active'
-                    ? 'app-filter-chip--green'
-                    : ''
-                }`}
-              >
-                Activos ({temas.filter((tema) => tema.estado !== false).length})
-              </button>
-              <button
-                onClick={() => setStateFilter('inactive')}
-                className={`app-filter-chip ${
-                  stateFilter === 'inactive'
-                    ? 'app-filter-chip--amber'
-                    : ''
-                }`}
-              >
-                Inactivos ({temas.filter((tema) => tema.estado === false).length})
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Sección de Temas */}
         {temasLoading ? (
-          <div className="flex justify-center items-center py-12">
+          <div className="app-empty-panel py-12">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
               <p className="text-gray-600 text-sm">Cargando temas...</p>
             </div>
           </div>
         ) : temasError ? (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center mb-6">
-            <p className="text-yellow-600 text-sm">{temasError}</p>
+          <div className="app-alert app-alert--warning mb-6">
+            <p>{temasError}</p>
+          </div>
+        ) : !selectedSubject ? (
+          <div className="app-empty-panel py-12">
+            <p className="text-base text-slate-600">Selecciona un área para continuar.</p>
           </div>
         ) : temas.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-            <p className="text-gray-600">No hay temas disponibles para esta área</p>
+          <div className="app-empty-panel py-12">
+            <p className="text-base text-slate-600">No hay temas disponibles para esta área.</p>
+            <p className="mt-2 text-sm text-slate-500">Crea un tema para comenzar la estructura del área.</p>
           </div>
         ) : filteredTemas.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-            <p className="text-gray-600">No hay temas para el filtro seleccionado</p>
+          <div className="app-empty-panel py-12">
+            <p className="text-base text-slate-600">No hay temas para la vista actual.</p>
+            <p className="mt-2 text-sm text-slate-500">Ajusta la búsqueda o el filtro para volver a listarlos.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -697,14 +728,12 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
               return (
               <div
                 key={tema.id}
-                className={`bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 ${
-                  tema.estado === false ? 'opacity-70 saturate-50' : 'hover:shadow-lg'
+                className={`app-list-card ${
+                  tema.estado === false ? 'opacity-70 saturate-50' : ''
                 }`}
               >
-                {/* Tema Header */}
-                <div className="p-6">
-                  <div className="flex items-center justify-between gap-4">
-                    {/* Controles de ordenamiento */}
+                <div className="app-list-card__head">
+                  <div className="flex items-start gap-4 flex-1 min-w-0">
                     <div className="flex flex-col gap-1 flex-shrink-0">
                       <button
                         onClick={() => moveTemaUp(temaIndex)}
@@ -732,8 +761,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                       </button>
                     </div>
 
-                    {/* Contenido del tema */}
-                    <div className="flex items-center gap-4 flex-1">
+                    <div className="flex items-start gap-4 flex-1 min-w-0">
                       <button
                         onClick={() => toggleExpand(tema.id)}
                         className="text-gray-400 hover:text-[#3A4A5B] transition-colors flex-shrink-0"
@@ -744,49 +772,44 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                           <ChevronRight className="w-5 h-5" />
                         )}
                       </button>
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-[#3A4A5B] text-lg font-semibold">{tema.nombre}</h4>
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      <div className="flex-1 min-w-0">
+                        <div className="mb-3 flex items-center gap-2">
+                          <span className={`app-badge ${
                             tema.estado !== false
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-amber-100 text-amber-700'
+                              ? 'app-badge--green'
+                              : 'app-badge--amber'
                           }`}>
                             {tema.estado !== false ? 'Activo' : 'Inhabilitado'}
                           </span>
                         </div>
-                        <p className="text-gray-600 text-sm mt-1">{tema.descripcion}</p>
+                        <h4 className="app-list-card__title">{tema.nombre}</h4>
+                        <p className="app-list-card__description mt-2">{tema.descripcion || 'Sin descripción registrada.'}</p>
                       </div>
                     </div>
                     
-                    {/* Botones de acción */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {/* Editar */}
+                    <div className="app-action-row">
                       <button
                         onClick={() => handleEditTema(tema)}
-                        className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                        className="app-btn app-btn-ghost app-btn-sm"
                         title="Editar tema"
                       >
-                        <Edit2 className="w-5 h-5" />
+                        <Edit2 className="w-4 h-4" />
+                        <span>Editar</span>
                       </button>
-                      
-                      {/* Toggle Estado */}
+
                       <button
                         onClick={() => toggleTema(tema)}
-                        className="flex items-center gap-2 group ml-2"
+                        className="app-btn app-btn-secondary app-btn-sm"
                       >
                         {tema.estado ? (
                           <>
-                            <span className="text-sm text-[#7ED6A7]">Habilitado</span>
-                            <ToggleRight 
-                              className="w-12 h-12 transition-colors" 
-                              style={{ color: currentColor.primary }}
-                            />
+                            <ToggleRight className="w-4 h-4 transition-colors" />
+                            <span>Habilitado</span>
                           </>
                         ) : (
                           <>
-                            <span className="text-sm text-gray-400">Deshabilitado</span>
-                            <ToggleLeft className="w-12 h-12 text-gray-400 group-hover:text-gray-500 transition-colors" />
+                            <ToggleLeft className="w-4 h-4 transition-colors" />
+                            <span>Deshabilitado</span>
                           </>
                         )}
                       </button>
@@ -794,12 +817,8 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                   </div>
                 </div>
 
-                {/* Subtemas */}
                 {expandedThemes[tema.id] && (
-                  <div 
-                    className="border-t px-6 pb-6 pt-4"
-                    style={{ borderColor: `${currentColor.primary}20` }}
-                  >
+                  <div className="border-t border-slate-200 px-6 pb-6 pt-4">
                     {subtemasLoading[tema.id] ? (
                       <div className="flex justify-center items-center py-6">
                         <div className="text-center">
@@ -812,7 +831,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                         {subtemas[tema.id].map((subtema) => (
                           <div
                             key={subtema.id}
-                            className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors"
+                            className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/80 p-4 transition-colors"
                           >
                             <div className="flex-1">
                               <div className="flex items-center gap-3">
@@ -838,8 +857,6 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
             );})}
           </div>
         )}
-
-
       </main>
 
       {/* Modal para crear/editar tema */}
@@ -850,7 +867,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
               <div>
                 <div className="app-modal-kicker">Temas</div>
                 <h3 className="app-modal-title">{editingTema ? 'Editar tema' : 'Crear nuevo tema'}</h3>
-                <p className="app-modal-description">Organiza la información temática con el mismo patrón visual del resto de formularios administrativos.</p>
+                <p className="app-modal-description">Define la información del tema.</p>
               </div>
               <button
                 onClick={handleCloseModal}

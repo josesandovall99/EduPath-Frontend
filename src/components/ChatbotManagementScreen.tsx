@@ -464,7 +464,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
       setForm(emptyForm());
     }
 
-    setStatusMessage('Formulario oculto. Usa Crear Nuevo Chatbot o Editar para abrirlo cuando lo necesites.');
+    setStatusMessage('Formulario oculto. Usa Nuevo chatbot o Editar para abrirlo cuando lo necesites.');
   }
 
   function updateForm<K extends keyof ChatbotFormState>(key: K, value: ChatbotFormState[K]) {
@@ -1028,9 +1028,11 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
                       <button onClick={() => void handleUploadDocument()} disabled={!canConfirmPdf} className="app-btn app-btn-success h-14 justify-center text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                         {isUploading ? 'Cargando...' : 'Cargar PDF'}
                       </button>
-                      <button onClick={() => setSelectedFile(null)} disabled={!canCancelPdf} className="app-btn chatbot-admin-upload-band__cancel h-14 justify-center text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                        Cancelar PDF
-                      </button>
+                      {canCancelPdf ? (
+                        <button onClick={() => setSelectedFile(null)} className="app-btn chatbot-admin-upload-band__cancel h-14 justify-center text-sm font-semibold">
+                          Cancelar PDF
+                        </button>
+                      ) : null}
                     </div>
 
                     <div className="chatbot-admin-document-list space-y-3 max-h-72 overflow-y-auto pr-1">
@@ -1114,11 +1116,6 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
                     <h3 className="chatbot-admin-section-title">Resumen del chatbot</h3>
                     <p className="chatbot-admin-section-description">Contexto y estado.</p>
                   </div>
-                  {!isFormVisible && selectedChatbotId ? (
-                    <button onClick={handleEditSelected} className="app-btn app-btn-secondary px-4 py-3">
-                      Editar chatbot seleccionado
-                    </button>
-                  ) : null}
                 </div>
 
                 <div className="chatbot-admin-sidebar-summary">

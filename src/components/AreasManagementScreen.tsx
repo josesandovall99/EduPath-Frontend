@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Eye, EyeOff, Pencil, Plus, Search, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 
 interface Area {
@@ -52,7 +53,10 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/areas`);
+      const response = await fetch(`${API_BASE_URL}/areas`, {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
+      });
       if (!response.ok) {
         throw new Error('Error al cargar áreas');
       }
@@ -78,9 +82,10 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
       setError(null);
       const response = await fetch(`${API_BASE_URL}/areas/${area.id}/toggle-estado`, {
         method: 'PUT',
-        headers: {
+        headers: buildAuthHeaders({
           Accept: 'application/json'
-        }
+        }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -154,10 +159,11 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
 
       const response = await fetch(endpoint, {
         method: isEditMode ? 'PUT' : 'POST',
-        headers: {
+        headers: buildAuthHeaders({
           'Content-Type': 'application/json',
           'Accept': 'application/json'
-        },
+        }),
+        credentials: 'include',
         body: JSON.stringify({
           nombre: formData.nombre.trim(),
           descripcion: formData.descripcion.trim() || undefined
@@ -199,25 +205,25 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
 
   const activeAreas = areas.filter((area) => isAreaActive(area)).length;
   const inactiveAreas = areas.length - activeAreas;
+  const currentViewLabel = stateFilter === 'all' ? 'Vista completa' : stateFilter === 'active' ? 'Solo activas' : 'Solo inactivas';
 
   return (
     <div className="app-shell">
-      {/* Header */}
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
               <button
                 type="button"
                 onClick={onHome}
-                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                className="app-brand-icon"
                 title="Ir al panel principal"
               >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Áreas - Subtemas - Contenidos</h1>
-                <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                <p className="text-gray-500 text-sm">Mapa académico y entrada a la estructura de contenidos de EduPath.</p>
               </div>
             </div>
           </div>
@@ -226,7 +232,6 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
 
       {/* Main Content */}
       <main className="app-main">
-        {/* Back Button */}
         <button
           onClick={onBack}
           className="app-back-button mb-6"
@@ -235,125 +240,125 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
           <span>Volver al Panel</span>
         </button>
 
-        {/* Informational Message */}
-        <div className="app-info-banner mb-8 p-6">
-          <h2 className="text-lg font-bold mb-2">Gestión de Contenido Educativo</h2>
-          <p className="text-sm opacity-95">
-            Selecciona un área para gestionar sus subtemas y contenidos. Desde aquí podrás organizar la estructura completa 
-            de aprendizaje, definir el orden de los temas y asignar materiales educativos a cada subtema.
-          </p>
-        </div>
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Arquitectura académica</div>
+              <h2 className="app-page-hero__title">Gestión de áreas</h2>
+              <p className="app-page-hero__description">
+                Consulta áreas y accede a sus temas.
+              </p>
+            </div>
 
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-[#3A4A5B] text-xl">Areas académicas</h2>
-            <p className="text-gray-500 text-sm">Crea nuevas areas para organizar los contenidos.</p>
-          </div>
-          <button
-            onClick={handleOpenCreate}
-            className="app-btn app-primary-btn px-5 py-2.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nueva area</span>
-          </button>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-md p-4 mb-6">
-          <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-            Filtrar por nombre de área
-          </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Escribe el nombre del área..."
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-            />
+            <div className="app-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Áreas</div>
+                <div className="app-hero-metric__value">{areas.length}</div>
+                <div className="app-hero-metric__help">Total registradas en la plataforma.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Activas</div>
+                <div className="app-hero-metric__value">{activeAreas}</div>
+                <div className="app-hero-metric__help">Disponibles para gestionar contenidos.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Resultados</div>
+                <div className="app-hero-metric__value">{filteredAreas.length}</div>
+                <div className="app-hero-metric__help">Coincidencias según nombre y estado.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Vista</div>
+                <div className="app-hero-metric__value">{currentViewLabel}</div>
+                <div className="app-hero-metric__help">Lectura operativa activa del catálogo.</div>
+              </div>
+            </div>
           </div>
 
-          <div className="app-filter-row mt-4">
-            <button
-              onClick={() => setStateFilter('all')}
-              className={`app-filter-chip ${
-                stateFilter === 'all'
-                  ? 'app-filter-chip--blue'
-                  : ''
-              }`}
-            >
-              Todas ({areas.length})
-            </button>
-            <button
-              onClick={() => setStateFilter('active')}
-              className={`app-filter-chip ${
-                stateFilter === 'active'
-                  ? 'app-filter-chip--green'
-                  : ''
-              }`}
-            >
-              Activas ({activeAreas})
-            </button>
-            <button
-              onClick={() => setStateFilter('inactive')}
-              className={`app-filter-chip ${
-                stateFilter === 'inactive'
-                  ? 'app-filter-chip--amber'
-                  : ''
-              }`}
-            >
-              Inactivas ({inactiveAreas})
-            </button>
+          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.78fr)]">
+            <div className="app-toolbar-card">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del catálogo</p>
+                  <p className="mt-1 text-sm text-slate-600">Filtra por estado.</p>
+                </div>
+                <button onClick={handleOpenCreate} className="app-btn app-primary-btn">
+                  <Plus className="w-4 h-4" />
+                  <span>Nueva área</span>
+                </button>
+              </div>
+              <div className="app-filter-row">
+                <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
+                  <span>Todas ({areas.length})</span>
+                </button>
+                <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>
+                  <Eye className="h-4 w-4 shrink-0" />
+                  <span>Activas ({activeAreas})</span>
+                </button>
+                <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>
+                  <EyeOff className="h-4 w-4 shrink-0" />
+                  <span>Inactivas ({inactiveAreas})</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="app-sidebar-stack">
+              <div className="app-soft-card app-soft-card--blue">
+                <div className="mb-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda</p>
+                  <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Buscar área</h3>
+                  <p className="mt-1 text-sm text-slate-600">Busca por nombre.</p>
+                </div>
+                <div className="app-search-field">
+                  <Search className="app-search-field__icon" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Buscar área"
+                    className="app-form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="app-soft-card app-context-card">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
+                <p className="app-context-card__title">{filteredAreas.length}</p>
+                <p className="app-context-card__text">{currentViewLabel}</p>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
         {successMessage && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-center justify-between">
-            <p className="text-green-700 font-medium">{successMessage}</p>
-            <button
-              onClick={() => setSuccessMessage(null)}
-              className="text-green-500 hover:text-green-700"
-            >
+          <div className="app-alert app-alert--success mb-6">
+            <p>{successMessage}</p>
+            <button onClick={() => setSuccessMessage(null)} className="text-green-600 hover:text-green-800">
               <X className="w-5 h-5" />
             </button>
           </div>
         )}
 
-        {/* Loading State */}
         {isLoading ? (
-          <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
+          <div className="app-empty-panel py-12">
             <p className="text-gray-600">Cargando áreas...</p>
           </div>
         ) : error ? (
-          <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
-            <p className="text-red-600">{error}</p>
+          <div className="app-alert app-alert--error mb-6">
+            <p>{error}</p>
           </div>
         ) : areas.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <div className="mb-4 flex justify-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-[#4A90E2] to-[#357abd] rounded-full flex items-center justify-center opacity-10"></div>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">No hay áreas disponibles</h3>
-            <p className="text-gray-600 mb-4">
-              No se encontraron áreas en el sistema. Crea una nueva área para comenzar a organizar contenidos.
-            </p>
-            <p className="text-sm text-gray-500">
-              Las áreas son las categorías principales de aprendizaje en la plataforma educativa.
-            </p>
+          <div className="app-empty-panel py-12">
+            <p className="text-base text-slate-600">No hay áreas disponibles todavía.</p>
+            <p className="mt-2 text-sm text-slate-500">Crea la primera área para comenzar a organizar temas, subtemas y contenidos.</p>
           </div>
         ) : filteredAreas.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Sin resultados</h3>
-            <p className="text-gray-600">
-              No se encontraron áreas con el nombre ingresado.
-            </p>
+          <div className="app-empty-panel py-12">
+            <p className="text-base text-slate-600">Sin resultados para la búsqueda actual.</p>
+            <p className="mt-2 text-sm text-slate-500">Prueba otro nombre o cambia el estado visible del catálogo.</p>
           </div>
         ) : (
-          <>
-            {/* Areas Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="app-card-grid">
               {filteredAreas.map((area, index) => {
-                const gradient = getColorForArea(index);
                 const areaIsActive = isAreaActive(area);
                 return (
                   <div
@@ -367,39 +372,38 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                         onSelectArea(area.id, area.nombre);
                       }
                     }}
-                    className={`bg-gradient-to-br ${gradient} rounded-2xl shadow-lg transition-all duration-300 p-8 text-left group cursor-pointer ${
-                      areaIsActive ? 'hover:shadow-2xl hover:scale-[1.05]' : 'opacity-70 saturate-50'
-                    }`}
+                    className={`app-list-card cursor-pointer ${areaIsActive ? '' : 'opacity-75'}`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
+                    <div className="app-list-card__head">
+                      <div className="min-w-0 flex-1">
                         <div className="mb-3 flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            areaIsActive ? 'bg-white/20 text-white' : 'bg-black/20 text-white'
-                          }`}>
+                          <span className={`app-badge ${areaIsActive ? 'app-badge--blue' : 'bg-amber-100 text-amber-700'}`}>
                             {areaIsActive ? 'Activa' : 'Inhabilitada'}
                           </span>
                         </div>
-                        <h2 className="text-white text-2xl font-bold group-hover:text-gray-100 transition-colors mb-2">
+                        <h2 className="app-list-card__title uppercase">
                           {area.nombre}
                         </h2>
-                        <p className="text-white text-opacity-90 text-sm">
+                        <p className="app-list-card__description mt-2">
                           {areaIsActive
-                            ? 'Click para gestionar subtemas y contenidos'
-                            : 'Área inhabilitada. Puedes abrirla para revisar su estructura o volver a habilitarla.'}
+                            ? 'Ingresa para gestionar sus temas, subtemas y recursos vinculados.'
+                            : 'Está inhabilitada, pero puedes revisarla o devolverla al flujo activo.'}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                    </div>
+                    <div className="app-list-card__footer">
+                      <span className="app-list-card__meta">{area.descripcion || 'Sin descripción registrada.'}</span>
+                      <div className="app-action-row">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             handleToggleArea(area);
                           }}
-                          className="app-btn mt-1 bg-white/20 px-3 py-1.5 text-white hover:bg-white/30"
+                          className={`app-btn app-btn-sm ${areaIsActive ? 'app-btn-secondary' : 'app-btn-success'}`}
                         >
                           {areaIsActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          <span className="text-sm font-medium">{areaIsActive ? 'Inhabilitar' : 'Habilitar'}</span>
+                          <span>{areaIsActive ? 'Inhabilitar' : 'Habilitar'}</span>
                         </button>
                         <button
                           type="button"
@@ -407,18 +411,17 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                             event.stopPropagation();
                             handleOpenEdit(area);
                           }}
-                          className="app-btn mt-1 bg-white/20 px-3 py-1.5 text-white hover:bg-white/30"
+                          className="app-btn app-btn-sm app-btn-ghost"
                         >
                           <Pencil className="w-4 h-4" />
-                          <span className="text-sm font-medium">Editar</span>
+                          <span>Editar</span>
                         </button>
                       </div>
                     </div>
                   </div>
                 );
               })}
-            </div>
-          </>
+          </div>
         )}
 
       </main>
@@ -430,7 +433,7 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
               <div>
                 <div className="app-modal-kicker">Áreas</div>
                 <h3 className="app-modal-title">{editingAreaId !== null ? 'Editar área' : 'Crear nueva área'}</h3>
-                <p className="app-modal-description">Define el nombre y la descripción del área con el mismo patrón visual de los formularios administrativos.</p>
+                <p className="app-modal-description">Define el nombre y la descripción del área.</p>
               </div>
               <button
                 onClick={handleCloseModal}

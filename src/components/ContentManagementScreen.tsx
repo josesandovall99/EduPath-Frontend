@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Plus, FileText, PlayCircle, Edit, Eye, EyeOff, Search, Loader } from 'lucide-react';
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 import { createQuillModules, loadQuill } from '../utils/quill';
 
@@ -52,6 +53,24 @@ interface Subtema {
   tema_id: number;
 }
 
+const normalizeContentType = (value: unknown): ContentItem['type'] => {
+  const normalized = String(value || '').trim().toLowerCase();
+
+  if (normalized === 'video') {
+    return 'video';
+  }
+
+  if (normalized === 'document' || normalized === 'documento' || normalized === 'pdf') {
+    return 'document';
+  }
+
+  if (normalized === 'activity' || normalized === 'actividad' || normalized === 'explicacion' || normalized === 'explicación') {
+    return 'activity';
+  }
+
+  return 'activity';
+};
+
 export function ContentManagementScreen({ onBack, onHome }: ContentManagementScreenProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
@@ -83,7 +102,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   // Funciones para cargar datos
   const loadAreas = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/areas`);
+      const response = await fetch(`${API_BASE_URL}/areas`, {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
+      });
       if (response.ok) {
         const data = await response.json();
         setAreas(data);
@@ -95,7 +117,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
 
   const loadTemasByArea = async (areaId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/temas/por-area/` + areaId);
+      const response = await fetch(`${API_BASE_URL}/temas/por-area/` + areaId, {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
+      });
       if (response.ok) {
         const data = await response.json();
         setTemas(data);
@@ -108,7 +133,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
 
   const loadSubtemasByTema = async (temaId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/subtemas/por-tema/` + temaId);
+      const response = await fetch(`${API_BASE_URL}/subtemas/por-tema/` + temaId, {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
+      });
       if (response.ok) {
         const data = await response.json();
         setSubtemas(data);
@@ -152,9 +180,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     try {
       const response = await fetch(`${API_BASE_URL}/contenidos`, {
         method: 'GET',
-        headers: {
+        headers: buildAuthHeaders({
           'Content-Type': 'application/json',
-        }
+        }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -173,7 +202,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
           // Obtener información del tema
           if (item.tema_id) {
             try {
-              const temaResponse = await fetch(`${API_BASE_URL}/temas/${item.tema_id}`);
+              const temaResponse = await fetch(`${API_BASE_URL}/temas/${item.tema_id}`, {
+                headers: buildAuthHeaders({ Accept: 'application/json' }),
+                credentials: 'include'
+              });
               if (temaResponse.ok) {
                 const tema = await temaResponse.json();
                 temaNombre = tema.nombre;
@@ -181,7 +213,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                 // Obtener información del área
                 if (tema.area_id) {
                   try {
-                    const areaResponse = await fetch(`${API_BASE_URL}/areas/${tema.area_id}`);
+                    const areaResponse = await fetch(`${API_BASE_URL}/areas/${tema.area_id}`, {
+                      headers: buildAuthHeaders({ Accept: 'application/json' }),
+                      credentials: 'include'
+                    });
                     if (areaResponse.ok) {
                       const area = await areaResponse.json();
                       areaNombre = area.nombre;
@@ -199,7 +234,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
           // Obtener información del subtema
           if (item.subtema_id) {
             try {
-              const subtemaResponse = await fetch(`${API_BASE_URL}/subtemas/${item.subtema_id}`);
+              const subtemaResponse = await fetch(`${API_BASE_URL}/subtemas/${item.subtema_id}`, {
+                headers: buildAuthHeaders({ Accept: 'application/json' }),
+                credentials: 'include'
+              });
               if (subtemaResponse.ok) {
                 const subtema = await subtemaResponse.json();
                 subtemaNombre = subtema.nombre;
@@ -212,7 +250,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
           return {
             id: item.id?.toString() || '',
             title: item.titulo,
-            type: item.tipo,
+            type: normalizeContentType(item.tipo),
             linkedTo: 'subtheme',
             linkedName: temaNombre && subtemaNombre ? `${temaNombre} - ${subtemaNombre}` : 'Sin vincular',
             subject: areaNombre,
@@ -252,9 +290,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
 
       const response = await fetch(url, {
         method: method,
-        headers: {
+        headers: buildAuthHeaders({
           'Content-Type': 'application/json',
-        },
+        }),
+        credentials: 'include',
         body: JSON.stringify({
           titulo: formData.titulo,
           tipo: formData.tipo,
@@ -283,7 +322,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                 return {
                   ...c,
                   title: contenidoActualizado.titulo,
-                  type: contenidoActualizado.tipo,
+                  type: normalizeContentType(contenidoActualizado.tipo),
                   descripcion: contenidoActualizado.descripcion,
                   url: contenidoActualizado.url,
                   estado: nextEstado,
@@ -304,7 +343,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
         const nuevoItemLocal: ContentItem = {
           id: contenidoActualizado.id?.toString() || Date.now().toString(),
           title: contenidoActualizado.titulo,
-          type: contenidoActualizado.tipo,
+          type: normalizeContentType(contenidoActualizado.tipo),
           linkedTo: 'subtheme',
           linkedName: `Tema ${contenidoActualizado.tema_id} - Subtema ${contenidoActualizado.subtema_id}`,
           subject: 'Sin clasificar',
@@ -371,7 +410,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     // Si hay tema_id, cargar el tema para obtener el área
     if (content.tema_id) {
       try {
-        const response = await fetch(`${API_BASE_URL}/temas/` + content.tema_id);
+        const response = await fetch(`${API_BASE_URL}/temas/` + content.tema_id, {
+          headers: buildAuthHeaders({ Accept: 'application/json' }),
+          credentials: 'include'
+        });
         if (response.ok) {
           const tema = await response.json();
           setSelectedAreaId(tema.area_id.toString());
@@ -397,9 +439,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     try {
       const response = await fetch(`${API_BASE_URL}/contenidos/${content.id}/toggle-estado`, {
         method: 'PUT',
-        headers: {
+        headers: buildAuthHeaders({
           'Content-Type': 'application/json',
-        }
+        }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -537,12 +580,17 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     formData.tema_id,
     formData.subtema_id
   ].filter(Boolean).length;
+  const activeContentsCount = contents.filter((content) => isContentActive(content)).length;
+  const inactiveContentsCount = contents.length - activeContentsCount;
+  const videoContentsCount = contents.filter((content) => content.type === 'video').length;
+  const currentViewLabel = stateFilter === 'all' ? 'Vista completa' : stateFilter === 'active' ? 'Solo activos' : 'Solo inactivos';
 
   const getTypeIcon = (type: ContentItem['type']) => {
     switch (type) {
       case 'video': return PlayCircle;
       case 'document': return FileText;
       case 'activity': return Edit;
+      default: return FileText;
     }
   };
 
@@ -551,43 +599,34 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
       case 'video': return '#4A90E2';
       case 'document': return '#7ED6A7';
       case 'activity': return '#F5A97F';
+      default: return '#64748B';
     }
   };
 
   return (
     <div className="app-shell">
-      {/* Header */}
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
               <button
                 type="button"
                 onClick={onHome}
-                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                className="app-brand-icon"
                 title="Ir al panel principal"
               >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Contenidos</h1>
-                <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                <p className="text-gray-500 text-sm">Catálogo, búsqueda y mantenimiento de recursos dentro del mismo entorno administrativo.</p>
               </div>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="app-btn app-btn-success px-6 py-3"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Crear Nuevo Contenido</span>
-            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="app-main">
-        {/* Back Button */}
         <button 
           onClick={onBack}
           className="app-back-button mb-6"
@@ -596,182 +635,181 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
           <span>Volver al Panel</span>
         </button>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <FileText className="w-6 h-6 text-[#4A90E2]" />
-              </div>
-              <span className="text-3xl text-[#4A90E2]">{contents.length}</span>
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Biblioteca administrativa</div>
+              <h2 className="app-page-hero__title">Gestión de contenidos</h2>
+              <p className="app-page-hero__description">
+                Consulta, filtra y actualiza contenidos.
+              </p>
             </div>
-            <p className="text-gray-600 text-sm">Total Contenidos</p>
+
+            <div className="app-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Catálogo</div>
+                <div className="app-hero-metric__value">{contents.length}</div>
+                <div className="app-hero-metric__help">Recursos totales registrados.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Activos</div>
+                <div className="app-hero-metric__value">{activeContentsCount}</div>
+                <div className="app-hero-metric__help">Disponibles en el catálogo actual.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Videos</div>
+                <div className="app-hero-metric__value">{videoContentsCount}</div>
+                <div className="app-hero-metric__help">Recursos audiovisuales dentro del total.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Resultados</div>
+                <div className="app-hero-metric__value">{filteredContents.length}</div>
+                <div className="app-hero-metric__help">{currentViewLabel} y búsqueda aplicada.</div>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Eye className="w-6 h-6 text-[#7ED6A7]" />
-              </div>
-              <span className="text-3xl text-[#7ED6A7]">
-                {contents.filter((content) => isContentActive(content)).length}
-              </span>
-            </div>
-            <p className="text-gray-600 text-sm">Activos</p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <EyeOff className="w-6 h-6 text-gray-500" />
-              </div>
-              <span className="text-3xl text-gray-500">
-                {contents.filter((content) => !isContentActive(content)).length}
-              </span>
-            </div>
-            <p className="text-gray-600 text-sm">Inhabilitados</p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <PlayCircle className="w-6 h-6 text-[#4A90E2]" />
-              </div>
-              <span className="text-3xl text-[#4A90E2]">
-                {contents.filter(c => c.type === 'video').length}
-              </span>
-            </div>
-            <p className="text-gray-600 text-sm">Videos</p>
-          </div>
-        </div>
-
-        {/* Filters and Search */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="space-y-3">
-              <div className="app-filter-row">
-              <button
-                onClick={() => setFilterType('all')}
-                className={`app-filter-chip ${
-                  filterType === 'all'
-                    ? 'app-filter-chip--blue'
-                    : ''
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                onClick={() => setFilterType('video')}
-                className={`app-filter-chip ${
-                  filterType === 'video'
-                    ? 'app-filter-chip--blue'
-                    : ''
-                }`}
-              >
-                Videos
-              </button>
-              <button
-                onClick={() => setFilterType('document')}
-                className={`app-filter-chip ${
-                  filterType === 'document'
-                    ? 'app-filter-chip--green'
-                    : ''
-                }`}
-              >
-                Documentos
-              </button>
-              <button
-                onClick={() => setFilterType('activity')}
-                className={`app-filter-chip ${
-                  filterType === 'activity'
-                    ? 'app-filter-chip--amber'
-                    : ''
-                }`}
-              >
-                Actividades
-              </button>
-            </div>
-
-              <div className="app-filter-row">
-                <button
-                  onClick={() => setStateFilter('all')}
-                  className={`app-filter-chip ${
-                    stateFilter === 'all'
-                      ? 'app-filter-chip--blue'
-                      : ''
-                  }`}
-                >
-                  Todos
-                </button>
-                <button
-                  onClick={() => setStateFilter('active')}
-                  className={`app-filter-chip ${
-                    stateFilter === 'active'
-                      ? 'app-filter-chip--green'
-                      : ''
-                  }`}
-                >
-                  Activos ({contents.filter((content) => isContentActive(content)).length})
-                </button>
-                <button
-                  onClick={() => setStateFilter('inactive')}
-                  className={`app-filter-chip ${
-                    stateFilter === 'inactive'
-                      ? 'app-filter-chip--amber'
-                      : ''
-                  }`}
-                >
-                  Inactivos ({contents.filter((content) => !isContentActive(content)).length})
+          <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.18fr)_minmax(290px,0.72fr)]">
+            <div className="app-toolbar-card">
+              <div className="app-content-toolbar__header">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Catálogo</p>
+                  <p className="mt-1 text-sm text-slate-600">Filtra, busca y deja listo el acceso al catálogo.</p>
+                </div>
+                <button onClick={() => setShowCreateModal(true)} className="app-btn app-btn-success">
+                  <Plus className="w-5 h-5" />
+                  <span>Nuevo contenido</span>
                 </button>
               </div>
+
+              <div className="app-content-toolbar__search app-search-field">
+                <Search className="app-search-field__icon" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Buscar por título, área o descripción"
+                  className="app-form-input"
+                />
+              </div>
+
+              <div className="app-content-filter-grid">
+                <div className="app-content-filter-block">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Tipo de contenido</p>
+                  <p className="mt-1 text-sm text-slate-600">Filtra por formato.</p>
+                  <div className="app-filter-row mt-4">
+                    <button
+                      onClick={() => setFilterType('all')}
+                      className={`app-filter-chip ${filterType === 'all' ? 'app-filter-chip--blue' : ''}`}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      onClick={() => setFilterType('video')}
+                      className={`app-filter-chip ${filterType === 'video' ? 'app-filter-chip--blue' : ''}`}
+                    >
+                      Videos
+                    </button>
+                    <button
+                      onClick={() => setFilterType('document')}
+                      className={`app-filter-chip ${filterType === 'document' ? 'app-filter-chip--green' : ''}`}
+                    >
+                      Documentos
+                    </button>
+                    <button
+                      onClick={() => setFilterType('activity')}
+                      className={`app-filter-chip ${filterType === 'activity' ? 'app-filter-chip--amber' : ''}`}
+                    >
+                      Actividades
+                    </button>
+                  </div>
+                </div>
+
+                <div className="app-content-filter-block">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado visible</p>
+                  <p className="mt-1 text-sm text-slate-600">Filtra por disponibilidad.</p>
+                  <div className="app-filter-row mt-4">
+                    <button
+                      onClick={() => setStateFilter('all')}
+                      className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      onClick={() => setStateFilter('active')}
+                      className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}
+                    >
+                      Activos ({activeContentsCount})
+                    </button>
+                    <button
+                      onClick={() => setStateFilter('inactive')}
+                      className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}
+                    >
+                      Inactivos ({inactiveContentsCount})
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Buscar contenidos..."
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-              />
+            <div className="app-sidebar-stack">
+              <div className="app-soft-card app-context-card">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
+                <p className="app-context-card__title">{filteredContents.length} resultados</p>
+                <p className="app-context-card__text">{currentViewLabel}. La búsqueda y los filtros están aplicados sobre el catálogo actual.</p>
+              </div>
+
+              <div className="app-soft-card app-soft-card--blue">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Lectura rápida</p>
+                <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Explora el catálogo</h3>
+                <p className="mt-1 text-sm text-slate-600">Usa tipo, estado y búsqueda desde el mismo bloque para revisar el listado sin saltos visuales.</p>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Loading State */}
         {isLoadingData ? (
-          <div className="bg-white rounded-xl shadow-md p-12 flex justify-center items-center">
+          <div className="app-empty-panel py-12">
             <div className="flex flex-col items-center gap-4">
               <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
               <p className="text-gray-600">Cargando contenidos...</p>
             </div>
           </div>
+        ) : filteredContents.length === 0 ? (
+          <div className="app-empty-panel py-12">
+            <p className="text-base text-slate-600">No hay contenidos para la vista actual.</p>
+            <p className="mt-2 text-sm text-slate-500">Prueba con otro tipo, cambia el estado o ajusta el texto de búsqueda.</p>
+          </div>
         ) : (
-          <>
-            {/* Content Table */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div className="app-table-card">
+              <div className="app-table-card__header app-table-card__header--blue">
+                <div>
+                  <div className="app-table-card__title">Biblioteca de contenidos</div>
+                  <p className="app-table-card__description">Consulta el catálogo y aplica acciones rápidas.</p>
+                </div>
+              </div>
+              <div className="app-table-card__body p-0">
               <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+            <table className="app-data-table">
+              <thead>
                 <tr>
-                  <th className="px-6 py-4 text-left text-[#3A4A5B]">Título</th>
-                  <th className="px-6 py-4 text-left text-[#3A4A5B]">Tipo</th>
-                  <th className="px-6 py-4 text-left text-[#3A4A5B]">Materia</th>
-                  <th className="px-6 py-4 text-left text-[#3A4A5B]">Vinculado a</th>
-                  <th className="px-6 py-4 text-left text-[#3A4A5B]">Estado</th>
-                  <th className="px-6 py-4 text-center text-[#3A4A5B]">Acciones</th>
+                  <th>Título</th>
+                  <th>Tipo</th>
+                  <th>Materia</th>
+                  <th>Vinculado a</th>
+                  <th>Estado</th>
+                  <th className="text-center">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody>
                 {filteredContents.map((content) => {
                   const Icon = getTypeIcon(content.type);
                   const color = getTypeColor(content.type);
                   const contentIsActive = isContentActive(content);
                   
                   return (
-                    <tr key={content.id} className={`transition-colors ${contentIsActive ? 'hover:bg-gray-50' : 'bg-slate-50/70 text-slate-500'}`}>
-                      <td className="px-6 py-4">
+                    <tr key={content.id} className={contentIsActive ? '' : 'bg-slate-50/70 text-slate-500'}>
+                      <td>
                         <div className="flex items-center gap-3">
                           <div 
                             className="p-2 rounded-lg"
@@ -782,14 +820,14 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                           <span className="text-[#3A4A5B]">{content.title}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td>
                         <span className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: `${color}15`, color }}>
                           {content.type === 'video' ? 'Videos' : content.type === 'document' ? 'Documento' : 'Explicación'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">{content.subject}</td>
-                      <td className="px-6 py-4 text-gray-600 text-sm">{content.linkedName}</td>
-                      <td className="px-6 py-4">
+                      <td>{content.subject}</td>
+                      <td>{content.linkedName}</td>
+                      <td>
                         <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
                           contentIsActive
                             ? 'bg-emerald-100 text-emerald-700'
@@ -798,11 +836,11 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                           {contentIsActive ? 'Activo' : 'Inhabilitado'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 align-middle">
+                      <td className="text-center">
                         <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                           <button
                             onClick={() => handleEditContent(content)}
-                            className="p-2 text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-colors"
+                            className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
                             title="Editar"
                           >
                             <Edit className="w-4 h-4" />
@@ -810,11 +848,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                           <button
                             onClick={() => handleToggleContent(content)}
                             disabled={isLoading}
-                            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-                              contentIsActive
-                                ? 'text-amber-700 hover:bg-amber-50'
-                                : 'text-emerald-700 hover:bg-emerald-50'
-                            }`}
+                            className={`app-btn app-btn-sm disabled:opacity-50 ${contentIsActive ? 'app-btn-secondary' : 'app-btn-success'}`}
                             title={contentIsActive ? 'Inhabilitar contenido' : 'Habilitar contenido'}
                           >
                             {contentIsActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -828,8 +862,8 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
               </tbody>
             </table>
           </div>
+              </div>
             </div>
-          </>
         )}
 
       </main>

@@ -330,7 +330,7 @@ export function SubThemeManagementScreen({
   // Guardar subtema (crear o actualizar)
   const handleSaveSubtema = async () => {
     if (!formData.nombre.trim()) {
-      alert('El nombre del subtema es obligatorio');
+      setError('El nombre del subtema es obligatorio.');
       return;
     }
 
@@ -340,7 +340,7 @@ export function SubThemeManagementScreen({
       if (editingSubtema) {
         // Actualizar subtema existente
         await axios.put(`${API_BASE_URL}/subtemas/${editingSubtema.id}`, formData);
-        setSuccessMessage('Subtema actualizado exitosamente');
+        setSuccessMessage('Subtema actualizado correctamente.');
         
         // Actualizar en el estado local
         setSubtemas(prev =>
@@ -349,7 +349,7 @@ export function SubThemeManagementScreen({
       } else {
         // Crear nuevo subtema
         const response = await axios.post(`${API_BASE_URL}/subtemas`, formData);
-        setSuccessMessage('Subtema creado exitosamente');
+        setSuccessMessage('Subtema registrado correctamente.');
         
         // Agregar al estado local
         setSubtemas(prev => [...prev, response.data]);
@@ -362,9 +362,9 @@ export function SubThemeManagementScreen({
     } catch (err) {
       console.error('Error saving subtema:', err);
       if (axios.isAxiosError(err) && err.response) {
-        alert(`Error: ${err.response.data.message || 'No se pudo guardar el subtema'}`);
+        setError(err.response.data.message || 'No se pudo guardar el subtema.');
       } else {
-        alert('Error al guardar el subtema');
+        setError('No se pudo guardar el subtema.');
       }
     } finally {
       setSubmitting(false);
@@ -384,7 +384,7 @@ export function SubThemeManagementScreen({
     try {
       const response = await axios.put(`${API_BASE_URL}/subtemas/${subtema.id}/toggle-estado`);
       const updatedEstado = response.data?.estado ?? !currentlyActive;
-      setSuccessMessage(`Subtema ${updatedEstado ? 'habilitado' : 'inhabilitado'} exitosamente`);
+      setSuccessMessage(`Subtema ${updatedEstado ? 'habilitado' : 'inhabilitado'} correctamente.`);
       
       setSubtemas(prev => prev.map((item) => (
         item.id === subtema.id ? { ...item, estado: updatedEstado } : item
@@ -395,9 +395,9 @@ export function SubThemeManagementScreen({
     } catch (err) {
       console.error('Error toggling subtema:', err);
       if (axios.isAxiosError(err) && err.response) {
-        alert(`Error: ${err.response.data.message || 'No se pudo cambiar el estado del subtema'}`);
+        setError(err.response.data.message || 'No se pudo cambiar el estado del subtema.');
       } else {
-        alert('Error al cambiar el estado del subtema');
+        setError('No se pudo cambiar el estado del subtema.');
       }
     }
   };
@@ -436,6 +436,9 @@ export function SubThemeManagementScreen({
   const filteredAreas = areas.filter((area) =>
     area.nombre.toLowerCase().includes(searchAreaTerm.toLowerCase().trim())
   );
+  const activeSubtemas = subtemas.filter((subtema) => isSubtemaActive(subtema)).length;
+  const inactiveSubtemas = subtemas.length - activeSubtemas;
+  const currentStateLabel = stateFilter === 'all' ? 'Vista completa' : stateFilter === 'active' ? 'Solo activos' : 'Solo inactivos';
 
   // Mostrar estado de carga
   if (loading) {
@@ -463,31 +466,28 @@ export function SubThemeManagementScreen({
 
   return (
     <div className="app-shell">
-      {/* Header */}
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
               <button
                 type="button"
                 onClick={onHome}
-                className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md"
+                className="app-brand-icon"
                 title="Ir al panel principal"
               >
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Subtemas</h1>
-                <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                <p className="text-gray-500 text-sm">Áreas, temas y subtemas en una misma vista operativa.</p>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="app-main">
-        {/* Back Button */}
         <button 
           onClick={onBack}
           className="app-back-button mb-6"
@@ -496,32 +496,64 @@ export function SubThemeManagementScreen({
           <span>Volver al Panel</span>
         </button>
 
-        {/* Area Selector */}
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
-          <h3 className="text-[#3A4A5B] mb-4">Seleccionar Área</h3>
+        <section className="app-page-hero mb-6">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Estructura académica</div>
+              <h2 className="app-page-hero__title">Gestión de subtemas</h2>
+              <p className="app-page-hero__description">
+                Consulta, filtra y organiza subtemas dentro del tema seleccionado.
+              </p>
+            </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-              Filtrar áreas por nombre
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="app-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Áreas</div>
+                <div className="app-hero-metric__value">{areas.length}</div>
+                <div className="app-hero-metric__help">Catálogo disponible para seleccionar.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Temas</div>
+                <div className="app-hero-metric__value">{temas.length}</div>
+                <div className="app-hero-metric__help">Temas visibles dentro del área activa.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Subtemas</div>
+                <div className="app-hero-metric__value">{subtemas.length}</div>
+                <div className="app-hero-metric__help">Registros asociados al tema actual.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Vista</div>
+                <div className="app-hero-metric__value">{currentStateLabel}</div>
+                <div className="app-hero-metric__help">Lectura operativa del listado.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
+          <section className="app-toolbar-card">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Selección de área</p>
+              <p className="mt-1 text-sm text-slate-600">Filtra el catálogo y define el contexto de trabajo antes de pasar a temas y subtemas.</p>
+            </div>
+            <div className="app-search-field mb-4">
+              <Search className="app-search-field__icon" />
               <input
                 type="text"
                 value={searchAreaTerm}
                 onChange={(event) => setSearchAreaTerm(event.target.value)}
-                placeholder="Escribe el nombre del área..."
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                placeholder="Buscar área"
+                className="app-form-input"
               />
             </div>
-          </div>
 
-          {areas.length === 0 ? (
-            <p className="text-gray-500 text-center">No hay áreas disponibles</p>
-          ) : filteredAreas.length === 0 ? (
-            <p className="text-gray-500 text-center">No se encontraron áreas con ese nombre</p>
-          ) : (
-            <div className={`grid gap-4 ${filteredAreas.length >= 3 ? 'grid-cols-3' : `grid-cols-${filteredAreas.length}`}`}>
+            {areas.length === 0 ? (
+              <div className="app-empty-panel">No hay áreas disponibles.</div>
+            ) : filteredAreas.length === 0 ? (
+              <div className="app-empty-panel">No hay coincidencias para el filtro aplicado.</div>
+            ) : (
+              <div className="app-card-grid">
               {filteredAreas.map((area, index) => {
                 const colorKey = getColorByIndex(index);
                 const Icon = subjectColors[colorKey].icon;
@@ -532,54 +564,57 @@ export function SubThemeManagementScreen({
                   <button
                     key={area.id}
                     onClick={() => setSelectedArea(area.id)}
-                    className={`p-4 rounded-xl border-2 transition-all duration-300 ${
+                    className={`app-list-card border-2 text-left ${
                       isSelected
-                        ? 'border-current shadow-lg transform scale-105'
-                        : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                        ? 'shadow-lg translate-y-[-1px]'
+                        : ''
                     }`}
                     style={{
                       borderColor: isSelected ? color : undefined,
-                      backgroundColor: isSelected ? `${color}10` : 'white'
+                      backgroundColor: isSelected ? `${color}10` : 'white',
+                      boxShadow: isSelected ? `0 16px 28px ${color}22` : undefined
                     }}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="app-list-card__head">
                       <div 
-                        className="p-2 rounded-lg"
+                        className="app-list-card__icon"
                         style={{ backgroundColor: `${color}15` }}
                       >
                         <Icon className="w-6 h-6" style={{ color }} />
                       </div>
-                      <div className="text-left">
-                        <div className="text-[#3A4A5B] text-sm font-semibold">{area.nombre}</div>
-                        <div className="text-gray-500 text-xs">{area.descripcion}</div>
+                      <div className="min-w-0 text-left">
+                        <div className="app-list-card__title">{area.nombre}</div>
+                        <div className="app-list-card__description mt-1">{area.descripcion || 'Sin descripción registrada.'}</div>
                       </div>
                     </div>
                   </button>
                 );
               })}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </section>
 
-        {/* Tema Selector */}
-        {selectedArea && (
-          <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
-            <h3 className="text-[#3A4A5B] mb-4">Seleccionar Tema</h3>
+          {selectedArea && (
+            <section className="app-toolbar-card">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Selección de tema</p>
+                <p className="mt-1 text-sm text-slate-600">Define el tema de trabajo dentro del área seleccionada.</p>
+              </div>
             {temasLoading ? (
-              <div className="flex justify-center py-4">
+              <div className="app-empty-panel py-8">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
                   <p className="text-gray-600 text-sm">Cargando temas...</p>
                 </div>
               </div>
             ) : temasError ? (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                <p className="text-yellow-600 text-sm">{temasError}</p>
+              <div className="app-alert app-alert--warning">
+                <p>{temasError}</p>
               </div>
             ) : temas.length === 0 ? (
-              <p className="text-gray-500 text-center">No hay temas disponibles para esta área</p>
+              <div className="app-empty-panel py-8">No hay temas disponibles para esta área.</div>
             ) : (
-              <div className="grid gap-3 grid-cols-2">
+              <div className="space-y-3">
                 {temas.map((tema) => {
                   const isSelected = selectedTema === tema.id;
                   
@@ -587,10 +622,10 @@ export function SubThemeManagementScreen({
                     <button
                       key={tema.id}
                       onClick={() => setSelectedTema(tema.id)}
-                      className={`p-4 rounded-xl border-2 transition-all duration-300 text-left ${
+                      className={`app-list-card border-2 text-left ${
                         isSelected
-                          ? 'border-current shadow-lg transform scale-105'
-                          : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                          ? 'shadow-lg translate-y-[-1px]'
+                          : ''
                       }`}
                       style={{
                         borderColor: isSelected ? currentColor.primary : undefined,
@@ -598,225 +633,208 @@ export function SubThemeManagementScreen({
                         opacity: tema.estado === false ? 0.65 : 1
                       }}
                     >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div 
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: currentColor.primary }}
-                        ></div>
-                        <h4 className="text-[#3A4A5B] font-semibold">{tema.nombre}</h4>
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          tema.estado !== false
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {tema.estado !== false ? 'Activo' : 'Inhabilitado'}
-                        </span>
+                      <div className="app-list-card__head">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className={`app-badge ${tema.estado !== false ? 'app-badge--green' : 'bg-amber-100 text-amber-700'}`}>
+                              {tema.estado !== false ? 'Activo' : 'Inhabilitado'}
+                            </span>
+                          </div>
+                          <h4 className="app-list-card__title">{tema.nombre}</h4>
+                          <p className="app-list-card__description mt-2">{tema.descripcion || 'Sin descripción registrada.'}</p>
+                        </div>
+                        <AreaIcon className="w-5 h-5" style={{ color: currentColor.primary }} />
                       </div>
-                      <p className="text-gray-600 text-xs">{tema.descripcion}</p>
                     </button>
                   );
                 })}
               </div>
             )}
-          </div>
-        )}
+            </section>
+          )}
+        </div>
 
         {/* Header de Subtemas */}
         {selectedTema && (
           <>
-            <div 
-              className="rounded-2xl p-8 mb-6 text-white shadow-lg"
-              style={{ background: `linear-gradient(135deg, ${currentColor.primary} 0%, ${currentColor.primary}dd 100%)` }}
-            >
-              <div className="flex items-center gap-4 mb-2">
-                <AreaIcon className="w-8 h-8" />
-                <h2 className="text-2xl">{currentTemaObj?.nombre || 'Subtemas'}</h2>
-              </div>
-              <p className="text-white/90">
-                Administra los subtemas del tema "{currentTemaObj?.nombre}" en {currentArea?.nombre}
-              </p>
-            </div>
-
-            {/* Mensaje de éxito */}
-            {successMessage && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-[10px]">OK</span>
-                  </div>
-                  <p className="text-green-700 font-medium">{successMessage}</p>
+            <section className="app-page-hero mb-6">
+              <div className="app-page-hero__content">
+                <div className="app-page-hero__copy">
+                  <div className="app-page-hero__eyebrow">Subtemas</div>
+                  <h2 className="app-page-hero__title">{currentTemaObj?.nombre || 'Tema seleccionado'}</h2>
+                  <p className="app-page-hero__description">Gestiona los subtemas del tema seleccionado.</p>
                 </div>
-                <button onClick={() => setSuccessMessage(null)} className="text-green-500 hover:text-green-700">
+
+                <div className="app-hero-metrics">
+                  <div className="app-hero-metric">
+                    <div className="app-hero-metric__label">Subtemas</div>
+                    <div className="app-hero-metric__value">{subtemas.length}</div>
+                    <div className="app-hero-metric__help">Total registrado en el tema.</div>
+                  </div>
+                  <div className="app-hero-metric">
+                    <div className="app-hero-metric__label">Activos</div>
+                    <div className="app-hero-metric__value">{activeSubtemas}</div>
+                    <div className="app-hero-metric__help">Subtemas disponibles para secuencia.</div>
+                  </div>
+                  <div className="app-hero-metric">
+                    <div className="app-hero-metric__label">Inactivos</div>
+                    <div className="app-hero-metric__value">{inactiveSubtemas}</div>
+                    <div className="app-hero-metric__help">Registros fuera del flujo activo.</div>
+                  </div>
+                  <div className="app-hero-metric">
+                    <div className="app-hero-metric__label">Resultados</div>
+                    <div className="app-hero-metric__value">{filteredSubtemas.length}</div>
+                    <div className="app-hero-metric__help">{currentStateLabel} y búsqueda aplicada.</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {successMessage && (
+              <div className="app-alert app-alert--success mb-6">
+                <p>{successMessage}</p>
+                <button onClick={() => setSuccessMessage(null)} className="text-green-600 hover:text-green-800">
                   <X className="w-5 h-5" />
                 </button>
               </div>
             )}
 
-            {/* Botón para agregar nuevo subtema */}
-            <div className="mb-6 flex flex-wrap items-center gap-3">
-              <button
-                onClick={handleCreateSubtema}
-                className="app-btn app-primary-btn px-6 py-3"
-              >
-                <Plus className="w-5 h-5" />
-                <span>Agregar Nuevo Subtema</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (!canManageSequences || !onManageSequences || !currentArea || !currentTemaObj) {
-                    return;
-                  }
-                  onManageSequences(
-                    Number(selectedArea),
-                    currentArea.nombre,
-                    Number(selectedTema),
-                    currentTemaObj.nombre
-                  );
-                }}
-                disabled={!canManageSequences}
-                className="app-btn app-btn-secondary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span>Gestionar Secuencia de Subtemas</span>
-              </button>
-            </div>
+            {error && (
+              <div className="app-alert app-alert--error mb-6">
+                <p>{error}</p>
+              </div>
+            )}
 
             {!hasMinimumSubtemasForSequence && selectedTema && (
-              <p className="mb-6 text-sm text-gray-600">
-                Se habilita con mínimo 2 subtemas creados.
-              </p>
+              <div className="app-flow-helper mb-6">
+                La secuencia de subtemas se habilita cuando el tema tiene al menos dos subtemas activos.
+              </div>
             )}
 
             {currentTemaObj?.estado === false && (
-              <p className="mb-6 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                Este tema está inhabilitado. Puedes revisar sus subtemas, pero no conviene gestionar secuencias hasta volver a habilitarlo.
-              </p>
+              <div className="app-alert app-alert--warning mb-6">
+                <p>El tema está inhabilitado. Puedes revisar sus subtemas, pero la gestión de secuencias queda en espera hasta reactivarlo.</p>
+              </div>
             )}
 
-            <div className="bg-white rounded-xl shadow-md p-4 mb-6">
-              <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-                Filtrar por nombre de subtema
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchSubtemaTerm}
-                  onChange={(event) => setSearchSubtemaTerm(event.target.value)}
-                  placeholder="Escribe el nombre del subtema..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-                />
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(280px,0.75fr)] mb-6">
+              <div className="app-toolbar-card">
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda y estado</p>
+                    <p className="mt-1 text-sm text-slate-600">Filtra el listado por nombre y por estado operativo.</p>
+                  </div>
+                  <div className="app-action-row justify-start">
+                    <button onClick={handleCreateSubtema} className="app-btn app-primary-btn">
+                      <Plus className="w-5 h-5" />
+                      <span>Nuevo subtema</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!canManageSequences || !onManageSequences || !currentArea || !currentTemaObj) {
+                          return;
+                        }
+                        onManageSequences(
+                          Number(selectedArea),
+                          currentArea.nombre,
+                          Number(selectedTema),
+                          currentTemaObj.nombre
+                        );
+                      }}
+                      disabled={!canManageSequences}
+                      className="app-btn app-btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span>Secuencia de subtemas</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="app-toolbar-card__search app-search-field mb-4">
+                  <Search className="app-search-field__icon" />
+                  <input
+                    type="text"
+                    value={searchSubtemaTerm}
+                    onChange={(event) => setSearchSubtemaTerm(event.target.value)}
+                    placeholder="Buscar subtema"
+                    className="app-form-input"
+                  />
+                </div>
+
+                <div className="app-filter-row">
+                  <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
+                    <span>Todos ({subtemas.length})</span>
+                  </button>
+                  <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>
+                    <Eye className="h-4 w-4 shrink-0" />
+                    <span>Activos ({activeSubtemas})</span>
+                  </button>
+                  <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>
+                    <EyeOff className="h-4 w-4 shrink-0" />
+                    <span>Inactivos ({inactiveSubtemas})</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="app-filter-row mt-4">
-                <button
-                  onClick={() => setStateFilter('all')}
-                  className={`app-filter-chip ${
-                    stateFilter === 'all'
-                      ? 'app-filter-chip--blue'
-                      : ''
-                  }`}
-                >
-                  Todos ({subtemas.length})
-                </button>
-                <button
-                  onClick={() => setStateFilter('active')}
-                  className={`app-filter-chip ${
-                    stateFilter === 'active'
-                      ? 'app-filter-chip--green'
-                      : ''
-                  }`}
-                >
-                  Activos ({subtemas.filter((subtema) => isSubtemaActive(subtema)).length})
-                </button>
-                <button
-                  onClick={() => setStateFilter('inactive')}
-                  className={`app-filter-chip ${
-                    stateFilter === 'inactive'
-                      ? 'app-filter-chip--amber'
-                      : ''
-                  }`}
-                >
-                  Inactivos ({subtemas.filter((subtema) => !isSubtemaActive(subtema)).length})
-                </button>
+              <div className="app-soft-card app-soft-card--blue app-context-card">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contexto activo</p>
+                <p className="app-context-card__title">{currentArea?.nombre || 'Área no seleccionada'}</p>
+                <p className="app-context-card__text">Tema: {currentTemaObj?.nombre || 'Sin tema activo'}</p>
               </div>
             </div>
 
-            {/* Lista de Subtemas */}
             {subtemasLoading ? (
-              <div className="flex justify-center items-center py-12">
+              <div className="app-empty-panel py-12">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
                   <p className="text-gray-600 text-sm">Cargando subtemas...</p>
                 </div>
               </div>
             ) : subtemasError ? (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center mb-6">
-                <p className="text-yellow-600 text-sm">{subtemasError}</p>
+              <div className="app-alert app-alert--warning mb-6">
+                <p>{subtemasError}</p>
               </div>
             ) : subtemas.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-                <p className="text-gray-600">No hay subtemas disponibles para este tema</p>
+              <div className="app-empty-panel py-12">
+                <p className="text-base text-slate-600">No hay subtemas registrados para este tema.</p>
+                <p className="mt-2 text-sm text-slate-500">Registra el primer subtema para continuar con la estructura.</p>
               </div>
             ) : filteredSubtemas.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-                <p className="text-gray-600">No se encontraron subtemas con el nombre ingresado.</p>
+              <div className="app-empty-panel py-12">
+                <p className="text-base text-slate-600">No hay resultados para el filtro actual.</p>
+                <p className="mt-2 text-sm text-slate-500">Ajusta la búsqueda o cambia el estado visible del listado.</p>
               </div>
             ) : (
               <div className="space-y-4">
                 {filteredSubtemas.map((subtema) => (
                   <div
                     key={subtema.id}
-                    className={`bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 ${
-                      isSubtemaActive(subtema) ? 'hover:shadow-lg' : 'opacity-70 saturate-50'
-                    }`}
+                    className={`app-list-card ${isSubtemaActive(subtema) ? '' : 'opacity-75'}`}
                   >
-                    <div className="p-6">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4 flex-1">
-                          <div 
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: currentColor.primary }}
-                          ></div>
-                          <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="text-[#3A4A5B] text-lg font-semibold">{subtema.nombre}</h4>
-                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                isSubtemaActive(subtema)
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-amber-100 text-amber-700'
-                              }`}>
-                                {isSubtemaActive(subtema) ? 'Activo' : 'Inhabilitado'}
-                              </span>
-                            </div>
-                            <p className="text-gray-600 text-sm mt-1">{subtema.descripcion}</p>
-                          </div>
+                    <div className="app-list-card__head">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-3 flex flex-wrap items-center gap-2">
+                          <span className={`app-badge ${isSubtemaActive(subtema) ? 'app-badge--green' : 'bg-amber-100 text-amber-700'}`}>
+                            {isSubtemaActive(subtema) ? 'Activo' : 'Inhabilitado'}
+                          </span>
                         </div>
-                        
-                        {/* Botones de acción */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {/* Editar */}
-                          <button
-                            onClick={() => handleEditSubtema(subtema)}
-                            className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
-                            title="Editar subtema"
-                          >
-                            <Edit2 className="w-5 h-5" />
-                          </button>
-                          
-                          <button
-                            onClick={() => handleToggleSubtema(subtema)}
-                            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                              isSubtemaActive(subtema)
-                                ? 'text-amber-700 hover:bg-amber-50'
-                                : 'text-emerald-700 hover:bg-emerald-50'
-                            }`}
-                            title={isSubtemaActive(subtema) ? 'Inhabilitar subtema' : 'Habilitar subtema'}
-                          >
-                            {isSubtemaActive(subtema) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            <span>{isSubtemaActive(subtema) ? 'Inhabilitar' : 'Habilitar'}</span>
-                          </button>
-                        </div>
+                        <h4 className="app-list-card__title">{subtema.nombre}</h4>
+                        <p className="app-list-card__description mt-2">{subtema.descripcion || 'Sin descripción registrada.'}</p>
+                      </div>
+                      <div className="app-action-row">
+                        <button
+                          onClick={() => handleEditSubtema(subtema)}
+                          className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
+                          title="Editar subtema"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleSubtema(subtema)}
+                          className={`app-btn app-btn-sm ${isSubtemaActive(subtema) ? 'app-btn-secondary' : 'app-btn-success'}`}
+                          title={isSubtemaActive(subtema) ? 'Inhabilitar subtema' : 'Habilitar subtema'}
+                        >
+                          {isSubtemaActive(subtema) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          <span>{isSubtemaActive(subtema) ? 'Inhabilitar' : 'Habilitar'}</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -827,70 +845,60 @@ export function SubThemeManagementScreen({
         )}
       </main>
 
-      {/* Modal para crear/editar subtema */}
       {showModal && (
         <div className="app-modal-overlay app-modal-overlay--top">
           <div className="app-modal-card app-modal-card--lg">
             <div className="app-modal-header">
               <div>
                 <div className="app-modal-kicker">Subtemas</div>
-                <h3 className="app-modal-title">{editingSubtema ? 'Editar subtema' : 'Crear nuevo subtema'}</h3>
-                <p className="app-modal-description">Mantén la estructura temática con el mismo diseño base que el resto de la gestión académica.</p>
+                <h2 className="app-modal-title">{editingSubtema ? 'Editar subtema' : 'Nuevo subtema'}</h2>
+                <p className="app-modal-description">Registra la información principal del subtema dentro del tema seleccionado.</p>
               </div>
-              <button
-                onClick={handleCloseModal}
-                className="app-modal-close"
-              >
-                <X className="w-6 h-6" />
+              <button onClick={handleCloseModal} className="app-modal-close">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="app-modal-scroll">
               <div className="app-form-layout">
-                <section className="app-form-section app-form-section--muted">
-              {/* Nombre */}
-              <div className="app-form-field">
-                <label className="app-form-label">
-                  Nombre del Subtema <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.nombre}
-                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                  className="app-form-input"
-                  placeholder="Ej: Variables locales y globales"
-                  required
-                />
-              </div>
-
-              {/* Descripción */}
-              <div className="app-form-field">
-                <label className="app-form-label">
-                  Descripción
-                </label>
-                <textarea
-                  value={formData.descripcion}
-                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                  className="app-form-textarea"
-                  placeholder="Descripción breve del subtema..."
-                  rows={4}
-                />
-              </div>
-
-              {/* Tema Asociado (solo mostrar, no editable) */}
-              <div className="app-form-field">
-                <label className="app-form-label">
-                  Tema Asociado
-                </label>
-                <div className="app-form-static">
-                  <p className="text-gray-700 font-medium">
-                    {temas.find(t => t.id === formData.tema_id)?.nombre || 'Tema no encontrado'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {temas.find(t => t.id === formData.tema_id)?.descripcion}
-                  </p>
+                <div className="app-form-note mb-6">
+                  <p className="text-sm text-blue-800">Completa el nombre, la descripción y verifica el tema asociado antes de guardar.</p>
                 </div>
-              </div>
+
+                <section className="space-y-5">
+                  <div className="app-form-field">
+                    <label className="app-form-label">Nombre del subtema</label>
+                    <input
+                      type="text"
+                      value={formData.nombre}
+                      onChange={(event) => setFormData((prev) => ({ ...prev, nombre: event.target.value }))}
+                      className="app-form-input"
+                      placeholder="Nombre del subtema"
+                    />
+                  </div>
+
+                  <div className="app-form-field">
+                    <label className="app-form-label">Descripción</label>
+                    <textarea
+                      value={formData.descripcion}
+                      onChange={(event) => setFormData((prev) => ({ ...prev, descripcion: event.target.value }))}
+                      rows={4}
+                      className="app-form-textarea"
+                      placeholder="Descripción del subtema"
+                    />
+                  </div>
+
+                  <div className="app-form-field">
+                    <label className="app-form-label">Tema asociado</label>
+                    <div className="app-form-static">
+                      <p className="text-gray-700 font-medium">
+                        {temas.find(t => t.id === formData.tema_id)?.nombre || 'Tema no encontrado'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {temas.find(t => t.id === formData.tema_id)?.descripcion || 'Sin descripción registrada.'}
+                      </p>
+                    </div>
+                  </div>
                 </section>
               </div>
             </div>
@@ -899,14 +907,14 @@ export function SubThemeManagementScreen({
               <button
                 onClick={handleCloseModal}
                 disabled={submitting}
-                className="app-btn app-btn-secondary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="app-btn app-btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSaveSubtema}
                 disabled={submitting || !formData.nombre.trim()}
-                className="app-btn app-primary-btn px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="app-btn app-primary-btn disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <>
@@ -914,7 +922,7 @@ export function SubThemeManagementScreen({
                     <span>Guardando...</span>
                   </>
                 ) : (
-                  <span>{editingSubtema ? 'Actualizar Subtema' : 'Crear Subtema'}</span>
+                  <span>{editingSubtema ? 'Actualizar subtema' : 'Guardar subtema'}</span>
                 )}
               </button>
             </div>

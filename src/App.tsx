@@ -166,9 +166,39 @@ export default function App() {
     localStorage.removeItem('adminDashboardState');
   };
 
+  const clearStaleProtectedSession = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('adminId');
+    localStorage.removeItem('personaId');
+    localStorage.removeItem(DOCENTE_SESSION_KEY);
+    localStorage.removeItem(ADMIN_SESSION_KEY);
+    clearPersistedNavigation();
+    setUserSession(null);
+    setDocenteSession(null);
+    setAdminSession(null);
+    applyAuthHeaders();
+  };
+
   useEffect(() => {
     setupAuthFetch();
     applyAuthHeaders();
+  }, []);
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setUserSession(null);
+      setDocenteSession(null);
+      setAdminSession(null);
+      setSelectedSubject(null);
+      setSelectedContent(null);
+      setSelectedTemaId(null);
+      setSelectedSubtemaId(null);
+      setPreviousScreen(null);
+      setCurrentScreen('login');
+    };
+
+    window.addEventListener('edupath:auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('edupath:auth-expired', handleAuthExpired);
   }, []);
 
   useEffect(() => {
@@ -191,6 +221,7 @@ export default function App() {
     }
 
     try {
+      const authToken = localStorage.getItem('authToken');
       const personaIdRaw = localStorage.getItem('personaId');
       const estudianteIdRaw = localStorage.getItem('estudianteId');
       const nombreEstudiante = localStorage.getItem('nombreEstudiante');
@@ -199,6 +230,14 @@ export default function App() {
       const role = localStorage.getItem(APP_ROLE_KEY);
       const storedDocenteSession = localStorage.getItem(DOCENTE_SESSION_KEY);
       const storedAdminSession = localStorage.getItem(ADMIN_SESSION_KEY);
+      const hasProtectedToken = typeof authToken === 'string' && authToken.trim().length > 0;
+
+      if ((role === 'admin' || role === 'docente' || role === 'estudiante') && !hasProtectedToken) {
+        clearStaleProtectedSession();
+        setCurrentScreen('login');
+        setIsHydratingState(false);
+        return;
+      }
 
       if (personaIdRaw && estudianteIdRaw && nombreEstudiante && codigoEstudiante) {
         const restoredStudent: UserSession = {

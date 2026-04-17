@@ -102,16 +102,16 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
-      <header className="bg-white shadow-sm border-b border-gray-200">
+    <div className="app-shell">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-[#3A4A5B]">Gestion de Administradores</h1>
+                <h1 className="text-[#3A4A5B]">Gestión de administradores</h1>
                 <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
               </div>
             </div>
@@ -119,70 +119,52 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-8 py-8">
-        <button
-          onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
-        >
+      <main className="app-main">
+        <button onClick={onBack} className="app-back-button mb-6">
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
         </button>
 
-        <div className="mb-8 p-6 bg-gradient-to-r from-[#4A90E2] to-[#357abd] text-white rounded-xl shadow-lg">
-          <h2 className="text-lg font-bold mb-2">Crear Administradores</h2>
-          <p className="text-sm opacity-95">
-            Desde aqui puedes registrar administradores del sistema y enviar sus credenciales automaticamente por correo.
-          </p>
-        </div>
-
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-[#3A4A5B] text-xl">Administradores</h2>
-            <p className="text-gray-500 text-sm">Crea un administrador nuevo para el sistema.</p>
+        <section className="app-page-hero mb-8">
+          <div className="app-page-hero__content">
+            <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Administración</div>
+              <h2 className="app-page-hero__title">Gestión de administradores</h2>
+              <p className="app-page-hero__description">
+                Registra y gestiona cuentas administrativas.
+              </p>
+            </div>
           </div>
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white shadow-md hover:shadow-lg transition-all"
-            style={{ backgroundColor: '#4A90E2' }}
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nuevo administrador</span>
-          </button>
-        </div>
+        </section>
 
-        {successMessage && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 flex items-center justify-between">
-            <p className="text-green-700 font-medium">{successMessage}</p>
-            <button
-              onClick={() => setSuccessMessage(null)}
-              className="text-green-500 hover:text-green-700"
-            >
-              <X className="w-5 h-5" />
+        <section className="app-panel p-6">
+          <div className="app-section-head">
+            <div>
+              <h3 className="app-section-title">Administradores</h3>
+              <p className="app-section-description">Crea un administrador nuevo para el sistema.</p>
+            </div>
+            <button onClick={handleOpenCreate} className="app-btn app-primary-btn px-5 py-3">
+              <Plus className="w-4 h-4" />
+              <span>Nuevo administrador</span>
             </button>
           </div>
-        )}
 
-        <div className="bg-white rounded-xl shadow-md p-8 text-center">
-          <p className="text-gray-600">
-            Usa el boton "Nuevo administrador" para registrar un nuevo administrador.
-          </p>
-        </div>
+          {successMessage && (
+            <div className="app-alert app-alert--success mb-6">
+              <p>{successMessage}</p>
+              <button onClick={() => setSuccessMessage(null)} className="text-green-600 hover:text-green-800">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          )}
 
-        <div className="mt-8 flex gap-4 justify-end">
-          <button
-            onClick={handleOpenCreate}
-            className="px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all"
-            style={{ backgroundColor: '#4A90E2' }}
-          >
-            Crear administrador
-          </button>
-          <button
-            onClick={onBack}
-            className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
-          >
-            Volver
-          </button>
-        </div>
+          <div className="app-soft-card app-context-card">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Acción principal</p>
+            <p className="app-context-card__title">Nuevo administrador</p>
+            <p className="app-context-card__text">Registra una nueva cuenta administrativa desde esta sección.</p>
+          </div>
+        </section>
+
       </main>
 
       {showModal && (
@@ -192,7 +174,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
               <div>
                 <div className="app-modal-kicker">Administración</div>
                 <h3 className="app-modal-title">Crear administrador</h3>
-                <p className="app-modal-description">Registra un nuevo administrador manteniendo el mismo lenguaje visual del panel general.</p>
+                <p className="app-modal-description">Registra un nuevo administrador.</p>
               </div>
               <button
                 onClick={handleCloseModal}
@@ -204,16 +186,12 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
 
             <div className="app-modal-scroll">
             <div className="app-form-layout">
-              {formError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                  {formError}
-                </div>
-              )}
+              {formError && <div className="app-alert app-alert--error">{formError}</div>}
 
               <section className="app-form-section app-form-section--muted">
                 <div className="mb-4">
                   <h4 className="app-form-section-title">Información personal</h4>
-                  <p className="app-form-section-description">Datos base para crear la cuenta administrativa.</p>
+                  <p className="app-form-section-description">Datos básicos de la cuenta.</p>
                 </div>
                 <div className="app-form-grid app-form-grid-2">
                 <div className="app-form-field">
@@ -244,7 +222,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
               <section className="app-form-section">
                 <div className="mb-4">
                   <h4 className="app-form-section-title">Acceso</h4>
-                  <p className="app-form-section-description">Configura el código inicial y confirma el envío automático de credenciales.</p>
+                  <p className="app-form-section-description">Define el código inicial.</p>
                 </div>
                 <div className="app-form-grid app-form-grid-2">
                 <div className="app-form-field">
@@ -277,8 +255,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
               <button
                 onClick={handleCreateAdmin}
                 disabled={submitting || !formData.nombre.trim() || !formData.email.trim() || !formData.codigoAcceso.trim()}
-                className="app-btn px-6 py-3 text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: '#4A90E2' }}
+                className="app-btn app-primary-btn px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <>
