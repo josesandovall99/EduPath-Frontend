@@ -44,6 +44,14 @@ interface EditFormData {
   respuesta_miniproyecto: string;
 }
 
+type MetodoDerivado = {
+  nombre: string;
+  retorno: string;
+  parametros: Array<{ nombre: string; tipo: string }>;
+};
+
+type CompilerCase = { inputs: string; output: string };
+
 type ScheduleRow = { milestone: string; start: string; end: string };
 type CostRow = { deliverable: string; unitMeasure: string; quantity: string; unitPrice: string };
 
@@ -73,6 +81,78 @@ const normalizeAreaName = (value?: string | null) =>
     .trim()
     .toLowerCase();
 
+const JAVA_LANGUAGE_ID = 62;
+
+const emptyCompilerCase = (): CompilerCase => ({ inputs: '', output: '' });
+
+const createDefaultCompilerConfig = () => ({
+  tipo: 'programacion',
+  lenguajesPermitidos: [JAVA_LANGUAGE_ID],
+  sintaxis: [],
+  casos_prueba: [emptyCompilerCase(), emptyCompilerCase(), emptyCompilerCase()],
+  metodo: null as MetodoDerivado | null,
+});
+
+function normalizeCompilerCases(rawCases: unknown, fallbackOutput = ''): CompilerCase[] {
+  if (Array.isArray(rawCases) && rawCases.length === 3) {
+    return rawCases.map((caseItem: any) => ({
+      inputs: (caseItem?.inputs || caseItem?.input || caseItem?.entrada || '').toString(),
+      output: (caseItem?.output || caseItem?.esperado || caseItem?.salida || '').toString(),
+    }));
+  }
+
+  return [
+    { inputs: '', output: fallbackOutput },
+    emptyCompilerCase(),
+    emptyCompilerCase(),
+  ];
+}
+
+function parseMethodTemplate(template: string): MetodoDerivado | null {
+  const match = template.match(/(?:public|private|protected)?\s*(?:static\s+)?([A-Za-z_][A-Za-z0-9_<>\[\],\s?]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/);
+  if (!match) return null;
+
+  const parametros = match[3].trim()
+    ? match[3].split(',').map((parametro) => parametro.trim()).filter(Boolean).map((parametro, index) => {
+        const partes = parametro.split(/\s+/).filter(Boolean);
+        if (partes.length < 2) {
+          return { tipo: partes[0] || 'String', nombre: `arg${index}` };
+        }
+        const nombre = partes.pop() || `arg${index}`;
+        return { tipo: partes.join(' '), nombre };
+      })
+    : [];
+
+  return {
+    retorno: match[1].trim(),
+    nombre: match[2].trim(),
+    parametros,
+  };
+}
+
+function formatJavaLikeTemplate(input: string) {
+  const lines = input.split('\n');
+  let indentLevel = 0;
+
+  return lines
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return '';
+
+      const leadingClosers = (trimmed.match(/^\}+/) || [''])[0].length;
+      indentLevel = Math.max(0, indentLevel - leadingClosers);
+
+      const formatted = `${'    '.repeat(indentLevel)}${trimmed}`;
+
+      const openBraces = (trimmed.match(/\{/g) || []).length;
+      const closeBraces = (trimmed.match(/\}/g) || []).length;
+      indentLevel = Math.max(0, indentLevel + openBraces - closeBraces + leadingClosers);
+
+      return formatted;
+    })
+    .join('\n');
+}
+
 export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementScreenProps) {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
@@ -89,9 +169,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [expectedOutput, setExpectedOutput] = useState('');
+  const [compilerTemplate, setCompilerTemplate] = useState('');
+  const [compilerCases, setCompilerCases] = useState<CompilerCase[]>(createDefaultCompilerConfig().casos_prueba);
   const [sintaxisRequerida, setSintaxisRequerida] = useState<string[]>([]);
-  const [lenguajesPermitidos, setLenguajesPermitidos] = useState<number[]>([]);
   const [stakeholdersList, setStakeholdersList] = useState<string[]>([]);
   const [functionalList, setFunctionalList] = useState<string[]>([]);
   const [nonFunctionalList, setNonFunctionalList] = useState<string[]>([]);
@@ -143,23 +223,19 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
 
     ensureQuill();
 
-    if (quillRef.current) {
-      quillRef.current.root.innerHTML = formData.descripcion || '';
-    }
-
     return () => {
       cancelled = true;
     };
-  }, [selected, formData.descripcion, isProgrammingMiniproyecto]);
+  }, [isProgrammingMiniproyecto]);
 
-  const lenguajesDisponibles = [
-    { id: 62, nombre: 'Java', extension: '.java', ejemplo: 'public class Main {\n  public static void main(String[] args) {\n    System.out.println("Hola Mundo");\n  }\n}' },
-    { id: 71, nombre: 'Python', extension: '.py', ejemplo: '# Escribe tu código aquí\nprint("Hola Mundo")' },
-    { id: 63, nombre: 'JavaScript', extension: '.js', ejemplo: '// Escribe tu código aquí\nconsole.log("Hola Mundo");' },
-    { id: 50, nombre: 'C', extension: '.c', ejemplo: '#include <stdio.h>\n\nint main() {\n  printf("Hola Mundo\\n");\n  return 0;\n}' },
-    { id: 54, nombre: 'C++', extension: '.cpp', ejemplo: '#include <iostream>\nusing namespace std;\n\nint main() {\n  cout << "Hola Mundo" << endl;\n  return 0;\n}' },
-    { id: 51, nombre: 'C#', extension: '.cs', ejemplo: 'using System;\n\nclass Program {\n  static void Main() {\n    Console.WriteLine("Hola Mundo");\n  }\n}' }
-  ];
+  useEffect(() => {
+    if (!isProgrammingMiniproyecto || !quillRef.current) return;
+
+    const nextHtml = formData.descripcion || '';
+    if (quillRef.current.root.innerHTML !== nextHtml) {
+      quillRef.current.root.innerHTML = nextHtml;
+    }
+  }, [selected?.id, isProgrammingMiniproyecto]);
 
   const sintaxisDisponibles = ['while', 'for', 'if', 'switch'];
 
@@ -273,9 +349,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     let parsedAssumptions: string[] = [];
     let parsedSchedule: ScheduleRow[] = [];
     let parsedCosts: CostRow[] = [];
-    let parsedEsperado = '';
+    let parsedTemplate = '';
+    let parsedCases = createDefaultCompilerConfig().casos_prueba;
     let parsedSintaxis: string[] = [];
-    let parsedLenguajes: number[] = [];
 
     if (item.respuesta_miniproyecto) {
       try {
@@ -304,9 +380,13 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
           parsed?.supuestos ?? parsed?.justificacionGestion ?? parsed?.justificacion ?? parsed?.notas
         );
         if (parsed?.tipo === 'programacion') {
-          parsedEsperado = parsed?.esperado || '';
+          parsedTemplate = typeof parsed?.metodo?.plantilla === 'string'
+            ? parsed.metodo.plantilla
+            : typeof parsed?.plantillaMetodo === 'string'
+              ? parsed.plantillaMetodo
+              : '';
+          parsedCases = normalizeCompilerCases(parsed?.casos_prueba, parsed?.esperado || '');
           parsedSintaxis = Array.isArray(parsed?.sintaxis) ? parsed.sintaxis : [];
-          parsedLenguajes = Array.isArray(parsed?.lenguajesPermitidos) ? parsed.lenguajesPermitidos : [];
         }
         const cronogramaRaw = Array.isArray(parsed?.cronograma) ? parsed.cronograma : [];
         parsedSchedule = cronogramaRaw.map((entry: any) => {
@@ -415,13 +495,13 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     const normalizedItemAreaName = normalizeAreaName(item.Area?.nombre);
     const isProgrammingItem = normalizedItemAreaName.includes('programacion');
     if (isProgrammingItem) {
-      setExpectedOutput(parsedEsperado || item.respuesta_miniproyecto || '');
+      setCompilerTemplate(parsedTemplate);
+      setCompilerCases(parsedCases);
       setSintaxisRequerida(parsedSintaxis);
-      setLenguajesPermitidos(parsedLenguajes);
     } else {
-      setExpectedOutput('');
+      setCompilerTemplate('');
+      setCompilerCases(createDefaultCompilerConfig().casos_prueba);
       setSintaxisRequerida([]);
-      setLenguajesPermitidos([]);
     }
   };
 
@@ -446,10 +526,20 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     );
   };
 
-  const toggleLenguajePermitido = (lenguajeId: number) => {
-    setLenguajesPermitidos((prev) =>
-      prev.includes(lenguajeId) ? prev.filter((id) => id !== lenguajeId) : [...prev, lenguajeId]
-    );
+  const compilerMethod = parseMethodTemplate(compilerTemplate);
+
+  const handleCompilerTemplateChange = (value: string) => {
+    setCompilerTemplate(value);
+  };
+
+  const handleFormatCompilerTemplate = () => {
+    setCompilerTemplate((prev) => formatJavaLikeTemplate(prev || ''));
+  };
+
+  const handleCompilerCaseChange = (index: number, field: keyof CompilerCase, value: string) => {
+    setCompilerCases((prev) => prev.map((caseItem, caseIndex) => (
+      caseIndex === index ? { ...caseItem, [field]: value } : caseItem
+    )));
   };
 
   useEffect(() => {
@@ -470,9 +560,43 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     event.preventDefault();
     if (!selected) return;
 
+    let programmingPayload: string | null = null;
+
     if (isProgrammingMiniproyecto) {
-      if (!expectedOutput.trim()) {
-        setError('Define la salida esperada antes de guardar.');
+      const plantilla = compilerTemplate.trim();
+      const metodoDerivado = parseMethodTemplate(plantilla);
+
+      if (!plantilla || !metodoDerivado) {
+        setError('La plantilla del método es obligatoria y debe incluir una firma Java válida.');
+        return;
+      }
+
+      if (compilerCases.length !== 3) {
+        setError('Debes definir exactamente 3 casos de prueba para el miniproyecto.');
+        return;
+      }
+
+      for (let index = 0; index < compilerCases.length; index += 1) {
+        if (!compilerCases[index]?.output?.trim()) {
+          setError(`El caso ${index + 1} debe tener output esperado.`);
+          return;
+        }
+      }
+
+      programmingPayload = JSON.stringify({
+        ...createDefaultCompilerConfig(),
+        sintaxis: sintaxisRequerida,
+        lenguajesPermitidos: [JAVA_LANGUAGE_ID],
+        metodo: { ...metodoDerivado, plantilla },
+        casos_prueba: compilerCases.map((caseItem) => ({
+          inputs: (caseItem.inputs || '').trim(),
+          output: (caseItem.output || '').trim(),
+        })),
+        esperado: (compilerCases[0]?.output || '').trim(),
+      });
+
+      if (!JSON.parse(programmingPayload).esperado) {
+        setError('El primer caso debe tener un output esperado para sincronizar la evaluación.');
         return;
       }
     }
@@ -493,12 +617,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
           nivel_dificultad: formData.nivel_dificultad,
           entregable: formData.entregable,
           respuesta_miniproyecto: isProgrammingMiniproyecto
-            ? JSON.stringify({
-                tipo: 'programacion',
-                esperado: expectedOutput.trim(),
-                sintaxis: sintaxisRequerida,
-                lenguajesPermitidos
-              })
+            ? programmingPayload
             : isManagementMiniproyecto
               ? JSON.stringify({
                   objetivoPrincipal: projectObjective.trim() ? [projectObjective.trim()] : [],
@@ -528,12 +647,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
             ...item,
             entregable: formData.entregable,
             respuesta_miniproyecto: isProgrammingMiniproyecto
-              ? JSON.stringify({
-                  tipo: 'programacion',
-                  esperado: expectedOutput.trim(),
-                  sintaxis: sintaxisRequerida,
-                  lenguajesPermitidos
-                })
+              ? programmingPayload || item.respuesta_miniproyecto || ''
               : isManagementMiniproyecto
                 ? JSON.stringify({
                     objetivoPrincipal: projectObjective.trim() ? [projectObjective.trim()] : [],
@@ -764,7 +878,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 <div>
                   <label className="block text-sm text-gray-600 mb-1.5">Descripción</label>
                   {isProgrammingMiniproyecto ? (
-                    <div className="quill-editor-container">
+                    <div className="quill-editor-container app-rich-text-editor">
                       <div
                         ref={editorRef}
                         className="w-full"
@@ -798,12 +912,62 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 </div>
                 {isProgrammingMiniproyecto ? (
                   <div className="space-y-4">
-                    <div className="space-y-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+                    <div className="space-y-4 rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-[#3A4A5B]">Configuración de compilador</label>
+                          <p className="mt-1 text-xs text-gray-500">Este miniproyecto se editará como ejercicio de programación: método Java, restricciones y 3 casos de prueba.</p>
+                        </div>
+                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                          Java
+                        </span>
+                      </div>
+
                       <div>
-                        <label className="text-sm text-gray-600">Sintaxis requerida</label>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <label className="block text-sm font-medium text-[#3A4A5B]">Plantilla del método *</label>
+                          <button
+                            type="button"
+                            onClick={handleFormatCompilerTemplate}
+                            className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+                          >
+                            Dar formato
+                          </button>
+                        </div>
+                        <textarea
+                          value={compilerTemplate}
+                          onChange={(event) => handleCompilerTemplateChange(event.target.value)}
+                          placeholder={"public static int sumar(int a, int b) {\n    // TODO\n}"}
+                          rows={10}
+                          className="w-full min-h-64 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono text-sm leading-7 bg-white resize-y"
+                        />
+                        <p className="mt-2 text-xs text-gray-500">El backend envolverá este método y ejecutará automáticamente los 3 casos de prueba, igual que en ejercicios.</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
+                          <div className="text-xs text-gray-500 mb-1">Método derivado</div>
+                          <div className="text-sm font-semibold text-[#3A4A5B]">{compilerMethod?.nombre || 'Pendiente de derivar'}</div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
+                          <div className="text-xs text-gray-500 mb-1">Retorno</div>
+                          <div className="text-sm font-semibold text-[#3A4A5B]">{compilerMethod?.retorno || 'Pendiente de derivar'}</div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
+                          <div className="text-xs text-gray-500 mb-1">Parámetros</div>
+                          <div className="text-sm font-semibold text-[#3A4A5B] break-words">
+                            {compilerMethod?.parametros?.length
+                              ? compilerMethod.parametros.map((param) => `${param.tipo} ${param.nombre}`).join(', ')
+                              : 'Pendiente de derivar'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-sm text-gray-600">Restricciones técnicas (opcionales)</label>
+                        <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
                           {sintaxisDisponibles.map((sintaxis) => (
-                            <label key={sintaxis} className="flex items-center gap-2 text-xs text-gray-700">
+                            <label key={sintaxis} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-gray-700">
                               <input
                                 type="checkbox"
                                 checked={sintaxisRequerida.includes(sintaxis)}
@@ -814,36 +978,39 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                             </label>
                           ))}
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">Define estructuras obligatorias para validar el codigo.</p>
+                        <p className="text-xs text-gray-500 mt-2">Si no defines restricciones, la evaluación validará únicamente los casos de prueba.</p>
                       </div>
 
                       <div>
-                        <label className="text-sm text-gray-600">Lenguajes permitidos</label>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          {lenguajesDisponibles.map((lenguaje) => (
-                            <label key={lenguaje.id} className="flex items-center gap-2 text-xs text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={lenguajesPermitidos.includes(lenguaje.id)}
-                                onChange={() => toggleLenguajePermitido(lenguaje.id)}
-                                className="h-4 w-4"
-                              />
-                              <span>{lenguaje.nombre}</span>
-                            </label>
+                        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Casos de prueba obligatorios *</label>
+                        <p className="text-xs text-gray-500 mb-3">Los inputs aceptan valores separados por comas. El output del caso 1 también se usa como referencia resumida del esperado.</p>
+                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+                          {compilerCases.map((caseItem, index) => (
+                            <div key={index} className="space-y-3 bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
+                              <div className="text-xs font-semibold uppercase tracking-wide text-[#3A4A5B]">Caso {index + 1}</div>
+                              <div>
+                                <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Inputs</label>
+                                <input
+                                  type="text"
+                                  value={caseItem.inputs}
+                                  onChange={(event) => handleCompilerCaseChange(index, 'inputs', event.target.value)}
+                                  placeholder="Ej: 5,3"
+                                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Output esperado *</label>
+                                <input
+                                  type="text"
+                                  value={caseItem.output}
+                                  onChange={(event) => handleCompilerCaseChange(index, 'output', event.target.value)}
+                                  placeholder="Resultado esperado"
+                                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
+                                />
+                              </div>
+                            </div>
                           ))}
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">Si no seleccionas ninguno, se permiten todos.</p>
-                      </div>
-
-                      <div>
-                        <label className="text-sm text-gray-600">Salida esperada</label>
-                        <textarea
-                          value={expectedOutput}
-                          onChange={(event) => setExpectedOutput(event.target.value)}
-                          rows={4}
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                          placeholder="Ejemplo: 1 2 3"
-                        />
                       </div>
                     </div>
                   </div>

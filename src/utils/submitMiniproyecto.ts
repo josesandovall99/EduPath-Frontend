@@ -41,3 +41,30 @@ export async function submitMiniproyecto(
     return { status: 0, data: null, message: error?.message || 'Network error' };
   }
 }
+
+export async function executeMiniproyecto(
+  miniproyectoId: string | number,
+  payload: { codigo: string; lenguaje_id: number }
+): Promise<SubmitMiniproyectoResult> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/miniproyectos/${miniproyectoId}/ejecutar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        codigo: payload.codigo,
+        lenguaje_id: payload.lenguaje_id
+      })
+    });
+
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch {
+      // Non-JSON or empty body
+    }
+
+    return { status: res.status, data, message: data && (data.message || data.error) };
+  } catch (error: any) {
+    return { status: 0, data: null, message: error?.message || 'Network error' };
+  }
+}
