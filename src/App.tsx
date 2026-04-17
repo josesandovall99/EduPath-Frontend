@@ -11,6 +11,7 @@ import { StudentTrackingScreen } from './components/StudentTrackingScreen';
 import { SubjectContentScreen } from './components/SubjectContentScreen';
 import { ProgrammingContentView } from './components/ProgrammingContentView';
 import { ProgrammingMiniproyectoView } from './components/ProgrammingMiniproyectoView';
+import { ConfigurableMiniproyectoView } from './components/ConfigurableMiniproyectoView';
 import { TheoryContentView } from './components/TheoryContentView';
 import { QuizActivityView } from './components/QuizActivityView';
 import { UMLDiagramView } from './components/UMLDiagramView';
@@ -41,6 +42,7 @@ type Screen =
   | 'subject-content' 
   | 'programming-content'
   | 'programming-miniproyecto'
+  | 'configurable-miniproyecto'
   | 'theory-content'
   | 'quiz-activity'
   | 'uml-diagram'
@@ -93,6 +95,7 @@ interface Content {
   actividadId?: number;
   areaId?: number;
   areaNombre?: string;
+  miniproyectoMode?: 'legacy' | 'configurable';
 }
 
 const normalizeLabel = (value?: string | null) =>
@@ -250,6 +253,7 @@ export default function App() {
           if (
             screen === 'programming-content' ||
             screen === 'programming-miniproyecto' ||
+            screen === 'configurable-miniproyecto' ||
             screen === 'theory-content' ||
             screen === 'quiz-activity' ||
             screen === 'uml-diagram' ||
@@ -556,6 +560,11 @@ export default function App() {
     }
 
     if (content.isMiniproyecto) {
+      if (content.miniproyectoMode === 'configurable') {
+        setCurrentScreen('configurable-miniproyecto');
+        return;
+      }
+
       const normalizedAreaName = normalizeLabel(content.areaNombre || selectedSubject?.name);
       const isProgrammingMiniproyecto = normalizedAreaName.includes('programacion');
 
@@ -779,6 +788,13 @@ export default function App() {
             contextLabel={selectedContent.title}
           />
         </>
+      )}
+
+      {currentScreen === 'configurable-miniproyecto' && selectedContent && (
+        <ConfigurableMiniproyectoView
+          content={selectedContent}
+          onBack={handleBackToSubject}
+        />
       )}
 
       {currentScreen === 'theory-content' && selectedContent && selectedSubject && userSession && (

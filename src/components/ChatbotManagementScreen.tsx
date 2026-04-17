@@ -21,6 +21,10 @@ const MODEL_OPTIONS = ['qwen2.5:0.5b', 'llama3.2:1b', 'llama3.2'];
 
 interface ChatbotManagementScreenProps {
   onBack: () => void;
+  mode?: 'admin' | 'docente';
+  docenteId?: number;
+  docentePersonaId?: number;
+  docenteAreaId?: number;
 }
 
 interface AreaItem {
@@ -185,9 +189,16 @@ function InfoBadge({ text }: { text: string }) {
   );
 }
 
-export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps) {
+export function ChatbotManagementScreen({
+  onBack,
+  mode = 'admin',
+  docenteId,
+  docentePersonaId,
+  docenteAreaId,
+}: ChatbotManagementScreenProps) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const documentSectionRef = useRef<HTMLDivElement | null>(null);
+  const isDocenteMode = mode === 'docente';
 
   const [chatbots, setChatbots] = useState<ChatbotItem[]>([]);
   const [areas, setAreas] = useState<AreaItem[]>([]);
@@ -210,6 +221,49 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
   const [typeFilter, setTypeFilter] = useState<'all' | 'GENERAL' | 'MINIPROYECTO'>('all');
   const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [statusMessage, setStatusMessage] = useState('');
+
+  const requestHeaders = useMemo(() => {
+    const authToken = localStorage.getItem('authToken');
+    const personaId = docentePersonaId || Number(localStorage.getItem('personaId'));
+    const headers: Record<string, string> = {};
+
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
+    if (isDocenteMode && Number.isFinite(Number(docenteId))) {
+      headers['x-docente-id'] = String(Number(docenteId));
+    }
+
+    if (isDocenteMode && Number.isFinite(Number(docenteAreaId))) {
+      headers['x-area-id'] = String(Number(docenteAreaId));
+    }
+
+    if (Number.isFinite(personaId)) {
+      headers['x-persona-id'] = String(personaId);
+    }
+
+    return headers;
+  }, [docenteAreaId, docenteId, docentePersonaId, isDocenteMode]);
+
+  function apiFetch(path: string, init: RequestInit = {}, areaIdOverride?: number | null) {
+    const nextHeaders = new Headers(init.headers || {});
+
+    Object.entries(requestHeaders).forEach(([key, value]) => {
+      if (!nextHeaders.has(key)) {
+        nextHeaders.set(key, value);
+      }
+    });
+
+    if (Number.isFinite(Number(areaIdOverride))) {
+      nextHeaders.set('x-area-id', String(Number(areaIdOverride)));
+    }
+
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: nextHeaders,
+    });
+  }
 
   useEffect(() => {
     void loadInitialData();
@@ -276,6 +330,14 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
 
   const areaOptions = useMemo(() => areas.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)), [areas]);
 
+  useEffect(() => {
+    if (!isDocenteMode || form.area_id || areaOptions.length !== 1) {
+      return;
+    }
+
+    setForm((prev) => ({ ...prev, area_id: String(areaOptions[0].id) }));
+  }, [areaOptions, form.area_id, isDocenteMode]);
+
   const miniproyectoOptions = useMemo(() => {
     const areaId = Number(form.area_id);
     return miniproyectos
@@ -328,7 +390,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     form.descripcion.trim(),
     form.tipo,
     form.model.trim(),
-    form.tipo === 'GENERAL' ? true : form.area_id,
+    form.tipo === 'GENERAL' && !isDocenteMode ? true : form.area_id,
     form.tipo === 'GENERAL' ? true : form.miniproyecto_id,
   ].filter(Boolean).length;
   const canConfirmPdf = Boolean(selectedChatbotId && selectedFile && !isUploading);
@@ -355,10 +417,11 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     setIsLoading(true);
     setStatusMessage('');
     try {
+      const areasEndpoint = isDocenteMode ? '/areas/mis-areas' : '/areas';
       const [chatbotsResponse, areasResponse, miniproyectosResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/chatbots`),
-        fetch(`${API_BASE_URL}/areas`),
-        fetch(`${API_BASE_URL}/miniproyectos`),
+        apiFetch('/chatbots'),
+        apiFetch(areasEndpoint),
+        apiFetch('/miniproyectos', {}, docenteAreaId ?? null),
       ]);
 
       if (!chatbotsResponse.ok) throw new Error('No se pudieron cargar los chatbots.');
@@ -390,7 +453,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
   }
 
   async function loadChatbots() {
-    const response = await fetch(`${API_BASE_URL}/chatbots`);
+    const response = await apiFetch('/chatbots');
     if (!response.ok) {
       throw new Error('No se pudieron refrescar los chatbots.');
     }
@@ -409,8 +472,8 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
 
     try {
       const [documentsResponse, statsResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/chatbots/${chatbot.id}/documents`),
-        fetch(`${API_BASE_URL}/chatbots/${chatbot.id}/stats`),
+        apiFetch(`/chatbots/${chatbot.id}/documents`),
+        apiFetch(`/chatbots/${chatbot.id}/stats`),
       ]);
 
       if (documentsResponse.ok) {
@@ -432,7 +495,12 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
 
   function handleCreateNew() {
     setSelectedChatbotId(null);
-    setForm(emptyForm());
+    setForm({
+      ...emptyForm(),
+      area_id: isDocenteMode
+        ? String(Number(docenteAreaId) || Number(areaOptions[0]?.id) || '')
+        : '',
+    });
     setDocuments([]);
     setStats(null);
     setSelectedFile(null);
@@ -477,6 +545,11 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
       return;
     }
 
+    if (isDocenteMode && !form.area_id) {
+      setStatusMessage('Como docente debes asignar el chatbot a tu área.');
+      return;
+    }
+
     if (form.tipo === 'MINIPROYECTO' && (!form.area_id || !form.miniproyecto_id)) {
       setStatusMessage('Para un chatbot de miniproyecto debes seleccionar área y miniproyecto.');
       return;
@@ -506,11 +579,11 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
 
     try {
       const isEditing = typeof form.id === 'number' && Number.isFinite(form.id) && form.id > 0;
-      const response = await fetch(isEditing ? `${API_BASE_URL}/chatbots/${form.id}` : `${API_BASE_URL}/chatbots`, {
+      const response = await apiFetch(isEditing ? `/chatbots/${form.id}` : '/chatbots', {
         method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      });
+      }, form.area_id ? Number(form.area_id) : (docenteAreaId ?? null));
 
       const data = await response.json();
       if (!response.ok) {
@@ -547,7 +620,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     setIsDeleting(true);
     setStatusMessage('Eliminando chatbot...');
     try {
-      const response = await fetch(`${API_BASE_URL}/chatbots/${selectedChatbotId}`, { method: 'DELETE' });
+      const response = await apiFetch(`/chatbots/${selectedChatbotId}`, { method: 'DELETE' });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data?.mensaje || data?.error || 'No se pudo eliminar el chatbot.');
@@ -591,7 +664,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     formData.append('pdf', selectedFile);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/chatbots/${selectedChatbotId}/documents`, {
+      const response = await apiFetch(`/chatbots/${selectedChatbotId}/documents`, {
         method: 'POST',
         body: formData,
       });
@@ -619,7 +692,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     if (!selectedChatbotId) return;
     setStatusMessage('Eliminando documento...');
     try {
-      const response = await fetch(`${API_BASE_URL}/chatbots/${selectedChatbotId}/documents/${documentId}`, {
+      const response = await apiFetch(`/chatbots/${selectedChatbotId}/documents/${documentId}`, {
         method: 'DELETE',
       });
       const data = await response.json();
@@ -644,7 +717,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
     setIsReloading(true);
     setStatusMessage('Recargando documentos del chatbot...');
     try {
-      const response = await fetch(`${API_BASE_URL}/chatbots/${selectedChatbotId}/reload`, { method: 'POST' });
+      const response = await apiFetch(`/chatbots/${selectedChatbotId}/reload`, { method: 'POST' });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data?.mensaje || data?.error || 'No se pudo recargar el chatbot.');
@@ -681,7 +754,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
       let receivedFirstChunk = false;
       const timeoutId = window.setTimeout(() => controller.abort(), CHATBOT_TIMEOUT_MS);
 
-      const response = await fetch(`${API_BASE_URL}/chatbots/${selectedChatbotId}/chat/stream`, {
+      const response = await apiFetch(`/chatbots/${selectedChatbotId}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
@@ -752,7 +825,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
               </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Chatbots</h1>
-                <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                <p className="text-gray-500 text-sm">{isDocenteMode ? 'Panel de Docente - EduPath' : 'Panel de Administrador - EduPath'}</p>
               </div>
             </div>
           </div>
@@ -1255,6 +1328,12 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
                     </div>
                   )}
 
+                  {isDocenteMode ? (
+                    <div className="app-form-note">
+                      Como docente solo puedes gestionar chatbots vinculados a tu área asignada.
+                    </div>
+                  ) : null}
+
                   <section className="app-form-section app-form-section--muted">
                     <div className="mb-4 space-y-1.5">
                       <h4 className="app-form-section-title">Información base</h4>
@@ -1311,7 +1390,13 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
                       <div className="app-form-field">
                         <label className="app-form-label">Área</label>
                         <select value={form.area_id} onChange={(event) => updateForm('area_id', event.target.value)} className="app-form-select">
-                          <option value="">{form.tipo === 'GENERAL' ? 'Sin área (global)' : 'Selecciona un área'}</option>
+                          <option value="">
+                            {isDocenteMode
+                              ? 'Selecciona tu área'
+                              : form.tipo === 'GENERAL'
+                                ? 'Sin área (global)'
+                                : 'Selecciona un área'}
+                          </option>
                           {areaOptions.map((area) => (
                             <option key={area.id} value={area.id}>{area.nombre}</option>
                           ))}
@@ -1399,7 +1484,7 @@ export function ChatbotManagementScreen({ onBack }: ChatbotManagementScreenProps
                       <div className="app-form-note">
                         <div className="app-form-summary-label">Estado del formulario</div>
                         <div className="app-form-summary-value">{selectedChatbotId ? 'Editando configuración existente' : 'Preparando nuevo chatbot'}</div>
-                        <div className="app-form-summary-help">Avance del formulario: {formCompletion}/{form.tipo === 'GENERAL' ? 5 : 6} campos clave completos.</div>
+                        <div className="app-form-summary-help">Avance del formulario: {formCompletion}/{form.tipo === 'GENERAL' ? (isDocenteMode ? 6 : 5) : 6} campos clave completos.</div>
                       </div>
                     </div>
                   </section>

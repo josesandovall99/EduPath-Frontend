@@ -2,6 +2,7 @@ import { ArrowLeft, CheckCircle2, Clock, FileText, PlayCircle, Edit, Share2, Use
 import { useState, useEffect, useRef } from 'react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
+import { parseConfigurableMiniproyecto } from './configurableEmbeddedExercises';
 
 interface Subject {
   id: string;
@@ -26,6 +27,7 @@ interface Content {
   areaId?: number;
   areaNombre?: string;
   miniproyectoAprobado?: boolean;
+  miniproyectoMode?: 'legacy' | 'configurable';
   // Campos opcionales para el sistema de desbloqueo progresivo
   desbloqueado?: boolean;
   completo?: boolean;
@@ -339,6 +341,14 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
               const aprobados = await Promise.all(
                 minisArray.map(async (mini) => {
                   try {
+                    const configurablePayload = parseConfigurableMiniproyecto(mini.respuesta_miniproyecto);
+                    if (configurablePayload && configurablePayload.exercises.length > 0) {
+                      const progressResponse = await fetch(`${API_BASE_URL}/miniproyectos/${mini.id}/configurable-progress`);
+                      if (!progressResponse.ok) return [mini.id, false] as const;
+                      const progressData = await progressResponse.json();
+                      return [mini.id, Boolean(progressData?.completado)] as const;
+                    }
+
                     const response = await fetch(
                       `${API_BASE_URL}/evaluaciones/by?miniproyecto_id=${mini.id}`
                     );
@@ -358,11 +368,12 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
             }
 
             miniproyectosContent = minisArray.map((mini) => {
+              const configurablePayload = parseConfigurableMiniproyecto(mini.respuesta_miniproyecto);
               const aprobado = aprobadosMap.get(mini.id) || false;
               return {
                 id: mini.id.toString(),
                 title: mini.Actividad?.titulo || 'Miniproyecto',
-                type: [11, 13].includes(Number(mini.actividad_id)) ? 'workshop' : 'activity',
+                type: configurablePayload ? 'activity' : [11, 13].includes(Number(mini.actividad_id)) ? 'workshop' : 'activity',
                 duration: undefined,
                 status: aprobado ? 'completed' : ('not-started' as const),
                 isMiniproyecto: true,
@@ -370,6 +381,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 areaId: mini.Area?.id,
                 areaNombre: mini.Area?.nombre,
                 miniproyectoAprobado: aprobado,
+                miniproyectoMode: configurablePayload ? 'configurable' : 'legacy',
                 completo: aprobado
               };
             });

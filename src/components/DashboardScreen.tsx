@@ -21,42 +21,7 @@ interface DashboardScreenProps {
   estudianteId?: number;
 }
 
-type AreaCategory = 'fundamentos' | 'analisis' | 'atc';
-
 const colorPalette = ['#4A90E2', '#7ED6A7', '#F5A97F', '#FFB84D', '#A78BFA', '#EC4899'];
-
-const normalizeAreaName = (value?: string | null) =>
-  (value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ');
-
-const getAreaCategory = (areaName?: string | null): AreaCategory | null => {
-  const normalizedName = normalizeAreaName(areaName);
-
-  if (normalizedName.includes('fundamentos') && normalizedName.includes('program')) {
-    return 'fundamentos';
-  }
-
-  if (normalizedName.includes('analisis')) {
-    return 'analisis';
-  }
-
-  if (
-    normalizedName === 'atc' ||
-    normalizedName.includes('alcance') ||
-    normalizedName.includes('tiempo') ||
-    normalizedName.includes('costo') ||
-    normalizedName.includes('gestion de proyectos') ||
-    normalizedName.includes('gestion proyectos')
-  ) {
-    return 'atc';
-  }
-
-  return null;
-};
 
 // Fallback data por si falla el fetch
 const FALLBACK_SUBJECTS = [
@@ -98,18 +63,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
   const [error, setError] = useState<string | null>(null);
   const [progresosPorArea, setProgresosPorArea] = useState<Map<number, number>>(new Map());
   const [loadingProgresos, setLoadingProgresos] = useState(false);
-
-  // Función para obtener áreas permitidas según el semestre
-  const obtenerAreasPermitidas = (semestre: number): AreaCategory[] => {
-    if (semestre >= 1 && semestre <= 4) {
-      return ['fundamentos'];
-    } else if (semestre >= 5 && semestre <= 6) {
-      return ['fundamentos', 'analisis'];
-    } else if (semestre >= 7 && semestre <= 10) {
-      return ['fundamentos', 'analisis', 'atc'];
-    }
-    return []; // Si el semestre está fuera de rango
-  };
 
   // Obtener progreso de una área específica
   const obtenerProgresoArea = async (areaId: number) => {
@@ -159,22 +112,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         const areas = await response.json();
         console.log('Areas loaded successfully:', areas);
 
-        // Filtro de seguridad: obtener semestre del estudiante
-        // NOTA: Esto debería venir del backend en producción
-        const semestre = parseInt(localStorage.getItem('semestreEstudiante') || '1');
-        const areasPermitidas = obtenerAreasPermitidas(semestre);
-        
-        // Filtrar áreas según el semestre
-        const areasFiltradas = areas.filter((area: Area) => {
-          const category = getAreaCategory(area.nombre);
-          return category ? areasPermitidas.includes(category) : false;
-        });
-
-        console.log(`Semestre ${semestre} - Áreas permitidas:`, areasPermitidas);
-        console.log('Áreas filtradas:', areasFiltradas);
-
         // Transformar áreas a formato de subjects
-        const transformedSubjects = areasFiltradas.map((area: Area, index: number) => ({
+        const transformedSubjects = areas.map((area: Area, index: number) => ({
           id: area.id.toString(),
           name: area.nombre,
           icon: Code,

@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../utils/constants';
 import { ExerciseManagementScreen } from './ExerciseManagementScreen';
 import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
 import { ReportsScreen } from './ReportsScreen';
+import { ChatbotManagementScreen } from './ChatbotManagementScreen';
 
 interface DocenteDashboardProps {
   onLogout: () => void;
@@ -53,7 +54,7 @@ const EMPTY_STATS: DashboardStats = {
 const isActiveFlag = (value: unknown) => value !== false;
 
 export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'ejercicios' | 'miniproyectos' | 'reports'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'ejercicios' | 'miniproyectos' | 'chatbot' | 'reports'>('dashboard');
   const [statsData, setStatsData] = useState<DashboardStats>(EMPTY_STATS);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
 
@@ -209,6 +210,15 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
       onClick: () => setCurrentScreen('miniproyectos')
     },
     {
+      id: 'chatbot',
+      title: 'Gestión de Chatbots',
+      description: 'Administra únicamente los chatbots de tu área y prepara asistentes para tus miniproyectos.',
+      icon: BookOpen,
+      color: '#14B8A6',
+      gradient: 'from-[#14B8A6] to-[#2DD4BF]',
+      onClick: () => setCurrentScreen('chatbot')
+    },
+    {
       id: 'reports',
       title: 'Informes de Materia',
       description: 'Consulta progreso por estudiante y reporte de fallos de tu materia asignada.',
@@ -231,6 +241,22 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
     return (
       <MiniproyectoManagementScreen
         onBack={() => setCurrentScreen('dashboard')}
+        mode="docente"
+        docenteId={docente?.id}
+        docentePersonaId={docente?.personaId}
+        docenteAreaId={docente?.areaId}
+      />
+    );
+  }
+
+  if (currentScreen === 'chatbot') {
+    return (
+      <ChatbotManagementScreen
+        onBack={() => setCurrentScreen('dashboard')}
+        mode="docente"
+        docenteId={docente?.id}
+        docentePersonaId={docente?.personaId}
+        docenteAreaId={docente?.areaId}
       />
     );
   }
@@ -302,7 +328,7 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
           })}
         </div>
 
-        <div className="grid grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
           {actions.map((action) => {
             const Icon = action.icon;
             return (

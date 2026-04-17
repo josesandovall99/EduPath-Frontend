@@ -17,6 +17,13 @@ interface ProgrammingContentViewProps {
   content: Content;
   onBack: () => void;
   embedded?: boolean;
+  configurableMode?: boolean;
+  configurableResponse?: any;
+  onConfigurableResponseChange?: (response: any) => void;
+  exerciseId?: number;
+  exerciseData?: Ejercicio | null;
+  executePath?: string;
+  submitPath?: string;
 }
 
 interface MetodoConfiguracion {
@@ -203,7 +210,7 @@ function formatJavaLikeCode(input: string) {
     .join('\n');
 }
 
-export function ProgrammingContentView({ content, onBack, embedded = false }: ProgrammingContentViewProps) {
+export function ProgrammingContentView({ content, onBack, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, exerciseId, exerciseData = null, executePath, submitPath }: ProgrammingContentViewProps) {
   const subjectColor = '#4A90E2';
   const wrapperClassName = embedded ? 'w-full min-w-0 lg:h-full' : 'overflow-hidden rounded-[2rem] bg-[#F2F2F2]';
   const workspaceClassName = embedded
@@ -240,14 +247,26 @@ export function ProgrammingContentView({ content, onBack, embedded = false }: Pr
   const visibleEditorLineCount = Math.max(EDITOR_BASE_VISIBLE_LINES, editorLines.length);
 
   useEffect(() => {
+    if (exerciseData) {
+      setEjercicio(exerciseData);
+      setCode(getInitialTemplate(exerciseData));
+      setIsLoadingExercise(false);
+      return;
+    }
+
     const cargarEjercicio = async () => {
       setIsLoadingExercise(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/ejercicios?contenido_id=${content.id}`);
+        const response = await fetch(
+          exerciseId
+            ? `${API_BASE_URL}/ejercicios/${exerciseId}`
+            : `${API_BASE_URL}/ejercicios?contenido_id=${content.id}`
+        );
         const data = await response.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setEjercicio(data[0]);
-          setCode(getInitialTemplate(data[0]));
+        const ejercicioCargado = Array.isArray(data) ? data[0] : data;
+        if (ejercicioCargado) {
+          setEjercicio(ejercicioCargado);
+          setCode(getInitialTemplate(ejercicioCargado));
         } else {
           setCode(DEFAULT_TEMPLATE);
         }
@@ -259,7 +278,18 @@ export function ProgrammingContentView({ content, onBack, embedded = false }: Pr
     };
 
     cargarEjercicio();
-  }, [content.id]);
+  }, [content.id, exerciseData, exerciseId]);
+
+  useEffect(() => {
+    const nextCode = (configurableResponse?.codigo || '').toString();
+    if (!configurableMode || !nextCode) return;
+    setCode((currentCode) => currentCode === nextCode ? currentCode : nextCode);
+  }, [configurableMode, configurableResponse?.codigo]);
+
+  useEffect(() => {
+    if (!configurableMode || !onConfigurableResponseChange) return;
+    onConfigurableResponseChange({ codigo: code, respuesta: { texto: code }, lenguaje_id: 62 });
+  }, [code, configurableMode, onConfigurableResponseChange]);
 
   const clearResults = () => {
     setFeedback('');
@@ -291,7 +321,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false }: Pr
     setCasosPruebaResultados([]);
     setResultMode('execution');
 
-    const result = await executeExercise(ejercicio.id, { texto: code });
+    const result = await executeExercise(ejercicio.id, code, 62, executePath);
     const data: any = result.data || {};
 
     if (result.status === 200) {
@@ -327,7 +357,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false }: Pr
       return;
     }
 
-    const result = await submitExercise(ejercicio.id, { texto: code }, estudianteId);
+    const result = await submitExercise(ejercicio.id, { texto: code }, estudianteId, submitPath, executePath ? { codigo: code } : undefined);
     const data: any = result.data || {};
 
     if (result.status === 429) {
@@ -527,15 +557,21 @@ export function ProgrammingContentView({ content, onBack, embedded = false }: Pr
                 {isRunning && <Loader2 className="h-4 w-4 animate-spin" />}
                 {isRunning ? 'Ejecutando...' : 'Ejecutar'}
               </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || isRunning || aprobado || isLoadingExercise}
-                className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ background: isSubmitting || isRunning || aprobado || isLoadingExercise ? '#94a3b8' : 'linear-gradient(135deg, #4A90E2 0%, #5B9FED 55%, #7ED6A7 100%)' }}
-              >
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {aprobado ? 'Aprobado' : isSubmitting ? 'Enviando...' : 'Enviar'}
-              </button>
+              {configurableMode ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-600">
+                  La solución actual se evaluará con el botón principal del miniproyecto.
+                </div>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || isRunning || aprobado || isLoadingExercise}
+                  className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: isSubmitting || isRunning || aprobado || isLoadingExercise ? '#94a3b8' : 'linear-gradient(135deg, #4A90E2 0%, #5B9FED 55%, #7ED6A7 100%)' }}
+                >
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {aprobado ? 'Aprobado' : isSubmitting ? 'Enviando...' : 'Enviar'}
+                </button>
+              )}
             </div>
           </div>
 

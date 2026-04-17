@@ -1,11 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ClipboardList, RefreshCw, Save, Search } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Plus, RefreshCw, Save, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
 import { createQuillModules, loadQuill } from '../utils/quill';
+import { ConfigurableEmbeddedExerciseEditor } from './ConfigurableEmbeddedExerciseEditor';
+import { CreateConfigurableMiniproyectoWorkspace, CreateConfigurableFormData } from './CreateConfigurableMiniproyectoWorkspace';
+import {
+  CompilerCase,
+  EmbeddedExercise,
+  createDefaultCompilerConfig,
+  emptyCompilerCase,
+  parseConfigurableMiniproyecto,
+  parseMethodTemplate,
+  formatJavaLikeTemplate,
+} from './configurableEmbeddedExercises';
 
 interface MiniproyectoManagementScreenProps {
   onBack: () => void;
+  mode?: 'admin' | 'docente';
+  docenteId?: number;
+  docentePersonaId?: number;
+  docenteAreaId?: number;
 }
 
 interface AreaInfo {
@@ -24,7 +39,17 @@ interface ActividadInfo {
   descripcion?: string;
   nivel_dificultad?: string;
   fecha_creacion?: string;
+  estado?: boolean;
   tipo?: TipoActividadInfo;
+}
+
+interface ChatbotInfo {
+  id: number;
+  nombre: string;
+  tipo: 'GENERAL' | 'MINIPROYECTO';
+  estado?: boolean;
+  area_id?: number | null;
+  miniproyecto_id?: number | null;
 }
 
 interface MiniproyectoItem {
@@ -34,6 +59,7 @@ interface MiniproyectoItem {
   respuesta_miniproyecto?: string;
   Area?: AreaInfo;
   Actividad?: ActividadInfo;
+  chatbots?: ChatbotInfo[];
 }
 
 interface EditFormData {
@@ -43,14 +69,6 @@ interface EditFormData {
   entregable: string;
   respuesta_miniproyecto: string;
 }
-
-type MetodoDerivado = {
-  nombre: string;
-  retorno: string;
-  parametros: Array<{ nombre: string; tipo: string }>;
-};
-
-type CompilerCase = { inputs: string; output: string };
 
 type ScheduleRow = { milestone: string; start: string; end: string };
 type CostRow = { deliverable: string; unitMeasure: string; quantity: string; unitPrice: string };
@@ -83,14 +101,15 @@ const normalizeAreaName = (value?: string | null) =>
 
 const JAVA_LANGUAGE_ID = 62;
 
-const emptyCompilerCase = (): CompilerCase => ({ inputs: '', output: '' });
-
-const createDefaultCompilerConfig = () => ({
-  tipo: 'programacion',
-  lenguajesPermitidos: [JAVA_LANGUAGE_ID],
-  sintaxis: [],
-  casos_prueba: [emptyCompilerCase(), emptyCompilerCase(), emptyCompilerCase()],
-  metodo: null as MetodoDerivado | null,
+const createEmptyConfigurableForm = (): CreateConfigurableFormData => ({
+  titulo: '',
+  descripcion: '',
+  nivel_dificultad: 'media',
+  entregable: '',
+  areaId: '',
+  exercises: [],
+  useChatbot: false,
+  chatbotId: '',
 });
 
 function normalizeCompilerCases(rawCases: unknown, fallbackOutput = ''): CompilerCase[] {
@@ -108,55 +127,19 @@ function normalizeCompilerCases(rawCases: unknown, fallbackOutput = ''): Compile
   ];
 }
 
-function parseMethodTemplate(template: string): MetodoDerivado | null {
-  const match = template.match(/(?:public|private|protected)?\s*(?:static\s+)?([A-Za-z_][A-Za-z0-9_<>\[\],\s?]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/);
-  if (!match) return null;
-
-  const parametros = match[3].trim()
-    ? match[3].split(',').map((parametro) => parametro.trim()).filter(Boolean).map((parametro, index) => {
-        const partes = parametro.split(/\s+/).filter(Boolean);
-        if (partes.length < 2) {
-          return { tipo: partes[0] || 'String', nombre: `arg${index}` };
-        }
-        const nombre = partes.pop() || `arg${index}`;
-        return { tipo: partes.join(' '), nombre };
-      })
-    : [];
-
-  return {
-    retorno: match[1].trim(),
-    nombre: match[2].trim(),
-    parametros,
-  };
-}
-
-function formatJavaLikeTemplate(input: string) {
-  const lines = input.split('\n');
-  let indentLevel = 0;
-
-  return lines
-    .map((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return '';
-
-      const leadingClosers = (trimmed.match(/^\}+/) || [''])[0].length;
-      indentLevel = Math.max(0, indentLevel - leadingClosers);
-
-      const formatted = `${'    '.repeat(indentLevel)}${trimmed}`;
-
-      const openBraces = (trimmed.match(/\{/g) || []).length;
-      const closeBraces = (trimmed.match(/\}/g) || []).length;
-      indentLevel = Math.max(0, indentLevel + openBraces - closeBraces + leadingClosers);
-
-      return formatted;
-    })
-    .join('\n');
-}
-
-export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementScreenProps) {
+export function MiniproyectoManagementScreen({
+  onBack,
+  mode = 'admin',
+  docenteId,
+  docentePersonaId,
+  docenteAreaId,
+}: MiniproyectoManagementScreenProps) {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
+  const isDocenteMode = mode === 'docente';
   const [miniproyectos, setMiniproyectos] = useState<MiniproyectoItem[]>([]);
+  const [areas, setAreas] = useState<AreaInfo[]>([]);
+  const [chatbots, setChatbots] = useState<ChatbotInfo[]>([]);
   const [selected, setSelected] = useState<MiniproyectoItem | null>(null);
   const [formData, setFormData] = useState<EditFormData>({
     titulo: '',
@@ -193,14 +176,73 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
   const [scopeInput, setScopeInput] = useState('');
   const [showExpectedModal, setShowExpectedModal] = useState(false);
   const [expectedSnapshot, setExpectedSnapshot] = useState<ExpectedSnapshot | null>(null);
+  const [selectedEmbeddedExercises, setSelectedEmbeddedExercises] = useState<EmbeddedExercise[]>([]);
+  const [selectedUseChatbot, setSelectedUseChatbot] = useState(false);
+  const [selectedChatbotId, setSelectedChatbotId] = useState<string>('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateConfigurableFormData>(createEmptyConfigurableForm());
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+
+  const requestHeaders = useMemo(() => {
+    const authToken = localStorage.getItem('authToken');
+    const personaId = docentePersonaId || Number(localStorage.getItem('personaId'));
+    const headers: Record<string, string> = {};
+
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
+    if (isDocenteMode && Number.isFinite(Number(docenteId))) {
+      headers['x-docente-id'] = String(Number(docenteId));
+    }
+
+    if (isDocenteMode && Number.isFinite(Number(docenteAreaId))) {
+      headers['x-area-id'] = String(Number(docenteAreaId));
+    }
+
+    if (Number.isFinite(personaId)) {
+      headers['x-persona-id'] = String(personaId);
+    }
+
+    return headers;
+  }, [docenteAreaId, docenteId, docentePersonaId, isDocenteMode]);
+
+  function apiFetch(path: string, init: RequestInit = {}, areaIdOverride?: number | null) {
+    const nextHeaders = new Headers(init.headers || {});
+
+    Object.entries(requestHeaders).forEach(([key, value]) => {
+      if (!nextHeaders.has(key)) {
+        nextHeaders.set(key, value);
+      }
+    });
+
+    if (Number.isFinite(Number(areaIdOverride))) {
+      nextHeaders.set('x-area-id', String(Number(areaIdOverride)));
+    }
+
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: nextHeaders,
+    });
+  }
 
   // El tipo de editor depende del area del miniproyecto, no del id de la actividad.
   const selectedAreaName = normalizeAreaName(selected?.Area?.nombre);
   const isProgrammingMiniproyecto = selectedAreaName.includes('programacion');
   const isManagementMiniproyecto = selectedAreaName.includes('alcance') || selectedAreaName.includes('gestion');
+  const selectedConfigurablePayload = parseConfigurableMiniproyecto(selected?.respuesta_miniproyecto);
+  const isConfigurableMiniproyecto = Boolean(selectedConfigurablePayload);
+  const usesRichDescriptionEditor = isConfigurableMiniproyecto || (isProgrammingMiniproyecto && !isConfigurableMiniproyecto);
 
   useEffect(() => {
-    if (!isProgrammingMiniproyecto) return;
+    if (!usesRichDescriptionEditor) {
+      quillRef.current = null;
+      if (editorRef.current) {
+        editorRef.current.innerHTML = '';
+      }
+      return;
+    }
 
     let cancelled = false;
 
@@ -208,46 +250,87 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
       if (!editorRef.current) return;
       const Quill = await loadQuill();
       if (cancelled || !editorRef.current) return;
-      if (!quillRef.current) {
-        editorRef.current.innerHTML = '';
-        quillRef.current = new Quill(editorRef.current, {
-          theme: 'snow',
-          placeholder: 'Ingrese la descripcion del miniproyecto',
-          modules: createQuillModules()
-        });
-        quillRef.current.on('text-change', () => {
-          setFormData((prev) => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
-        });
+      editorRef.current.innerHTML = '';
+      const quill = new Quill(editorRef.current, {
+        theme: 'snow',
+        placeholder: 'Ingrese la descripcion del miniproyecto',
+        modules: createQuillModules()
+      });
+
+      const nextHtml = formData.descripcion || '';
+      if (quill.root.innerHTML !== nextHtml) {
+        quill.root.innerHTML = nextHtml;
       }
+
+      quill.on('text-change', () => {
+        const nextDescription = quill.root.innerHTML;
+        setFormData((prev) => prev.descripcion === nextDescription ? prev : { ...prev, descripcion: nextDescription });
+      });
+
+      quillRef.current = quill;
     };
 
     ensureQuill();
 
     return () => {
       cancelled = true;
+      quillRef.current = null;
+      if (editorRef.current) {
+        editorRef.current.innerHTML = '';
+      }
     };
-  }, [isProgrammingMiniproyecto]);
+  }, [formData.descripcion, selected?.id, usesRichDescriptionEditor]);
 
   useEffect(() => {
-    if (!isProgrammingMiniproyecto || !quillRef.current) return;
+    if (!usesRichDescriptionEditor || !quillRef.current) return;
 
     const nextHtml = formData.descripcion || '';
     if (quillRef.current.root.innerHTML !== nextHtml) {
       quillRef.current.root.innerHTML = nextHtml;
     }
-  }, [selected?.id, isProgrammingMiniproyecto]);
+  }, [formData.descripcion, usesRichDescriptionEditor]);
 
   const sintaxisDisponibles = ['while', 'for', 'if', 'switch'];
 
   useEffect(() => {
     loadMiniproyectos();
+    loadSupportingData();
   }, []);
+
+  const loadSupportingData = async () => {
+    try {
+      const areasEndpoint = isDocenteMode ? '/areas/mis-areas' : '/areas';
+      const [areasResponse, chatbotsResponse] = await Promise.all([
+        apiFetch(areasEndpoint),
+        apiFetch('/chatbots'),
+      ]);
+
+      if (!areasResponse.ok) {
+        throw new Error('No se pudieron cargar las áreas disponibles');
+      }
+
+      if (!chatbotsResponse.ok) {
+        throw new Error('No se pudieron cargar los chatbots disponibles');
+      }
+
+      const [areasData, chatbotsData] = await Promise.all([
+        areasResponse.json(),
+        chatbotsResponse.json(),
+      ]);
+
+      setAreas(Array.isArray(areasData) ? areasData : []);
+      setChatbots(Array.isArray(chatbotsData) ? chatbotsData : []);
+    } catch (err) {
+      console.error('Error cargando datos auxiliares de miniproyectos:', err);
+      setError((previousError) => previousError || (err instanceof Error ? err.message : 'Error al cargar áreas y chatbots'));
+    }
+  };
 
   const loadMiniproyectos = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/miniproyectos`);
+      const response = await apiFetch('/miniproyectos', {}, docenteAreaId ?? null);
       if (!response.ok) {
         throw new Error('No se pudieron cargar los miniproyectos');
       }
@@ -271,6 +354,53 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
       return titulo.includes(term) || area.includes(term) || nivel.includes(term);
     });
   }, [miniproyectos, query]);
+
+  const activeMiniproyectoAreaIds = useMemo(() => {
+    return new Set(
+      miniproyectos
+        .filter((item) => item.Actividad?.estado !== false)
+        .map((item) => Number(item.Area?.id ?? item.Area?.id))
+        .filter((item) => Number.isInteger(item) && item > 0)
+    );
+  }, [miniproyectos]);
+
+  const freeAreas = useMemo(() => {
+    return areas
+      .filter((area) => !activeMiniproyectoAreaIds.has(Number(area.id)))
+      .sort((left, right) => left.nombre.localeCompare(right.nombre));
+  }, [areas, activeMiniproyectoAreaIds]);
+
+  const selectedCreateAreaId = Number(createForm.areaId);
+
+  const createEligibleChatbots = useMemo(() => {
+    if (!Number.isInteger(selectedCreateAreaId) || selectedCreateAreaId <= 0) return [];
+
+    return chatbots
+      .filter((chatbot) => (
+        chatbot.estado !== false &&
+        (chatbot.miniproyecto_id === null || chatbot.miniproyecto_id === undefined) &&
+        Number(chatbot.area_id) === selectedCreateAreaId
+      ))
+      .sort((left, right) => left.nombre.localeCompare(right.nombre));
+  }, [chatbots, selectedCreateAreaId]);
+
+  const selectedEligibleChatbots = useMemo(() => {
+    const selectedAreaId = Number(selected?.Area?.id);
+    if (!isConfigurableMiniproyecto || !Number.isInteger(selectedAreaId) || selectedAreaId <= 0) return [];
+
+    return chatbots
+      .filter((chatbot) => (
+        chatbot.estado !== false &&
+        (chatbot.miniproyecto_id === null || chatbot.miniproyecto_id === undefined || Number(chatbot.miniproyecto_id) === Number(selected?.id)) &&
+        Number(chatbot.area_id) === selectedAreaId
+      ))
+      .sort((left, right) => left.nombre.localeCompare(right.nombre));
+  }, [chatbots, selected?.Area?.id, selected?.id, isConfigurableMiniproyecto]);
+
+  const miniproyectoActivityTypeId = useMemo(() => {
+    const typeId = miniproyectos.find((item) => Number(item.Actividad?.tipo?.id))?.Actividad?.tipo?.id;
+    return Number(typeId) || null;
+  }, [miniproyectos]);
 
   const parseNumber = (value: string) => {
     const normalized = value.replace(/[^0-9.,]/g, '').replace(',', '.');
@@ -340,6 +470,7 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
 
   const handleSelect = (item: MiniproyectoItem) => {
     setSelected(item);
+    const configurablePayload = parseConfigurableMiniproyecto(item.respuesta_miniproyecto);
     let parsedStakeholders: string[] = [];
     let parsedFunctional: string[] = [];
     let parsedNonFunctional: string[] = [];
@@ -503,6 +634,10 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
       setCompilerCases(createDefaultCompilerConfig().casos_prueba);
       setSintaxisRequerida([]);
     }
+
+    setSelectedEmbeddedExercises(configurablePayload?.exercises || []);
+    setSelectedUseChatbot(Boolean(configurablePayload?.chatbot?.enabled));
+    setSelectedChatbotId(configurablePayload?.chatbot?.chatbotId ? String(configurablePayload.chatbot.chatbotId) : '');
   };
 
   const addListItem = (value: string, setter: React.Dispatch<React.SetStateAction<string[]>>, reset: () => void) => {
@@ -542,6 +677,93 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     )));
   };
 
+  const openCreateModal = () => {
+    setCreateError(null);
+    setCreateForm({
+      ...createEmptyConfigurableForm(),
+      areaId: freeAreas.length === 1 ? String(freeAreas[0].id) : '',
+    });
+    setShowCreateModal(true);
+  };
+
+  const closeCreateModal = () => {
+    if (isCreating) return;
+    setShowCreateModal(false);
+    setCreateError(null);
+  };
+
+  const handleCreateConfigurableMiniproyecto = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!createForm.titulo.trim()) {
+      setCreateError('El título es obligatorio.');
+      return;
+    }
+
+    if (!createForm.areaId) {
+      setCreateError('Debes seleccionar un área libre.');
+      return;
+    }
+
+    if (createForm.exercises.length === 0) {
+      setCreateError('Crea al menos un ejercicio para el nuevo miniproyecto.');
+      return;
+    }
+
+    if (createForm.useChatbot && !createForm.chatbotId) {
+      setCreateError('Selecciona un chatbot si deseas usar simulación de cliente.');
+      return;
+    }
+
+    if (!miniproyectoActivityTypeId) {
+      setCreateError('No se pudo identificar el tipo de actividad para miniproyectos.');
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateError(null);
+
+    try {
+      const payload = {
+        titulo: createForm.titulo.trim(),
+        descripcion: createForm.descripcion.trim(),
+        nivel_dificultad: createForm.nivel_dificultad.trim() || 'media',
+        entregable: createForm.entregable.trim(),
+        area_id: Number(createForm.areaId),
+        tipo_actividad_id: miniproyectoActivityTypeId,
+        respuesta_miniproyecto: {
+          tipo: 'configurable',
+          modo: 'ejercicios',
+          exercises: createForm.exercises,
+          chatbot: {
+            enabled: createForm.useChatbot,
+            chatbotId: createForm.useChatbot && createForm.chatbotId ? Number(createForm.chatbotId) : null,
+          },
+        },
+      };
+
+      const response = await apiFetch('/miniproyectos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }, Number(createForm.areaId));
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'No fue posible crear el miniproyecto configurable');
+      }
+
+      await Promise.all([loadMiniproyectos(), loadSupportingData()]);
+      setShowCreateModal(false);
+      setCreateForm(createEmptyConfigurableForm());
+    } catch (err) {
+      console.error('Error creando miniproyecto configurable:', err);
+      setCreateError(err instanceof Error ? err.message : 'Error al crear el miniproyecto configurable');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   useEffect(() => {
     if (!isManagementMiniproyecto) return;
 
@@ -561,8 +783,29 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
     if (!selected) return;
 
     let programmingPayload: string | null = null;
+    let configurablePayload: string | null = null;
 
-    if (isProgrammingMiniproyecto) {
+    if (isConfigurableMiniproyecto) {
+      if (selectedEmbeddedExercises.length === 0) {
+        setError('Debes crear al menos un ejercicio para el miniproyecto configurable.');
+        return;
+      }
+
+      if (selectedUseChatbot && !selectedChatbotId) {
+        setError('Selecciona un chatbot para activar la simulación del cliente.');
+        return;
+      }
+
+      configurablePayload = JSON.stringify({
+        tipo: 'configurable',
+        modo: 'ejercicios',
+        exercises: selectedEmbeddedExercises,
+        chatbot: {
+          enabled: selectedUseChatbot,
+          chatbotId: selectedUseChatbot && selectedChatbotId ? Number(selectedChatbotId) : null,
+        },
+      });
+    } else if (isProgrammingMiniproyecto) {
       const plantilla = compilerTemplate.trim();
       const metodoDerivado = parseMethodTemplate(plantilla);
 
@@ -616,7 +859,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
           descripcion: formData.descripcion,
           nivel_dificultad: formData.nivel_dificultad,
           entregable: formData.entregable,
-          respuesta_miniproyecto: isProgrammingMiniproyecto
+          respuesta_miniproyecto: isConfigurableMiniproyecto
+            ? configurablePayload
+            : isProgrammingMiniproyecto
             ? programmingPayload
             : isManagementMiniproyecto
               ? JSON.stringify({
@@ -640,39 +885,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
         throw new Error(errorData.error || 'Error al actualizar el miniproyecto');
       }
 
-      setMiniproyectos((prev) =>
-        prev.map((item) => {
-          if (item.id !== selected.id) return item;
-          return {
-            ...item,
-            entregable: formData.entregable,
-            respuesta_miniproyecto: isProgrammingMiniproyecto
-              ? programmingPayload || item.respuesta_miniproyecto || ''
-              : isManagementMiniproyecto
-                ? JSON.stringify({
-                    objetivoPrincipal: projectObjective.trim() ? [projectObjective.trim()] : [],
-                    objetivosEspecificos: specificObjectivesList,
-                    entregables: scopeList,
-                    cronograma: scheduleList,
-                    costos: costsList,
-                    supuestos: assumptionsList
-                  })
-                : JSON.stringify({
-                    stakeholders: stakeholdersList,
-                    requisitosFuncionales: functionalList,
-                    requisitosNoFuncionales: nonFunctionalList
-                  }),
-            Actividad: {
-              ...(item.Actividad || {}),
-              titulo: formData.titulo,
-              descripcion: formData.descripcion,
-              nivel_dificultad: formData.nivel_dificultad
-            }
-          };
-        })
-      );
+      await Promise.all([loadMiniproyectos(), loadSupportingData()]);
 
-      if (!isProgrammingMiniproyecto) {
+      if (!isProgrammingMiniproyecto && !isConfigurableMiniproyecto) {
         if (isManagementMiniproyecto) {
           setExpectedSnapshot({
             mode: 'management',
@@ -695,6 +910,9 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
       }
 
       setSelected(null);
+      setSelectedEmbeddedExercises([]);
+      setSelectedUseChatbot(false);
+      setSelectedChatbotId('');
     } catch (err) {
       console.error('Error actualizando miniproyecto:', err);
       setError(err instanceof Error ? err.message : 'Error al actualizar el miniproyecto');
@@ -749,6 +967,13 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={openCreateModal}
+                className="app-btn px-4 py-2 bg-[#4A90E2] text-white hover:bg-[#3A7ED1]"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-sm">Crear configurable</span>
+              </button>
               <div className="hidden md:flex items-center gap-2 text-xs text-gray-500 bg-gray-100 px-3 py-2 rounded-full">
                 <span>Total:</span>
                 <span className="font-semibold text-gray-700">{totalMiniproyectos}</span>
@@ -877,8 +1102,8 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1.5">Descripción</label>
-                  {isProgrammingMiniproyecto ? (
-                    <div className="quill-editor-container app-rich-text-editor">
+                  {usesRichDescriptionEditor ? (
+                    <div className="quill-editor-container app-rich-text-editor" key={`rich-description-${selected?.id || 'none'}`}>
                       <div
                         ref={editorRef}
                         className="w-full"
@@ -910,7 +1135,57 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
                     className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                   />
                 </div>
-                {isProgrammingMiniproyecto ? (
+                {isConfigurableMiniproyecto ? (
+                  <div className="space-y-5 rounded-2xl border border-[#4A90E2]/20 bg-[#F8FBFF] p-5">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold text-[#3A4A5B]">Miniproyecto configurable por ejercicios</h3>
+                        <p className="text-xs text-gray-500">Este miniproyecto contiene ejercicios creados dentro del mismo flujo y puede usar un chatbot como cliente simulado.</p>
+                      </div>
+                      <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-semibold text-blue-700">
+                        Área: {selected?.Area?.nombre || 'Sin área'}
+                      </span>
+                    </div>
+
+                    <ConfigurableEmbeddedExerciseEditor
+                      exercises={selectedEmbeddedExercises}
+                      onChange={setSelectedEmbeddedExercises}
+                    />
+
+                    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+                      <label className="flex items-center gap-3 text-sm font-medium text-[#3A4A5B]">
+                        <input
+                          type="checkbox"
+                          checked={selectedUseChatbot}
+                          onChange={(event) => {
+                            const enabled = event.target.checked;
+                            setSelectedUseChatbot(enabled);
+                            if (!enabled) {
+                              setSelectedChatbotId('');
+                            }
+                          }}
+                          className="h-4 w-4"
+                        />
+                        Usar chatbot como simulación del cliente
+                      </label>
+
+                      {selectedUseChatbot ? (
+                        <select
+                          value={selectedChatbotId}
+                          onChange={(event) => setSelectedChatbotId(event.target.value)}
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                        >
+                          <option value="">Selecciona un chatbot</option>
+                          {selectedEligibleChatbots.map((chatbot) => (
+                            <option key={chatbot.id} value={String(chatbot.id)}>
+                              {chatbot.nombre} {chatbot.tipo === 'GENERAL' ? '(general)' : '(miniproyecto)'}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : isProgrammingMiniproyecto ? (
                   <div className="space-y-4">
                     <div className="space-y-4 rounded-xl border border-blue-100 bg-blue-50/40 p-4">
                       <div className="flex items-start justify-between gap-3">
@@ -1400,6 +1675,19 @@ export function MiniproyectoManagementScreen({ onBack }: MiniproyectoManagementS
           </section>
         </div>
       </main>
+
+      {showCreateModal ? (
+        <CreateConfigurableMiniproyectoWorkspace
+          formData={createForm}
+          freeAreas={freeAreas}
+          eligibleChatbots={createEligibleChatbots}
+          error={createError}
+          isCreating={isCreating}
+          onClose={closeCreateModal}
+          onSubmit={handleCreateConfigurableMiniproyecto}
+          onUpdate={setCreateForm}
+        />
+      ) : null}
 
       {showExpectedModal && expectedSnapshot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
