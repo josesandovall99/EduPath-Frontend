@@ -21,7 +21,7 @@ interface DashboardScreenProps {
   estudianteId?: number;
 }
 
-type AreaCategory = 'fundamentos' | 'analisis' | 'atc';
+type RestrictedAreaCategory = 'fundamentos' | 'analisis' | 'atc';
 
 const colorPalette = ['#4A90E2', '#7ED6A7', '#F5A97F', '#FFB84D', '#A78BFA', '#EC4899'];
 
@@ -33,7 +33,7 @@ const normalizeAreaName = (value?: string | null) =>
     .trim()
     .replace(/\s+/g, ' ');
 
-const getAreaCategory = (areaName?: string | null): AreaCategory | null => {
+const getRestrictedAreaCategory = (areaName?: string | null): RestrictedAreaCategory | null => {
   const normalizedName = normalizeAreaName(areaName);
 
   if (normalizedName.includes('fundamentos') && normalizedName.includes('program')) {
@@ -100,7 +100,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
   const [loadingProgresos, setLoadingProgresos] = useState(false);
 
   // Función para obtener áreas permitidas según el semestre
-  const obtenerAreasPermitidas = (semestre: number): AreaCategory[] => {
+  const obtenerAreasPermitidas = (semestre: number): RestrictedAreaCategory[] => {
     if (semestre >= 1 && semestre <= 4) {
       return ['fundamentos'];
     } else if (semestre >= 5 && semestre <= 6) {
@@ -166,8 +166,15 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         
         // Filtrar áreas según el semestre
         const areasFiltradas = areas.filter((area: Area) => {
-          const category = getAreaCategory(area.nombre);
-          return category ? areasPermitidas.includes(category) : false;
+          const restrictedCategory = getRestrictedAreaCategory(area.nombre);
+
+          // Las áreas históricas siguen limitadas por semestre.
+          // Cualquier área nueva queda visible para todos los estudiantes.
+          if (!restrictedCategory) {
+            return true;
+          }
+
+          return areasPermitidas.includes(restrictedCategory);
         });
 
         console.log(`Semestre ${semestre} - Áreas permitidas:`, areasPermitidas);
