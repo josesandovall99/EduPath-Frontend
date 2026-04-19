@@ -175,6 +175,14 @@ function mapChatbotToForm(chatbot: ChatbotItem): ChatbotFormState {
   };
 }
 
+function enforceDocenteFormMode(formState: ChatbotFormState, docenteAreaId?: number, fallbackAreaId?: number) {
+  return {
+    ...formState,
+    tipo: 'MINIPROYECTO' as const,
+    area_id: formState.area_id || String(Number(docenteAreaId) || Number(fallbackAreaId) || ''),
+  };
+}
+
 function InfoBadge({ text }: { text: string }) {
   return (
     <span
@@ -466,7 +474,11 @@ export function ChatbotManagementScreen({
 
   async function selectChatbot(chatbot: ChatbotItem) {
     setSelectedChatbotId(chatbot.id);
-    setForm(mapChatbotToForm(chatbot));
+    setForm(
+      isDocenteMode
+        ? enforceDocenteFormMode(mapChatbotToForm(chatbot), docenteAreaId, Number(areaOptions[0]?.id))
+        : mapChatbotToForm(chatbot)
+    );
     setDocuments(chatbot.documentos || []);
     setMessages([]);
 
@@ -495,12 +507,14 @@ export function ChatbotManagementScreen({
 
   function handleCreateNew() {
     setSelectedChatbotId(null);
-    setForm({
-      ...emptyForm(),
-      area_id: isDocenteMode
-        ? String(Number(docenteAreaId) || Number(areaOptions[0]?.id) || '')
-        : '',
-    });
+    setForm(
+      isDocenteMode
+        ? enforceDocenteFormMode(emptyForm(), docenteAreaId, Number(areaOptions[0]?.id))
+        : {
+            ...emptyForm(),
+            area_id: '',
+          }
+    );
     setDocuments([]);
     setStats(null);
     setSelectedFile(null);
@@ -526,10 +540,18 @@ export function ChatbotManagementScreen({
     if (selectedChatbotId) {
       const selectedChatbot = chatbots.find((item) => item.id === selectedChatbotId);
       if (selectedChatbot) {
-        setForm(mapChatbotToForm(selectedChatbot));
+        setForm(
+          isDocenteMode
+            ? enforceDocenteFormMode(mapChatbotToForm(selectedChatbot), docenteAreaId, Number(areaOptions[0]?.id))
+            : mapChatbotToForm(selectedChatbot)
+        );
       }
     } else {
-      setForm(emptyForm());
+      setForm(
+        isDocenteMode
+          ? enforceDocenteFormMode(emptyForm(), docenteAreaId, Number(areaOptions[0]?.id))
+          : emptyForm()
+      );
     }
 
     setStatusMessage('Formulario oculto. Usa Crear Nuevo Chatbot o Editar para abrirlo cuando lo necesites.');
@@ -561,12 +583,12 @@ export function ChatbotManagementScreen({
     const payload = {
       nombre_chatbot: form.nombre_chatbot,
       descripcion: form.descripcion,
-      tipo: form.tipo,
+      tipo: isDocenteMode ? 'MINIPROYECTO' : form.tipo,
       prompt_base: form.prompt_base,
       estado: form.estado,
       configuracion: {
         area_id: form.area_id ? Number(form.area_id) : null,
-        miniproyecto_id: form.tipo === 'MINIPROYECTO' && form.miniproyecto_id ? Number(form.miniproyecto_id) : null,
+        miniproyecto_id: (isDocenteMode || form.tipo === 'MINIPROYECTO') && form.miniproyecto_id ? Number(form.miniproyecto_id) : null,
       },
       parametros_rendimiento: {
         model: form.model,
@@ -1348,9 +1370,20 @@ export function ChatbotManagementScreen({
 
                       <div className="app-form-field">
                         <label className="app-form-label">Tipo</label>
-                        <select value={form.tipo} onChange={(event) => updateForm('tipo', event.target.value as ChatbotFormState['tipo'])} className="app-form-select">
-                          <option value="GENERAL">General</option>
-                          <option value="MINIPROYECTO">Miniproyecto</option>
+                        <select
+                          value={isDocenteMode ? 'MINIPROYECTO' : form.tipo}
+                          onChange={(event) => updateForm('tipo', event.target.value as ChatbotFormState['tipo'])}
+                          disabled={isDocenteMode}
+                          className="app-form-select disabled:bg-gray-100 disabled:text-gray-400"
+                        >
+                          {isDocenteMode ? (
+                            <option value="MINIPROYECTO">Miniproyecto</option>
+                          ) : (
+                            <>
+                              <option value="GENERAL">General</option>
+                              <option value="MINIPROYECTO">Miniproyecto</option>
+                            </>
+                          )}
                         </select>
                       </div>
 

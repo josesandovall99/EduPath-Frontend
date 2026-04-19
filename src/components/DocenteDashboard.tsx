@@ -5,7 +5,7 @@ import { API_BASE_URL } from '../utils/constants';
 import { ExerciseManagementScreen } from './ExerciseManagementScreen';
 import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
 import { ReportsScreen } from './ReportsScreen';
-import { ChatbotManagementScreen } from './ChatbotManagementScreen';
+import { DocenteChatbotManagementScreen } from './DocenteChatbotManagementScreen';
 
 interface DocenteDashboardProps {
   onLogout: () => void;
@@ -251,9 +251,8 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
 
   if (currentScreen === 'chatbot') {
     return (
-      <ChatbotManagementScreen
+      <DocenteChatbotManagementScreen
         onBack={() => setCurrentScreen('dashboard')}
-        mode="docente"
         docenteId={docente?.id}
         docentePersonaId={docente?.personaId}
         docenteAreaId={docente?.areaId}
