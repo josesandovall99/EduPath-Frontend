@@ -134,7 +134,7 @@ export function MiniproyectoManagementScreen({
   docentePersonaId,
   docenteAreaId,
 }: MiniproyectoManagementScreenProps) {
-  const editorRef = useRef<HTMLDivElement | null>(null);
+  const editorHostRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
   const isDocenteMode = mode === 'docente';
   const [miniproyectos, setMiniproyectos] = useState<MiniproyectoItem[]>([]);
@@ -235,23 +235,30 @@ export function MiniproyectoManagementScreen({
   const isConfigurableMiniproyecto = Boolean(selectedConfigurablePayload);
   const usesRichDescriptionEditor = isConfigurableMiniproyecto || (isProgrammingMiniproyecto && !isConfigurableMiniproyecto);
 
+  const clearQuillArtifacts = () => {
+    if (editorHostRef.current) {
+      editorHostRef.current.innerHTML = '';
+    }
+  };
+
   useEffect(() => {
     if (!usesRichDescriptionEditor) {
       quillRef.current = null;
-      if (editorRef.current) {
-        editorRef.current.innerHTML = '';
-      }
+      clearQuillArtifacts();
       return;
     }
 
     let cancelled = false;
 
     const ensureQuill = async () => {
-      if (!editorRef.current) return;
+      if (!editorHostRef.current || quillRef.current) return;
       const Quill = await loadQuill();
-      if (cancelled || !editorRef.current) return;
-      editorRef.current.innerHTML = '';
-      const quill = new Quill(editorRef.current, {
+      if (cancelled || !editorHostRef.current || quillRef.current) return;
+      clearQuillArtifacts();
+      const mountNode = document.createElement('div');
+      editorHostRef.current.appendChild(mountNode);
+
+      const quill = new Quill(mountNode, {
         theme: 'snow',
         placeholder: 'Ingrese la descripcion del miniproyecto',
         modules: createQuillModules()
@@ -275,11 +282,9 @@ export function MiniproyectoManagementScreen({
     return () => {
       cancelled = true;
       quillRef.current = null;
-      if (editorRef.current) {
-        editorRef.current.innerHTML = '';
-      }
+      clearQuillArtifacts();
     };
-  }, [formData.descripcion, selected?.id, usesRichDescriptionEditor]);
+  }, [selected?.id, usesRichDescriptionEditor]);
 
   useEffect(() => {
     if (!usesRichDescriptionEditor || !quillRef.current) return;
@@ -923,67 +928,50 @@ export function MiniproyectoManagementScreen({
 
   const totalMiniproyectos = miniproyectos.length;
   const resultadosMostrados = filteredMiniproyectos.length;
-
-  const kpiCards = [
-    {
-      label: 'Miniproyectos totales',
-      value: String(totalMiniproyectos),
-      bg: '#4A90E2'
-    },
-    {
-      label: 'Resultados visibles',
-      value: String(resultadosMostrados),
-      bg: '#14B8A6'
-    },
-    {
-      label: 'Seleccionado',
-      value: selected?.Actividad?.titulo || 'Sin selección',
-      bg: '#8B5CF6'
-    }
-  ];
-
-  const getMiniproyectoTone = (index: number) => {
-    const tones = [
-      { bg: '#EAF3FF', border: '#4A90E2' },
-      { bg: '#EAFBF7', border: '#14B8A6' },
-      { bg: '#FFF6EA', border: '#F59E0B' },
-      { bg: '#F3EEFF', border: '#8B5CF6' }
-    ];
-    return tones[index % tones.length];
-  };
+  const activeMiniproyectos = miniproyectos.filter((item) => item.Actividad?.estado !== false).length;
+  const selectedMiniproyectoTitle = selected?.Actividad?.titulo || 'Sin selección';
+  const selectedMiniproyectoArea = selected?.Area?.nombre || 'Área no definida';
+  const selectedEditorMode = isConfigurableMiniproyecto
+    ? 'Configurable'
+    : isProgrammingMiniproyecto
+      ? 'Programación'
+      : isManagementMiniproyecto
+        ? 'Gestión'
+        : selected
+          ? 'Análisis'
+          : 'Sin editor';
+    const managementSnapshot = expectedSnapshot?.mode === 'management' ? expectedSnapshot : null;
+    const analysisSnapshot = expectedSnapshot?.mode === 'analysis' ? expectedSnapshot : null;
 
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Miniproyectos</h1>
-                <p className="text-gray-500 text-sm">Panel de Docente - EduPath</p>
+                <p className="text-gray-500 text-sm">Listado, edición y seguimiento dentro del mismo lenguaje visual del panel.</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+
+            <div className="app-action-row">
               <button
                 onClick={openCreateModal}
-                className="app-btn px-4 py-2 bg-[#4A90E2] text-white hover:bg-[#3A7ED1]"
+                className="app-btn app-primary-btn"
               >
                 <Plus className="w-4 h-4" />
-                <span className="text-sm">Crear configurable</span>
+                <span>Crear configurable</span>
               </button>
-              <div className="hidden md:flex items-center gap-2 text-xs text-gray-500 bg-gray-100 px-3 py-2 rounded-full">
-                <span>Total:</span>
-                <span className="font-semibold text-gray-700">{totalMiniproyectos}</span>
-              </div>
               <button
                 onClick={loadMiniproyectos}
-                className="app-btn app-btn-secondary px-4 py-2 text-gray-600 hover:text-[#4A90E2]"
+                className="app-btn app-btn-secondary"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span className="text-sm">Actualizar</span>
+                <span>Actualizar</span>
               </button>
             </div>
           </div>
@@ -991,155 +979,205 @@ export function MiniproyectoManagementScreen({
       </header>
 
       <main className="app-main">
-        <button
-          onClick={onBack}
-          className="app-back-button mb-6"
-        >
+        <button onClick={onBack} className="app-back-button mb-6">
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Panel</span>
         </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {kpiCards.map((card) => (
-            <div
-              key={card.label}
-              className="rounded-xl shadow-md p-4 text-white"
-              style={{ backgroundColor: card.bg }}
-            >
-              <p className="text-xs text-white/90">{card.label}</p>
-              <p className="text-2xl font-semibold text-white truncate">{card.value}</p>
-            </div>
-          ))}
-        </div>
+        <section className="app-page-hero app-miniproyecto-hero mb-5">
+          <div className="app-miniproyecto-hero-grid">
+            <div className="app-miniproyecto-hero-main">
+              <div className="app-page-hero__copy">
+              <div className="app-page-hero__eyebrow">Edición docente</div>
+              <h2 className="app-page-hero__title">Gestión de miniproyectos</h2>
+              <p className="app-page-hero__description">Administra el catálogo y trabaja el editor desde una composición compacta y coherente con el panel.</p>
+              </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-8">
-          <section className="bg-white rounded-2xl shadow-md p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-              <div>
-                <h2 className="text-[#3A4A5B] text-lg font-semibold">Listado de Miniproyectos</h2>
-                <p className="text-sm text-gray-500">Selecciona un miniproyecto para editarlo.</p>
-              </div>
-              <div className="relative w-full sm:w-auto">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Buscar por título, área o nivel"
-                  className="w-full sm:w-80 h-11 pl-10 pr-4 border border-gray-300 rounded-lg text-sm leading-5 focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent bg-white"
-                />
+              <div className="app-toolbar-card app-miniproyecto-toolbar app-miniproyecto-toolbar--hero">
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Catálogo visible</p>
+                    <p className="mt-1 text-sm text-slate-600">Filtra por título, área o nivel.</p>
+                  </div>
+                  <div className="max-w-full truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                    {resultadosMostrados} visibles
+                  </div>
+                </div>
+                <div className="app-search-field">
+                  <Search className="app-search-field__icon" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Buscar por título, área o nivel"
+                    className="app-form-input"
+                  />
+                </div>
               </div>
             </div>
+
+            <aside className="app-miniproyecto-hero-side">
+            <div className="app-hero-metrics app-miniproyecto-hero-metrics">
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Catálogo</div>
+                <div className="app-hero-metric__value">{totalMiniproyectos}</div>
+                <div className="app-hero-metric__help">Miniproyectos registrados.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Visibles</div>
+                <div className="app-hero-metric__value">{resultadosMostrados}</div>
+                <div className="app-hero-metric__help">Resultados según la búsqueda actual.</div>
+              </div>
+              <div className="app-hero-metric">
+                <div className="app-hero-metric__label">Activos</div>
+                <div className="app-hero-metric__value">{activeMiniproyectos}</div>
+                <div className="app-hero-metric__help">Disponibles en el flujo principal.</div>
+              </div>
+            </div>
+
+            <div className="app-soft-card app-context-card app-miniproyecto-hero-context">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Proyecto activo</p>
+              <p className="app-context-card__title">{selectedMiniproyectoTitle}</p>
+              <p className="app-context-card__text">Área: {selectedMiniproyectoArea}</p>
+              <p className="app-context-card__text">Editor: {selectedEditorMode}</p>
+            </div>
+            </aside>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)] gap-6">
+          <section className="app-table-card">
+            <div className="app-table-card__header app-table-card__header--blue">
+              <div>
+                <div className="app-table-card__title">Listado de miniproyectos</div>
+                <p className="app-table-card__description">Selecciona un registro para cargarlo en el editor lateral.</p>
+              </div>
+            </div>
+            <div className="app-table-card__body app-miniproyecto-table-body">
 
             {isLoading ? (
-              <div className="py-10 text-center text-gray-500">Cargando miniproyectos...</div>
+              <div className="app-empty-panel py-10">Cargando miniproyectos...</div>
             ) : error ? (
-              <div className="py-10 text-center text-red-600">{error}</div>
+              <div className="app-alert app-alert--error">{error}</div>
             ) : filteredMiniproyectos.length === 0 ? (
-              <div className="py-10 text-center text-gray-500">
-                No hay miniproyectos que coincidan con la búsqueda.
-              </div>
+              <div className="app-empty-panel py-10">No hay miniproyectos que coincidan con la búsqueda.</div>
             ) : (
-              <div className="space-y-4">
+              <div className="app-miniproyecto-catalog-grid">
                 {filteredMiniproyectos.map((item, index) => (
                   <button
                     key={item.id}
                     onClick={() => handleSelect(item)}
-                    className={`w-full text-left border rounded-2xl p-5 transition-all hover:shadow-lg ${
-                      selected?.id === item.id ? 'shadow-md' : ''
-                    }`}
+                    className={`app-list-card app-list-card--compact app-miniproyecto-catalog-card w-full border-2 ${selected?.id === item.id ? 'shadow-lg translate-y-[-1px]' : ''}`}
                     style={
                       selected?.id === item.id
                         ? {
-                            backgroundColor: '#EAF3FF',
-                            borderColor: '#4A90E2'
+                            borderColor: '#4A90E2',
+                            backgroundColor: '#F8FBFF'
                           }
                         : {
-                            backgroundColor: getMiniproyectoTone(index).bg,
-                            borderColor: getMiniproyectoTone(index).border
+                            borderColor: index % 3 === 0 ? '#BFDBFE' : index % 3 === 1 ? '#BBF7D0' : '#FDE68A',
+                            backgroundColor: '#FFFFFF'
                           }
                     }
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-[#3A4A5B]">
-                          {item.Actividad?.titulo || 'Sin título'}
-                        </h3>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <span className="text-xs px-2.5 py-1 rounded-full bg-white/80 text-gray-700">
-                            Área: {item.Area?.nombre || 'Sin área'}
+                    <div className="app-list-card__head app-miniproyecto-catalog-card__head">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-3 flex flex-wrap items-center gap-2">
+                          <span className={`app-badge ${item.Actividad?.estado !== false ? 'app-badge--green' : 'app-badge--amber'}`}>
+                            {item.Actividad?.estado !== false ? 'Activo' : 'Inhabilitado'}
                           </span>
-                          <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
-                            Nivel: {item.Actividad?.nivel_dificultad || 'No definido'}
-                          </span>
+                          <span className="app-badge app-badge--blue">{item.Actividad?.nivel_dificultad || 'Nivel no definido'}</span>
                         </div>
+                        <h3 className="app-list-card__title uppercase">{item.Actividad?.titulo || 'Sin título'}</h3>
+                        <p className="app-list-card__description mt-1.5">{item.Area?.nombre || 'Sin área asignada'}</p>
                       </div>
-                      <div className="flex items-center gap-2 text-[#4A90E2]">
-                        <ClipboardList className="w-5 h-5" />
-                        <span className="text-sm font-medium">Editar</span>
+                      <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#4A90E2] app-miniproyecto-catalog-card__action">
+                        <ClipboardList className="w-4 h-4" />
+                        <span>Editar</span>
                       </div>
+                    </div>
+                    <div className="app-list-card__footer">
+                      <span className="app-list-card__meta">{item.chatbots?.length ? `${item.chatbots.length} chatbot(s) vinculados` : 'Sin chatbot vinculado'}</span>
+                      <span className="app-list-card__meta">Actividad #{item.actividad_id || item.Actividad?.id || item.id}</span>
                     </div>
                   </button>
                 ))}
               </div>
             )}
+            </div>
           </section>
 
-          <section className="bg-white rounded-2xl shadow-md p-6">
-            <h2 className="text-[#3A4A5B] text-lg font-semibold mb-4">Editar Miniproyecto</h2>
-            {!selected ? (
-              <div className="py-12 text-center text-gray-500">
-                Selecciona un miniproyecto para editar sus datos.
+          <section className="app-table-card">
+            <div className={`app-table-card__header ${selected ? 'app-table-card__header--green' : ''}`}>
+              <div>
+                <div className="app-table-card__title">Editor de miniproyecto</div>
+                <p className="app-table-card__description">Ajusta la ficha del registro seleccionado y conserva el mismo orden visual que en el resto del panel.</p>
               </div>
+            </div>
+            <div className="app-table-card__body app-miniproyecto-table-body">
+            {!selected ? (
+              <div className="app-empty-panel py-12">Selecciona un miniproyecto para editar sus datos.</div>
             ) : (
-              <form onSubmit={handleSave} className="space-y-6">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1.5">Título</label>
+              <form onSubmit={handleSave} className="app-form-stack app-miniproyecto-form-stack">
+                <section className="app-form-section app-form-section--muted app-miniproyecto-base-section">
+                  <div className="mb-3 space-y-1">
+                    <h4 className="app-form-section-title">Información base</h4>
+                    <p className="app-form-section-description">Define el título, la descripción general, el nivel y el entregable principal.</p>
+                  </div>
+
+                  <div className="app-miniproyecto-base-grid">
+                <div className="app-form-field app-miniproyecto-base-grid__field">
+                  <label className="app-form-label">Título</label>
                   <input
                     value={formData.titulo}
                     onChange={(event) => handleChange('titulo', event.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                    className="app-form-input"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1.5">Descripción</label>
+
+                <div className="app-form-field app-miniproyecto-base-grid__field">
+                  <label className="app-form-label">Nivel de dificultad</label>
+                  <input
+                    value={formData.nivel_dificultad}
+                    onChange={(event) => handleChange('nivel_dificultad', event.target.value)}
+                    className="app-form-input"
+                  />
+                </div>
+
+                <div className="app-form-field app-miniproyecto-base-grid__field">
+                  <label className="app-form-label">Entregable</label>
+                  <input
+                    value={formData.entregable}
+                    onChange={(event) => handleChange('entregable', event.target.value)}
+                    className="app-form-input"
+                  />
+                </div>
+
+                <div className="app-form-field app-miniproyecto-base-grid__editor">
+                  <label className="app-form-label">Descripción</label>
                   {usesRichDescriptionEditor ? (
-                    <div className="quill-editor-container app-rich-text-editor" key={`rich-description-${selected?.id || 'none'}`}>
+                    <div className="quill-editor-container app-rich-text-editor app-miniproyecto-rich-editor" key={`rich-description-${selected?.id || 'none'}`}>
                       <div
-                        ref={editorRef}
-                        className="w-full"
-                        data-placeholder="Ingrese la descripcion del miniproyecto"
+                        ref={editorHostRef}
+                        className="app-miniproyecto-rich-editor__host"
                       />
                     </div>
                   ) : (
                     <textarea
                       value={formData.descripcion}
                       onChange={(event) => handleChange('descripcion', event.target.value)}
-                      rows={3}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                      rows={6}
+                      className="app-form-textarea"
                     />
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1.5">Nivel de dificultad</label>
-                  <input
-                    value={formData.nivel_dificultad}
-                    onChange={(event) => handleChange('nivel_dificultad', event.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1.5">Entregable</label>
-                  <input
-                    value={formData.entregable}
-                    onChange={(event) => handleChange('entregable', event.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                  />
-                </div>
+                  </div>
+                </section>
                 {isConfigurableMiniproyecto ? (
-                  <div className="space-y-5 rounded-2xl border border-[#4A90E2]/20 bg-[#F8FBFF] p-5">
+                  <section className="app-form-section app-miniproyecto-mode-section">
+                  <div className="space-y-4">
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <h3 className="text-sm font-semibold text-[#3A4A5B]">Miniproyecto configurable por ejercicios</h3>
+                        <h4 className="app-form-section-title">Miniproyecto configurable</h4>
                         <p className="text-xs text-gray-500">Este miniproyecto contiene ejercicios creados dentro del mismo flujo y puede usar un chatbot como cliente simulado.</p>
                       </div>
                       <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-semibold text-blue-700">
@@ -1147,50 +1185,80 @@ export function MiniproyectoManagementScreen({
                       </span>
                     </div>
 
-                    <ConfigurableEmbeddedExerciseEditor
-                      exercises={selectedEmbeddedExercises}
-                      onChange={setSelectedEmbeddedExercises}
-                    />
-
-                    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
-                      <label className="flex items-center gap-3 text-sm font-medium text-[#3A4A5B]">
-                        <input
-                          type="checkbox"
-                          checked={selectedUseChatbot}
-                          onChange={(event) => {
-                            const enabled = event.target.checked;
-                            setSelectedUseChatbot(enabled);
-                            if (!enabled) {
-                              setSelectedChatbotId('');
-                            }
-                          }}
-                          className="h-4 w-4"
+                    <div className="app-miniproyecto-config-grid">
+                      <div className="min-w-0">
+                        <ConfigurableEmbeddedExerciseEditor
+                          exercises={selectedEmbeddedExercises}
+                          onChange={setSelectedEmbeddedExercises}
                         />
-                        Usar chatbot como simulación del cliente
-                      </label>
+                      </div>
 
-                      {selectedUseChatbot ? (
-                        <select
-                          value={selectedChatbotId}
-                          onChange={(event) => setSelectedChatbotId(event.target.value)}
-                          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                        >
-                          <option value="">Selecciona un chatbot</option>
-                          {selectedEligibleChatbots.map((chatbot) => (
-                            <option key={chatbot.id} value={String(chatbot.id)}>
-                              {chatbot.nombre} {chatbot.tipo === 'GENERAL' ? '(general)' : '(miniproyecto)'}
-                            </option>
-                          ))}
-                        </select>
-                      ) : null}
+                      <aside className="app-miniproyecto-config-aside">
+                        <section className="app-form-section app-form-section--muted app-miniproyecto-config-panel">
+                          <h5 className="app-form-section-title">Simulación del cliente</h5>
+                          <p className="app-form-section-description">Activa el chatbot cuando el proyecto necesite una contraparte simulada durante la actividad.</p>
+                          <div className="mt-4 space-y-3">
+                            <label className="flex items-center gap-3 text-sm font-medium text-[#3A4A5B]">
+                              <input
+                                type="checkbox"
+                                checked={selectedUseChatbot}
+                                onChange={(event) => {
+                                  const enabled = event.target.checked;
+                                  setSelectedUseChatbot(enabled);
+                                  if (!enabled) {
+                                    setSelectedChatbotId('');
+                                  }
+                                }}
+                                className="h-4 w-4"
+                              />
+                              Usar chatbot como simulación del cliente
+                            </label>
+
+                            {selectedUseChatbot ? (
+                              <select
+                                value={selectedChatbotId}
+                                onChange={(event) => setSelectedChatbotId(event.target.value)}
+                                className="app-form-select"
+                              >
+                                <option value="">Selecciona un chatbot</option>
+                                {selectedEligibleChatbots.map((chatbot) => (
+                                  <option key={chatbot.id} value={String(chatbot.id)}>
+                                    {chatbot.nombre} {chatbot.tipo === 'GENERAL' ? '(general)' : '(miniproyecto)'}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
+                          </div>
+                        </section>
+
+                        <section className="app-form-section app-miniproyecto-config-panel">
+                          <h5 className="app-form-section-title">Resumen rápido</h5>
+                          <div className="mt-4 space-y-3 text-sm">
+                            <div className="app-form-summary-card">
+                              <div className="app-form-summary-label">Ejercicios</div>
+                              <div className="app-form-summary-value">{selectedEmbeddedExercises.length}</div>
+                              <div className="app-form-summary-help">Secuencia actual del miniproyecto.</div>
+                            </div>
+                            <div className="app-form-summary-card">
+                              <div className="app-form-summary-label">Área</div>
+                              <div className="app-form-summary-value">{selected?.Area?.nombre || 'Sin área'}</div>
+                            </div>
+                            <div className="app-form-summary-card">
+                              <div className="app-form-summary-label">Chatbot</div>
+                              <div className="app-form-summary-value">{selectedUseChatbot ? 'Activado' : 'No usado'}</div>
+                            </div>
+                          </div>
+                        </section>
+                      </aside>
                     </div>
                   </div>
+                  </section>
                 ) : isProgrammingMiniproyecto ? (
-                  <div className="space-y-4">
-                    <div className="space-y-4 rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+                  <section className="app-form-section app-miniproyecto-mode-section">
+                    <div className="space-y-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <label className="block text-sm font-medium text-[#3A4A5B]">Configuración de compilador</label>
+                          <h4 className="app-form-section-title">Configuración de compilador</h4>
                           <p className="mt-1 text-xs text-gray-500">Este miniproyecto se editará como ejercicio de programación: método Java, restricciones y 3 casos de prueba.</p>
                         </div>
                         <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
@@ -1204,7 +1272,7 @@ export function MiniproyectoManagementScreen({
                           <button
                             type="button"
                             onClick={handleFormatCompilerTemplate}
-                            className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+                            className="app-btn app-btn-secondary app-btn-sm text-violet-700"
                           >
                             Dar formato
                           </button>
@@ -1232,7 +1300,7 @@ export function MiniproyectoManagementScreen({
                           <div className="text-xs text-gray-500 mb-1">Parámetros</div>
                           <div className="text-sm font-semibold text-[#3A4A5B] break-words">
                             {compilerMethod?.parametros?.length
-                              ? compilerMethod.parametros.map((param) => `${param.tipo} ${param.nombre}`).join(', ')
+                              ? compilerMethod?.parametros.map((param) => `${param.tipo} ${param.nombre}`).join(', ')
                               : 'Pendiente de derivar'}
                           </div>
                         </div>
@@ -1288,8 +1356,9 @@ export function MiniproyectoManagementScreen({
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </section>
                 ) : (
+                  <section className="app-form-section app-miniproyecto-mode-section">
                   <div className="space-y-4">
                     {isManagementMiniproyecto ? (
                       <>
@@ -1311,12 +1380,12 @@ export function MiniproyectoManagementScreen({
                               value={specificObjectiveInput}
                               onChange={(event) => setSpecificObjectiveInput(event.target.value)}
                               placeholder="Agregar objetivo específico"
-                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                              className="app-form-input"
                             />
                             <button
                               type="button"
                               onClick={() => addListItem(specificObjectiveInput, setSpecificObjectivesList, () => setSpecificObjectiveInput(''))}
-                              className="px-4 py-2 rounded-lg bg-[#4A90E2] text-white text-sm"
+                              className="app-btn app-primary-btn app-btn-sm"
                             >
                               Agregar
                             </button>
@@ -1338,12 +1407,12 @@ export function MiniproyectoManagementScreen({
                               value={scopeInput}
                               onChange={(event) => setScopeInput(event.target.value)}
                               placeholder="Agregar entregable"
-                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                              className="app-form-input"
                             />
                             <button
                               type="button"
                               onClick={() => addListItem(scopeInput, setScopeList, () => setScopeInput(''))}
-                              className="px-4 py-2 rounded-lg bg-[#4A90E2] text-white text-sm"
+                              className="app-btn app-primary-btn app-btn-sm"
                             >
                               Agregar
                             </button>
@@ -1551,12 +1620,12 @@ export function MiniproyectoManagementScreen({
                               value={assumptionInput}
                               onChange={(event) => setAssumptionInput(event.target.value)}
                               placeholder="Agregar supuesto verificable"
-                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                              className="app-form-input"
                             />
                             <button
                               type="button"
                               onClick={() => addListItem(assumptionInput, setAssumptionsList, () => setAssumptionInput(''))}
-                              className="px-4 py-2 rounded-lg bg-[#4A90E2] text-white text-sm"
+                              className="app-btn app-primary-btn app-btn-sm"
                             >
                               Agregar
                             </button>
@@ -1580,12 +1649,12 @@ export function MiniproyectoManagementScreen({
                               value={stakeholderInput}
                               onChange={(event) => setStakeholderInput(event.target.value)}
                               placeholder="Agregar stakeholder"
-                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                              className="app-form-input"
                             />
                             <button
                               type="button"
                               onClick={() => addListItem(stakeholderInput, setStakeholdersList, () => setStakeholderInput(''))}
-                              className="px-4 py-2 rounded-lg bg-[#4A90E2] text-white text-sm"
+                              className="app-btn app-primary-btn app-btn-sm"
                             >
                               Agregar
                             </button>
@@ -1607,12 +1676,12 @@ export function MiniproyectoManagementScreen({
                               value={functionalInput}
                               onChange={(event) => setFunctionalInput(event.target.value)}
                               placeholder="Agregar requisito funcional"
-                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                              className="app-form-input"
                             />
                             <button
                               type="button"
                               onClick={() => addListItem(functionalInput, setFunctionalList, () => setFunctionalInput(''))}
-                              className="px-4 py-2 rounded-lg bg-[#4A90E2] text-white text-sm"
+                              className="app-btn app-primary-btn app-btn-sm"
                             >
                               Agregar
                             </button>
@@ -1634,12 +1703,12 @@ export function MiniproyectoManagementScreen({
                               value={nonFunctionalInput}
                               onChange={(event) => setNonFunctionalInput(event.target.value)}
                               placeholder="Agregar requisito no funcional"
-                              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                              className="app-form-input"
                             />
                             <button
                               type="button"
                               onClick={() => addListItem(nonFunctionalInput, setNonFunctionalList, () => setNonFunctionalInput(''))}
-                              className="px-4 py-2 rounded-lg bg-[#4A90E2] text-white text-sm"
+                              className="app-btn app-primary-btn app-btn-sm"
                             >
                               Agregar
                             </button>
@@ -1656,22 +1725,45 @@ export function MiniproyectoManagementScreen({
                       </>
                     )}
                   </div>
+                  </section>
                 )}
 
                 {error && (
-                  <div className="text-sm text-red-600">{error}</div>
+                  <div className="app-alert app-alert--error"><span>{error}</span></div>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="w-full flex items-center justify-center gap-2 bg-[#4A90E2] text-white py-2 rounded-lg hover:bg-[#357ABD] transition-all disabled:opacity-70"
-                >
-                  <Save className="w-4 h-4" />
-                  {isSaving ? 'Guardando...' : 'Guardar cambios'}
-                </button>
+                <section className="app-form-section app-form-section--accent app-miniproyecto-summary-section">
+                  <h4 className="app-form-section-title">Resumen del registro</h4>
+                  <div className="app-miniproyecto-summary-grid mt-4 text-sm">
+                    <div className="app-form-summary-card">
+                      <div className="app-form-summary-label">Proyecto</div>
+                      <div className="app-form-summary-value">{selectedMiniproyectoTitle}</div>
+                      <div className="app-form-summary-help">{selectedMiniproyectoArea}</div>
+                    </div>
+                    <div className="app-form-summary-card">
+                      <div className="app-form-summary-label">Editor</div>
+                      <div className="app-form-summary-value">{selectedEditorMode}</div>
+                    </div>
+                    <div className="app-form-summary-card">
+                      <div className="app-form-summary-label">Estado</div>
+                      <div className="app-form-summary-value">{selected?.Actividad?.estado !== false ? 'Activo' : 'Inhabilitado'}</div>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="app-action-row justify-start">
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="app-btn app-primary-btn disabled:opacity-70"
+                  >
+                    <Save className="w-4 h-4" />
+                    {isSaving ? 'Guardando...' : 'Guardar cambios'}
+                  </button>
+                </div>
               </form>
             )}
+            </div>
           </section>
         </div>
       </main>
@@ -1701,12 +1793,12 @@ export function MiniproyectoManagementScreen({
                 ✕
               </button>
             </div>
-            {expectedSnapshot.mode === 'management' ? (
+            {managementSnapshot ? (
               <div className="space-y-4">
                 <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-cyan-700 mb-2">Objetivo principal</h4>
                   <ul className="text-xs text-cyan-700 space-y-1">
-                    {expectedSnapshot.objetivoPrincipal.map((item, index) => (
+                    {managementSnapshot!.objetivoPrincipal.map((item: string, index: number) => (
                       <li key={`objective-${index}`}>• {item}</li>
                     ))}
                   </ul>
@@ -1714,7 +1806,7 @@ export function MiniproyectoManagementScreen({
                 <div className="bg-sky-50 border border-sky-100 rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-sky-700 mb-2">Objetivos específicos</h4>
                   <ul className="text-xs text-sky-700 space-y-1">
-                    {expectedSnapshot.objetivosEspecificos.map((item, index) => (
+                    {managementSnapshot!.objetivosEspecificos.map((item: string, index: number) => (
                       <li key={`specific-objective-${index}`}>• {item}</li>
                     ))}
                   </ul>
@@ -1723,7 +1815,7 @@ export function MiniproyectoManagementScreen({
                   <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-blue-700 mb-2">Entregables clave</h4>
                   <ul className="text-xs text-blue-700 space-y-1">
-                    {expectedSnapshot.entregables.map((item, index) => (
+                    {managementSnapshot!.entregables.map((item: string, index: number) => (
                       <li key={`scope-${index}`}>• {item}</li>
                     ))}
                   </ul>
@@ -1731,7 +1823,7 @@ export function MiniproyectoManagementScreen({
                   <div className="bg-green-50 border border-green-100 rounded-xl p-4">
                     <h4 className="text-sm font-semibold text-green-700 mb-2">Cronograma</h4>
                     <ul className="text-xs text-green-700 space-y-1">
-                      {expectedSnapshot.cronograma.map((item, index) => (
+                      {managementSnapshot!.cronograma.map((item: string, index: number) => (
                         <li key={`schedule-${index}`}>• {item}</li>
                       ))}
                     </ul>
@@ -1739,7 +1831,7 @@ export function MiniproyectoManagementScreen({
                   <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
                     <h4 className="text-sm font-semibold text-orange-700 mb-2">Costos</h4>
                     <ul className="text-xs text-orange-700 space-y-1">
-                      {expectedSnapshot.costos.map((item, index) => (
+                      {managementSnapshot!.costos.map((item: string, index: number) => (
                         <li key={`cost-${index}`}>• {item}</li>
                       ))}
                     </ul>
@@ -1748,7 +1840,7 @@ export function MiniproyectoManagementScreen({
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-slate-700 mb-2">Supuestos</h4>
                   <ul className="text-xs text-slate-700 space-y-1">
-                    {expectedSnapshot.supuestos.map((item, index) => (
+                    {managementSnapshot!.supuestos.map((item: string, index: number) => (
                       <li key={`assumption-${index}`}>• {item}</li>
                     ))}
                   </ul>
@@ -1759,7 +1851,7 @@ export function MiniproyectoManagementScreen({
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-blue-700 mb-2">Stakeholders</h4>
                   <ul className="text-xs text-blue-700 space-y-1">
-                    {expectedSnapshot.stakeholders.map((item, index) => (
+                    {analysisSnapshot?.stakeholders.map((item: string, index: number) => (
                       <li key={`stake-${index}`}>• {item}</li>
                     ))}
                   </ul>
@@ -1767,7 +1859,7 @@ export function MiniproyectoManagementScreen({
                 <div className="bg-green-50 border border-green-100 rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-green-700 mb-2">Requisitos funcionales</h4>
                   <ul className="text-xs text-green-700 space-y-1">
-                    {expectedSnapshot.requisitosFuncionales.map((item, index) => (
+                    {analysisSnapshot?.requisitosFuncionales.map((item: string, index: number) => (
                       <li key={`func-${index}`}>• {item}</li>
                     ))}
                   </ul>
@@ -1775,7 +1867,7 @@ export function MiniproyectoManagementScreen({
                 <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-orange-700 mb-2">Requisitos no funcionales</h4>
                   <ul className="text-xs text-orange-700 space-y-1">
-                    {expectedSnapshot.requisitosNoFuncionales.map((item, index) => (
+                    {analysisSnapshot?.requisitosNoFuncionales.map((item: string, index: number) => (
                       <li key={`nonfunc-${index}`}>• {item}</li>
                     ))}
                   </ul>

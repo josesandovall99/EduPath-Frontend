@@ -1100,6 +1100,265 @@
   color: #475569;
 }
 
+.app-miniproyecto-hero {
+  padding: 1.3rem 1.35rem;
+}
+
+.app-miniproyecto-hero-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.28fr) 380px;
+  align-items: stretch;
+}
+
+.app-miniproyecto-hero .app-page-hero__title {
+  margin-top: 0.45rem;
+  font-size: clamp(1.42rem, 1.9vw, 1.9rem);
+}
+
+.app-miniproyecto-hero .app-page-hero__description {
+  margin-top: 0.4rem;
+  line-height: 1.45;
+}
+
+.app-miniproyecto-hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.app-miniproyecto-hero-side {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.app-miniproyecto-hero-metrics {
+  width: 100%;
+  gap: 0.65rem;
+}
+
+.app-miniproyecto-hero .app-hero-metric {
+  padding: 0.8rem 0.9rem;
+}
+
+.app-miniproyecto-toolbar,
+.app-miniproyecto-context-card,
+.app-miniproyecto-table-body {
+  padding: 1rem;
+}
+
+.app-miniproyecto-toolbar--hero {
+  margin-top: auto;
+}
+
+.app-miniproyecto-hero-context {
+  min-height: 8.6rem;
+  justify-content: center;
+}
+
+.app-miniproyecto-catalog-grid {
+  display: grid;
+  gap: 0.95rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-miniproyecto-catalog-card {
+  min-height: 12.5rem;
+  justify-content: space-between;
+}
+
+.app-miniproyecto-catalog-card__head {
+  align-items: flex-start;
+}
+
+.app-miniproyecto-catalog-card__action {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.app-list-card--compact {
+  gap: 0.75rem;
+  padding: 0.95rem 1rem;
+}
+
+.app-list-card--compact .app-list-card__head {
+  gap: 0.75rem;
+}
+
+.app-list-card--compact .app-list-card__title {
+  font-size: 0.98rem;
+}
+
+.app-list-card--compact .app-list-card__footer {
+  padding-top: 0.65rem;
+}
+
+.app-miniproyecto-form-stack {
+  gap: 1rem;
+}
+
+.app-miniproyecto-base-section,
+.app-miniproyecto-mode-section,
+.app-miniproyecto-summary-section {
+  padding: 1rem;
+}
+
+.app-miniproyecto-summary-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-miniproyecto-base-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+
+.app-miniproyecto-base-grid__field {
+  grid-column: span 1;
+}
+
+.app-miniproyecto-base-grid__editor {
+  grid-column: 1 / -1;
+}
+
+.app-miniproyecto-config-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.app-miniproyecto-config-aside {
+  display: grid;
+  gap: 1rem;
+  grid-template-rows: auto 1fr;
+}
+
+.app-miniproyecto-config-panel {
+  padding: 1rem;
+}
+
+.app-miniproyecto-builder-stack {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.app-miniproyecto-builder-panel {
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 1.1rem;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(148, 163, 184, 0.08);
+  padding: 0.95rem;
+}
+
+.app-miniproyecto-builder-panel--summary,
+.app-miniproyecto-builder-panel--actions {
+  min-height: 0;
+}
+
+.app-miniproyecto-builder-workbench {
+  display: grid;
+  gap: 0.95rem;
+  grid-template-columns: minmax(220px, 0.68fr) minmax(0, 1.32fr);
+  align-items: start;
+}
+
+.app-miniproyecto-builder-actions-grid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-miniproyecto-builder-panel--map,
+.app-miniproyecto-builder-panel--editor {
+  min-height: 100%;
+}
+
+.app-miniproyecto-rich-editor .ql-editor {
+  min-height: 18rem;
+  max-height: 30rem;
+  overflow-wrap: anywhere;
+}
+
+.app-miniproyecto-rich-editor__host {
+  min-height: 18rem;
+}
+
+.app-miniproyecto-rich-editor .ql-editor img,
+.app-rich-text-editor .ql-editor img {
+  display: block;
+  width: auto !important;
+  max-width: min(100%, 40rem);
+  max-height: min(18rem, 38vh);
+  height: auto;
+  border-radius: 0.85rem;
+  margin: 0.85rem auto;
+  object-fit: contain;
+}
+
+.app-miniproyecto-embedded-map-grid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  max-height: 22rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.app-miniproyecto-embedded-editor .text-base {
+  font-size: 0.95rem;
+}
+
+@media (max-width: 1023px) {
+  .app-miniproyecto-hero-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .app-miniproyecto-hero-main {
+    width: 100%;
+  }
+
+  .app-miniproyecto-config-grid,
+  .app-miniproyecto-builder-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .app-miniproyecto-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-miniproyecto-hero {
+    padding: 1rem;
+  }
+
+  .app-miniproyecto-base-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-miniproyecto-builder-actions-grid,
+  .app-miniproyecto-catalog-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .app-miniproyecto-base-grid__field,
+  .app-miniproyecto-base-grid__editor {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-miniproyecto-base-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .app-form-summary-card {
   border: 1px solid rgba(255, 255, 255, 0.75);
   border-radius: 1rem;

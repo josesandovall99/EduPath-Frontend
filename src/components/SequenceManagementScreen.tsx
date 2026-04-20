@@ -74,6 +74,12 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   const [selectedArea, setSelectedArea] = useState('');
   const [selectedTema, setSelectedTema] = useState('');
   const [selectedSubtema, setSelectedSubtema] = useState('');
+  const incomingAreaValue = areaId !== undefined ? areaId.toString() : '';
+  const incomingTemaValue = temaId !== undefined ? temaId.toString() : '';
+  const incomingSubtemaValue = subtemaId !== undefined ? subtemaId.toString() : '';
+  const effectiveSelectedArea = selectedArea || incomingAreaValue;
+  const effectiveSelectedTema = selectedTema || incomingTemaValue;
+  const effectiveSelectedSubtema = selectedSubtema || incomingSubtemaValue;
 
   // Modal-specific filtros (no afectan los filtros de la pantalla)
   const [modalSelectedArea, setModalSelectedArea] = useState('');
@@ -1167,12 +1173,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   // Estado para drag and drop
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
-  const incomingAreaValue = areaId !== undefined ? areaId.toString() : '';
-  const incomingTemaValue = temaId !== undefined ? temaId.toString() : '';
-  const incomingSubtemaValue = subtemaId !== undefined ? subtemaId.toString() : '';
-  const effectiveSelectedArea = selectedArea || incomingAreaValue;
-  const effectiveSelectedTema = selectedTema || incomingTemaValue;
-  const effectiveSelectedSubtema = selectedSubtema || incomingSubtemaValue;
 
   const getTypeColor = (type: string) => {
     switch (type) {

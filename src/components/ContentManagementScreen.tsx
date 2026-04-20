@@ -53,6 +53,17 @@ interface Subtema {
   tema_id: number;
 }
 
+interface BackendContenidoItem {
+  id?: number | string;
+  titulo: string;
+  tipo: unknown;
+  estado?: boolean;
+  tema_id?: number;
+  subtema_id?: number;
+  descripcion?: string;
+  url?: string;
+}
+
 const normalizeContentType = (value: unknown): ContentItem['type'] => {
   const normalized = String(value || '').trim().toLowerCase();
 
@@ -150,7 +161,6 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   // Cargar contenidos y áreas al montar el componente
   useEffect(() => {
     loadContenidos();
-    loadAreas();
   }, []);
 
   // Cargar temas cuando cambia el área seleccionada
@@ -178,91 +188,61 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   const loadContenidos = async () => {
     setIsLoadingData(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/contenidos`, {
-        method: 'GET',
-        headers: buildAuthHeaders({
-          'Content-Type': 'application/json',
-        }),
-        credentials: 'include'
-      });
+      const requestOptions = {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include' as const
+      };
 
-      if (!response.ok) {
+      const [contentsResponse, temasResponse, subtemasResponse, areasResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/contenidos`, {
+          method: 'GET',
+          headers: buildAuthHeaders({
+            'Content-Type': 'application/json',
+          }),
+          credentials: 'include'
+        }),
+        fetch(`${API_BASE_URL}/temas`, requestOptions),
+        fetch(`${API_BASE_URL}/subtemas`, requestOptions),
+        fetch(`${API_BASE_URL}/areas`, requestOptions)
+      ]);
+
+      if (!contentsResponse.ok) {
         throw new Error('Error al cargar los contenidos');
       }
 
-      const data = await response.json();
-      
-      // Para cada contenido, obtener los nombres de área, tema y subtema
-      const contenidosMapeados: ContentItem[] = await Promise.all(
-        data.map(async (item: any) => {
-          let areaNombre = 'Sin clasificar';
-          let temaNombre = '';
-          let subtemaNombre = '';
+      const [data, temasCatalog, subtemasCatalog, areasCatalog] = await Promise.all([
+        contentsResponse.json() as Promise<BackendContenidoItem[]>,
+        temasResponse.ok ? (temasResponse.json() as Promise<Tema[]>) : Promise.resolve([]),
+        subtemasResponse.ok ? (subtemasResponse.json() as Promise<Subtema[]>) : Promise.resolve([]),
+        areasResponse.ok ? (areasResponse.json() as Promise<Area[]>) : Promise.resolve([])
+      ]);
 
-          // Obtener información del tema
-          if (item.tema_id) {
-            try {
-              const temaResponse = await fetch(`${API_BASE_URL}/temas/${item.tema_id}`, {
-                headers: buildAuthHeaders({ Accept: 'application/json' }),
-                credentials: 'include'
-              });
-              if (temaResponse.ok) {
-                const tema = await temaResponse.json();
-                temaNombre = tema.nombre;
+      setAreas(areasCatalog);
 
-                // Obtener información del área
-                if (tema.area_id) {
-                  try {
-                    const areaResponse = await fetch(`${API_BASE_URL}/areas/${tema.area_id}`, {
-                      headers: buildAuthHeaders({ Accept: 'application/json' }),
-                      credentials: 'include'
-                    });
-                    if (areaResponse.ok) {
-                      const area = await areaResponse.json();
-                      areaNombre = area.nombre;
-                    }
-                  } catch (err) {
-                    console.error('Error cargando área:', err);
-                  }
-                }
-              }
-            } catch (err) {
-              console.error('Error cargando tema:', err);
-            }
-          }
+      const temasById = new Map(temasCatalog.map((tema) => [Number(tema.id), tema]));
+      const subtemasById = new Map(subtemasCatalog.map((subtema) => [Number(subtema.id), subtema]));
+      const areasById = new Map(areasCatalog.map((area) => [Number(area.id), area]));
 
-          // Obtener información del subtema
-          if (item.subtema_id) {
-            try {
-              const subtemaResponse = await fetch(`${API_BASE_URL}/subtemas/${item.subtema_id}`, {
-                headers: buildAuthHeaders({ Accept: 'application/json' }),
-                credentials: 'include'
-              });
-              if (subtemaResponse.ok) {
-                const subtema = await subtemaResponse.json();
-                subtemaNombre = subtema.nombre;
-              }
-            } catch (err) {
-              console.error('Error cargando subtema:', err);
-            }
-          }
+      const contenidosMapeados: ContentItem[] = data.map((item) => {
+        const tema = item.tema_id ? temasById.get(Number(item.tema_id)) : undefined;
+        const subtema = item.subtema_id ? subtemasById.get(Number(item.subtema_id)) : undefined;
+        const area = tema?.area_id ? areasById.get(Number(tema.area_id)) : undefined;
 
-          return {
-            id: item.id?.toString() || '',
-            title: item.titulo,
-            type: normalizeContentType(item.tipo),
-            linkedTo: 'subtheme',
-            linkedName: temaNombre && subtemaNombre ? `${temaNombre} - ${subtemaNombre}` : 'Sin vincular',
-            subject: areaNombre,
-            status: item.estado === false ? 'draft' : 'published',
-            estado: item.estado !== false,
-            tema_id: item.tema_id,
-            subtema_id: item.subtema_id,
-            descripcion: item.descripcion,
-            url: item.url
-          };
-        })
-      );
+        return {
+          id: item.id?.toString() || '',
+          title: item.titulo,
+          type: normalizeContentType(item.tipo),
+          linkedTo: 'subtheme',
+          linkedName: tema?.nombre && subtema?.nombre ? `${tema.nombre} - ${subtema.nombre}` : 'Sin vincular',
+          subject: area?.nombre || 'Sin clasificar',
+          status: item.estado === false ? 'draft' : 'published',
+          estado: item.estado !== false,
+          tema_id: item.tema_id,
+          subtema_id: item.subtema_id,
+          descripcion: item.descripcion,
+          url: item.url
+        };
+      });
 
       setContents(contenidosMapeados);
     } catch (err) {

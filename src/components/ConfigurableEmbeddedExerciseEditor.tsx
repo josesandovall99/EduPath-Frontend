@@ -92,63 +92,80 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange }: Conf
     setEditingTypeExerciseId(null);
   };
 
+  const builderSummaryPanel = (
+    <section className="app-miniproyecto-builder-panel app-miniproyecto-builder-panel--summary">
+      <div className="space-y-1">
+        <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">
+          <ClipboardList className="h-3.5 w-3.5" />
+          Constructor del miniproyecto
+        </div>
+        <h3 className="text-sm font-semibold text-[#243447] md:text-base">Ejercicios embebidos del miniproyecto</h3>
+        <p className="text-xs leading-5 text-slate-500">Configura la secuencia del estudiante y edita un ejercicio a la vez.</p>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-medium">{exercises.length} ejercicios</span>
+        <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-medium">Activo: {selectedExercise ? selectedExercise.titulo : 'Sin selección'}</span>
+      </div>
+    </section>
+  );
+
+  const builderActionsPanel = (
+    <section className="app-miniproyecto-builder-panel app-miniproyecto-builder-panel--actions">
+      <div className="mb-2 text-sm font-semibold text-[#243447]">Agregar ejercicio</div>
+      <p className="mb-3 text-xs leading-5 text-slate-500">Selecciona el tipo de bloque que vas a incorporar al flujo del miniproyecto.</p>
+      <div className="app-miniproyecto-builder-actions-grid">
+        {EXERCISE_TYPES.map((type) => (
+          <button key={type} type="button" onClick={() => handleAddExercise(type)} className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium text-[#243447] transition-all hover:-translate-y-0.5 ${EXERCISE_TYPE_META[type].soft}`}>
+            <Plus className="h-4 w-4" />
+            <span>{type}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+
   return (
-    <div className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_16px_36px_rgba(58,74,91,0.08)]">
-      <div className="flex flex-col gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">
-            <ClipboardList className="h-3.5 w-3.5" />
-            Constructor del miniproyecto
-          </div>
-          <h3 className="text-sm font-semibold text-[#243447] md:text-base">Ejercicios embebidos del miniproyecto</h3>
-          <p className="max-w-2xl text-xs leading-5 text-slate-500">Configura la secuencia del estudiante y edita un ejercicio a la vez.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-medium">{exercises.length} ejercicios</span>
-          <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-medium">Activo: {selectedExercise ? selectedExercise.titulo : 'Sin selección'}</span>
-        </div>
-      </div>
-
-      <div className="rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="mb-2 text-sm font-semibold text-[#243447]">Agregar ejercicio</div>
-        <div className="flex flex-wrap gap-2">
-          {EXERCISE_TYPES.map((type) => (
-            <button key={type} type="button" onClick={() => handleAddExercise(type)} className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium text-[#243447] transition-all hover:-translate-y-0.5 ${EXERCISE_TYPE_META[type].soft}`}>
-              <Plus className="h-4 w-4" />
-              <span>{type}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
+    <div className="app-miniproyecto-embedded-editor space-y-3 rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_12px_28px_rgba(58,74,91,0.07)]">
       {exercises.length === 0 ? (
-        <div className="rounded-[24px] border border-dashed border-slate-300 bg-white px-6 py-10 text-center text-sm text-slate-500 shadow-sm">
-          Agrega al menos un ejercicio para este miniproyecto.
-        </div>
+        <>
+          <div className="app-miniproyecto-builder-stack">
+            {builderSummaryPanel}
+            {builderActionsPanel}
+          </div>
+          <div className="rounded-[24px] border border-dashed border-slate-300 bg-white px-6 py-10 text-center text-sm text-slate-500 shadow-sm">
+            Agrega al menos un ejercicio para este miniproyecto.
+          </div>
+        </>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[216px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)]">
-          <aside className="rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-4 lg:h-fit">
-            <div className="mb-2 text-sm font-semibold text-[#243447]">Mapa del miniproyecto</div>
-            <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-              {exercises.map((exercise, index) => {
-                const isActive = exercise.id === selectedExerciseId;
-                const meta = EXERCISE_TYPE_META[exercise.tipo_ejercicio];
-                const Icon = meta.icon;
-                return (
-                  <button key={exercise.id} type="button" onClick={() => setSelectedExerciseId(exercise.id)} className={`w-full rounded-xl border px-3 py-2.5 text-left transition-all ${isActive ? 'border-sky-300 bg-sky-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Ejercicio {index + 1}</div>
-                    <div className="mt-1 truncate text-xs font-semibold text-[#243447]">{exercise.titulo || `Ejercicio ${index + 1}`}</div>
-                    <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                      <Icon className={`h-3.5 w-3.5 ${meta.accent}`} />
-                      {meta.label}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+        <div className="app-miniproyecto-builder-stack">
+          {builderSummaryPanel}
+
+          {builderActionsPanel}
+
+          <div className="app-miniproyecto-builder-workbench">
+          <aside className="app-miniproyecto-builder-panel app-miniproyecto-builder-panel--map">
+              <div className="mb-2 text-sm font-semibold text-[#243447]">Mapa del miniproyecto</div>
+              <div className="app-miniproyecto-embedded-map-grid">
+                {exercises.map((exercise, index) => {
+                  const isActive = exercise.id === selectedExerciseId;
+                  const meta = EXERCISE_TYPE_META[exercise.tipo_ejercicio];
+                  const Icon = meta.icon;
+                  return (
+                    <button key={exercise.id} type="button" onClick={() => setSelectedExerciseId(exercise.id)} className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${isActive ? 'border-sky-300 bg-sky-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Ejercicio {index + 1}</div>
+                      <div className="mt-1 truncate text-xs font-semibold text-[#243447]">{exercise.titulo || `Ejercicio ${index + 1}`}</div>
+                      <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                        <Icon className={`h-3.5 w-3.5 ${meta.accent}`} />
+                        {meta.label}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
           </aside>
 
-          <div className="space-y-4">
+          <div className="app-miniproyecto-builder-panel app-miniproyecto-builder-panel--editor min-w-0">
             {selectedExercise ? (() => {
               const exercise = selectedExercise;
               const index = selectedIndex;
@@ -162,19 +179,19 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange }: Conf
               const matchingPairs: Array<{ concepto: string; definicion: string }> = Array.isArray(exercise.configuracion?.pares) ? exercise.configuracion.pares : [];
 
               return (
-                <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm md:p-5">
-                  <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 md:flex-row md:items-start md:justify-between">
+                <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 border-b border-slate-100 pb-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Ejercicio {index + 1}</div>
                       <div className="mt-1 text-base font-semibold text-[#243447]">{exercise.titulo || `Ejercicio ${index + 1}`}</div>
                     </div>
-                    <button type="button" onClick={() => handleRemoveExercise(index)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-100">
+                    <button type="button" onClick={() => handleRemoveExercise(index)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100">
                       <Trash2 className="h-4 w-4" />
                       <span>Eliminar ejercicio</span>
                     </button>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-slate-600">Título del ejercicio</label>
                       <input value={exercise.titulo} onChange={(event) => handleUpdateExercise(index, { titulo: event.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm" />
@@ -203,9 +220,9 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange }: Conf
                     </div>
                   </div>
 
-                  <div className="mt-4 space-y-4">
+                  <div className="mt-3 space-y-3">
                     {exercise.tipo_ejercicio === 'Compilador' ? (
-                      <div className="space-y-4 rounded-[20px] border border-sky-100 bg-sky-50 p-4">
+                      <div className="space-y-3 rounded-[18px] border border-sky-100 bg-sky-50 p-3.5">
                         <div className="flex items-center justify-between gap-3">
                           <label className="block text-sm font-semibold text-[#243447]">Plantilla Java</label>
                           <button type="button" onClick={() => handleUpdateExercise(index, { codigoEstructura: formatJavaLikeTemplate(methodTemplate) })} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-100">Dar formato</button>
@@ -217,7 +234,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange }: Conf
                             const metodo = parseMethodTemplate(plantilla);
                             handleUpdateExercise(index, { codigoEstructura: plantilla, configuracion: { ...compilerConfig, metodo: metodo ? { ...metodo, plantilla } : null } });
                           }}
-                          rows={8}
+                          rows={7}
                           className="w-full rounded-[18px] border border-sky-100 bg-white px-4 py-3 font-mono text-sm leading-6"
                         />
                         <div className="text-xs text-slate-500">Método derivado: {derivedMethod ? `${derivedMethod.retorno} ${derivedMethod.nombre}(${derivedMethod.parametros.map((param) => `${param.tipo} ${param.nombre}`).join(', ')})` : 'Firma pendiente de detectar'}</div>
@@ -240,7 +257,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange }: Conf
                     ) : null}
 
                     {exercise.tipo_ejercicio === 'Opción única' ? (
-                      <div className="space-y-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 md:p-5">
+                      <div className="space-y-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3.5 md:p-4">
                         <input value={exercise.configuracion?.enunciado || ''} onChange={(event) => handleUpdateConfig(index, { enunciado: event.target.value })} placeholder="Enunciado" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" />
                         <div className="grid gap-3 md:grid-cols-2">
                           {options.map((option, optionIndex) => (
@@ -254,7 +271,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange }: Conf
                     ) : null}
 
                     {exercise.tipo_ejercicio === 'Ordenar' ? (
-                      <div className="space-y-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 md:p-5">
+                      <div className="space-y-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3.5 md:p-4">
                         <input value={exercise.configuracion?.enunciado || ''} onChange={(event) => handleUpdateConfig(index, { enunciado: event.target.value })} placeholder="Enunciado" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" />
                         {orderingItems.map((item, itemIndex) => (
                           <input key={`${exercise.id}-item-${itemIndex}`} value={item} onChange={(event) => {
@@ -266,7 +283,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange }: Conf
                     ) : null}
 
                     {exercise.tipo_ejercicio === 'Relacionar' ? (
-                      <div className="space-y-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 md:p-5">
+                      <div className="space-y-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3.5 md:p-4">
                         <input value={exercise.configuracion?.enunciado || ''} onChange={(event) => handleUpdateConfig(index, { enunciado: event.target.value })} placeholder="Enunciado" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" />
                         {matchingPairs.map((pair, pairIndex) => (
                           <div key={`${exercise.id}-pair-${pairIndex}`} className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 md:grid-cols-2">
@@ -301,7 +318,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange }: Conf
                     ) : null}
 
                     {exercise.tipo_ejercicio === 'Preguntas' ? (
-                      <div className="space-y-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4 md:p-5">
+                      <div className="space-y-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3.5 md:p-4">
                         {questions.map((question, questionIndex) => (
                           <div key={question.id} className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
                             <div className="mb-3 flex flex-col gap-3 md:flex-row">
@@ -325,6 +342,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange }: Conf
                 </div>
               );
             })() : null}
+          </div>
           </div>
         </div>
       )}
