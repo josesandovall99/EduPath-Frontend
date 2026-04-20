@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Download, FileSpreadsheet, Filter, X, User, Calendar, Activity, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, BarChart3, Award, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Download, Filter, X, User, Calendar, Activity, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, BarChart3, Award, AlertTriangle } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 import axios from 'axios';
@@ -107,6 +107,7 @@ interface FailuresItem {
   fallos: number;
   aciertos: number;
   aprobado: boolean;
+  estudiantesAfectados?: number;
 }
 
 interface FailuresReportData {
@@ -352,6 +353,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     }
     if (docenteId) {
       headers['x-docente-id'] = String(docenteId);
+    }
+    if (docenteAreaId) {
+      headers['x-area-id'] = String(docenteAreaId);
     }
 
     return Object.keys(headers).length > 0 ? { headers } : undefined;
@@ -683,22 +687,13 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     setHasAppliedFilters(true);
   };
 
-  const handleExport = (format: 'pdf' | 'excel') => {
-    if (format === 'pdf') {
-      downloadPdf(activeTab);
-      return;
-    }
-    alert(`Exportando informe en formato ${format.toUpperCase()}...`);
+  const handleExport = () => {
+    downloadPdf(activeTab);
   };
 
   const downloadPdf = async (type: 'student' | 'date' | 'activity' | 'failures') => {
     if (!hasAppliedFilters) {
       alert('Aplica los filtros antes de descargar el informe.');
-      return;
-    }
-
-    if (isDocenteMode) {
-      alert('La exportación PDF para el módulo docente no está habilitada en esta versión.');
       return;
     }
 
@@ -728,6 +723,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
       }
 
       const response = await api.get(`/progresos/reporte-pdf?${params.toString()}`, {
+        ...(getDocenteRequestConfig() || {}),
         responseType: 'blob'
       });
 
@@ -1008,7 +1004,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             map.set(key, {
               ...item,
               estudiante_id: 0,
-              aprobado: Boolean(item.aprobado)
+              aprobado: Boolean(item.aprobado),
+              estudiantesAfectados: 1
             });
             return map;
           }
@@ -1017,6 +1014,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
           existing.fallos += item.fallos || 0;
           existing.aciertos += item.aciertos || 0;
           existing.aprobado = existing.aprobado && Boolean(item.aprobado);
+          existing.estudiantesAfectados = (existing.estudiantesAfectados || 0) + 1;
           map.set(key, existing);
           return map;
         }, new Map<string, FailuresItem>()).values()
@@ -1039,11 +1037,30 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     fallos: area.fallos,
     intentos: area.intentos
   }));
-
   const failuresStudentsSorted = [...failuresByStudent].sort((a, b) => b.fallos - a.fallos);
   const failuresStudentsDisplay = appliedFilters.student === 'all'
     ? failuresStudentsSorted.slice(0, 20)
     : failuresStudentsSorted;
+  const docenteFailuresStudentChartData = failuresStudentsDisplay
+    .slice(0, 8)
+    .map((student) => ({
+      name: student.nombre || `Estudiante ${student.estudiante_id}`,
+      shortName: (student.nombre || `Estudiante ${student.estudiante_id}`).length > 24
+        ? `${(student.nombre || `Estudiante ${student.estudiante_id}`).slice(0, 24)}...`
+        : (student.nombre || `Estudiante ${student.estudiante_id}`),
+      fallos: student.fallos,
+      intentos: student.intentos
+    }));
+  const docenteFailuresActivityChartData = failuresItemsDisplay
+    .slice(0, 8)
+    .map((item) => ({
+      name: item.titulo || `${item.tipo} ${item.actividad_id}`,
+      shortName: (item.titulo || `${item.tipo} ${item.actividad_id}`).length > 28
+        ? `${(item.titulo || `${item.tipo} ${item.actividad_id}`).slice(0, 28)}...`
+        : (item.titulo || `${item.tipo} ${item.actividad_id}`),
+      fallos: item.fallos,
+      intentos: item.intentos
+    }));
   const appliedFilterCount = Object.values(appliedFilters).filter((value) => value && value !== 'all').length + (appliedSearch ? 1 : 0);
   const globalAverageProgress = studentsData.length
     ? studentsData.reduce((sum, student) => {
@@ -1095,11 +1112,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
               </div>
             </div>
             <div className="app-action-row">
-              <button onClick={() => handleExport('excel')} className="app-btn app-btn-secondary text-emerald-700">
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>Excel</span>
-              </button>
-              <button onClick={() => handleExport('pdf')} className="app-btn app-primary-btn">
+              <button onClick={handleExport} className="app-btn app-primary-btn">
                 <Download className="w-4 h-4" />
                 <span>Exportar PDF</span>
               </button>
@@ -2198,68 +2211,130 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                     </ResponsiveContainer>
                   </div>
 
-                  <div className="bg-white rounded-xl shadow-md p-6">
-                    <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5 text-[#DC2626]" />
-                      Fallos por Tipo
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'Ejercicios', value: failuresByType.ejercicios.fallos },
-                            { name: 'Miniproyectos', value: failuresByType.miniproyectos.fallos }
-                          ]}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={110}
-                          label={(entry) => `${entry.value}`}
-                        >
-                          <Cell fill="#DC2626" />
-                          <Cell fill="#F87171" />
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {isDocenteMode ? (
+                    <>
+                      <div className="bg-white rounded-xl shadow-md p-6">
+                        <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
+                          <BarChart3 className="w-5 h-5 text-[#DC2626]" />
+                          Estudiantes con Más Fallos
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={docenteFailuresStudentChartData} layout="vertical" margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis type="number" tick={{ fontSize: 12 }} />
+                            <YAxis dataKey="shortName" type="category" width={120} tick={{ fontSize: 11 }} />
+                            <Tooltip
+                              formatter={(value: number, dataKey: string) => {
+                                if (dataKey === 'fallos') return [value, 'Fallos'];
+                                if (dataKey === 'intentos') return [value, 'Intentos'];
+                                return [value, dataKey];
+                              }}
+                              labelFormatter={(_, payload) => {
+                                if (Array.isArray(payload) && payload.length > 0) {
+                                  return payload[0]?.payload?.name || 'Estudiante';
+                                }
+                                return 'Estudiante';
+                              }}
+                            />
+                            <Bar dataKey="fallos" fill="#F97316" radius={[0, 8, 8, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
 
-                  <div className="bg-white rounded-xl shadow-md p-6">
-                    <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5 text-[#DC2626]" />
-                      Fallos por Área
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={failuresAreaChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis
-                          dataKey="shortName"
-                          interval={0}
-                          height={70}
-                          angle={-18}
-                          textAnchor="end"
-                          tick={{ fontSize: 11 }}
-                        />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip
-                          formatter={(value: number, dataKey: string) => {
-                            if (dataKey === 'fallos') return [value, 'Fallos'];
-                            if (dataKey === 'intentos') return [value, 'Intentos'];
-                            return [value, dataKey];
-                          }}
-                          labelFormatter={(_, payload) => {
-                            if (Array.isArray(payload) && payload.length > 0) {
-                              return payload[0]?.payload?.name || 'Area';
-                            }
-                            return 'Area';
-                          }}
-                        />
-                        <Bar dataKey="fallos" fill="#DC2626" radius={[8, 8, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                      <div className="bg-white rounded-xl shadow-md p-6">
+                        <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
+                          <AlertTriangle className="w-5 h-5 text-[#DC2626]" />
+                          Actividades con Más Fallos
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={docenteFailuresActivityChartData} layout="vertical" margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis type="number" tick={{ fontSize: 12 }} />
+                            <YAxis dataKey="shortName" type="category" width={140} tick={{ fontSize: 11 }} />
+                            <Tooltip
+                              formatter={(value: number, dataKey: string) => {
+                                if (dataKey === 'fallos') return [value, 'Fallos'];
+                                if (dataKey === 'intentos') return [value, 'Intentos'];
+                                return [value, dataKey];
+                              }}
+                              labelFormatter={(_, payload) => {
+                                if (Array.isArray(payload) && payload.length > 0) {
+                                  return payload[0]?.payload?.name || 'Actividad';
+                                }
+                                return 'Actividad';
+                              }}
+                            />
+                            <Bar dataKey="fallos" fill="#DC2626" radius={[0, 8, 8, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="bg-white rounded-xl shadow-md p-6">
+                        <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
+                          <BarChart3 className="w-5 h-5 text-[#DC2626]" />
+                          Fallos por Tipo
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Ejercicios', value: failuresByType.ejercicios.fallos },
+                                { name: 'Miniproyectos', value: failuresByType.miniproyectos.fallos }
+                              ]}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={110}
+                              label={(entry) => `${entry.value}`}
+                            >
+                              <Cell fill="#DC2626" />
+                              <Cell fill="#F87171" />
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      <div className="bg-white rounded-xl shadow-md p-6">
+                        <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
+                          <AlertTriangle className="w-5 h-5 text-[#DC2626]" />
+                          Fallos por Área
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={failuresAreaChartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis
+                              dataKey="shortName"
+                              interval={0}
+                              height={70}
+                              angle={-18}
+                              textAnchor="end"
+                              tick={{ fontSize: 11 }}
+                            />
+                            <YAxis tick={{ fontSize: 12 }} />
+                            <Tooltip
+                              formatter={(value: number, dataKey: string) => {
+                                if (dataKey === 'fallos') return [value, 'Fallos'];
+                                if (dataKey === 'intentos') return [value, 'Intentos'];
+                                return [value, dataKey];
+                              }}
+                              labelFormatter={(_, payload) => {
+                                if (Array.isArray(payload) && payload.length > 0) {
+                                  return payload[0]?.payload?.name || 'Area';
+                                }
+                                return 'Area';
+                              }}
+                            />
+                            <Bar dataKey="fallos" fill="#DC2626" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="app-table-card">
@@ -2370,7 +2445,11 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                         <tr>
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Tipo</th>
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Actividad</th>
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Área</th>
+                          {(!isDocenteMode || isAllStudentsFailuresView) && (
+                            <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">
+                              {isDocenteMode ? 'Estudiantes afectados' : 'Área'}
+                            </th>
+                          )}
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Intentos</th>
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aciertos</th>
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Fallos</th>
@@ -2380,14 +2459,18 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                       <tbody>
                         {failuresItemsDisplay.length === 0 && (
                           <tr>
-                            <td className="px-4 py-3 text-sm text-gray-500" colSpan={7}>Sin datos</td>
+                            <td className="px-4 py-3 text-sm text-gray-500" colSpan={(!isDocenteMode || isAllStudentsFailuresView) ? 7 : 6}>Sin datos</td>
                           </tr>
                         )}
                         {failuresItemsDisplay.map((item) => (
                           <tr key={`${item.tipo}-${item.actividad_id}-${item.estudiante_id}`} className="hover:bg-gray-50 transition-colors">
                             <td className="px-4 py-3 text-[#3A4A5B] text-sm">{item.tipo}</td>
                             <td className="px-4 py-3 text-gray-600 text-sm">{item.titulo}</td>
-                            <td className="px-4 py-3 text-gray-600 text-sm">{item.area_name || 'Sin area'}</td>
+                            {(!isDocenteMode || isAllStudentsFailuresView) && (
+                              <td className="px-4 py-3 text-gray-600 text-sm">
+                                {isDocenteMode ? (item.estudiantesAfectados || 0) : (item.area_name || 'Sin area')}
+                              </td>
+                            )}
                             <td className="px-4 py-3 text-gray-600 text-sm">{item.intentos}</td>
                             <td className="px-4 py-3 text-gray-600 text-sm">{item.aciertos}</td>
                             <td className="px-4 py-3 text-gray-600 text-sm">{item.fallos}</td>
