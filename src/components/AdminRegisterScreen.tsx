@@ -16,7 +16,7 @@ export function AdminRegisterScreen({ onBack, onRegister }: AdminRegisterScreenP
             <img src='https://tse1.mm.bing.net/th/id/OIP.RfniSZo5EqSsXFGeP-zRuQHaE7?cb=ucfimg2&ucfimg=1&rs=1&pid=ImgDetMain&o=7&rm=3' alt="EduPath" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-white mb-2 text-3xl">Registro de Administrador</h1>
-          <p className="text-white/90">Completa el formulario para solicitar acceso como administrador</p>
+          <p className="text-white/90">Formulario de solicitud de acceso administrativo.</p>
         </div>
 
         {/* Register Form Box */}
@@ -48,7 +48,7 @@ export function AdminRegisterScreen({ onBack, onRegister }: AdminRegisterScreenP
                 <span>Continuar con Google</span>
               </button>
               <p className="text-gray-500 text-sm mt-3">
-                Se usará tu cuenta de Gmail institucional para el acceso
+                La cuenta institucional de Gmail será utilizada para el acceso.
               </p>
             </div>
 
@@ -107,7 +107,7 @@ export function AdminRegisterScreen({ onBack, onRegister }: AdminRegisterScreenP
               <textarea
                 className="w-full border-2 border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent transition-all resize-none"
                 rows={4}
-                placeholder="Explica brevemente por qué necesitas acceso administrativo..."
+                placeholder="Descripción breve de la solicitud de acceso administrativo"
               ></textarea>
             </div>
 
@@ -140,8 +140,7 @@ export function AdminRegisterScreen({ onBack, onRegister }: AdminRegisterScreenP
           </div>
 
           <p className="mt-4 text-center text-gray-500 text-sm">
-            Tu solicitud será revisada por el equipo administrativo. Recibirás una confirmación 
-            en tu correo electrónico.
+            La solicitud será revisada por el equipo administrativo. La confirmación será enviada al correo electrónico registrado.
           </p>
         </div>
       </div>

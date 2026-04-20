@@ -67,7 +67,7 @@ interface CasoPruebaResultado {
 
 type ResultMode = 'idle' | 'execution' | 'evaluation';
 
-const DEFAULT_TEMPLATE = 'public static int resolver() {\n    // Escribe tu solucion aqui\n    return 0;\n}';
+const DEFAULT_TEMPLATE = 'public static int resolver() {\n    // Codigo inicial\n    return 0;\n}';
 const COMPILER_WRAPPER_LINE_OFFSET = 6;
 const EDITOR_BASE_VISIBLE_LINES = 15;
 
@@ -97,7 +97,7 @@ function buildMethodPreview(metodo?: MetodoConfiguracion) {
   return [
     'public class Solution {',
     `    ${signature} {`,
-    '        // Implementa tu solucion aqui',
+    '        // Implementacion inicial',
     '    }',
     '}'
   ].join('\n');
@@ -122,7 +122,7 @@ function normalizeCompilerMessage(message: string | undefined | null, editorCode
   return message
     .replace(/Main\.java:(\d+)/gi, (_, rawLine) => {
       const normalized = normalizeCompilerLineNumber(Number(rawLine), editorLineCount);
-      return `Tu codigo: linea ${normalized}`;
+      return `Codigo registrado: linea ${normalized}`;
     })
     .replace(/line\s+(\d+)/gi, (_, rawLine) => {
       const normalized = normalizeCompilerLineNumber(Number(rawLine), editorLineCount);
@@ -223,8 +223,8 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
     'Implementa unicamente la logica dentro del metodo proporcionado.',
     'No modifiques el nombre del metodo ni sus parametros.',
     'No escribas el metodo main.',
-    'Revisa los casos visibles antes de enviar para entender como sera evaluada tu solucion.',
-    'Usa Ejecutar para probar y Enviar para calificar tu solucion.'
+    'Los casos visibles permiten revisar el criterio de evaluación de la solución.',
+    'El botón Ejecutar permite pruebas previas y Enviar registra la calificación de la solución.'
   ];
 
   const [code, setCode] = useState(DEFAULT_TEMPLATE);
@@ -607,7 +607,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">Cargando ejercicio...</div>
               ) : casosPruebaResultados.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                  {resultMode === 'execution' ? 'Ejecuta tu solucion para ver la salida por caso.' : 'Envia tu solucion para ver el estado de cada caso.'}
+                  {resultMode === 'execution' ? 'La ejecución mostrará la salida por caso.' : 'El envío mostrará el estado de cada caso.'}
                 </div>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

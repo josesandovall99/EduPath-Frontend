@@ -698,7 +698,7 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
       </div>
 
       {preguntas.length === 0 ? (
-        <p className="text-gray-500 text-sm italic text-center py-4">No hay preguntas. Haz clic en "Agregar Pregunta" para comenzar.</p>
+        <p className="text-gray-500 text-sm italic text-center py-4">No hay preguntas registradas. Utilice "Agregar Pregunta" para crear el primer registro.</p>
       ) : (
         <div className="space-y-4">
           {preguntas.map((pregunta, idx) => (
@@ -1430,59 +1430,59 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
             </div>
           </div>
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.78fr)]">
+          <div className="app-hero-layout app-hero-layout--aside">
             <div className="app-toolbar-card">
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Catálogo</p>
-                  <p className="mt-1 text-sm text-slate-600">Filtra por estado.</p>
+              <div className="app-hero-panel">
+                <div className="app-hero-panel__header">
+                  <div className="app-hero-panel__copy">
+                    <p className="app-hero-panel__eyebrow">Catálogo</p>
+                    <h3 className="app-hero-panel__title">Estado del ejercicio</h3>
+                    <p className="app-hero-panel__description">Filtra por estado.</p>
+                  </div>
+                  <button onClick={openCreate} className="app-btn app-btn-success">
+                    <Plus className="w-4 h-4" />
+                    <span>Nuevo ejercicio</span>
+                  </button>
                 </div>
-                <button onClick={openCreate} className="app-btn app-btn-success">
-                  <Plus className="w-4 h-4" />
-                  <span>Nuevo ejercicio</span>
-                </button>
-              </div>
-              <div className="mb-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del ejercicio</p>
-              </div>
-              <div className="app-filter-row">
-                <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
-                  <span>Todos ({ejercicios.length})</span>
-                </button>
-                <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>
-                  <Eye className="h-4 w-4 shrink-0" />
-                  <span>Activos ({activeExercisesCount})</span>
-                </button>
-                <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>
-                  <EyeOff className="h-4 w-4 shrink-0" />
-                  <span>Inactivos ({inactiveExercisesCount})</span>
-                </button>
+                <div className="app-hero-panel__body">
+                  <div className="app-filter-row">
+                    <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
+                      <span>Todos ({ejercicios.length})</span>
+                    </button>
+                    <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>
+                      <Eye className="h-4 w-4 shrink-0" />
+                      <span>Activos ({activeExercisesCount})</span>
+                    </button>
+                    <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>
+                      <EyeOff className="h-4 w-4 shrink-0" />
+                      <span>Inactivos ({inactiveExercisesCount})</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="app-sidebar-stack">
-              <div className="app-soft-card app-soft-card--blue">
-                <div className="mb-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda</p>
-                  <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Buscar ejercicio</h3>
-                  <p className="mt-1 text-sm text-slate-600">Busca por título, tipo o contenido.</p>
+              <div className="app-toolbar-card">
+                <div className="app-hero-panel">
+                  <div className="app-hero-panel__copy">
+                    <p className="app-hero-panel__eyebrow">Búsqueda</p>
+                    <h3 className="app-hero-panel__title">Buscar ejercicio</h3>
+                    <p className="app-hero-panel__description">Busca por título, tipo o contenido.</p>
+                  </div>
+                  <div className="app-hero-panel__body">
+                    <div className="app-search-field">
+                      <Search className="app-search-field__icon" />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        placeholder="Buscar ejercicios"
+                        className="app-form-input"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="app-search-field">
-                  <Search className="app-search-field__icon" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Buscar ejercicios"
-                    className="app-form-input"
-                  />
-                </div>
-              </div>
-
-              <div className="app-soft-card app-context-card">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
-                <p className="app-context-card__title">{filteredEjercicios.length}</p>
-                <p className="app-context-card__text">{currentStateLabel}</p>
               </div>
             </div>
           </div>
@@ -1498,7 +1498,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
           </div>
         ) : filteredEjercicios.length === 0 ? (
           <div className="app-empty-panel py-12">
-            <p className="text-base text-slate-600">No hay ejercicios que coincidan con la vista actual.</p>
+            <p className="text-base text-slate-600">No hay ejercicios que coincidan con los filtros aplicados.</p>
             <p className="mt-2 text-sm text-slate-500">Prueba con otro estado o ajusta la búsqueda para recuperar resultados.</p>
           </div>
         ) : (
@@ -1828,7 +1828,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                   <section className="app-form-section">
                     <h4 className="app-form-section-title">Antes de guardar</h4>
                     <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                      <p>Verifica que el tipo de ejercicio sí coincida con la interacción esperada para el estudiante.</p>
+                      <p>Validación del tipo de ejercicio según la interacción esperada para el estudiante.</p>
                       <p>Comprueba que el contenido asociado sea correcto, porque desde ahí se contextualiza la actividad.</p>
                       <p>Completa la configuración específica antes de guardar para evitar ejercicios incompletos en producción.</p>
                     </div>

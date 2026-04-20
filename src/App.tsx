@@ -848,7 +848,7 @@ export default function App() {
           <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
             <div className="px-6 py-5 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-[#3A4A5B]">Confirmar cierre de sesión</h3>
-              <p className="text-sm text-gray-500 mt-1">¿Deseas cerrar sesión?</p>
+              <p className="text-sm text-gray-500 mt-1">La sesión actual será cerrada al confirmar.</p>
             </div>
             <div className="px-6 py-4 flex items-center justify-end gap-3 bg-gray-50">
               <button

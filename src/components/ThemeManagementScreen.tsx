@@ -569,32 +569,9 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                 Ordena, edita y revisa los temas del área activa sin salir del flujo actual.
               </p>
             </div>
-
-            <div className="app-hero-metrics">
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Temas</div>
-                <div className="app-hero-metric__value">{temas.length}</div>
-                <div className="app-hero-metric__help">Registros del área actual.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Activos</div>
-                <div className="app-hero-metric__value">{activeTemasCount}</div>
-                <div className="app-hero-metric__help">Disponibles en la estructura.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Inactivos</div>
-                <div className="app-hero-metric__value">{inactiveTemasCount}</div>
-                <div className="app-hero-metric__help">Fuera del flujo activo.</div>
-              </div>
-              <div className="app-hero-metric app-hero-metric--wide">
-                <div className="app-hero-metric__label">Área</div>
-                <div className="app-hero-metric__value app-hero-metric__value--text">{currentSubject?.nombre || 'Sin área activa'}</div>
-                <div className="app-hero-metric__help">Contexto actual de trabajo.</div>
-              </div>
-            </div>
           </div>
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.74fr)]">
+          <div className="app-hero-layout app-hero-layout--narrow">
             <div className="app-toolbar-card">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -671,12 +648,6 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
             </div>
 
             <div className="app-sidebar-stack">
-              <div className="app-soft-card app-soft-card--blue app-context-card">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
-                <p className="app-context-card__title">{currentSubject?.nombre || 'Sin área activa'}</p>
-                <p className="app-context-card__text">{currentSubject?.descripcion || 'Selecciona un área para cargar los temas asociados.'}</p>
-              </div>
-
               <div className="app-soft-card app-context-card">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Flujo</p>
                 <p className="app-context-card__title">Ordena y expande</p>
@@ -717,7 +688,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
           </div>
         ) : filteredTemas.length === 0 ? (
           <div className="app-empty-panel py-12">
-            <p className="text-base text-slate-600">No hay temas para la vista actual.</p>
+            <p className="text-base text-slate-600">No hay temas con los filtros aplicados.</p>
             <p className="mt-2 text-sm text-slate-500">Ajusta la búsqueda o el filtro para volver a listarlos.</p>
           </div>
         ) : (

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, ChevronRight, ClipboardList, Clock, GitBranch, LogOut, MapPinned, Users } from 'lucide-react';
+import { ArrowRight, BarChart3, BookOpen, Bot, ClipboardList, GitBranch, LogOut, MapPinned } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
 import { ExerciseManagementScreen } from './ExerciseManagementScreen';
 import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
 import { ReportsScreen } from './ReportsScreen';
 import { DocenteChatbotManagementScreen } from './DocenteChatbotManagementScreen';
+import { AdminFlowGuide } from './ui/AdminFlowGuide';
 
 interface DocenteDashboardProps {
   onLogout: () => void;
@@ -25,6 +27,27 @@ type DashboardStats = {
   assignedAreas: number;
   areaTemas: number;
   areaSubtemas: number;
+};
+
+type DashboardStat = {
+  label: string;
+  value: number | string;
+  icon: LucideIcon;
+  color: string;
+  deferToLoad?: boolean;
+};
+
+type DashboardAction = {
+  id: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  color: string;
+  gradient: string;
+  group: 'workflow' | 'support';
+  badge: string;
+  tone: 'blue' | 'green' | 'amber' | 'slate';
+  onClick: () => void;
 };
 
 type AreaSummary = {
@@ -150,38 +173,7 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
     };
   }, [currentScreen, docente?.id, docente?.personaId]);
 
-  const stats = [
-    {
-      label: 'Áreas asignadas',
-      value: String(statsData.assignedAreas),
-      icon: MapPinned,
-      color: '#4A90E2',
-      trend: isLoadingStats ? 'Cargando' : 'En BD'
-    },
-    {
-      label: 'Temas de sus áreas',
-      value: String(statsData.areaTemas),
-      icon: GitBranch,
-      color: '#7ED6A7',
-      trend: isLoadingStats ? 'Cargando' : 'En BD'
-    },
-    {
-      label: 'Subtemas de sus áreas',
-      value: String(statsData.areaSubtemas),
-      icon: ClipboardList,
-      color: '#F5A97F',
-      trend: isLoadingStats ? 'Cargando' : 'En BD'
-    },
-    {
-      label: 'Perfil docente',
-      value: docente?.nombre ? 'Activo' : '-',
-      icon: Users,
-      color: '#A78BFA',
-      trend: 'Sesión'
-    }
-  ];
-
-  const actions = [
+  const actions: DashboardAction[] = [
     {
       id: 'area',
       title: 'Gestión de Área',
@@ -189,45 +181,131 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
       icon: MapPinned,
       color: '#4A90E2',
       gradient: 'from-[#4A90E2] to-[#5B9FED]',
+      group: 'workflow',
+      badge: 'Ruta base',
+      tone: 'blue',
       onClick: onManageArea
     },
     {
       id: 'ejercicios',
       title: 'Gestión de Ejercicios',
-      description: 'Crear y editar ejercicios asociados a contenidos específicos.',
+      description: 'Creación y edición de ejercicios asociados a contenidos.',
       icon: ClipboardList,
       color: '#0EA5E9',
       gradient: 'from-[#0EA5E9] to-[#38BDF8]',
+      group: 'workflow',
+      badge: 'Práctica',
+      tone: 'blue',
       onClick: () => setCurrentScreen('ejercicios')
     },
     {
       id: 'miniproyectos',
       title: 'Gestión de Miniproyectos',
-      description: 'Selecciona y edita miniproyectos existentes y su actividad asociada.',
+      description: 'Administración de miniproyectos y actividades relacionadas.',
       icon: ClipboardList,
       color: '#0EA5E9',
       gradient: 'from-[#0EA5E9] to-[#38BDF8]',
+      group: 'workflow',
+      badge: 'Proyecto',
+      tone: 'green',
       onClick: () => setCurrentScreen('miniproyectos')
     },
     {
       id: 'chatbot',
       title: 'Gestión de Chatbots',
-      description: 'Administra únicamente los chatbots de tu área y prepara asistentes para tus miniproyectos.',
-      icon: BookOpen,
+      description: 'Administración de chatbots asociados al área y a los miniproyectos disponibles.',
+      icon: Bot,
       color: '#14B8A6',
       gradient: 'from-[#14B8A6] to-[#2DD4BF]',
+      group: 'support',
+      badge: 'Asistente',
+      tone: 'slate',
       onClick: () => setCurrentScreen('chatbot')
     },
     {
       id: 'reports',
       title: 'Informes de Materia',
-      description: 'Consulta progreso por estudiante y reporte de fallos de tu materia asignada.',
-      icon: ClipboardList,
+      description: 'Consulta de progreso por estudiante y reporte de fallos del área asignada.',
+      icon: BarChart3,
       color: '#F5A97F',
       gradient: 'from-[#F5A97F] to-[#F7B98F]',
+      group: 'support',
+      badge: 'Seguimiento',
+      tone: 'amber',
       onClick: () => setCurrentScreen('reports')
     }
   ];
+
+  const stats: DashboardStat[] = [
+    {
+      label: 'Áreas asignadas',
+      value: statsData.assignedAreas,
+      icon: MapPinned,
+      color: '#4A90E2',
+      deferToLoad: true
+    },
+    {
+      label: 'Temas de sus áreas',
+      value: statsData.areaTemas,
+      icon: GitBranch,
+      color: '#7ED6A7',
+      deferToLoad: true
+    },
+    {
+      label: 'Subtemas de sus áreas',
+      value: statsData.areaSubtemas,
+      icon: ClipboardList,
+      color: '#F5A97F',
+      deferToLoad: true
+    },
+    {
+      label: 'Módulos del panel',
+      value: actions.length,
+      icon: BookOpen,
+      color: '#8B5CF6'
+    }
+  ];
+
+  const academicActions = actions.filter((action) => action.group === 'workflow');
+  const supportActions = actions.filter((action) => action.group === 'support');
+  const hasAssignedArea = Boolean(docente?.areaId || docente?.areaNombre);
+  const docenteAreaLabel = docente?.areaNombre || 'Área asignada';
+
+  const renderActionCard = (action: DashboardAction) => {
+    const Icon = action.icon;
+
+    return (
+      <button
+        key={action.id}
+        type="button"
+        onClick={action.onClick}
+        className="app-list-card group border-transparent text-left"
+      >
+        <div className="app-list-card__head">
+          <div
+            className={`app-list-card__icon bg-gradient-to-br ${action.gradient} shadow-md`}
+            style={{ backgroundColor: action.color }}
+          >
+            <Icon className="w-6 h-6 text-white" />
+          </div>
+          <span className={`app-badge app-badge--${action.tone}`}>{action.badge}</span>
+        </div>
+        <div>
+          <div className="app-list-card__title">{action.title}</div>
+          <div className="app-list-card__description mt-2">{action.description}</div>
+        </div>
+        <div className="app-list-card__footer">
+          <span className="app-list-card__meta">
+            {action.group === 'workflow' ? 'Gestión docente' : 'Seguimiento y soporte'}
+          </span>
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#2563eb]">
+            Abrir
+            <ArrowRight className="w-4 h-4" />
+          </span>
+        </div>
+      </button>
+    );
+  };
 
   if (currentScreen === 'ejercicios') {
     return (
@@ -275,29 +353,27 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#4A90E2] to-[#7ED6A7] rounded-xl flex items-center justify-center p-2 shadow-md">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-[#3A4A5B]">Panel de Docente</h1>
-                <p className="text-gray-500 text-sm">Sistema de Gestión Académica - EduPath</p>
+                <p className="text-gray-500 text-sm">Acceso a los módulos del rol docente.</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-[#3A4A5B]">{docente?.nombre || 'Docente'}</p>
-                <p className="text-gray-500 text-sm">{docente?.especialidad || 'Especialidad no definida'}</p>
+
+            <div className="app-user-chip">
+              <div className="app-user-chip__meta">
+                <p>{docente?.nombre || 'Docente'}</p>
+                <p>{docente?.especialidad || 'Especialidad no definida'}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-[#F5A97F] to-[#F7B98F] rounded-full flex items-center justify-center text-white shadow-md">
+              <div className="app-user-avatar">
                 <span className="text-xl">D</span>
               </div>
-              <button
-                onClick={onLogout}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-all duration-300"
-              >
+              <button onClick={onLogout} className="app-btn app-btn-ghost">
                 <LogOut className="w-4 h-4" />
                 <span>Cerrar sesión</span>
               </button>
@@ -307,96 +383,91 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
       </header>
 
       <main className="app-main">
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        <div className="app-section-head mb-6">
+          <div>
+            <h2 className="app-section-title">Módulos del docente</h2>
+            <p className="app-section-description">Panel principal con acceso al área asignada, actividades, chatbot e informes.</p>
+          </div>
+        </div>
+
+        <AdminFlowGuide
+          eyebrow="Ruta docente"
+          title="Orden de trabajo del área asignada"
+          description={hasAssignedArea
+            ? `Acceso a la gestión del área ${docenteAreaLabel}, sus actividades y el seguimiento operativo.`
+            : 'Acceso a la gestión del área asignada, actividades y seguimiento del trabajo docente.'}
+          breadcrumbs={[
+            { label: 'Panel docente' },
+            { label: hasAssignedArea ? docenteAreaLabel : 'Sin área asignada', current: true }
+          ]}
+          steps={[
+            {
+              label: 'Área asignada',
+              helper: hasAssignedArea ? 'Base académica disponible para organizar el trabajo.' : 'Pendiente de asignación institucional.',
+              status: hasAssignedArea ? 'complete' : 'current'
+            },
+            {
+              label: 'Temas y subtemas',
+              helper: 'Estructura del contenido disponible dentro del área.',
+              status: hasAssignedArea ? 'current' : 'upcoming'
+            },
+            {
+              label: 'Ejercicios y miniproyectos',
+              helper: 'Actividades aplicadas sobre los contenidos habilitados.',
+              status: hasAssignedArea ? 'upcoming' : 'upcoming'
+            },
+            {
+              label: 'Informes y chatbot',
+              helper: 'Seguimiento académico y apoyo conversacional del área.',
+              status: hasAssignedArea ? 'upcoming' : 'upcoming'
+            }
+          ]}
+        />
+
+        <div className="app-metric-grid mb-8">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
-              <div key={stat.label} className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-all duration-300">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: `${stat.color}15` }}>
+              <div key={stat.label} className="app-metric-card">
+                <div className="app-metric-icon" style={{ backgroundColor: `${stat.color}16`, color: stat.color }}>
                     <Icon className="w-6 h-6" style={{ color: stat.color }} />
-                  </div>
-                  <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
-                    {stat.trend}
-                  </span>
                 </div>
-                <div className="text-3xl mb-1" style={{ color: stat.color }}>{stat.value}</div>
-                <p className="text-gray-600 text-sm">{stat.label}</p>
+                <div>
+                  <div className="app-metric-value" style={{ color: stat.color }}>
+                    {stat.deferToLoad && isLoadingStats ? '...' : stat.value}
+                  </div>
+                  <p className="app-metric-label">{stat.label}</p>
+                </div>
               </div>
             );
           })}
         </div>
 
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-          {actions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={action.id}
-                type="button"
-                onClick={action.onClick}
-                className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-8 text-left group hover:transform hover:scale-[1.02]"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-4 rounded-xl bg-gradient-to-br ${action.gradient} shadow-md`} style={{ backgroundColor: action.color }}>
-                    <Icon className="w-8 h-8 text-white" />
-                  </div>
-                  <ChevronRight className="w-6 h-6 text-gray-400 group-hover:text-[#4A90E2] transition-colors" />
-                </div>
-                <h2 className="text-[#3A4A5B] mb-2 text-xl group-hover:text-[#4A90E2] transition-colors">
-                  {action.title}
-                </h2>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  {action.description}
-                </p>
-              </button>
-            );
-          })}
-        </div>
+        <section className="mb-8">
+          <div className="app-section-head">
+            <div>
+              <h3 className="app-section-title">Gestión académica</h3>
+              <p className="app-section-description">Módulos para administrar el área asignada, ejercicios y miniproyectos.</p>
+            </div>
+          </div>
 
-        <div className="bg-white rounded-2xl shadow-md">
-          <div className="border-b border-gray-200 p-6">
-            <h3 className="text-[#3A4A5B] text-xl">Actividad Reciente</h3>
+          <div className="app-card-grid">
+            {academicActions.map(renderActionCard)}
           </div>
-          <div className="p-6 space-y-4">
-            <div className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <BookOpen className="w-5 h-5 text-[#4A90E2]" />
-              </div>
-              <div className="flex-1">
-                <p className="text-[#3A4A5B]">Área asignada: {docente?.areaNombre || 'Por confirmar'}.</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Clock className="w-3 h-3 text-gray-400" />
-                  <span className="text-gray-500 text-sm">Actualización reciente</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <GitBranch className="w-5 h-5 text-[#A78BFA]" />
-              </div>
-              <div className="flex-1">
-                <p className="text-[#3A4A5B]">Gestión de subtemas disponible desde tu panel.</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Clock className="w-3 h-3 text-gray-400" />
-                  <span className="text-gray-500 text-sm">Hace unos minutos</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
-              <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <ClipboardList className="w-5 h-5 text-[#0EA5E9]" />
-              </div>
-              <div className="flex-1">
-                <p className="text-[#3A4A5B]">Módulos de ejercicios y miniproyectos listos para gestionar.</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Clock className="w-3 h-3 text-gray-400" />
-                  <span className="text-gray-500 text-sm">Estado del sistema</span>
-                </div>
-              </div>
+        </section>
+
+        <section className="mb-8">
+          <div className="app-section-head">
+            <div>
+              <h3 className="app-section-title">Seguimiento y soporte</h3>
+              <p className="app-section-description">Herramientas para informes académicos y soporte conversacional del área.</p>
             </div>
           </div>
-        </div>
+
+          <div className="app-card-grid">
+            {supportActions.map(renderActionCard)}
+          </div>
+        </section>
       </main>
     </div>
   );

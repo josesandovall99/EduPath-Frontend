@@ -84,11 +84,11 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
           <p className="text-white/90">
             {isFirstLogin
               ? userRole === 'docente'
-                ? 'Por seguridad, configura tu nueva clave para acceder como docente.'
+                ? 'Actualización de clave requerida para acceso docente.'
                 : userRole === 'admin'
-                  ? 'Por seguridad, configura tu nueva clave para acceder como administrador.'
-                : 'Por seguridad, configura tu nueva clave de acceso.'
-              : 'Mantén tu cuenta segura.'}
+                  ? 'Actualización de clave requerida para acceso administrativo.'
+                : 'Actualización de clave requerida para el primer acceso.'
+              : 'Gestión de seguridad de la cuenta.'}
           </p>
         </div>
 
@@ -99,7 +99,7 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
             <div className="bg-blue-50 border-b border-blue-100 p-4 flex gap-3">
               <AlertCircle className="w-5 h-5 text-blue-500 shrink-0" />
               <p className="text-sm text-blue-700">
-                <strong>Importante:</strong> Crea una contraseña que recuerdes fácilmente.
+                <strong>Importante:</strong> Registrar una contraseña segura y de fácil recordación.
               </p>
             </div>
           )}
@@ -123,7 +123,7 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
                     autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Crea una contraseña segura"
+                    placeholder="Registrar contraseña"
                     className="w-full appearance-none border border-gray-300 rounded-lg p-3 pl-11 pr-14 bg-white focus:outline-none focus:ring-2 focus:ring-[#4A90E2] transition-all placeholder:text-gray-300"
                     required
                   />
@@ -164,7 +164,7 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
                     type={showConfirm ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repite la nueva contraseña"
+                    placeholder="Confirmar contraseña"
                     className={`w-full appearance-none border rounded-lg p-3 pl-11 pr-14 bg-white outline-none transition-all ${
                         passwordsMatch && confirmPassword 
                         ? 'border-[#7ED6A7] focus:ring-2 focus:ring-[#7ED6A7]' 
@@ -185,7 +185,7 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
                 {confirmPassword && !passwordsMatch && (
                   <div className="mt-2 flex items-center gap-2 text-red-500">
                     <AlertCircle className="w-4 h-4" />
-                    <span className="text-xs font-medium">Las contraseñas no coinciden</span>
+                    <span className="text-xs font-medium">Las contraseñas registradas no coinciden</span>
                   </div>
                 )}
               </div>

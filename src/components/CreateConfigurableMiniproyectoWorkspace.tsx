@@ -163,12 +163,12 @@ export function CreateConfigurableMiniproyectoWorkspace({
                 <section className="app-form-section">
                   <div className="mb-4 space-y-1.5">
                     <h4 className="app-form-section-title">Constructor de ejercicios</h4>
-                    <p className="app-form-section-description">Crea varios ejercicios internos desde cero.</p>
+                    <p className="app-form-section-description">Registro de ejercicios internos para el miniproyecto.</p>
                   </div>
 
                   {!formData.areaId ? (
                     <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">
-                      Selecciona primero un área libre para habilitar el constructor.
+                      La selección de un área libre habilita el constructor.
                     </div>
                   ) : (
                     <ConfigurableEmbeddedExerciseEditor

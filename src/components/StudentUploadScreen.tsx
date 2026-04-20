@@ -234,7 +234,7 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
                     </div>
                     <div>
                       <p className="text-[#3A4A5B] mb-1 font-medium">
-                        Haz clic para seleccionar tu Excel
+                        Selección del archivo Excel de carga
                       </p>
                       <p className="text-gray-500 text-sm">
                         Formatos soportados: .xlsx, .xls

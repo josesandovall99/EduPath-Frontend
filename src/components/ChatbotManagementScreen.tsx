@@ -410,7 +410,7 @@ export function ChatbotManagementScreen({
 
   function openPdfPicker() {
     if (!selectedChatbotId) {
-      setStatusMessage('Primero crea y guarda el chatbot; luego podrás seleccionar el PDF.');
+      setStatusMessage('El chatbot debe estar registrado antes de asociar el PDF.');
       scrollToDocumentSection();
       return;
     }
@@ -554,7 +554,7 @@ export function ChatbotManagementScreen({
       );
     }
 
-    setStatusMessage('Formulario oculto. Usa Crear Nuevo Chatbot o Editar para abrirlo cuando lo necesites.');
+    setStatusMessage('Formulario oculto. La edición puede reanudarse desde Crear Nuevo Chatbot o Editar.');
   }
 
   function updateForm<K extends keyof ChatbotFormState>(key: K, value: ChatbotFormState[K]) {
@@ -568,12 +568,12 @@ export function ChatbotManagementScreen({
     }
 
     if (isDocenteMode && !form.area_id) {
-      setStatusMessage('Como docente debes asignar el chatbot a tu área.');
+      setStatusMessage('Asignación de área obligatoria para el rol docente.');
       return;
     }
 
     if (form.tipo === 'MINIPROYECTO' && (!form.area_id || !form.miniproyecto_id)) {
-      setStatusMessage('Para un chatbot de miniproyecto debes seleccionar área y miniproyecto.');
+      setStatusMessage('Selección de área y miniproyecto obligatoria para chatbots de miniproyecto.');
       return;
     }
 
@@ -1268,14 +1268,14 @@ export function ChatbotManagementScreen({
                       {messages.length === 0 ? (
                         <div className="chatbot-admin-empty-state chatbot-admin-empty-state--compact">
                           <Bot className="w-12 h-12 text-slate-300" />
-                          <p>Selecciona un chatbot y haz una pregunta para probarlo.</p>
+                          <p>Seleccione un chatbot y registre una consulta de prueba.</p>
                         </div>
                       ) : (
                         messages.map((message, index) => (
                           <div key={index} className="chatbot-admin-transcript-row">
                             <div className="chatbot-admin-transcript-row__meta">
                               <span className={`chatbot-admin-transcript-row__tag ${message.isBot ? 'chatbot-admin-transcript-row__tag--bot' : 'chatbot-admin-transcript-row__tag--user'}`}>
-                                {message.isBot ? 'Chatbot' : 'Tú'}
+                                {message.isBot ? 'Chatbot' : 'Usuario'}
                               </span>
                             </div>
                             <div className={`chatbot-admin-message ${message.isBot ? 'chatbot-admin-message--bot' : 'chatbot-admin-message--user'}`}>
@@ -1297,7 +1297,7 @@ export function ChatbotManagementScreen({
                           }
                         }}
                         disabled={isAsking || !selectedChatbotId}
-                        placeholder={selectedChatbotId ? 'Haz una pregunta al chatbot seleccionado...' : 'Primero crea o selecciona un chatbot'}
+                        placeholder={selectedChatbotId ? 'Registrar consulta de prueba...' : 'Se requiere crear o seleccionar un chatbot'}
                         className="chatbot-admin-chat-input"
                       />
                       <button onClick={() => void handleAskQuestion()} disabled={isAsking || !selectedChatbotId || !inputValue.trim()} className="app-btn app-primary-btn px-5 py-3 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -1326,7 +1326,7 @@ export function ChatbotManagementScreen({
                   <div className="app-modal-kicker">Chatbot</div>
                   <h2 className="app-modal-title">{selectedChatbotId ? 'Editar chatbot' : 'Crear nuevo chatbot'}</h2>
                   <p className="app-modal-description">
-                    Configura el comportamiento del tutor, asígnalo al contexto académico correcto y deja lista su base documental.
+                    Configuración del comportamiento del asistente, vinculación al contexto académico y preparación de la base documental.
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1346,20 +1346,20 @@ export function ChatbotManagementScreen({
                 <div className="app-form-main app-form-stack">
                   {!selectedChatbotId && (
                     <div className="app-form-note">
-                      Crea primero el chatbot y luego completa su base documental para dejarlo listo para estudiantes o miniproyectos.
+                      El chatbot debe registrarse antes de cargar la base documental.
                     </div>
                   )}
 
                   {isDocenteMode ? (
                     <div className="app-form-note">
-                      Como docente solo puedes gestionar chatbots vinculados a tu área asignada.
+                      En modo docente, solo se gestionan chatbots vinculados al área asignada.
                     </div>
                   ) : null}
 
                   <section className="app-form-section app-form-section--muted">
                     <div className="mb-4 space-y-1.5">
                       <h4 className="app-form-section-title">Información base</h4>
-                      <p className="app-form-section-description">Define el nombre, el propósito y el tipo de chatbot que vas a publicar.</p>
+                      <p className="app-form-section-description">Definición del nombre, propósito y tipo de chatbot publicado.</p>
                     </div>
 
                     <div className="app-form-grid app-form-grid-2">
@@ -1416,7 +1416,7 @@ export function ChatbotManagementScreen({
                   <section className="app-form-section">
                     <div className="mb-4 space-y-1.5">
                       <h4 className="app-form-section-title">Vinculación académica</h4>
-                      <p className="app-form-section-description">Asocia el chatbot al área correcta y, si aplica, al miniproyecto específico que lo va a consumir.</p>
+                      <p className="app-form-section-description">Asociación del chatbot al área correspondiente y, cuando aplique, al miniproyecto específico.</p>
                     </div>
 
                     <div className="app-form-grid app-form-grid-2">
@@ -1425,10 +1425,10 @@ export function ChatbotManagementScreen({
                         <select value={form.area_id} onChange={(event) => updateForm('area_id', event.target.value)} className="app-form-select">
                           <option value="">
                             {isDocenteMode
-                              ? 'Selecciona tu área'
+                              ? 'Área asignada'
                               : form.tipo === 'GENERAL'
                                 ? 'Sin área (global)'
-                                : 'Selecciona un área'}
+                                : 'Área requerida'}
                           </option>
                           {areaOptions.map((area) => (
                             <option key={area.id} value={area.id}>{area.nombre}</option>
@@ -1448,10 +1448,10 @@ export function ChatbotManagementScreen({
                             {form.tipo !== 'MINIPROYECTO'
                               ? 'No aplica para General'
                               : !form.area_id
-                                ? 'Primero selecciona un área'
+                                ? 'Selección de área requerida'
                                 : miniproyectoOptions.length === 0
-                                  ? 'No hay miniproyectos para esta área'
-                                  : 'Selecciona un miniproyecto'}
+                                  ? 'No hay miniproyectos disponibles para esta área'
+                                  : 'Seleccione un miniproyecto'}
                           </option>
                           {miniproyectoOptions.map((item) => (
                             <option key={item.id} value={item.id}>{getMiniproyectoLabel(item)}</option>
@@ -1525,9 +1525,9 @@ export function ChatbotManagementScreen({
                   <section className="app-form-section">
                     <h4 className="app-form-section-title">Antes de guardar</h4>
                     <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                      <p>Verifica que el modelo escrito exista realmente en tu proveedor configurado.</p>
-                      <p>Para chatbots de miniproyecto, confirma que el área y el miniproyecto correspondan al contexto correcto.</p>
-                      <p>Después de guardar, completa la base documental y prueba una conversación corta antes de publicarlo.</p>
+                      <p>Validación del modelo configurado en el proveedor correspondiente.</p>
+                      <p>Para chatbots de miniproyecto, área y miniproyecto deben corresponder al contexto configurado.</p>
+                      <p>Después del guardado, corresponde cargar la base documental y ejecutar una prueba breve.</p>
                     </div>
                   </section>
 

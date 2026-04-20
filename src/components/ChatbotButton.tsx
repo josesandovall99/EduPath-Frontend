@@ -44,17 +44,17 @@ function buildWelcomeMessage(chatbotType: ChatbotType, chatbotName?: string | nu
 
   if (chatbotType === 'MINIPROYECTO') {
     if (chatbotName) {
-      return `Hola, soy ${chatbotName}. Puedo ayudarte con ${contextLabel || 'este miniproyecto'}.`;
+      return `${chatbotName} disponible para consultas sobre ${contextLabel || 'este miniproyecto'}.`;
     }
 
-    return `Hola, puedo ayudarte con ${contextLabel || 'este miniproyecto'}.`;
+    return `Asistente disponible para consultas sobre ${contextLabel || 'este miniproyecto'}.`;
   }
 
   if (chatbotName) {
-    return `Hola, soy ${chatbotName}. ¿Qué quieres consultar?`;
+    return `${chatbotName} disponible para consultas generales.`;
   }
 
-  return '¡Hola! Soy tu asistente EduPath. ¿Qué dato deseas consultar?';
+  return 'Asistente EduPath disponible para consultas.';
 }
 
 export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproyectoId = null, contextLabel }: ChatbotButtonProps) {
@@ -183,17 +183,17 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
       window.clearTimeout(timeoutId);
 
       if (!accumulatedText.trim()) {
-        setMessages(prev => replaceLastBotMessage(prev, 'No pude obtener respuesta.'));
+        setMessages(prev => replaceLastBotMessage(prev, 'Respuesta no disponible.'));
       }
 
     } catch (error) {
       console.error("Error:", error);
       setMessages(prev => replaceLastBotMessage(prev,
         error instanceof Error && error.name === 'AbortError'
-          ? 'Timeout: el chatbot tardó más de 2 minutos en responder.'
+          ? 'Tiempo de espera agotado en la respuesta del chatbot.'
           : error instanceof Error && error.message === 'timeout'
-            ? 'Timeout: el chatbot tardó más de 2 minutos en responder.'
-            : 'Error de conexión con el chatbot. Verifica que el servidor esté activo.'));
+            ? 'Tiempo de espera agotado en la respuesta del chatbot.'
+            : 'Error de conexión con el servicio de chatbot.'));
     } finally {
       setIsLoading(false);
     }

@@ -20,7 +20,7 @@ export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, on
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const invalidCredentialsMessage = 'Credenciales inválidas. Verifica tu código y contraseña e inténtalo de nuevo.';
+  const invalidCredentialsMessage = 'Código de acceso o contraseña incorrectos. Intente nuevamente.';
   const hasAuthError = Boolean(error);
 
   const clearLocalAuthState = () => {
@@ -195,7 +195,7 @@ const handleStudentLogin = async () => {
       if (hasInvalidCredentials) {
         setError(invalidCredentialsMessage);
       } else if (hasConnectionIssues) {
-        setError('No se pudo conectar con el servidor. Intenta nuevamente en unos segundos.');
+        setError('No fue posible establecer conexión con el servidor. Intente nuevamente en unos segundos.');
       } else {
         setError(invalidCredentialsMessage);
       }
@@ -295,7 +295,7 @@ return (
                 onClick={() => onShowForgotPassword && onShowForgotPassword()}
                 className="text-[#4A90E2] hover:text-[#3A7BC8] transition-colors"
               >
-                ¿Olvidaste tu contraseña?
+                Recuperar contraseña
               </button>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Edit2, Eye, Loader, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ThemeManagementScreen } from './ThemeManagementScreen';
+import { AdminFlowGuide } from './ui/AdminFlowGuide';
 import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -96,7 +97,6 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
   const filteredTemas = temas.filter((tema) =>
     tema.nombre.toLowerCase().includes(searchTerm.toLowerCase().trim())
   );
-  const activeTemas = temas.filter((tema) => tema.estado !== false).length;
 
   if (showThemeManager) {
     return (
@@ -141,41 +141,37 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
           <span>Volver</span>
         </button>
 
+        <AdminFlowGuide
+          title="Gestión de temas"
+          description="Selección y administración temática dentro del área registrada."
+          breadcrumbs={[
+            { label: 'Panel admin' },
+            { label: 'Áreas' },
+            { label: areaName },
+            { label: 'Temas', current: true }
+          ]}
+          steps={[
+            { label: 'Áreas', helper: 'Área registrada para la operación actual.', status: 'complete' },
+            { label: 'Temas', helper: 'Selección del tema correspondiente.', status: 'current' },
+            { label: 'Subtemas', helper: 'Detalle de subtemas del tema.', status: 'upcoming' },
+            { label: 'Secuencias', helper: 'Orden de la secuencia académica.', status: 'upcoming' }
+          ]}
+          asideTitle="Siguiente paso"
+          asideDescription="La selección de un tema habilita la gestión de subtemas dentro del mismo flujo."
+        />
+
         <section className="app-page-hero mb-6">
           <div className="app-page-hero__content">
             <div className="app-page-hero__copy">
               <div className="app-page-hero__eyebrow">Estructura temática</div>
               <h2 className="app-page-hero__title">Gestión de temas</h2>
               <p className="app-page-hero__description">
-                Revisa, edita y abre el detalle de cada tema.
+                Consulta, edición y acceso al detalle de cada tema.
               </p>
-            </div>
-
-            <div className="app-hero-metrics">
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Temas</div>
-                <div className="app-hero-metric__value">{temas.length}</div>
-                <div className="app-hero-metric__help">Registros asociados al área actual.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Activos</div>
-                <div className="app-hero-metric__value">{activeTemas}</div>
-                <div className="app-hero-metric__help">Disponibles para continuar la estructura.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Resultados</div>
-                <div className="app-hero-metric__value">{filteredTemas.length}</div>
-                <div className="app-hero-metric__help">Coincidencias según la búsqueda actual.</div>
-              </div>
-              <div className="app-hero-metric app-hero-metric--wide">
-                <div className="app-hero-metric__label">Área</div>
-                <div className="app-hero-metric__value app-hero-metric__value--text">{areaName}</div>
-                <div className="app-hero-metric__help">Contexto activo de trabajo.</div>
-              </div>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(280px,0.75fr)]">
+          <div className="mt-6">
             <div className="app-toolbar-card">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -197,12 +193,6 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
                   className="app-form-input"
                 />
               </div>
-            </div>
-
-            <div className="app-soft-card app-soft-card--blue app-context-card">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
-              <p className="app-context-card__title">{areaName}</p>
-              <p className="app-context-card__text">Selecciona un tema para continuar con subtemas y contenidos.</p>
             </div>
           </div>
         </section>
@@ -227,7 +217,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
         ) : temas.length === 0 ? (
           <div className="app-empty-panel py-12">
             <p className="text-base text-slate-600">No hay temas registrados para esta área.</p>
-            <p className="mt-2 text-sm text-slate-500">Crea un tema para continuar con la estructura académica.</p>
+            <p className="mt-2 text-sm text-slate-500">El registro de un tema habilita la estructura académica del área.</p>
           </div>
         ) : filteredTemas.length === 0 ? (
           <div className="app-empty-panel py-12">

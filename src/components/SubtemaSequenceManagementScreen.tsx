@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight, ArrowDownUp } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { AdminFlowGuide } from './ui/AdminFlowGuide';
 import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -852,9 +853,6 @@ export function SubtemaSequenceManagementScreen({
   };
 
   const orderedSequence = buildOrderedSequence();
-  const activeSequencesCount = scopedSequences.filter((sequence) => sequence.estado).length;
-  const inactiveSequencesCount = scopedSequences.filter((sequence) => !sequence.estado).length;
-  const currentScopeLabel = temaName || 'Todos los temas';
 
   const handleSaveOrder = async (newOrder: Array<{ subtema_id: number; sequence_id?: number }>) => {
     setIsLoading(true);
@@ -931,6 +929,25 @@ export function SubtemaSequenceManagementScreen({
           <span>{temaId ? 'Volver a Temas' : 'Volver al Panel'}</span>
         </button>
 
+        <AdminFlowGuide
+          title="Secuencia de subtemas"
+          description="Organización del orden de subtemas dentro del tema seleccionado."
+          breadcrumbs={[
+            { label: 'Panel admin' },
+            { label: areaName || 'Áreas' },
+            { label: temaName || 'Temas' },
+            { label: 'Secuencia de subtemas', current: true }
+          ]}
+          steps={[
+            { label: 'Áreas', helper: 'Área registrada para la operación actual.', status: areaName ? 'complete' : 'upcoming' },
+            { label: 'Temas', helper: 'Tema base de la secuencia académica.', status: temaName ? 'complete' : 'current' },
+            { label: 'Secuencias', helper: 'Ajuste del orden entre subtemas.', status: 'current' },
+            { label: 'Contenidos', helper: 'Acceso al nivel de contenidos por subtema.', status: 'upcoming' }
+          ]}
+          asideTitle="Siguiente paso"
+          asideDescription="La selección de un subtema habilita la secuencia de contenidos asociada."
+        />
+
         <section className="app-page-hero mb-6">
           <div className="app-page-hero__content">
             <div className="app-page-hero__copy">
@@ -940,32 +957,9 @@ export function SubtemaSequenceManagementScreen({
                 Consulta, ajusta y organiza la secuencia del tema seleccionado.
               </p>
             </div>
-
-            <div className="app-hero-metrics">
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Secuencias</div>
-                <div className="app-hero-metric__value">{sequences.length}</div>
-                <div className="app-hero-metric__help">Total registrado en el módulo.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Activas</div>
-                <div className="app-hero-metric__value">{activeSequencesCount}</div>
-                <div className="app-hero-metric__help">Secuencias dentro del flujo actual.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Inactivas</div>
-                <div className="app-hero-metric__value">{inactiveSequencesCount}</div>
-                <div className="app-hero-metric__help">Registros fuera del flujo activo.</div>
-              </div>
-              <div className="app-hero-metric app-hero-metric--wide">
-                <div className="app-hero-metric__label">Contexto</div>
-                <div className="app-hero-metric__value app-hero-metric__value--text">{currentScopeLabel}</div>
-                <div className="app-hero-metric__help">Tema activo para la edición.</div>
-              </div>
-            </div>
           </div>
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.75fr)]">
+          <div className="app-hero-layout app-hero-layout--balanced">
             <div className="app-toolbar-card">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -1073,11 +1067,6 @@ export function SubtemaSequenceManagementScreen({
                 </div>
               </div>
 
-              <div className="app-soft-card app-context-card">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contexto activo</p>
-                <p className="app-context-card__title">{temaName || 'Tema no definido'}</p>
-                <p className="app-context-card__text">Área: {areaName || 'Sin área activa'}</p>
-              </div>
             </div>
           </div>
         </section>
@@ -1107,7 +1096,7 @@ export function SubtemaSequenceManagementScreen({
                 <div className="app-table-card__header">
                   <div>
                     <div className="app-table-card__title">Secuencia ordenada</div>
-                    <p className="app-table-card__description">Vista resumida del orden actual entre subtemas activos.</p>
+                    <p className="app-table-card__description">Resumen del orden actual entre subtemas activos.</p>
                   </div>
                   <div className="app-sequence-reorder-note">
                     <ArrowDownUp className="w-4 h-4" />
@@ -1190,7 +1179,7 @@ export function SubtemaSequenceManagementScreen({
             <div className="space-y-4">
               {filteredSequences.length === 0 ? (
                 <div className="app-empty-panel py-12">
-                  <p className="text-base text-slate-600">No hay secuencias registradas para la vista actual.</p>
+                  <p className="text-base text-slate-600">No hay secuencias registradas con los filtros aplicados.</p>
                   <p className="mt-2 text-sm text-slate-500">Crea una secuencia para establecer el orden entre subtemas.</p>
                 </div>
               ) : (

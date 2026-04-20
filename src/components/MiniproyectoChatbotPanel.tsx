@@ -49,13 +49,13 @@ function buildWelcomeMessage(chatbotType: ChatbotType, chatbotName?: string | nu
 
   if (chatbotType === 'MINIPROYECTO') {
     return chatbotName
-      ? `Hola, soy ${chatbotName}. Voy a reemplazar al cliente simulado y ayudarte con ${contextLabel || 'este miniproyecto'}.`
-      : `Hola. Estoy listo para ayudarte con ${contextLabel || 'este miniproyecto'}.`;
+      ? `${chatbotName} configurado como cliente simulado para ${contextLabel || 'este miniproyecto'}.`
+      : `Asistente configurado para ${contextLabel || 'este miniproyecto'}.`;
   }
 
   return chatbotName
-    ? `Hola, soy ${chatbotName}. ¿Qué necesitas para este taller?`
-    : 'Hola. Estoy listo para ayudarte con este taller.';
+    ? `${chatbotName} disponible para consultas del taller.`
+    : 'Asistente disponible para consultas del taller.';
 }
 
 export function MiniproyectoChatbotPanel({
@@ -179,14 +179,14 @@ export function MiniproyectoChatbotPanel({
 
       window.clearTimeout(timeoutId);
       if (!accumulatedText.trim()) {
-        setMessages((prev) => replaceLastBotMessage(prev, 'No pude obtener respuesta.'));
+        setMessages((prev) => replaceLastBotMessage(prev, 'Respuesta no disponible.'));
       }
     } catch (error) {
       console.error('Error in managed chatbot panel:', error);
       setMessages((prev) => replaceLastBotMessage(
         prev,
         error instanceof Error && (error.name === 'AbortError' || error.message === 'timeout')
-          ? 'Timeout: el chatbot tardó más de 2 minutos en responder.'
+          ? 'Tiempo de espera agotado en la respuesta del chatbot.'
           : 'Error de conexión con el chatbot del miniproyecto.'
       ));
     } finally {
@@ -237,7 +237,7 @@ export function MiniproyectoChatbotPanel({
               }
             }}
             disabled={isLoading || isResolving || !resolvedChatbot?.id}
-            placeholder={resolvedChatbot?.id ? 'Escribe tu mensaje para el cliente del proyecto...' : 'No hay chatbot disponible para este miniproyecto'}
+            placeholder={resolvedChatbot?.id ? 'Registrar mensaje para el cliente del proyecto...' : 'No hay chatbot disponible para este miniproyecto'}
             className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] disabled:bg-gray-100"
           />
           <button

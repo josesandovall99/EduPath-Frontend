@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, Clock, GitBranch, ClipboardList, Shield } from 'lucide-react';
+import { LogOut, BookOpen, FileEdit, BarChart3, Users, TrendingUp, ClipboardList, Shield, Upload, Bot, ArrowRight } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
 import { ContentManagementScreen } from './ContentManagementScreen';
@@ -10,11 +10,10 @@ import { TemasManagementScreen } from './TemasManagementScreen';
 import { SubThemeManagementScreen } from './SubThemeManagementScreen';
 import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
 import { ExerciseManagementScreen } from './ExerciseManagementScreen';
-import { Upload } from "lucide-react";
 import { ChatbotManagementScreen } from './ChatbotManagementScreen';
-import { Bot } from 'lucide-react';
 import { DocenteManagementScreen } from './DocenteManagementScreen';
 import { AdminManagementScreen } from './AdminManagementScreen';
+import { AdminFlowGuide } from './ui/AdminFlowGuide';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -28,6 +27,20 @@ type DashboardStats = {
   activeTemas: number;
   activeEstudiantes: number;
   activeContenidos: number;
+};
+
+type DashboardAction = {
+  id: string;
+  title: string;
+  description: string;
+  icon: any;
+  color: string;
+  gradient: string;
+  group: 'workflow' | 'support';
+  badge: string;
+  tone: 'blue' | 'green' | 'amber' | 'slate';
+  onClick?: () => void;
+  navigateSection?: 'themes' | 'contents' | 'reports' | 'students' | 'upload' | 'subtema-sequences' | 'subthemes';
 };
 
 const EMPTY_STATS: DashboardStats = {
@@ -123,7 +136,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         };
 
         const fetchJsonWithFallback = async (paths: string[]) => {
-          let lastError = null;
+          let lastError: unknown = null;
 
           for (const path of paths) {
             try {
@@ -205,107 +218,212 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
     setNavigationHistory([]);
     setCurrentScreen('dashboard');
   };
+
+  const handleAreaSelect = (areaId: number, areaName: string) => {
+    setSelectedAreaId(areaId);
+    setSelectedAreaName(areaName);
+    setSelectedTemaId(null);
+    setSelectedTemaName('');
+    setSelectedSubtemaId(null);
+    setSelectedSubtemaNombre('');
+    navigateTo('temas');
+  };
+
+  const handleTemaSelect = (temaId: number, temaName: string, nextScreen: AdminScreen = 'subthemes') => {
+    setSelectedTemaId(temaId);
+    setSelectedTemaName(temaName);
+    setSelectedSubtemaId(null);
+    setSelectedSubtemaNombre('');
+    navigateTo(nextScreen);
+  };
+
+  const handleSubtemaSelect = (subtemaId: number, temaId: number, subtemaNombre: string) => {
+    setSelectedTemaId(temaId);
+    setSelectedSubtemaId(subtemaId);
+    setSelectedSubtemaNombre(subtemaNombre);
+    navigateTo('contents');
+  };
+
   const stats = [
     { label: 'Áreas activas', value: statsData.activeAreas, icon: BookOpen, color: '#4A90E2' },
     { label: 'Temas activos', value: statsData.activeTemas, icon: FileEdit, color: '#7ED6A7' },
     { label: 'Estudiantes activos', value: statsData.activeEstudiantes, icon: Users, color: '#F5A97F' },
-    { label: 'Contenidos activos', value: statsData.activeContenidos, icon: TrendingUp, color: '#A78BFA' }
+    { label: 'Contenidos activos', value: statsData.activeContenidos, icon: TrendingUp, color: '#14B8A6' }
   ];
 
-  const actions = [
+  const actions: DashboardAction[] = [
     {
       id: 'areas',
       title: 'Gestión de Áreas',
-      description: 'Crear, editar y eliminar áreas académicas. Define el nombre y la descripción del área.',
+      description: 'Registro y organización de áreas académicas.',
       icon: BookOpen,
       color: '#4A90E2',
       gradient: 'from-[#4A90E2] to-[#5B9FED]',
+      group: 'workflow',
+      badge: 'Paso 1',
+      tone: 'blue',
       onClick: () => navigateTo('areas')
     },
     {
       id: 'contents',
-      title: 'Gestión de Contenidos',
-      description: 'Crea, edita y administra contenidos educativos asociados a subtemas y secuencias.',
+      title: 'Catálogo de Contenidos',
+      description: 'Administración del catálogo de contenidos, recursos y actividades.',
       icon: TrendingUp,
-      color: '#A78BFA',
-      gradient: 'from-[#A78BFA] to-[#C4B5FD]',
+      color: '#0F766E',
+      gradient: 'from-[#0F766E] to-[#14B8A6]',
+      group: 'workflow',
+      badge: 'Paso final',
+      tone: 'green',
       onClick: () => navigateTo('content-management')
     },
     {
       id: 'ejercicios',
       title: 'Gestión de Ejercicios',
-      description: 'Crear y editar ejercicios asociados a contenidos específicos.',
+      description: 'Creación y edición de ejercicios asociados a contenidos.',
       icon: ClipboardList,
       color: '#0EA5E9',
       gradient: 'from-[#0EA5E9] to-[#38BDF8]',
+      group: 'workflow',
+      badge: 'Complemento',
+      tone: 'blue',
       onClick: () => navigateTo('ejercicios')
     },
     {
       id: 'miniproyectos',
       title: 'Gestión de Miniproyectos',
-      description: 'Selecciona y edita miniproyectos existentes y su actividad asociada.',
+      description: 'Administración de miniproyectos y actividades relacionadas.',
       icon: ClipboardList,
       color: '#0EA5E9',
       gradient: 'from-[#0EA5E9] to-[#38BDF8]',
+      group: 'workflow',
+      badge: 'Complemento',
+      tone: 'green',
       onClick: () => navigateTo('miniproyectos')
     },
     {
       id: 'reports',
       title: 'Generación de Informes',
-      description: 'Genera informes de progreso por estudiante, materia o estado de avance. Exporta datos y estadísticas.',
+      description: 'Consulta y exportación de informes de progreso y estado.',
       icon: BarChart3,
       color: '#F5A97F',
-      gradient: 'from-[#F5A97F] to-[#F7B98F]'
+      gradient: 'from-[#F5A97F] to-[#F7B98F]',
+      group: 'support',
+      badge: 'Seguimiento',
+      tone: 'amber',
+      navigateSection: 'reports'
     },
     {
       id: 'docentes',
       title: 'Gestión de Docentes',
-      description: 'Crear, editar y eliminar docentes del sistema. Administra su especialidad y área asignada.',
+      description: 'Administración de docentes, especialidades y áreas asignadas.',
       icon: Users,
       color: '#14B8A6',
       gradient: 'from-[#14B8A6] to-[#2DD4BF]',
+      group: 'support',
+      badge: 'Operación',
+      tone: 'green',
       onClick: () => navigateTo('docentes')
     },
     {
       id: 'administradores',
       title: 'Gestión de Administradores',
-      description: 'Crear administradores y controlar sus credenciales dentro del sistema.',
+      description: 'Administración de cuentas y credenciales del rol administrador.',
       icon: Shield,
       color: '#2563EB',
       gradient: 'from-[#2563EB] to-[#3B82F6]',
+      group: 'support',
+      badge: 'Control',
+      tone: 'blue',
       onClick: () => navigateTo('administradores')
     },
     {
       id: 'upload',
       title: 'Carga Masiva de Estudiantes',
-      description: 'Importa múltiples estudiantes desde un archivo Excel. Crea usuarios automáticamente y envía credenciales.',
+      description: 'Importación masiva de estudiantes desde archivo Excel.',
       icon: Upload,
       color: '#F472B6',
-      gradient: 'from-[#F472B6] to-[#FB87C6]'
+      gradient: 'from-[#F472B6] to-[#FB87C6]',
+      group: 'support',
+      badge: 'Operación',
+      tone: 'amber',
+      navigateSection: 'upload'
     },
     {
       id: 'chatbot',
       title: 'Gestión del Chatbot',
-      description: 'Administra los documentos del chatbot. Sube PDFs, recarga la base de conocimiento y prueba las respuestas.',
+      description: 'Administración de documentos y actualización de la base de conocimiento.',
       icon: Bot,
       color: '#6366F1',
       gradient: 'from-[#6366F1] to-[#818CF8]',
+      group: 'support',
+      badge: 'Soporte',
+      tone: 'slate',
       onClick: () => navigateTo('chatbot')
     }
   ];
 
-  // Renderizar la pantalla actual
+  const hasAreaContext = Boolean(selectedAreaId);
+  const hasTemaContext = Boolean(selectedTemaId);
+  const hasSubtemaContext = Boolean(selectedSubtemaId);
+  const currentFlowLabel = hasSubtemaContext ? 'Secuencias y contenidos' : hasTemaContext ? 'Subtemas' : hasAreaContext ? 'Temas' : 'Áreas';
+  const academicActions = actions.filter((action) => action.group === 'workflow');
+  const supportActions = actions.filter((action) => action.group === 'support');
+  const lastNavigationScreen = navigationHistory.length > 0 ? navigationHistory[navigationHistory.length - 1] : null;
+  const isContentManagementFlowScoped = lastNavigationScreen === 'contents' && (hasAreaContext || hasTemaContext || hasSubtemaContext);
+
+  const openAction = (action: DashboardAction) => {
+    if (action.onClick) {
+      action.onClick();
+      return;
+    }
+
+    if (action.navigateSection) {
+      onNavigate(action.navigateSection);
+    }
+  };
+
+  const renderActionCard = (action: DashboardAction) => {
+    const Icon = action.icon;
+
+    return (
+      <button
+        key={action.id}
+        onClick={() => openAction(action)}
+        className="app-list-card group border-transparent text-left"
+      >
+        <div className="app-list-card__head">
+          <div
+            className={`app-list-card__icon bg-gradient-to-br ${action.gradient} shadow-md`}
+            style={{ backgroundColor: action.color }}
+          >
+            <Icon className="w-6 h-6 text-white" />
+          </div>
+          <span className={`app-badge app-badge--${action.tone}`}>{action.badge}</span>
+        </div>
+        <div>
+          <div className="app-list-card__title">{action.title}</div>
+          <div className="app-list-card__description mt-2">{action.description}</div>
+        </div>
+        <div className="app-list-card__footer">
+          <span className="app-list-card__meta">
+            {action.group === 'workflow' ? 'Ruta principal' : 'Soporte operativo'}
+          </span>
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#2563eb]">
+            Abrir
+            <ArrowRight className="w-4 h-4" />
+          </span>
+        </div>
+      </button>
+    );
+  };
+
   if (currentScreen === 'subthemes') {
     if (!selectedAreaId) {
       return (
         <AreasManagementScreen
           onBack={goBack}
           onHome={goHome}
-          onSelectArea={(areaId, areaName) => {
-            setSelectedAreaId(areaId);
-            setSelectedAreaName(areaName);
-            navigateTo('temas');
-          }}
+          onSelectArea={handleAreaSelect}
         />
       );
     }
@@ -317,11 +435,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           areaName={selectedAreaName}
           onBack={goBack}
           onHome={goHome}
-          onSelectTema={(temaId, temaName) => {
-            setSelectedTemaId(temaId);
-            setSelectedTemaName(temaName);
-            navigateTo('subthemes');
-          }}
+          onSelectTema={(temaId, temaName) => handleTemaSelect(temaId, temaName, 'subthemes')}
         />
       );
     }
@@ -337,6 +451,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           setSelectedAreaName(nextAreaName);
           setSelectedTemaId(nextTemaId);
           setSelectedTemaName(nextTemaName);
+          setSelectedSubtemaId(null);
+          setSelectedSubtemaNombre('');
           navigateTo('subtema-sequences');
         }}
       />
@@ -344,15 +460,13 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   }
 
   if (currentScreen === 'areas') {
-    return <AreasManagementScreen 
-      onBack={goBack}
-      onHome={goHome}
-      onSelectArea={(areaId, areaName) => {
-        setSelectedAreaId(areaId);
-        setSelectedAreaName(areaName);
-        navigateTo('temas');
-      }}
-    />;
+    return (
+      <AreasManagementScreen
+        onBack={goBack}
+        onHome={goHome}
+        onSelectArea={handleAreaSelect}
+      />
+    );
   }
 
   if (currentScreen === 'temas') {
@@ -361,26 +475,20 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         <AreasManagementScreen
           onBack={goBack}
           onHome={goHome}
-          onSelectArea={(areaId, areaName) => {
-            setSelectedAreaId(areaId);
-            setSelectedAreaName(areaName);
-            navigateTo('temas');
-          }}
+          onSelectArea={handleAreaSelect}
         />
       );
     }
 
-    return <TemasManagementScreen 
-      areaId={selectedAreaId!}
-      areaName={selectedAreaName}
-      onBack={goBack}
-      onHome={goHome}
-      onSelectTema={(temaId, temaName) => {
-        setSelectedTemaId(temaId);
-        setSelectedTemaName(temaName);
-        navigateTo('subthemes');
-      }}
-    />;
+    return (
+      <TemasManagementScreen
+        areaId={selectedAreaId}
+        areaName={selectedAreaName}
+        onBack={goBack}
+        onHome={goHome}
+        onSelectTema={(temaId, temaName) => handleTemaSelect(temaId, temaName, 'subthemes')}
+      />
+    );
   }
 
   if (currentScreen === 'subtema-sequences') {
@@ -389,11 +497,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         <AreasManagementScreen
           onBack={goBack}
           onHome={goHome}
-          onSelectArea={(areaId, areaName) => {
-            setSelectedAreaId(areaId);
-            setSelectedAreaName(areaName);
-            navigateTo('temas');
-          }}
+          onSelectArea={handleAreaSelect}
         />
       );
     }
@@ -405,126 +509,122 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           areaName={selectedAreaName}
           onBack={goBack}
           onHome={goHome}
-          onSelectTema={(temaId, temaName) => {
-            setSelectedTemaId(temaId);
-            setSelectedTemaName(temaName);
-            navigateTo('subthemes');
-          }}
+          onSelectTema={(temaId, temaName) => handleTemaSelect(temaId, temaName, 'subthemes')}
         />
       );
     }
 
-    return <SubtemaSequenceManagementScreen 
-      onBack={goBack}
-      onHome={goHome}
-      onSelectSubtema={(subtemaId, temaId, subtemaNombre) => {
-        setSelectedSubtemaId(subtemaId);
-        setSelectedSubtemaNombre(subtemaNombre);
-        navigateTo('contents');
-      }}
-      areaId={selectedAreaId || undefined}
-      areaName={selectedAreaName}
-      temaId={selectedTemaId || undefined}
-      temaName={selectedTemaName}
-    />;
+    return (
+      <SubtemaSequenceManagementScreen
+        onBack={goBack}
+        onHome={goHome}
+        onSelectSubtema={handleSubtemaSelect}
+        areaId={selectedAreaId || undefined}
+        areaName={selectedAreaName}
+        temaId={selectedTemaId || undefined}
+        temaName={selectedTemaName}
+      />
+    );
   }
 
   if (currentScreen === 'miniproyectos') {
-    return (
-      <MiniproyectoManagementScreen
-        onBack={goBack}
-      />
-    );
+    return <MiniproyectoManagementScreen onBack={goBack} />;
   }
 
   if (currentScreen === 'ejercicios') {
-    return (
-      <ExerciseManagementScreen
-        onBack={goBack}
-      />
-    );
+    return <ExerciseManagementScreen onBack={goBack} />;
   }
 
   if (currentScreen === 'chatbot') {
-    return (
-      <ChatbotManagementScreen
-        onBack={goBack}
-      />
-    );
+    return <ChatbotManagementScreen onBack={goBack} />;
   }
 
   if (currentScreen === 'docentes') {
-    return (
-      <DocenteManagementScreen
-        onBack={goBack}
-      />
-    );
+    return <DocenteManagementScreen onBack={goBack} />;
   }
 
   if (currentScreen === 'administradores') {
+    return <AdminManagementScreen onBack={goBack} />;
+  }
+
+  if (currentScreen === 'contents') {
+    if (selectedSubtemaId && selectedTemaId) {
+      return (
+        <SequenceManagementScreen
+          onBack={() => {
+            setSelectedSubtemaId(null);
+            setSelectedSubtemaNombre('');
+            goBack();
+          }}
+          onHome={goHome}
+          onGoToContentManagement={() => {
+            navigateTo('content-management');
+          }}
+          subtemaId={selectedSubtemaId}
+          temaId={selectedTemaId}
+          areaId={selectedAreaId || undefined}
+          areaName={selectedAreaName}
+          temaName={selectedTemaName}
+          subtemaNombre={selectedSubtemaNombre}
+        />
+      );
+    }
+
     return (
-      <AdminManagementScreen
+      <ContentManagementScreen
         onBack={goBack}
+        onHome={goHome}
+        scopeMode={hasAreaContext || hasTemaContext || hasSubtemaContext ? 'flow' : 'catalog'}
+        initialAreaId={selectedAreaId || undefined}
+        initialAreaName={selectedAreaName || undefined}
+        initialTemaId={selectedTemaId || undefined}
+        initialTemaName={selectedTemaName || undefined}
+        initialSubtemaId={selectedSubtemaId || undefined}
+        initialSubtemaName={selectedSubtemaNombre || undefined}
       />
     );
   }
 
-  if (currentScreen === 'contents') {
-    // Si viene de un subtema, mostrar SequenceManagementScreen con filtro
-    if (selectedSubtemaId && selectedTemaId) {
-      return <SequenceManagementScreen 
-        onBack={() => {
-          setSelectedSubtemaId(null);
-          setSelectedSubtemaNombre('');
-          goBack();
-        }}
-        onHome={goHome}
-        onGoToContentManagement={() => {
-          navigateTo('content-management');
-        }}
-        subtemaId={selectedSubtemaId}
-        temaId={selectedTemaId}
-        areaId={selectedAreaId || undefined}
-        areaName={selectedAreaName}
-        temaName={selectedTemaName}
-        subtemaNombre={selectedSubtemaNombre}
-      />;
-    }
-    // Fallback: si no hay subtema seleccionado, ir a gestión de contenidos
-    return <ContentManagementScreen onBack={goBack} onHome={goHome} />;
-  }
-
   if (currentScreen === 'content-management') {
-    return <ContentManagementScreen onBack={goBack} onHome={goHome} />;
+    return (
+      <ContentManagementScreen
+        onBack={goBack}
+        onHome={goHome}
+        scopeMode={isContentManagementFlowScoped ? 'flow' : 'catalog'}
+        initialAreaId={isContentManagementFlowScoped ? selectedAreaId || undefined : undefined}
+        initialAreaName={isContentManagementFlowScoped ? selectedAreaName || undefined : undefined}
+        initialTemaId={isContentManagementFlowScoped ? selectedTemaId || undefined : undefined}
+        initialTemaName={isContentManagementFlowScoped ? selectedTemaName || undefined : undefined}
+        initialSubtemaId={isContentManagementFlowScoped ? selectedSubtemaId || undefined : undefined}
+        initialSubtemaName={isContentManagementFlowScoped ? selectedSubtemaNombre || undefined : undefined}
+      />
+    );
   }
 
   return (
     <div className="app-shell">
-      {/* Header */}
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#4A90E2] to-[#7ED6A7] rounded-xl flex items-center justify-center p-2 shadow-md">
+        <div className="app-main py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-[#3A4A5B]">Panel de Administrador</h1>
-                <p className="text-gray-500 text-sm">Sistema de Gestión Académica - EduPath</p>
+                <p className="text-gray-500 text-sm">Acceso a los módulos del rol administrador.</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-[#3A4A5B]">Admin Usuario</p>
-                <p className="text-gray-500 text-sm">Coordinador Académico</p>
+
+            <div className="app-user-chip">
+              <div className="app-user-chip__meta">
+                <p>Admin Usuario</p>
+                <p>Coordinador Académico</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-[#F5A97F] to-[#F7B98F] rounded-full flex items-center justify-center text-white shadow-md">
+              <div className="app-user-avatar">
                 <span className="text-xl">A</span>
               </div>
-              <button
-                onClick={onLogout}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-[#4A90E2] hover:bg-blue-50 rounded-lg transition-all duration-300"
-              >
+              <button onClick={onLogout} className="app-btn app-btn-ghost">
                 <LogOut className="w-4 h-4" />
                 <span>Cerrar sesión</span>
               </button>
@@ -533,109 +633,74 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="app-main">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        <div className="app-section-head mb-6">
+          <div>
+            <h2 className="app-section-title">Módulos del administrador</h2>
+            <p className="app-section-description">Panel principal con acceso a los módulos del rol administrador.</p>
+          </div>
+        </div>
+
+        <AdminFlowGuide
+          eyebrow="Flujo de gestión"
+          title="Orden de gestión académica"
+          description="Referencia del orden de acceso para áreas, temas, subtemas y secuencias."
+          breadcrumbs={[
+            { label: 'Panel admin' },
+            { label: currentFlowLabel, current: true }
+          ]}
+          steps={[
+            { label: 'Áreas', helper: 'Definición de la estructura base.', status: hasAreaContext ? 'complete' : 'current' },
+            { label: 'Temas', helper: 'Organización temática por área.', status: hasTemaContext ? 'complete' : hasAreaContext ? 'current' : 'upcoming' },
+            { label: 'Subtemas', helper: 'Detalle de la estructura académica.', status: hasSubtemaContext ? 'complete' : hasTemaContext ? 'current' : 'upcoming' },
+            { label: 'Secuencias y contenidos', helper: 'Orden y gestión del contenido final.', status: hasSubtemaContext ? 'current' : 'upcoming' }
+          ]}
+        />
+
+        <div className="app-metric-grid mb-8">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
             return (
-              <div key={index} className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-all duration-300">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: `${stat.color}15` }}>
-                    <Icon className="w-6 h-6" style={{ color: stat.color }} />
-                  </div>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                    {isLoadingStats ? 'Cargando' : 'En BD'}
-                  </span>
+              <div key={index} className="app-metric-card">
+                <div className="app-metric-icon" style={{ backgroundColor: `${stat.color}16`, color: stat.color }}>
+                  <Icon className="w-6 h-6" style={{ color: stat.color }} />
                 </div>
-                <div className="text-3xl mb-1" style={{ color: stat.color }}>{stat.value}</div>
-                <p className="text-gray-600 text-sm">{stat.label}</p>
+                <div>
+                  <div className="app-metric-value" style={{ color: stat.color }}>
+                    {isLoadingStats ? '...' : stat.value}
+                  </div>
+                  <p className="app-metric-label">{stat.label}</p>
+                </div>
               </div>
             );
           })}
         </div>
 
-        {/* Main Actions Grid */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          {actions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={action.id}
-                onClick={() => action.onClick ? action.onClick() : onNavigate(action.id as 'themes' | 'contents' | 'reports' | 'students' | 'upload' | 'subtema-sequences' | 'subthemes')}
-                className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-8 text-left group hover:transform hover:scale-[1.02]"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div 
-                      className={`p-4 rounded-xl bg-gradient-to-br ${action.gradient} shadow-md`}
-                      style={{ backgroundColor: action.color }}
-                  >
-                    <Icon className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="text-gray-400 group-hover:text-[#4A90E2] transition-colors">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-                <h2 className="text-[#3A4A5B] mb-2 text-xl group-hover:text-[#4A90E2] transition-colors">
-                  {action.title}
-                </h2>
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  {action.description}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white rounded-2xl shadow-md">
-          <div className="border-b border-gray-200 p-6">
-            <h3 className="text-[#3A4A5B] text-xl">Actividad Reciente</h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <FileEdit className="w-5 h-5 text-[#4A90E2]" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[#3A4A5B]">Nuevo contenido agregado en Fundamentos de Programación</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Clock className="w-3 h-3 text-gray-400" />
-                    <span className="text-gray-500 text-sm">Hace 2 horas</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Users className="w-5 h-5 text-[#7ED6A7]" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[#3A4A5B]">15 estudiantes completaron el taller de Análisis de Sistemas</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Clock className="w-3 h-3 text-gray-400" />
-                    <span className="text-gray-500 text-sm">Hace 5 horas</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
-                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-5 h-5 text-[#F5A97F]" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[#3A4A5B]">Tema deshabilitado en Alcance, Tiempo y Costo</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Clock className="w-3 h-3 text-gray-400" />
-                    <span className="text-gray-500 text-sm">Ayer</span>
-                  </div>
-                </div>
-              </div>
+        <section className="mb-8">
+          <div className="app-section-head">
+            <div>
+              <h3 className="app-section-title">Gestión académica</h3>
+              <p className="app-section-description">Módulos para áreas, contenidos, ejercicios y miniproyectos.</p>
             </div>
           </div>
-        </div>
+
+          <div className="app-card-grid">
+            {academicActions.map(renderActionCard)}
+          </div>
+        </section>
+
+        <section className="mb-8">
+          <div className="app-section-head">
+            <div>
+              <h3 className="app-section-title">Administración y soporte</h3>
+              <p className="app-section-description">Módulos para usuarios, informes, carga masiva y servicios del sistema.</p>
+            </div>
+          </div>
+
+          <div className="app-card-grid">
+            {supportActions.map(renderActionCard)}
+          </div>
+        </section>
       </main>
     </div>
   );

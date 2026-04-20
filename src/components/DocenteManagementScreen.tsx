@@ -416,7 +416,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
             </div>
           </div>
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.8fr)]">
+          <div className="app-hero-layout app-hero-layout--balanced">
             <div className="app-toolbar-card">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -779,7 +779,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                 <section className="app-form-section">
                   <h4 className="app-form-section-title">Verificación</h4>
                   <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                    <p>Verifica el correo antes de guardar.</p>
+                    <p>Validación del correo antes del guardado.</p>
                     <p>Confirma el código de acceso y la especialidad.</p>
                     <p>Asigna el área correcta para mantener consistencia operativa.</p>
                   </div>
@@ -829,7 +829,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
               </button>
             </div>
             <div className="space-y-3 p-6 text-sm leading-6 text-slate-600">
-              <p>Verifica que los datos del docente sean correctos.</p>
+              <p>Validación de datos del docente antes de confirmar la creación.</p>
               <p>Se enviarán las credenciales al correo proporcionado.</p>
             </div>
             <div className="flex gap-3 justify-end rounded-b-[26px] border-t border-slate-200 bg-white p-6">

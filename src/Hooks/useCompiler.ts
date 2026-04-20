@@ -30,7 +30,7 @@ export function useCompiler() {
       if (resultado.esCorrecta) {
         finalOutput = `EJERCICIO APROBADO!\n\nSalida del programa:\n${resultado.stdout || resultado.obtenido || ''}\n\nPuntos obtenidos: ${resultado.puntosObtenidos || 0}`;
       } else {
-        finalOutput = `Ejercicio NO aprobado\n\nTu salida:\n${resultado.stdout || resultado.obtenido || ''}\n\nSalida esperada:\n${resultado.esperado || ''}\n\nRevisa tu código e intenta de nuevo`;
+        finalOutput = `Ejercicio no aprobado\n\nSalida obtenida:\n${resultado.stdout || resultado.obtenido || ''}\n\nSalida esperada:\n${resultado.esperado || ''}\n\nSe requiere ajuste del código y nuevo envío.`;
       }
       
       setOutput(finalOutput);
@@ -47,7 +47,7 @@ export function useCompiler() {
         let finalOutput = '';
         
         if (resultado.esCorrecta === false) {
-          finalOutput = `Ejercicio NO aprobado\n\nTu salida:\n${resultado.stdout || resultado.obtenido || ''}\n\nSalida esperada:\n${resultado.esperado || ''}\n\nRevisa tu código e intenta de nuevo`;
+          finalOutput = `Ejercicio no aprobado\n\nSalida obtenida:\n${resultado.stdout || resultado.obtenido || ''}\n\nSalida esperada:\n${resultado.esperado || ''}\n\nSe requiere ajuste del código y nuevo envío.`;
         } else {
           const errorMsg = resultado.error || resultado.message || "Error desconocido";
           finalOutput = `Error: ${errorMsg}`;

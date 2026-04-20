@@ -267,9 +267,9 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         <section className="app-page-hero mb-8">
           <div className="app-page-hero__content">
             <div className="app-page-hero__copy">
-              <div className="app-page-hero__eyebrow">Bienvenida</div>
-              <h2 className="app-page-hero__title">Hola, {userName || 'Estudiante'}</h2>
-              <p className="app-page-hero__description">Continúa tu aprendizaje donde lo dejaste y entra a tus materias desde un entorno visual consistente.</p>
+              <div className="app-page-hero__eyebrow">Panel académico</div>
+              <h2 className="app-page-hero__title">{userName || 'Estudiante'}</h2>
+              <p className="app-page-hero__description">Resumen de áreas académicas y avance registrado.</p>
             </div>
             <BookOpen className="app-page-hero__icon w-20 h-20" />
           </div>
@@ -277,8 +277,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
 
         <div className="app-section-head">
           <div>
-            <h3 className="app-section-title">Tus materias</h3>
-            <p className="app-section-description">Accede a tus áreas y revisa el progreso de cada una.</p>
+            <h3 className="app-section-title">Áreas académicas</h3>
+            <p className="app-section-description">Consulta del progreso por área académica.</p>
           </div>
         </div>
 
@@ -375,7 +375,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <div className="app-activity-item__meta flex-1">
-                <p>Completaste “Variables y Tipos de Datos”</p>
+                <p>Contenido completado: “Variables y Tipos de Datos”</p>
                 <p>Fundamentos de Programación • Hace 2 horas</p>
               </div>
             </div>
@@ -384,7 +384,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
                 <BookOpen className="w-5 h-5" />
               </div>
               <div className="app-activity-item__meta flex-1">
-                <p>Nuevo contenido disponible en Análisis de Sistemas</p>
+                <p>Nuevo contenido registrado en Análisis de Sistemas</p>
                 <p>Diagramas UML • Hace 5 horas</p>
               </div>
             </div>
@@ -393,7 +393,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
                 <Clock className="w-5 h-5" />
               </div>
               <div className="app-activity-item__meta flex-1">
-                <p>Taller pendiente: Gestión del Alcance</p>
+                <p>Actividad pendiente: Gestión del Alcance</p>
                 <p>Alcance, Tiempo y Costo • Vence en 3 días</p>
               </div>
             </div>

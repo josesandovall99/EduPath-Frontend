@@ -345,12 +345,12 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
                   <div className="flex items-center gap-3 rounded-2xl px-2 py-1"><Circle className="h-5 w-5 text-rose-500" /><div><div className="text-xs text-slate-400">Incorrectas</div><div className="text-[1.65rem] font-semibold leading-none text-rose-500">{incorrectExercises}</div></div></div>
                 </div>
               </div>
-              <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,#3B82F6_0%,#2F74E8_100%)] px-4 py-3 text-sm font-medium text-white shadow-sm">Nota: El miniproyecto se evaluará en un solo resultado final. {readyToEvaluate ? 'Ya puedes usar el botón principal de evaluación.' : `Todavía faltan ${Math.max(totalExercises - answeredExercises, 0)} ejercicios por responder.`}</div>
+              <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,#3B82F6_0%,#2F74E8_100%)] px-4 py-3 text-sm font-medium text-white shadow-sm">Evaluación final unificada del miniproyecto. {readyToEvaluate ? 'El botón principal de evaluación ya está habilitado.' : `Restan ${Math.max(totalExercises - answeredExercises, 0)} ejercicios por responder.`}</div>
             </section>
 
             {showChatbot ? (
               <section className="space-y-4">
-                <div className="rounded-[24px] border border-sky-100 bg-[linear-gradient(135deg,#F2F8FF_0%,#F8FCFF_100%)] px-5 py-4 text-sm leading-6 text-slate-600 shadow-sm"><span className="font-semibold text-[#1F3A5F]">Apóyate del chatbot</span> para entender el contexto del caso, aclarar dudas del cliente simulado y resolver mejor los ejercicios del miniproyecto.</div>
+                <div className="rounded-[24px] border border-sky-100 bg-[linear-gradient(135deg,#F2F8FF_0%,#F8FCFF_100%)] px-5 py-4 text-sm leading-6 text-slate-600 shadow-sm"><span className="font-semibold text-[#1F3A5F]">Soporte del chatbot</span> para consulta del contexto del caso, aclaración de dudas del cliente simulado y apoyo al desarrollo del miniproyecto.</div>
                 <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_16px_34px_rgba(58,74,91,0.08)]">
                   <MiniproyectoChatbotPanel chatbotType="MINIPROYECTO" areaId={miniproyecto?.Area?.id || content.areaId || null} miniproyectoId={miniproyecto?.id || content.id} title="Petitbot" subtitle="Chatbot configurado para este miniproyecto" contextLabel={miniproyecto?.Actividad?.titulo || content.title} />
                 </div>
@@ -365,7 +365,7 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h3 className="text-[1.65rem] font-semibold text-[#213547]">Evaluación del miniproyecto</h3>
-                  <p className="mt-2 text-sm text-slate-500">Cuando hayas resuelto todos los ejercicios, usa este botón para evaluar tu solución del proyecto.</p>
+                  <p className="mt-2 text-sm text-slate-500">El botón de evaluación se habilita cuando todos los ejercicios del proyecto han sido resueltos.</p>
                 </div>
                 <button onClick={handleEvaluateMiniproyecto} disabled={!readyToEvaluate || isEvaluating || isCompleted} className="inline-flex items-center justify-center rounded-full border-2 border-[#3779F1] px-5 py-2.5 text-sm font-semibold text-[#3779F1] transition-colors hover:bg-[#EFF5FF] disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400">
                   {isCompleted ? 'Miniproyecto evaluado' : isEvaluating ? 'Evaluando...' : 'Evaluar miniproyecto'}

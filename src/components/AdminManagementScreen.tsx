@@ -61,7 +61,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
     }
 
     if (!authToken) {
-      setFormError('Tu sesion no es valida. Inicia sesion nuevamente.');
+      setFormError('Sesión inválida. Inicie sesión nuevamente.');
       return;
     }
 
@@ -91,7 +91,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
         throw new Error(errorData?.mensaje || 'Error al crear administrador');
       }
 
-      setSuccessMessage('Administrador creado correctamente. Las credenciales fueron enviadas por correo.');
+      setSuccessMessage('Cuenta administrativa registrada. Las credenciales fueron enviadas por correo.');
       setShowModal(false);
       resetForm();
     } catch (err) {
@@ -141,7 +141,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
           <div className="app-section-head">
             <div>
               <h3 className="app-section-title">Administradores</h3>
-              <p className="app-section-description">Crea un administrador nuevo para el sistema.</p>
+              <p className="app-section-description">Registro de cuentas administrativas del sistema.</p>
             </div>
             <button onClick={handleOpenCreate} className="app-btn app-primary-btn px-5 py-3">
               <Plus className="w-4 h-4" />
@@ -161,7 +161,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
           <div className="app-soft-card app-context-card">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Acción principal</p>
             <p className="app-context-card__title">Nuevo administrador</p>
-            <p className="app-context-card__text">Registra una nueva cuenta administrativa desde esta sección.</p>
+            <p className="app-context-card__text">Alta de una nueva cuenta administrativa.</p>
           </div>
         </section>
 
@@ -174,7 +174,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
               <div>
                 <div className="app-modal-kicker">Administración</div>
                 <h3 className="app-modal-title">Crear administrador</h3>
-                <p className="app-modal-description">Registra un nuevo administrador.</p>
+                <p className="app-modal-description">Registro de una nueva cuenta administrativa.</p>
               </div>
               <button
                 onClick={handleCloseModal}
@@ -222,7 +222,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
               <section className="app-form-section">
                 <div className="mb-4">
                   <h4 className="app-form-section-title">Acceso</h4>
-                  <p className="app-form-section-description">Define el código inicial.</p>
+                  <p className="app-form-section-description">Definición del código de acceso inicial.</p>
                 </div>
                 <div className="app-form-grid app-form-grid-2">
                 <div className="app-form-field">
@@ -237,7 +237,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
                   />
                 </div>
                 <div className="app-form-note flex items-center">
-                    La contrasena se genera automaticamente y se envia al correo del administrador.
+                  La contraseña se genera automáticamente y se envía al correo del administrador.
                 </div>
               </div>
               </section>

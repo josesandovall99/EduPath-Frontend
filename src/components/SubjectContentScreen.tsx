@@ -494,7 +494,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         {/* Progress Bar */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-8">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[#3A4A5B]">Tu Progreso</h3>
+            <h3 className="text-[#3A4A5B]">Progreso</h3>
             <span className="text-2xl" style={{ color: colors.primary }}>
               {loadingProgress ? '...' : `${currentProgress}%`}
             </span>

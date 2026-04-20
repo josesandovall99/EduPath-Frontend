@@ -37,9 +37,8 @@ const workshopConfigs = {
   analysis: {
     description: (
       <>
-        En este taller interactuarás con un cliente simulado por IA que te 
-        presentará un proyecto real. Tu objetivo es realizar el análisis de 
-        requisitos completo del sistema.
+        Taller con cliente simulado por IA para análisis completo de requisitos 
+        del sistema.
       </>
     ),
     tasks: [
@@ -51,9 +50,8 @@ const workshopConfigs = {
   management: {
     description: (
       <>
-        En este taller interactuarás con un cliente simulado por IA. Tu objetivo 
-        es determinar el alcance, crear un cronograma y estimar los costos del 
-        proyecto propuesto.
+        Taller con cliente simulado por IA para definición de alcance, 
+        cronograma y costos del proyecto propuesto.
       </>
     ),
     tasks: [
@@ -410,7 +408,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                 >
                   <Lightbulb className="w-3 h-3" style={{ color: subjectColor }} />
                 </div>
-                <span>Haz preguntas específicas al cliente para obtener información clara</span>
+                <span>Consulta específica al cliente para obtención de información clara</span>
               </div>
               <div className="flex gap-3 items-start">
                 <div 
@@ -419,7 +417,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                 >
                   <FileText className="w-3 h-3" style={{ color: subjectColor }} />
                 </div>
-                <span>Documenta todas las respuestas importantes</span>
+                <span>Registro de respuestas relevantes del caso</span>
               </div>
               <div className="flex gap-3 items-start">
                 <div 
@@ -428,7 +426,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                 >
                   <Check className="w-3 h-3" style={{ color: subjectColor }} />
                 </div>
-                <span>Verifica tu comprensión repitiendo lo entendido</span>
+                <span>Validación de comprensión mediante síntesis de la información</span>
               </div>
             </div>
           </div>
@@ -446,7 +444,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
             {isManagementWorkshop ? (
               <div className="space-y-3 text-xs text-gray-700">
                 <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-                  Tu respuesta se evalúa con una rúbrica ponderada por secciones. Cada sección se considera cumplida desde 70%.
+                  Evaluación basada en rúbrica ponderada por secciones. Cada sección se considera cumplida desde 70%.
                 </div>
                 <div className="grid gap-2">
                   <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
@@ -463,13 +461,13 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                   </div>
                 </div>
                 <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-[11px] text-gray-600">
-                  No necesitas coincidir exactamente con una única respuesta: necesitas justificar una propuesta coherente.
+                  No se exige coincidencia exacta con una única respuesta; se valora una propuesta coherente y justificada.
                 </div>
               </div>
             ) : (
               <div className="space-y-3 text-xs text-gray-700">
                 <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-                  Tu respuesta se evalúa con una rúbrica ponderada por secciones. Cada sección se considera cumplida desde 70%.
+                  Evaluación basada en rúbrica ponderada por secciones. Cada sección se considera cumplida desde 70%.
                 </div>
                 <div className="grid gap-2">
                   <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
@@ -483,7 +481,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                   </div>
                 </div>
                 <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-[11px] text-gray-600">
-                  Usa términos específicos y evita respuestas genéricas para obtener mejor puntaje.
+                  Se valoran términos específicos y respuestas no genéricas.
                 </div>
               </div>
             )}
@@ -564,17 +562,17 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
               </div>
 
               <div className="my-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600">
-                <p className="font-semibold text-gray-700">¿Cómo se evalúa?</p>
+                <p className="font-semibold text-gray-700">Criterios de evaluación</p>
                 {isManagementWorkshop ? (
                   <ul className="mt-2 list-disc pl-4 space-y-1">
                     <li>Se revisan actividades y rubros clave, no una fecha o costo exacto.</li>
                     <li>El cronograma suma más si las fases siguen un orden lógico y las fechas son coherentes.</li>
                     <li>Los costos suman más si los subtotales y el total general son consistentes.</li>
-                    <li>Explica tus supuestos para que la estimación hecha con la IA tenga respaldo.</li>
+                    <li>Registro de supuestos para respaldar la estimación realizada con IA.</li>
                   </ul>
                 ) : (
                   <ul className="mt-2 list-disc pl-4 space-y-1">
-                    <li>Se comparan tus respuestas con criterios esperados por palabras clave.</li>
+                    <li>Las respuestas se comparan con criterios esperados por palabras clave.</li>
                     <li>Incluye conceptos del cliente, fechas y términos específicos.</li>
                     <li>Mientras más completos y concretos sean los ítems, mejor puntuación.</li>
                   </ul>
@@ -1049,11 +1047,11 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
       {showConfirmModal && pendingEstado && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg text-[#3A4A5B] mb-2">¿Confirmar envío?</h3>
+            <h3 className="text-lg text-[#3A4A5B] mb-2">Confirmar envío</h3>
             <p className="text-sm text-gray-600 mb-6">
               {pendingEstado === 'COMPLETADO'
-                ? 'Se evaluará tu respuesta y se marcará el miniproyecto como completado.'
-                : 'Se guardará tu progreso actual. Podrás seguir editando luego.'}
+                ? 'La respuesta será evaluada y el miniproyecto quedará marcado como completado.'
+                : 'El progreso actual será guardado. La edición podrá continuar posteriormente.'}
             </p>
             <div className="flex justify-end gap-3">
               <button

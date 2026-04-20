@@ -1175,46 +1175,54 @@ export function MiniproyectoManagementScreen({
                 {isConfigurableMiniproyecto ? (
                   <section className="app-form-section app-miniproyecto-mode-section">
                   <div className="space-y-4">
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
                         <h4 className="app-form-section-title">Miniproyecto configurable</h4>
                         <p className="text-xs text-gray-500">Este miniproyecto contiene ejercicios creados dentro del mismo flujo y puede usar un chatbot como cliente simulado.</p>
                       </div>
-                      <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-semibold text-blue-700">
-                        Área: {selected?.Area?.nombre || 'Sin área'}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-semibold text-blue-700">
+                          Área: {selected?.Area?.nombre || 'Sin área'}
+                        </span>
+                        <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${selectedUseChatbot ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                          Chatbot: {selectedUseChatbot ? 'Activado' : 'No usado'}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="app-miniproyecto-config-grid">
-                      <div className="min-w-0">
-                        <ConfigurableEmbeddedExerciseEditor
-                          exercises={selectedEmbeddedExercises}
-                          onChange={setSelectedEmbeddedExercises}
-                        />
-                      </div>
+                    <div className="min-w-0">
+                      <ConfigurableEmbeddedExerciseEditor
+                        exercises={selectedEmbeddedExercises}
+                        onChange={setSelectedEmbeddedExercises}
+                      />
+                    </div>
 
-                      <aside className="app-miniproyecto-config-aside">
-                        <section className="app-form-section app-form-section--muted app-miniproyecto-config-panel">
+                    <section className="app-form-section app-form-section--muted app-miniproyecto-config-panel">
+                      <div className="app-miniproyecto-chatbot-band">
+                        <div className="app-miniproyecto-chatbot-band__copy">
                           <h5 className="app-form-section-title">Simulación del cliente</h5>
                           <p className="app-form-section-description">Activa el chatbot cuando el proyecto necesite una contraparte simulada durante la actividad.</p>
-                          <div className="mt-4 space-y-3">
-                            <label className="flex items-center gap-3 text-sm font-medium text-[#3A4A5B]">
-                              <input
-                                type="checkbox"
-                                checked={selectedUseChatbot}
-                                onChange={(event) => {
-                                  const enabled = event.target.checked;
-                                  setSelectedUseChatbot(enabled);
-                                  if (!enabled) {
-                                    setSelectedChatbotId('');
-                                  }
-                                }}
-                                className="h-4 w-4"
-                              />
-                              Usar chatbot como simulación del cliente
-                            </label>
+                        </div>
 
-                            {selectedUseChatbot ? (
+                        <div className="app-miniproyecto-chatbot-controls">
+                          <label className="app-miniproyecto-chatbot-toggle text-sm font-medium text-[#3A4A5B]">
+                            <input
+                              type="checkbox"
+                              checked={selectedUseChatbot}
+                              onChange={(event) => {
+                                const enabled = event.target.checked;
+                                setSelectedUseChatbot(enabled);
+                                if (!enabled) {
+                                  setSelectedChatbotId('');
+                                }
+                              }}
+                              className="h-4 w-4"
+                            />
+                            Usar chatbot como simulación del cliente
+                          </label>
+
+                          {selectedUseChatbot ? (
+                            <div className="app-miniproyecto-chatbot-select">
                               <select
                                 value={selectedChatbotId}
                                 onChange={(event) => setSelectedChatbotId(event.target.value)}
@@ -1227,30 +1235,15 @@ export function MiniproyectoManagementScreen({
                                   </option>
                                 ))}
                               </select>
-                            ) : null}
-                          </div>
-                        </section>
-
-                        <section className="app-form-section app-miniproyecto-config-panel">
-                          <h5 className="app-form-section-title">Resumen rápido</h5>
-                          <div className="mt-4 space-y-3 text-sm">
-                            <div className="app-form-summary-card">
-                              <div className="app-form-summary-label">Ejercicios</div>
-                              <div className="app-form-summary-value">{selectedEmbeddedExercises.length}</div>
-                              <div className="app-form-summary-help">Secuencia actual del miniproyecto.</div>
                             </div>
-                            <div className="app-form-summary-card">
-                              <div className="app-form-summary-label">Área</div>
-                              <div className="app-form-summary-value">{selected?.Area?.nombre || 'Sin área'}</div>
+                          ) : (
+                            <div className="app-form-note app-miniproyecto-chatbot-note">
+                              Activa la simulación para seleccionar un chatbot de apoyo al caso.
                             </div>
-                            <div className="app-form-summary-card">
-                              <div className="app-form-summary-label">Chatbot</div>
-                              <div className="app-form-summary-value">{selectedUseChatbot ? 'Activado' : 'No usado'}</div>
-                            </div>
-                          </div>
-                        </section>
-                      </aside>
-                    </div>
+                          )}
+                        </div>
+                      </div>
+                    </section>
                   </div>
                   </section>
                 ) : isProgrammingMiniproyecto ? (

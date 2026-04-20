@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plus, FileText, PlayCircle, Edit, Eye, EyeOff, Search, Loader } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, FileText, PlayCircle, Edit, Eye, EyeOff, Search, Loader } from 'lucide-react';
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { buildAuthHeaders } from '../utils/authHeaders';
@@ -9,6 +9,13 @@ import { createQuillModules, loadQuill } from '../utils/quill';
 interface ContentManagementScreenProps {
   onBack: () => void;
   onHome?: () => void;
+  scopeMode?: 'catalog' | 'flow';
+  initialAreaId?: number;
+  initialAreaName?: string;
+  initialTemaId?: number;
+  initialTemaName?: string;
+  initialSubtemaId?: number;
+  initialSubtemaName?: string;
 }
 
 interface ContentItem {
@@ -21,6 +28,7 @@ interface ContentItem {
   duration?: string;
   status: 'published' | 'draft';
   estado?: boolean;
+  area_id?: number;
   tema_id?: number;
   subtema_id?: number;
   descripcion?: string;
@@ -82,7 +90,22 @@ const normalizeContentType = (value: unknown): ContentItem['type'] => {
   return 'activity';
 };
 
-export function ContentManagementScreen({ onBack, onHome }: ContentManagementScreenProps) {
+export function ContentManagementScreen({
+  onBack,
+  onHome,
+  scopeMode = 'catalog',
+  initialAreaId,
+  initialAreaName,
+  initialTemaId,
+  initialTemaName,
+  initialSubtemaId,
+  initialSubtemaName,
+}: ContentManagementScreenProps) {
+  const scopeAreaId = initialAreaId ? String(initialAreaId) : '';
+  const scopeTemaId = initialTemaId ? String(initialTemaId) : '';
+  const scopeSubtemaId = initialSubtemaId ? String(initialSubtemaId) : '';
+  const isFlowScoped = scopeMode === 'flow' && Boolean(scopeAreaId || scopeTemaId || scopeSubtemaId);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
@@ -96,8 +119,8 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     tipo: 'video',
     descripcion: '',
     url: '',
-    tema_id: '',
-    subtema_id: ''
+    tema_id: isFlowScoped ? scopeTemaId : '',
+    subtema_id: isFlowScoped ? scopeSubtemaId : ''
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -107,8 +130,31 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   const [areas, setAreas] = useState<Area[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
   const [subtemas, setSubtemas] = useState<Subtema[]>([]);
-  const [selectedAreaId, setSelectedAreaId] = useState<string>('');
+  const [selectedAreaId, setSelectedAreaId] = useState<string>(isFlowScoped ? scopeAreaId : '');
+  const preserveAreaSelectionRef = useRef(false);
+  const preserveTemaSelectionRef = useRef(false);
   const isContentActive = (content: ContentItem) => content.estado !== false;
+
+  const buildContenidosRequestUrl = () => {
+    const query = new URLSearchParams();
+
+    if (isFlowScoped) {
+      if (scopeAreaId) {
+        query.set('areaId', scopeAreaId);
+      }
+
+      if (scopeTemaId) {
+        query.set('temaId', scopeTemaId);
+      }
+
+      if (scopeSubtemaId) {
+        query.set('subtemaId', scopeSubtemaId);
+      }
+    }
+
+    const search = query.toString();
+    return `${API_BASE_URL}/contenidos${search ? `?${search}` : ''}`;
+  };
 
   // Funciones para cargar datos
   const loadAreas = async () => {
@@ -161,12 +207,17 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   // Cargar contenidos y áreas al montar el componente
   useEffect(() => {
     loadContenidos();
-  }, []);
+  }, [scopeAreaId, scopeTemaId, scopeSubtemaId, isFlowScoped]);
 
   // Cargar temas cuando cambia el área seleccionada
   useEffect(() => {
     if (selectedAreaId) {
       loadTemasByArea(selectedAreaId);
+      if (preserveAreaSelectionRef.current) {
+        preserveAreaSelectionRef.current = false;
+        return;
+      }
+
       setFormData(prev => ({ ...prev, tema_id: '', subtema_id: '' }));
     } else {
       setTemas([]);
@@ -178,11 +229,31 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   useEffect(() => {
     if (formData.tema_id) {
       loadSubtemasByTema(formData.tema_id);
+      if (preserveTemaSelectionRef.current) {
+        preserveTemaSelectionRef.current = false;
+        return;
+      }
+
       setFormData(prev => ({ ...prev, subtema_id: '' }));
     } else {
       setSubtemas([]);
     }
   }, [formData.tema_id]);
+
+  useEffect(() => {
+    if (!showCreateModal || isEditMode || !isFlowScoped) {
+      return;
+    }
+
+    preserveAreaSelectionRef.current = true;
+    preserveTemaSelectionRef.current = true;
+    setSelectedAreaId(scopeAreaId);
+    setFormData((prev) => ({
+      ...prev,
+      tema_id: scopeTemaId,
+      subtema_id: scopeSubtemaId
+    }));
+  }, [showCreateModal, isEditMode, isFlowScoped, scopeAreaId, scopeTemaId, scopeSubtemaId]);
 
   // Función para cargar todos los contenidos
   const loadContenidos = async () => {
@@ -194,7 +265,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
       };
 
       const [contentsResponse, temasResponse, subtemasResponse, areasResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/contenidos`, {
+        fetch(buildContenidosRequestUrl(), {
           method: 'GET',
           headers: buildAuthHeaders({
             'Content-Type': 'application/json',
@@ -237,6 +308,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
           subject: area?.nombre || 'Sin clasificar',
           status: item.estado === false ? 'draft' : 'published',
           estado: item.estado !== false,
+          area_id: tema?.area_id,
           tema_id: item.tema_id,
           subtema_id: item.subtema_id,
           descripcion: item.descripcion,
@@ -258,6 +330,21 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   // Función para crear o actualizar contenido
   const handleSubmitContent = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const descripcionHtml = quillRef.current ? quillRef.current.root.innerHTML : formData.descripcion;
+    const descripcionPlano = descripcionHtml
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!formData.titulo.trim() || !formData.url.trim() || !selectedAreaId || !formData.tema_id || !formData.subtema_id || !descripcionPlano) {
+      toast.error('Formulario incompleto', {
+        description: 'Completa título, descripción, URL, área, tema y subtema antes de guardar.'
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -265,8 +352,6 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
       const url = isEditMode 
         ? `${API_BASE_URL}/contenidos/${selectedContent?.id}`
         : `${API_BASE_URL}/contenidos`;
-
-      const descripcionHtml = quillRef.current ? quillRef.current.root.innerHTML : formData.descripcion;
 
       const response = await fetch(url, {
         method: method,
@@ -292,49 +377,13 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
       const contenidoActualizado = await response.json();
 
       if (isEditMode) {
-        // Actualizar en la lista
-        const contenidosActualizados = contents.map(c => 
-          c.id === selectedContent?.id
-            ? (() => {
-                const nextEstado = contenidoActualizado.estado ?? c.estado;
-                const nextStatus: ContentItem['status'] = nextEstado === false ? 'draft' : 'published';
-
-                return {
-                  ...c,
-                  title: contenidoActualizado.titulo,
-                  type: normalizeContentType(contenidoActualizado.tipo),
-                  descripcion: contenidoActualizado.descripcion,
-                  url: contenidoActualizado.url,
-                  estado: nextEstado,
-                  status: nextStatus,
-                  tema_id: contenidoActualizado.tema_id,
-                  subtema_id: contenidoActualizado.subtema_id
-                };
-              })()
-            : c
-        );
-        setContents(contenidosActualizados);
+        await loadContenidos();
         toast.success('Contenido actualizado', {
           description: 'El contenido se ha actualizado exitosamente',
           duration: 5000
         });
       } else {
-        // Agregar nuevo contenido
-        const nuevoItemLocal: ContentItem = {
-          id: contenidoActualizado.id?.toString() || Date.now().toString(),
-          title: contenidoActualizado.titulo,
-          type: normalizeContentType(contenidoActualizado.tipo),
-          linkedTo: 'subtheme',
-          linkedName: `Tema ${contenidoActualizado.tema_id} - Subtema ${contenidoActualizado.subtema_id}`,
-          subject: 'Sin clasificar',
-          status: 'published',
-          estado: true,
-          tema_id: contenidoActualizado.tema_id,
-          subtema_id: contenidoActualizado.subtema_id,
-          descripcion: contenidoActualizado.descripcion,
-          url: contenidoActualizado.url
-        };
-        setContents([...contents, nuevoItemLocal]);
+        await loadContenidos();
         
         // Toast informativo para nuevo contenido
         toast.warning('Nuevo contenido creado', {
@@ -350,10 +399,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
         tipo: 'video',
         descripcion: '',
         url: '',
-        tema_id: '',
-        subtema_id: ''
+        tema_id: isFlowScoped ? scopeTemaId : '',
+        subtema_id: isFlowScoped ? scopeSubtemaId : ''
       });
-      setSelectedAreaId('');
+      setSelectedAreaId(isFlowScoped ? scopeAreaId : '');
       if (quillRef.current) {
         quillRef.current.root.innerHTML = '';
       }
@@ -378,6 +427,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
   const handleEditContent = async (content: ContentItem) => {
     setIsEditMode(true);
     setSelectedContent(content);
+    preserveTemaSelectionRef.current = true;
     setFormData({
       titulo: content.title,
       tipo: content.type,
@@ -396,6 +446,7 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
         });
         if (response.ok) {
           const tema = await response.json();
+          preserveAreaSelectionRef.current = true;
           setSelectedAreaId(tema.area_id.toString());
         }
       } catch (err) {
@@ -525,7 +576,15 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     };
   }, [showCreateModal, isEditMode, selectedContent]);
 
-  const filteredContents = contents.filter((content) => {
+  const scopedContents = contents.filter((content) => {
+    const matchesAreaScope = !isFlowScoped || !scopeAreaId || String(content.area_id || '') === scopeAreaId;
+    const matchesTemaScope = !isFlowScoped || !scopeTemaId || String(content.tema_id || '') === scopeTemaId;
+    const matchesSubtemaScope = !isFlowScoped || !scopeSubtemaId || String(content.subtema_id || '') === scopeSubtemaId;
+
+    return matchesAreaScope && matchesTemaScope && matchesSubtemaScope;
+  });
+
+  const filteredContents = scopedContents.filter((content) => {
     const matchesType = filterType === 'all' || content.type === filterType;
     const matchesState =
       stateFilter === 'all' ||
@@ -560,10 +619,24 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
     formData.tema_id,
     formData.subtema_id
   ].filter(Boolean).length;
-  const activeContentsCount = contents.filter((content) => isContentActive(content)).length;
-  const inactiveContentsCount = contents.length - activeContentsCount;
-  const videoContentsCount = contents.filter((content) => content.type === 'video').length;
-  const currentViewLabel = stateFilter === 'all' ? 'Vista completa' : stateFilter === 'active' ? 'Solo activos' : 'Solo inactivos';
+  const activeContentsCount = scopedContents.filter((content) => isContentActive(content)).length;
+  const inactiveContentsCount = scopedContents.length - activeContentsCount;
+  const flowScopeLabel = initialSubtemaName
+    ? `subtema ${initialSubtemaName}`
+    : initialTemaName
+      ? `tema ${initialTemaName}`
+      : initialAreaName
+        ? `área ${initialAreaName}`
+        : 'recorrido actual';
+  const flowBreadcrumbs = isFlowScoped
+    ? [
+        { label: 'Panel admin' },
+        ...(initialAreaName ? [{ label: initialAreaName }] : []),
+        ...(initialTemaName ? [{ label: initialTemaName }] : []),
+        ...(initialSubtemaName ? [{ label: initialSubtemaName }] : []),
+        { label: 'Gestión de contenidos', current: true as const }
+      ]
+    : [];
 
   const getTypeIcon = (type: ContentItem['type']) => {
     switch (type) {
@@ -616,40 +689,34 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
         </button>
 
         <section className="app-page-hero mb-6">
+          {isFlowScoped && (
+            <div className="app-flow-guide__breadcrumbs mb-6">
+              {flowBreadcrumbs.map((breadcrumb, index) => (
+                <div key={`${breadcrumb.label}-${index}`} className="app-flow-guide__breadcrumb-wrap">
+                  <span
+                    className={`app-flow-guide__breadcrumb ${breadcrumb.current ? 'app-flow-guide__breadcrumb--current' : ''}`}
+                  >
+                    {breadcrumb.label}
+                  </span>
+                  {index < flowBreadcrumbs.length - 1 && <ArrowRight className="app-flow-guide__separator" />}
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="app-page-hero__content">
             <div className="app-page-hero__copy">
               <div className="app-page-hero__eyebrow">Biblioteca administrativa</div>
               <h2 className="app-page-hero__title">Gestión de contenidos</h2>
               <p className="app-page-hero__description">
-                Consulta, filtra y actualiza contenidos.
+                {isFlowScoped
+                  ? `Consulta, filtra y actualiza solo los contenidos del ${flowScopeLabel}.`
+                  : 'Consulta, filtra y actualiza contenidos.'}
               </p>
-            </div>
-
-            <div className="app-hero-metrics">
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Catálogo</div>
-                <div className="app-hero-metric__value">{contents.length}</div>
-                <div className="app-hero-metric__help">Recursos totales registrados.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Activos</div>
-                <div className="app-hero-metric__value">{activeContentsCount}</div>
-                <div className="app-hero-metric__help">Disponibles en el catálogo actual.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Videos</div>
-                <div className="app-hero-metric__value">{videoContentsCount}</div>
-                <div className="app-hero-metric__help">Recursos audiovisuales dentro del total.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Resultados</div>
-                <div className="app-hero-metric__value">{filteredContents.length}</div>
-                <div className="app-hero-metric__help">{currentViewLabel} y búsqueda aplicada.</div>
-              </div>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.18fr)_minmax(290px,0.72fr)]">
+          <div className="app-hero-layout app-hero-layout--wide-main">
             <div className="app-toolbar-card">
               <div className="app-content-toolbar__header">
                 <div>
@@ -733,16 +800,18 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
             </div>
 
             <div className="app-sidebar-stack">
-              <div className="app-soft-card app-context-card">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
-                <p className="app-context-card__title">{filteredContents.length} resultados</p>
-                <p className="app-context-card__text">{currentViewLabel}. La búsqueda y los filtros están aplicados sobre el catálogo actual.</p>
-              </div>
-
               <div className="app-soft-card app-soft-card--blue">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Lectura rápida</p>
-                <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Explora el catálogo</h3>
-                <p className="mt-1 text-sm text-slate-600">Usa tipo, estado y búsqueda desde el mismo bloque para revisar el listado sin saltos visuales.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {isFlowScoped ? 'Contexto del flujo' : 'Catálogo'}
+                </p>
+                <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">
+                  {isFlowScoped ? 'Ruta activa' : 'Gestión del catálogo'}
+                </h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  {isFlowScoped
+                    ? `Mostrando únicamente los contenidos vinculados al ${flowScopeLabel}.`
+                    : 'Usa tipo, estado y búsqueda desde el mismo bloque para revisar el listado sin saltos visuales.'}
+                </p>
               </div>
             </div>
           </div>
@@ -757,15 +826,27 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
           </div>
         ) : filteredContents.length === 0 ? (
           <div className="app-empty-panel py-12">
-            <p className="text-base text-slate-600">No hay contenidos para la vista actual.</p>
-            <p className="mt-2 text-sm text-slate-500">Prueba con otro tipo, cambia el estado o ajusta el texto de búsqueda.</p>
+            <p className="text-base text-slate-600">
+              {isFlowScoped
+                ? 'No hay contenidos del flujo actual con los filtros aplicados.'
+                : 'No hay contenidos con los filtros aplicados.'}
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
+              {isFlowScoped
+                ? 'Prueba con otro tipo, cambia el estado o revisa el tramo académico en curso.'
+                : 'Prueba con otro tipo, cambia el estado o ajusta el texto de búsqueda.'}
+            </p>
           </div>
         ) : (
             <div className="app-table-card">
               <div className="app-table-card__header app-table-card__header--blue">
                 <div>
                   <div className="app-table-card__title">Biblioteca de contenidos</div>
-                  <p className="app-table-card__description">Consulta el catálogo y aplica acciones rápidas.</p>
+                  <p className="app-table-card__description">
+                    {isFlowScoped
+                      ? `Consulta únicamente los contenidos vinculados al ${flowScopeLabel}.`
+                      : 'Consulta el catálogo y aplica acciones rápidas.'}
+                  </p>
                 </div>
               </div>
               <div className="app-table-card__body p-0">
@@ -881,10 +962,10 @@ export function ContentManagementScreen({ onBack, onHome }: ContentManagementScr
                         tipo: 'video',
                         descripcion: '',
                         url: '',
-                        tema_id: '',
-                        subtema_id: ''
+                        tema_id: isFlowScoped ? scopeTemaId : '',
+                        subtema_id: isFlowScoped ? scopeSubtemaId : ''
                       });
-                      setSelectedAreaId('');
+                      setSelectedAreaId(isFlowScoped ? scopeAreaId : '');
                     }}
                     className="app-modal-close"
                   >

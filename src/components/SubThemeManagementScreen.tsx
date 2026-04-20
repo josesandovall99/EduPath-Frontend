@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Code, Database, BarChart3, Eye, EyeOff, ChevronUp, ChevronDown, ToggleLeft, ToggleRight, Plus, Edit2, Search, X } from 'lucide-react';
 import axios from 'axios';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { AdminFlowGuide } from './ui/AdminFlowGuide';
 import { API_BASE_URL } from '../utils/constants';
 
 interface SubThemeManagementScreenProps {
@@ -413,6 +414,7 @@ export function SubThemeManagementScreen({
   const currentColor = subjectColors[currentColorKey];
   const currentArea = areas.find(a => a.id === selectedArea);
   const currentTemaObj = temas.find(t => t.id === selectedTema);
+  const hasLockedAreaContext = Boolean(initialAreaId);
   const AreaIcon = currentColor.icon;
   const hasMinimumSubtemasForSequence = subtemas.length >= 2;
   const canManageSequences = Boolean(
@@ -438,7 +440,6 @@ export function SubThemeManagementScreen({
   );
   const activeSubtemas = subtemas.filter((subtema) => isSubtemaActive(subtema)).length;
   const inactiveSubtemas = subtemas.length - activeSubtemas;
-  const currentStateLabel = stateFilter === 'all' ? 'Vista completa' : stateFilter === 'active' ? 'Solo activos' : 'Solo inactivos';
 
   // Mostrar estado de carga
   if (loading) {
@@ -480,7 +481,7 @@ export function SubThemeManagementScreen({
               </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Subtemas</h1>
-                <p className="text-gray-500 text-sm">Áreas, temas y subtemas en una misma vista operativa.</p>
+                <p className="text-gray-500 text-sm">{hasLockedAreaContext ? 'Temas y subtemas dentro del área seleccionada.' : 'Áreas, temas y subtemas en una misma vista operativa.'}</p>
               </div>
             </div>
           </div>
@@ -496,42 +497,41 @@ export function SubThemeManagementScreen({
           <span>Volver al Panel</span>
         </button>
 
+        <AdminFlowGuide
+          title="Gestión de subtemas"
+          description={hasLockedAreaContext ? 'Administración de tema y subtemas dentro del área seleccionada.' : 'Administración de área, tema y subtemas asociados.'}
+          breadcrumbs={[
+            { label: 'Panel admin' },
+            { label: currentArea?.nombre || 'Áreas' },
+            { label: currentTemaObj?.nombre || 'Temas' },
+            { label: 'Subtemas', current: true }
+          ]}
+          steps={[
+            { label: 'Áreas', helper: 'Área registrada en el contexto actual.', status: selectedArea ? 'complete' : 'current' },
+            { label: 'Temas', helper: 'Tema base de la operación actual.', status: selectedTema ? 'complete' : selectedArea ? 'current' : 'upcoming' },
+            { label: 'Subtemas', helper: 'Administración del detalle temático.', status: selectedArea && selectedTema ? 'current' : 'upcoming' },
+            { label: 'Secuencias', helper: 'Secuencia disponible cuando el tema esté habilitado.', status: canManageSequences ? 'upcoming' : 'upcoming' }
+          ]}
+          asideTitle="Siguiente paso"
+          asideDescription="La gestión de secuencias se habilita cuando el tema dispone de al menos dos subtemas activos."
+        />
+
         <section className="app-page-hero mb-6">
           <div className="app-page-hero__content">
             <div className="app-page-hero__copy">
               <div className="app-page-hero__eyebrow">Estructura académica</div>
               <h2 className="app-page-hero__title">Gestión de subtemas</h2>
               <p className="app-page-hero__description">
-                Consulta, filtra y organiza subtemas dentro del tema seleccionado.
+                {hasLockedAreaContext
+                  ? 'Consulta, filtra y organiza subtemas dentro del área y tema seleccionados.'
+                  : 'Consulta, filtra y organiza subtemas dentro del tema seleccionado.'}
               </p>
-            </div>
-
-            <div className="app-hero-metrics">
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Áreas</div>
-                <div className="app-hero-metric__value">{areas.length}</div>
-                <div className="app-hero-metric__help">Catálogo disponible para seleccionar.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Temas</div>
-                <div className="app-hero-metric__value">{temas.length}</div>
-                <div className="app-hero-metric__help">Temas visibles dentro del área activa.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Subtemas</div>
-                <div className="app-hero-metric__value">{subtemas.length}</div>
-                <div className="app-hero-metric__help">Registros asociados al tema actual.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Vista</div>
-                <div className="app-hero-metric__value">{currentStateLabel}</div>
-                <div className="app-hero-metric__help">Lectura operativa del listado.</div>
-              </div>
             </div>
           </div>
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
+        <div className={hasLockedAreaContext ? 'mb-6' : 'grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]'}>
+          {!hasLockedAreaContext && (
           <section className="app-toolbar-card">
             <div className="mb-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Selección de área</p>
@@ -593,12 +593,17 @@ export function SubThemeManagementScreen({
               </div>
             )}
           </section>
+          )}
 
           {selectedArea && (
             <section className="app-toolbar-card">
               <div className="mb-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Selección de tema</p>
-                <p className="mt-1 text-sm text-slate-600">Define el tema de trabajo dentro del área seleccionada.</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {hasLockedAreaContext && currentArea
+                    ? `Define el tema de trabajo dentro de ${currentArea.nombre}.`
+                    : 'Define el tema de trabajo dentro del área seleccionada.'}
+                </p>
               </div>
             {temasLoading ? (
               <div className="app-empty-panel py-8">
@@ -664,29 +669,6 @@ export function SubThemeManagementScreen({
                   <h2 className="app-page-hero__title">{currentTemaObj?.nombre || 'Tema seleccionado'}</h2>
                   <p className="app-page-hero__description">Gestiona los subtemas del tema seleccionado.</p>
                 </div>
-
-                <div className="app-hero-metrics">
-                  <div className="app-hero-metric">
-                    <div className="app-hero-metric__label">Subtemas</div>
-                    <div className="app-hero-metric__value">{subtemas.length}</div>
-                    <div className="app-hero-metric__help">Total registrado en el tema.</div>
-                  </div>
-                  <div className="app-hero-metric">
-                    <div className="app-hero-metric__label">Activos</div>
-                    <div className="app-hero-metric__value">{activeSubtemas}</div>
-                    <div className="app-hero-metric__help">Subtemas disponibles para secuencia.</div>
-                  </div>
-                  <div className="app-hero-metric">
-                    <div className="app-hero-metric__label">Inactivos</div>
-                    <div className="app-hero-metric__value">{inactiveSubtemas}</div>
-                    <div className="app-hero-metric__help">Registros fuera del flujo activo.</div>
-                  </div>
-                  <div className="app-hero-metric">
-                    <div className="app-hero-metric__label">Resultados</div>
-                    <div className="app-hero-metric__value">{filteredSubtemas.length}</div>
-                    <div className="app-hero-metric__help">{currentStateLabel} y búsqueda aplicada.</div>
-                  </div>
-                </div>
               </div>
             </section>
 
@@ -713,11 +695,11 @@ export function SubThemeManagementScreen({
 
             {currentTemaObj?.estado === false && (
               <div className="app-alert app-alert--warning mb-6">
-                <p>El tema está inhabilitado. Puedes revisar sus subtemas, pero la gestión de secuencias queda en espera hasta reactivarlo.</p>
+                <p>El tema está inhabilitado. Los subtemas permanecen disponibles para consulta, pero la gestión de secuencias queda en espera hasta su reactivación.</p>
               </div>
             )}
 
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(280px,0.75fr)] mb-6">
+            <div className="mb-6">
               <div className="app-toolbar-card">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -773,12 +755,6 @@ export function SubThemeManagementScreen({
                   </button>
                 </div>
               </div>
-
-              <div className="app-soft-card app-soft-card--blue app-context-card">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contexto activo</p>
-                <p className="app-context-card__title">{currentArea?.nombre || 'Área no seleccionada'}</p>
-                <p className="app-context-card__text">Tema: {currentTemaObj?.nombre || 'Sin tema activo'}</p>
-              </div>
             </div>
 
             {subtemasLoading ? (
@@ -803,29 +779,23 @@ export function SubThemeManagementScreen({
                 <p className="mt-2 text-sm text-slate-500">Ajusta la búsqueda o cambia el estado visible del listado.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="app-card-grid app-subtema-catalog-grid">
                 {filteredSubtemas.map((subtema) => (
                   <div
                     key={subtema.id}
-                    className={`app-list-card ${isSubtemaActive(subtema) ? '' : 'opacity-75'}`}
+                    className={`app-list-card app-list-card--compact app-subtema-catalog-card ${isSubtemaActive(subtema) ? '' : 'opacity-75'}`}
                   >
-                    <div className="app-list-card__head">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-3 flex flex-wrap items-center gap-2">
-                          <span className={`app-badge ${isSubtemaActive(subtema) ? 'app-badge--green' : 'bg-amber-100 text-amber-700'}`}>
-                            {isSubtemaActive(subtema) ? 'Activo' : 'Inhabilitado'}
-                          </span>
-                        </div>
-                        <h4 className="app-list-card__title">{subtema.nombre}</h4>
-                        <p className="app-list-card__description mt-2">{subtema.descripcion || 'Sin descripción registrada.'}</p>
-                      </div>
-                      <div className="app-action-row">
+                    <div className="app-subtema-catalog-card__top">
+                      <span className={`app-badge ${isSubtemaActive(subtema) ? 'app-badge--green' : 'bg-amber-100 text-amber-700'}`}>
+                        {isSubtemaActive(subtema) ? 'Activo' : 'Inhabilitado'}
+                      </span>
+                      <div className="app-action-row app-subtema-catalog-card__actions">
                         <button
                           onClick={() => handleEditSubtema(subtema)}
                           className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
                           title="Editar subtema"
                         >
-                          <Edit2 className="w-5 h-5" />
+                          <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleToggleSubtema(subtema)}
@@ -836,6 +806,10 @@ export function SubThemeManagementScreen({
                           <span>{isSubtemaActive(subtema) ? 'Inhabilitar' : 'Habilitar'}</span>
                         </button>
                       </div>
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="app-list-card__title app-subtema-catalog-card__title">{subtema.nombre}</h4>
+                      <p className="app-list-card__description app-subtema-catalog-card__description">{subtema.descripcion || 'Sin descripción registrada.'}</p>
                     </div>
                   </div>
                 ))}
@@ -862,7 +836,7 @@ export function SubThemeManagementScreen({
             <div className="app-modal-scroll">
               <div className="app-form-layout">
                 <div className="app-form-note mb-6">
-                  <p className="text-sm text-blue-800">Completa el nombre, la descripción y verifica el tema asociado antes de guardar.</p>
+                  <p className="text-sm text-blue-800">Se requiere nombre, descripción y validación del tema asociado antes de guardar.</p>
                 </div>
 
                 <section className="space-y-5">

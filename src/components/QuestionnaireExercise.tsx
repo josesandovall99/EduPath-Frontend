@@ -107,7 +107,7 @@ export function QuestionnaireExercise({ activity, preguntas = [], onBack, embedd
                   onChange={(event) => setAnswers((prev) => ({ ...prev, [pregunta.id]: event.target.value }))}
                   rows={3}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]"
-                  placeholder="Escribe tu respuesta"
+                  placeholder="Registrar respuesta"
                 />
               ) : (
                 <div className="space-y-2">

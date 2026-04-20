@@ -45,7 +45,7 @@ export function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenProps) {
             <Mail className="h-8 w-8 text-[#4A90E2]" />
           </div>
           <h1 className="text-white mb-2 text-3xl font-bold">Recuperar contrasena</h1>
-          <p className="text-white/90">Te enviaremos un enlace para restablecer tu acceso.</p>
+          <p className="text-white/90">Envío de enlace para restablecimiento de acceso.</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
@@ -61,17 +61,17 @@ export function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenProps) {
               <div className="text-center space-y-4">
                 <div className="flex items-center justify-center gap-2 text-green-600">
                   <CheckCircle className="w-6 h-6" />
-                  <span className="font-medium">Revisa tu correo</span>
+                  <span className="font-medium">Solicitud registrada</span>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Si el correo existe, te enviamos un enlace para restablecer la contrasena.
+                  Si el correo existe en el sistema, se enviará un enlace para restablecer la contraseña.
                 </p>
                 <button
                   type="button"
                   onClick={onBack}
                   className="w-full bg-[#F5A97F] text-white p-3 rounded-lg hover:bg-[#F39759] transition-all"
                 >
-                  Volver al inicio de sesion
+                  Volver al inicio de sesión
                 </button>
               </div>
             ) : (
@@ -105,7 +105,7 @@ export function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenProps) {
                   className="w-full flex items-center justify-center gap-2 text-[#4A90E2] hover:text-[#3A7BC8] transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  Volver al inicio de sesion
+                  Volver al inicio de sesión
                 </button>
               </>
             )}

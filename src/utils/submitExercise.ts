@@ -39,7 +39,7 @@ export async function submitExercise(
       return {
         status: 0,
         data: null,
-        message: 'No se encontró estudiante_id en sesión. Inicia sesión como estudiante.'
+        message: 'No se encontró estudiante_id en la sesión activa. Se requiere autenticación de estudiante.'
       };
     }
 

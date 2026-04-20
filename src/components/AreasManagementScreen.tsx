@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Eye, EyeOff, Pencil, Plus, Search, X } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { AdminFlowGuide } from './ui/AdminFlowGuide';
 import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -205,7 +206,6 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
 
   const activeAreas = areas.filter((area) => isAreaActive(area)).length;
   const inactiveAreas = areas.length - activeAreas;
-  const currentViewLabel = stateFilter === 'all' ? 'Vista completa' : stateFilter === 'active' ? 'Solo activas' : 'Solo inactivas';
 
   return (
     <div className="app-shell">
@@ -240,6 +240,23 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
           <span>Volver al Panel</span>
         </button>
 
+        <AdminFlowGuide
+          title="Gestión de áreas académicas"
+          description="Registro y selección de áreas dentro de la estructura académica."
+          breadcrumbs={[
+            { label: 'Panel admin' },
+            { label: 'Áreas', current: true }
+          ]}
+          steps={[
+            { label: 'Áreas', helper: 'Registro o selección del área base.', status: 'current' },
+            { label: 'Temas', helper: 'Organización temática por área.', status: 'upcoming' },
+            { label: 'Subtemas', helper: 'Detalle de la estructura temática.', status: 'upcoming' },
+            { label: 'Secuencias', helper: 'Orden de la ruta académica.', status: 'upcoming' }
+          ]}
+          asideTitle="Siguiente paso"
+          asideDescription="La selección de un área habilita la gestión temática dentro del mismo flujo."
+        />
+
         <section className="app-page-hero mb-6">
           <div className="app-page-hero__content">
             <div className="app-page-hero__copy">
@@ -249,82 +266,63 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                 Consulta áreas y accede a sus temas.
               </p>
             </div>
-
-            <div className="app-hero-metrics">
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Áreas</div>
-                <div className="app-hero-metric__value">{areas.length}</div>
-                <div className="app-hero-metric__help">Total registradas en la plataforma.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Activas</div>
-                <div className="app-hero-metric__value">{activeAreas}</div>
-                <div className="app-hero-metric__help">Disponibles para gestionar contenidos.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Resultados</div>
-                <div className="app-hero-metric__value">{filteredAreas.length}</div>
-                <div className="app-hero-metric__help">Coincidencias según nombre y estado.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Vista</div>
-                <div className="app-hero-metric__value">{currentViewLabel}</div>
-                <div className="app-hero-metric__help">Lectura operativa activa del catálogo.</div>
-              </div>
-            </div>
           </div>
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.78fr)]">
+          <div className="app-hero-layout app-hero-layout--aside">
             <div className="app-toolbar-card">
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del catálogo</p>
-                  <p className="mt-1 text-sm text-slate-600">Filtra por estado.</p>
+              <div className="app-hero-panel">
+                <div className="app-hero-panel__header">
+                  <div className="app-hero-panel__copy">
+                    <p className="app-hero-panel__eyebrow">Catálogo</p>
+                    <h3 className="app-hero-panel__title">Estado del catálogo</h3>
+                    <p className="app-hero-panel__description">Filtra por estado.</p>
+                  </div>
+                  <button onClick={handleOpenCreate} className="app-btn app-primary-btn">
+                    <Plus className="w-4 h-4" />
+                    <span>Nueva área</span>
+                  </button>
                 </div>
-                <button onClick={handleOpenCreate} className="app-btn app-primary-btn">
-                  <Plus className="w-4 h-4" />
-                  <span>Nueva área</span>
-                </button>
-              </div>
-              <div className="app-filter-row">
-                <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
-                  <span>Todas ({areas.length})</span>
-                </button>
-                <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>
-                  <Eye className="h-4 w-4 shrink-0" />
-                  <span>Activas ({activeAreas})</span>
-                </button>
-                <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>
-                  <EyeOff className="h-4 w-4 shrink-0" />
-                  <span>Inactivas ({inactiveAreas})</span>
-                </button>
+                <div className="app-hero-panel__body">
+                  <div className="app-filter-row">
+                    <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
+                      <span>Todas ({areas.length})</span>
+                    </button>
+                    <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>
+                      <Eye className="h-4 w-4 shrink-0" />
+                      <span>Activas ({activeAreas})</span>
+                    </button>
+                    <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>
+                      <EyeOff className="h-4 w-4 shrink-0" />
+                      <span>Inactivas ({inactiveAreas})</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="app-sidebar-stack">
-              <div className="app-soft-card app-soft-card--blue">
-                <div className="mb-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda</p>
-                  <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Buscar área</h3>
-                  <p className="mt-1 text-sm text-slate-600">Busca por nombre.</p>
-                </div>
-                <div className="app-search-field">
-                  <Search className="app-search-field__icon" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Buscar área"
-                    className="app-form-input"
-                  />
+              <div className="app-toolbar-card">
+                <div className="app-hero-panel">
+                  <div className="app-hero-panel__copy">
+                    <p className="app-hero-panel__eyebrow">Búsqueda</p>
+                    <h3 className="app-hero-panel__title">Buscar área</h3>
+                    <p className="app-hero-panel__description">Busca por nombre.</p>
+                  </div>
+                  <div className="app-hero-panel__body">
+                    <div className="app-search-field">
+                      <Search className="app-search-field__icon" />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        placeholder="Buscar área"
+                        className="app-form-input"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="app-soft-card app-context-card">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista actual</p>
-                <p className="app-context-card__title">{filteredAreas.length}</p>
-                <p className="app-context-card__text">{currentViewLabel}</p>
-              </div>
             </div>
           </div>
         </section>
@@ -349,15 +347,15 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
         ) : areas.length === 0 ? (
           <div className="app-empty-panel py-12">
             <p className="text-base text-slate-600">No hay áreas disponibles todavía.</p>
-            <p className="mt-2 text-sm text-slate-500">Crea la primera área para comenzar a organizar temas, subtemas y contenidos.</p>
+            <p className="mt-2 text-sm text-slate-500">El registro del primer área habilita la organización de temas, subtemas y contenidos.</p>
           </div>
         ) : filteredAreas.length === 0 ? (
           <div className="app-empty-panel py-12">
             <p className="text-base text-slate-600">Sin resultados para la búsqueda actual.</p>
-            <p className="mt-2 text-sm text-slate-500">Prueba otro nombre o cambia el estado visible del catálogo.</p>
+            <p className="mt-2 text-sm text-slate-500">Modifique el nombre o el estado visible del catálogo para ampliar el resultado.</p>
           </div>
         ) : (
-          <div className="app-card-grid">
+          <div className="app-card-grid app-area-catalog-grid">
               {filteredAreas.map((area, index) => {
                 const areaIsActive = isAreaActive(area);
                 return (
@@ -372,27 +370,35 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                         onSelectArea(area.id, area.nombre);
                       }
                     }}
-                    className={`app-list-card cursor-pointer ${areaIsActive ? '' : 'opacity-75'}`}
+                    className={`app-list-card app-area-catalog-card cursor-pointer ${areaIsActive ? '' : 'opacity-75'}`}
                   >
-                    <div className="app-list-card__head">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <div className="app-area-catalog-card__top">
+                      <div className="flex flex-wrap items-center gap-2">
                           <span className={`app-badge ${areaIsActive ? 'app-badge--blue' : 'bg-amber-100 text-amber-700'}`}>
                             {areaIsActive ? 'Activa' : 'Inhabilitada'}
                           </span>
-                        </div>
-                        <h2 className="app-list-card__title uppercase">
-                          {area.nombre}
-                        </h2>
-                        <p className="app-list-card__description mt-2">
-                          {areaIsActive
-                            ? 'Ingresa para gestionar sus temas, subtemas y recursos vinculados.'
-                            : 'Está inhabilitada, pero puedes revisarla o devolverla al flujo activo.'}
-                        </p>
                       </div>
+                      <span className="app-area-catalog-card__hint">
+                        {areaIsActive ? 'Abrir temas' : 'Consultar área'}
+                      </span>
                     </div>
-                    <div className="app-list-card__footer">
-                      <span className="app-list-card__meta">{area.descripcion || 'Sin descripción registrada.'}</span>
+                    <div className="min-w-0">
+                      <h2 className="app-list-card__title app-area-catalog-card__title">
+                        {area.nombre}
+                      </h2>
+                      <p className="app-list-card__description app-area-catalog-card__summary">
+                        {areaIsActive
+                          ? 'Gestión de temas, subtemas y recursos vinculados.'
+                          : 'Registro inhabilitado, disponible para consulta o reactivación.'}
+                      </p>
+                    </div>
+                    <div className="app-area-catalog-card__body">
+                      <p className="app-area-catalog-card__label">Descripción</p>
+                      <p className="app-list-card__meta app-area-catalog-card__description">
+                        {area.descripcion || 'Sin descripción registrada.'}
+                      </p>
+                    </div>
+                    <div className="app-list-card__footer app-area-catalog-card__footer">
                       <div className="app-action-row">
                         <button
                           type="button"

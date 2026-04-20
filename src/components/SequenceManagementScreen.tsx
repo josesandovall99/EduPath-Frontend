@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight, ChevronUp, ChevronDown, ArrowDownUp } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+import { AdminFlowGuide } from './ui/AdminFlowGuide';
+import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 
 interface Area {
@@ -43,6 +45,18 @@ interface Sequence {
   destino?: ContentItem;
 }
 
+interface SequenceCreationContext {
+  subtemaId: number;
+  hasExistingChain: boolean;
+  lockedOriginId: number | null;
+  effectiveOriginId: number | null;
+  availableOriginIds: number[];
+  availableDestinationIds: number[];
+  connectedContentIds: number[];
+  totalActiveContents: number;
+  contents: ContentItem[];
+}
+
 interface SequenceManagementScreenProps {
   onBack: () => void;
   onHome?: () => void;
@@ -69,6 +83,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [insertAfterSequenceId, setInsertAfterSequenceId] = useState<number | null>(null);
 
   // Filtros
   const [selectedArea, setSelectedArea] = useState('');
@@ -88,6 +103,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   const [modalTemas, setModalTemas] = useState<Tema[]>([]);
   const [modalSubtemas, setModalSubtemas] = useState<Subtema[]>([]);
   const [modalContents, setModalContents] = useState<ContentItem[]>([]);
+  const [sequenceCreationContext, setSequenceCreationContext] = useState<SequenceCreationContext | null>(null);
 
   const [formData, setFormData] = useState({
     contenido_origen_id: '',
@@ -99,11 +115,78 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   const isTemaActive = (tema: Tema) => tema.estado !== false;
   const isSubtemaActive = (subtema: Subtema) => subtema.estado !== false;
   const isContentActive = (content: ContentItem) => content.estado !== false;
+  const scopedSubtemaQuery = incomingSubtemaValue ? `?subtemaId=${incomingSubtemaValue}` : '';
+
+  const apiFetch = (path: string, init: RequestInit = {}) => {
+    const headers = buildAuthHeaders(init.headers || {});
+
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: 'include'
+    });
+  };
+
+  const mapContentsWithArea = (rawContents: ContentItem[], temasCatalog: Tema[]) => {
+    const temasById = new Map(temasCatalog.map((tema) => [Number(tema.id), tema]));
+
+    return rawContents.map((content) => ({
+      ...content,
+      area_id: content.area_id ?? temasById.get(Number(content.tema_id))?.area_id
+    }));
+  };
+
+  const refreshSequences = async () => {
+    const sequencesRes = await apiFetch(`/secuencias-contenido${scopedSubtemaQuery}`);
+    if (!sequencesRes.ok) {
+      throw new Error('Error al recargar secuencias');
+    }
+
+    const sequencesData = await sequencesRes.json();
+    setSequences(sequencesData);
+  };
+
+  const loadCreationContext = async (subtemaValue: string, originValue?: string) => {
+    if (!subtemaValue || isEditMode || insertAfterSequenceId) {
+      setSequenceCreationContext(null);
+      return;
+    }
+
+    const query = new URLSearchParams();
+    if (originValue) {
+      query.set('origenId', originValue);
+    }
+
+    const response = await apiFetch(
+      `/secuencias-contenido/subtema/${subtemaValue}/contexto-creacion${query.toString() ? `?${query.toString()}` : ''}`
+    );
+
+    if (!response.ok) {
+      throw new Error('No se pudo cargar el contexto de creación de la secuencia');
+    }
+
+    const context = await response.json() as SequenceCreationContext;
+    const normalizedContents = mapContentsWithArea(context.contents || [], temas);
+
+    setSequenceCreationContext({
+      ...context,
+      contents: normalizedContents
+    });
+    setModalContents(normalizedContents);
+
+    if (context.lockedOriginId) {
+      setFormData((prev) => ({
+        ...prev,
+        contenido_origen_id: String(context.lockedOriginId),
+        contenido_destino_id: prev.contenido_destino_id === String(context.lockedOriginId) ? '' : prev.contenido_destino_id
+      }));
+    }
+  };
 
   // Cargar datos al montar
   useEffect(() => {
     loadData();
-  }, []);
+  }, [incomingSubtemaValue]);
 
   // Si viene un subtemaId, establecer los filtros automáticamente
   useEffect(() => {
@@ -151,15 +234,35 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
     }
   }, [showCreateModal, areaId, temaId, subtemaId, temas, subtemas, contents]);
 
+  useEffect(() => {
+    if (!showCreateModal || isEditMode || insertAfterSequenceId) {
+      return;
+    }
+
+    const subtemaScope = modalSelectedSubtema || incomingSubtemaValue;
+    if (!subtemaScope) {
+      setSequenceCreationContext(null);
+      return;
+    }
+
+    loadCreationContext(subtemaScope, formData.contenido_origen_id).catch((err) => {
+      console.error('Error cargando contexto de secuencia:', err);
+      setSequenceCreationContext(null);
+    });
+  }, [showCreateModal, isEditMode, insertAfterSequenceId, modalSelectedSubtema, incomingSubtemaValue, formData.contenido_origen_id, temas]);
+
   const loadData = async () => {
     setIsLoadingData(true);
     try {
+      const contenidosPath = incomingSubtemaValue ? `/contenidos?subtemaId=${incomingSubtemaValue}` : '/contenidos';
+      const secuenciasPath = `/secuencias-contenido${scopedSubtemaQuery}`;
+
       const [areasRes, temasRes, subtemasRes, contentsRes, sequencesRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/areas`),
-        fetch(`${API_BASE_URL}/temas`),
-        fetch(`${API_BASE_URL}/subtemas`),
-        fetch(`${API_BASE_URL}/contenidos`),
-        fetch(`${API_BASE_URL}/secuencias-contenido`)
+        apiFetch('/areas'),
+        apiFetch('/temas'),
+        apiFetch('/subtemas'),
+        apiFetch(contenidosPath),
+        apiFetch(secuenciasPath)
       ]);
 
       if (!areasRes.ok || !temasRes.ok || !subtemasRes.ok || !contentsRes.ok || !sequencesRes.ok) {
@@ -169,13 +272,9 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       const areasData = await areasRes.json();
       const temasData = await temasRes.json();
       const subtemasData = await subtemasRes.json();
-      let contentsData = await contentsRes.json();
+      const rawContentsData = await contentsRes.json();
       const sequencesData = await sequencesRes.json();
-
-      // Si se proporciona un subtemaId, filtrar contenidos solo de ese subtema
-      if (subtemaId) {
-        contentsData = contentsData.filter((c: ContentItem) => c.subtema_id === subtemaId);
-      }
+      const contentsData = mapContentsWithArea(rawContentsData, temasData);
 
       setAreas(areasData);
       setTemas(temasData);
@@ -218,7 +317,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
     };
 
     // Recorrer todas las secuencias para identificar contenidos usados
-    sequences.forEach(seq => {
+    sequences.filter((sequence) => sequence.estado !== false).forEach(seq => {
       used.origin.add(seq.contenido_origen_id);
       used.destination.add(seq.contenido_destino_id);
     });
@@ -298,6 +397,10 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
   // --- Modal-specific helpers to filtrar contenidos dentro del modal Crear Secuencia ---
   const getFilteredModalContents = () => {
+    if (!isEditMode && !insertAfterSequenceId && sequenceCreationContext) {
+      return sequenceCreationContext.contents.filter(isContentActive);
+    }
+
     // Si viene de un subtema específico, solo mostrar contenidos de ese subtema
     if (subtemaId) {
       return modalContents.filter((c) => c.subtema_id === subtemaId && isContentActive(c));
@@ -317,6 +420,11 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   };
 
   const getAvailableOriginModalContents = () => {
+    if (!isEditMode && !insertAfterSequenceId && sequenceCreationContext) {
+      const availableOriginIds = new Set(sequenceCreationContext.availableOriginIds.map((id) => Number(id)));
+      return getFilteredModalContents().filter((content) => availableOriginIds.has(Number(content.id)));
+    }
+
     const filtered = getFilteredModalContents();
     const used = getUsedContents();
     const { lockedOriginId } = getModalChainContext();
@@ -346,6 +454,11 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   };
 
   const getAvailableDestinationModalContents = () => {
+    if (!isEditMode && !insertAfterSequenceId && sequenceCreationContext) {
+      const availableDestinationIds = new Set(sequenceCreationContext.availableDestinationIds.map((id) => Number(id)));
+      return getFilteredModalContents().filter((content) => availableDestinationIds.has(Number(content.id)));
+    }
+
     const filtered = getFilteredModalContents();
     const used = getUsedContents();
     const { lockedOriginId, connectedContentIds } = getModalChainContext();
@@ -381,7 +494,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   };
 
   useEffect(() => {
-    if (!showCreateModal || isEditMode) {
+    if (!showCreateModal || isEditMode || insertAfterSequenceId || sequenceCreationContext) {
       return;
     }
 
@@ -395,10 +508,16 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       contenido_origen_id: String(lockedOriginId),
       contenido_destino_id: prev.contenido_destino_id === String(lockedOriginId) ? '' : prev.contenido_destino_id
     }));
-  }, [showCreateModal, isEditMode, modalSelectedSubtema, selectedSubtema, subtemaId, sequences, contents]);
+  }, [showCreateModal, isEditMode, insertAfterSequenceId, sequenceCreationContext, modalSelectedSubtema, selectedSubtema, subtemaId, sequences, contents]);
 
   const handleModalFilterChange = async (filterType: string, value: string) => {
     if (filterType === 'area') {
+      setSequenceCreationContext(null);
+      setFormData((prev) => ({
+        ...prev,
+        contenido_origen_id: '',
+        contenido_destino_id: ''
+      }));
       setModalSelectedArea(value);
       setModalSelectedTema('');
       setModalSelectedSubtema('');
@@ -407,7 +526,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       // Al seleccionar un área, obtener los temas del backend y luego filtrar contenidos
       if (value) {
         try {
-          const res = await fetch(`${API_BASE_URL}/temas/por-area/${value}`);
+          const res = await apiFetch(`/temas/por-area/${value}`);
           if (!res.ok) throw new Error('Error cargando temas');
           const data = await res.json();
           setModalTemas(data);
@@ -428,6 +547,12 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       }
 
     } else if (filterType === 'tema') {
+      setSequenceCreationContext(null);
+      setFormData((prev) => ({
+        ...prev,
+        contenido_origen_id: '',
+        contenido_destino_id: ''
+      }));
       setModalSelectedTema(value);
       setModalSelectedSubtema('');
       setModalSubtemas([]);
@@ -439,7 +564,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         setModalContents(filtered);
 
         try {
-          const res = await fetch(`${API_BASE_URL}/subtemas/por-tema/${value}`);
+          const res = await apiFetch(`/subtemas/por-tema/${value}`);
           if (!res.ok) throw new Error('Error cargando subtemas');
           const data = await res.json();
           setModalSubtemas(data);
@@ -458,12 +583,18 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       }
     } else if (filterType === 'subtema') {
       setModalSelectedSubtema(value);
+      setSequenceCreationContext(null);
+      setFormData((prev) => ({
+        ...prev,
+        contenido_origen_id: '',
+        contenido_destino_id: ''
+      }));
 
       if (value) {
         try {
-          const url = `${API_BASE_URL}/contenidos/subtema/${value}`;
+          const url = `/contenidos/subtema/${value}`;
           console.log('Cargando contenidos para modal desde:', url);
-          const res = await fetch(url);
+          const res = await apiFetch(url);
           if (!res.ok) {
             const errorData = await res.text();
             console.error('Error response (modal contenidos by subtema):', errorData);
@@ -471,7 +602,8 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           }
           const data = await res.json();
           console.log('DEBUG: Respuesta /contenidos/subtema/:', res.status, res.statusText, 'items:', Array.isArray(data) ? data.length : 'not-array', data.slice ? data.map((d: any) => ({ id: d.id, titulo: d.titulo, subtema_id: d.subtema_id })) : data);
-          setModalContents(data);
+          setModalContents(mapContentsWithArea(data, temas));
+          await loadCreationContext(value);
         } catch (err) {
           console.error('Error cargando contenidos por subtema (modal):', err);
           setModalContents([]);
@@ -543,9 +675,9 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       // Cargar temas del área seleccionada
       if (value) {
         try {
-          const url = `${API_BASE_URL}/temas/por-area/${value}`;
+          const url = `/temas/por-area/${value}`;
           console.log('Cargando temas desde:', url);
-          const res = await fetch(url);
+          const res = await apiFetch(url);
           console.log('Respuesta de temas:', res.status, res.statusText);
           if (!res.ok) {
             const errorData = await res.text();
@@ -569,9 +701,9 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       // Cargar subtemas del tema seleccionado
       if (value) {
         try {
-          const url = `${API_BASE_URL}/subtemas/por-tema/${value}`;
+          const url = `/subtemas/por-tema/${value}`;
           console.log('Cargando subtemas desde:', url);
-          const res = await fetch(url);
+          const res = await apiFetch(url);
           console.log('Respuesta de subtemas:', res.status, res.statusText);
           if (!res.ok) {
             const errorData = await res.text();
@@ -629,7 +761,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           // El origen SIEMPRE debe ser el que ya está (B)
           // El destino es el nuevo contenido intermedio (X)
           // Paso 1: Actualizar la secuencia existente B->C para que sea B->X
-          await fetch(`${API_BASE_URL}/secuencias-contenido/${insertAfterSequenceId}`, {
+          await apiFetch(`/secuencias-contenido/${insertAfterSequenceId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -641,7 +773,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           });
 
           // Paso 2: Crear nueva secuencia X->C (desde el contenido intermedio al destino original)
-          await fetch(`${API_BASE_URL}/secuencias-contenido`, {
+          await apiFetch('/secuencias-contenido', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -661,7 +793,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           estado: formData.estado
         };
 
-        const response = await fetch(`${API_BASE_URL}/secuencias-contenido`, {
+        const response = await apiFetch('/secuencias-contenido', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -673,15 +805,11 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         }
       }
 
-      // Recargar todas las secuencias del backend para tener el estado actualizado
-      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
-      if (sequencesRes.ok) {
-        const sequencesData = await sequencesRes.json();
-        setSequences(sequencesData);
-      }
+      await refreshSequences();
 
       setSuccess('Secuencia registrada correctamente.');
       resetForm();
+      setSequenceCreationContext(null);
       setInsertAfterSequenceId(null);
       setTimeout(() => setShowCreateModal(false), 1500);
     } catch (err) {
@@ -735,7 +863,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         estado: formData.estado
       };
 
-      const response = await fetch(`${API_BASE_URL}/secuencias-contenido/${selectedSequence.id}`, {
+      const response = await apiFetch(`/secuencias-contenido/${selectedSequence.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -751,12 +879,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       }
 
 
-      // Recargar todas las secuencias del backend para tener el estado actualizado
-      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
-      if (sequencesRes.ok) {
-        const sequencesData = await sequencesRes.json();
-        setSequences(sequencesData);
-      }
+      await refreshSequences();
 
 
       // Éxito - la respuesta puede venir en data.secuencia o directamente en data
@@ -777,7 +900,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   const handleToggleEstado = async (id: number, currentEstado: boolean) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/secuencias-contenido/${id}/estado`, {
+      const response = await apiFetch(`/secuencias-contenido/${id}/estado`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -786,12 +909,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         throw new Error('Error al cambiar estado');
       }
 
-      // Recargar todas las secuencias del backend para tener el estado actualizado
-      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
-      if (sequencesRes.ok) {
-        const sequencesData = await sequencesRes.json();
-        setSequences(sequencesData);
-      }
+      await refreshSequences();
 
       setSuccess(`Secuencia ${currentEstado ? 'inhabilitada' : 'habilitada'}`);
       setTimeout(() => setSuccess(null), 2000);
@@ -835,7 +953,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         deletePayload.nextSequenceId = nextSeq.id;
       }
 
-      const response = await fetch(`${API_BASE_URL}/secuencias-contenido/${id}`, {
+      const response = await apiFetch(`/secuencias-contenido/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(deletePayload)
@@ -845,12 +963,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
         throw new Error('Error al eliminar la secuencia');
       }
 
-      // Recargar todas las secuencias del backend para tener el estado actualizado
-      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
-      if (sequencesRes.ok) {
-        const sequencesData = await sequencesRes.json();
-        setSequences(sequencesData);
-      }
+      await refreshSequences();
 
       setSuccess(prevSeq && nextSeq 
         ? 'Secuencia eliminada y cadena reorganizada automáticamente' 
@@ -1002,9 +1115,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   };
 
   const orderedSequence = buildOrderedSequence();
-  const activeSequencesCount = scopedSequences.filter((sequence) => sequence.estado).length;
-  const inactiveSequencesCount = scopedSequences.filter((sequence) => !sequence.estado).length;
-  const currentScopeLabel = subtemaNombre || 'Todos los subtemas';
 
   // Función para guardar el nuevo orden después de drag and drop
   const handleSaveOrder = async (newOrder: Array<{ contenido_id: number; sequence_id?: number }>) => {
@@ -1014,7 +1124,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       const contenidosOrdenados = newOrder.map(item => item.contenido_id);
 
       // Usar el nuevo endpoint de reordenamiento
-      const response = await fetch(`${API_BASE_URL}/secuencias-contenido/reorder`, {
+      const response = await apiFetch('/secuencias-contenido/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1030,12 +1140,8 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       const result = await response.json();
 
       // Recargar secuencias para reflejar los cambios
-      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
-      if (sequencesRes.ok) {
-        const sequencesData = await sequencesRes.json();
-        setSequences(sequencesData);
-        setSuccess(`Orden actualizado: ${result.secuenciasCreadas} creadas, ${result.secuenciasEliminadas} eliminadas`);
-      }
+      await refreshSequences();
+      setSuccess(`Orden actualizado: ${result.secuenciasCreadas} creadas, ${result.secuenciasEliminadas} eliminadas`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar el orden');
     } finally {
@@ -1068,7 +1174,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       
       await Promise.all([
         // Actualizar secuencia anterior: origen -> destino de la actual
-        fetch(`${API_BASE_URL}/secuencias-contenido/${prevSeq.id}`, {
+        apiFetch(`/secuencias-contenido/${prevSeq.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1079,7 +1185,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           })
         }),
         // Actualizar secuencia actual: origen -> destino anterior
-        fetch(`${API_BASE_URL}/secuencias-contenido/${sequenceId}`, {
+        apiFetch(`/secuencias-contenido/${sequenceId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1092,12 +1198,8 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       ]);
 
       // Recargar secuencias
-      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
-      if (sequencesRes.ok) {
-        const sequencesData = await sequencesRes.json();
-        setSequences(sequencesData);
-        setSuccess('Secuencia reorganizada correctamente.');
-      }
+      await refreshSequences();
+      setSuccess('Secuencia reorganizada correctamente.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al reorganizar');
     } finally {
@@ -1130,7 +1232,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       
       await Promise.all([
         // Actualizar secuencia actual: origen -> destino de la siguiente
-        fetch(`${API_BASE_URL}/secuencias-contenido/${sequenceId}`, {
+        apiFetch(`/secuencias-contenido/${sequenceId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1141,7 +1243,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           })
         }),
         // Actualizar secuencia siguiente: origen -> destino anterior de la actual
-        fetch(`${API_BASE_URL}/secuencias-contenido/${nextSeq.id}`, {
+        apiFetch(`/secuencias-contenido/${nextSeq.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1154,12 +1256,8 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       ]);
 
       // Recargar secuencias
-      const sequencesRes = await fetch(`${API_BASE_URL}/secuencias-contenido`);
-      if (sequencesRes.ok) {
-        const sequencesData = await sequencesRes.json();
-        setSequences(sequencesData);
-        setSuccess('Secuencia reorganizada correctamente.');
-      }
+      await refreshSequences();
+      setSuccess('Secuencia reorganizada correctamente.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al reorganizar');
     } finally {
@@ -1167,9 +1265,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
     }
   };
 
-  // Estado para insertar en medio
-  const [insertAfterSequenceId, setInsertAfterSequenceId] = useState<number | null>(null);
-  
   // Estado para drag and drop
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
@@ -1186,6 +1281,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   const openCreateSequenceModal = () => {
     resetForm();
     setInsertAfterSequenceId(null);
+    setSequenceCreationContext(null);
 
     if (areaId !== undefined && temaId && subtemaId) {
       setModalSelectedArea(areaId.toString());
@@ -1200,6 +1296,10 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
       const contenidosFiltered = contents.filter(c => c.subtema_id === subtemaId);
       setModalContents(contenidosFiltered);
+
+      loadCreationContext(subtemaId.toString()).catch((err) => {
+        console.error('Error cargando contexto inicial de secuencia:', err);
+      });
     } else {
       setModalSelectedArea('');
       setModalSelectedTema('');
@@ -1260,6 +1360,26 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           </button>
         </div>
 
+        <AdminFlowGuide
+          title="Secuencia de contenidos"
+          description="Organización del orden de contenidos dentro del subtema seleccionado."
+          breadcrumbs={[
+            { label: 'Panel admin' },
+            { label: areaName || 'Áreas' },
+            { label: temaName || 'Temas' },
+            { label: subtemaNombre || 'Subtema' },
+            { label: 'Secuencia de contenidos', current: true }
+          ]}
+          steps={[
+            { label: 'Áreas', helper: 'Área registrada en el contexto actual.', status: areaName ? 'complete' : 'upcoming' },
+            { label: 'Temas', helper: 'Tema base del subtema seleccionado.', status: temaName ? 'complete' : 'upcoming' },
+            { label: 'Subtemas', helper: 'Subtema asociado a la edición actual.', status: subtemaNombre ? 'complete' : 'current' },
+            { label: 'Secuencia de contenidos', helper: 'Orden del contenido final.', status: 'current' }
+          ]}
+          asideTitle="Siguiente paso"
+          asideDescription="Si se requiere registrar recursos, use 'Gestionar contenidos'. Si el contenido existe, la secuencia puede crearse o ajustarse desde esta vista."
+        />
+
         <section className="app-page-hero mb-6">
           <div className="app-page-hero__content">
             <div className="app-page-hero__copy">
@@ -1269,32 +1389,9 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 Consulta, ajusta y organiza la secuencia del subtema seleccionado.
               </p>
             </div>
-
-            <div className="app-hero-metrics">
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Secuencias</div>
-                <div className="app-hero-metric__value">{filteredSequences.length}</div>
-                <div className="app-hero-metric__help">Total visible en la consulta actual.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Activas</div>
-                <div className="app-hero-metric__value">{activeSequencesCount}</div>
-                <div className="app-hero-metric__help">Secuencias dentro del flujo activo.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Inactivas</div>
-                <div className="app-hero-metric__value">{inactiveSequencesCount}</div>
-                <div className="app-hero-metric__help">Registros fuera del flujo actual.</div>
-              </div>
-              <div className="app-hero-metric app-hero-metric--wide">
-                <div className="app-hero-metric__label">Contexto</div>
-                <div className="app-hero-metric__value app-hero-metric__value--text">{currentScopeLabel}</div>
-                <div className="app-hero-metric__help">Subtema activo para edición.</div>
-              </div>
-            </div>
           </div>
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(280px,0.78fr)]">
+          <div className="app-hero-layout app-hero-layout--aside">
             <div className="app-toolbar-card">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -1302,15 +1399,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   <p className="mt-1 text-sm text-slate-600">Limita la vista por área, tema o subtema antes de revisar el orden de contenidos.</p>
                 </div>
                 <div className="app-action-row justify-start">
-                  {onGoToContentManagement && (
-                    <button
-                      onClick={onGoToContentManagement}
-                      className="app-btn app-btn-ghost"
-                    >
-                      <span>Gestionar contenidos</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  )}
                   <button
                     onClick={openCreateSequenceModal}
                     className="app-btn app-btn-success"
@@ -1326,7 +1414,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 Área
               </label>
               <select
-                value={selectedArea}
+                value={effectiveSelectedArea}
                 onChange={(e) => handleFilterChange('area', e.target.value)}
                 disabled={subtemaId !== undefined}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -1345,9 +1433,9 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 Tema
               </label>
               <select
-                value={selectedTema}
+                value={effectiveSelectedTema}
                 onChange={(e) => handleFilterChange('tema', e.target.value)}
-                disabled={!selectedArea || subtemaId !== undefined}
+                disabled={!effectiveSelectedArea || subtemaId !== undefined}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">Todos los temas</option>
@@ -1364,9 +1452,9 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 Subtema
               </label>
               <select
-                value={selectedSubtema}
+                value={effectiveSelectedSubtema}
                 onChange={(e) => handleFilterChange('subtema', e.target.value)}
-                disabled={!selectedTema || subtemaId !== undefined}
+                disabled={!effectiveSelectedTema || subtemaId !== undefined}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="">Todos los subtemas</option>
@@ -1398,11 +1486,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 </div>
               </div>
 
-              <div className="app-soft-card app-context-card">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contexto activo</p>
-                <p className="app-context-card__title">{subtemaNombre || 'Subtema no definido'}</p>
-                <p className="app-context-card__text">Tema: {temaName || 'Sin tema activo'}{areaName ? ` · Área: ${areaName}` : ''}</p>
-              </div>
             </div>
           </div>
         </section>
@@ -1432,19 +1515,31 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 <div className="app-table-card__header">
                   <div>
                     <div className="app-table-card__title">Secuencia ordenada</div>
-                    <p className="app-table-card__description">Vista resumida del orden actual entre contenidos.</p>
+                    <p className="app-table-card__description">Resumen del orden actual entre contenidos.</p>
                   </div>
                   <div className="app-action-row justify-start">
                     <div className="app-sequence-reorder-note">
                       <ArrowDownUp className="w-4 h-4" />
                       <span>Arrastra para reordenar</span>
                     </div>
-                    <button
-                      onClick={() => setInsertAfterSequenceId(null)}
-                      className="app-btn app-btn-ghost app-btn-sm"
-                    >
-                      {insertAfterSequenceId ? 'Cancelar inserción' : 'Vista completa'}
-                    </button>
+                    {onGoToContentManagement && (
+                      <button
+                        type="button"
+                        onClick={onGoToContentManagement}
+                        className="app-btn app-btn-ghost app-btn-sm"
+                      >
+                        <span>Gestionar contenidos</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    )}
+                    {insertAfterSequenceId && (
+                      <button
+                        onClick={() => setInsertAfterSequenceId(null)}
+                        className="app-btn app-btn-ghost app-btn-sm"
+                      >
+                        Cancelar inserción
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="app-table-card__body">
@@ -1554,7 +1649,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
             <div className="space-y-4">
               {filteredSequences.length === 0 ? (
                 <div className="app-empty-panel py-12">
-                  <p className="text-base text-slate-600">No hay secuencias disponibles para la vista actual.</p>
+                  <p className="text-base text-slate-600">No hay secuencias disponibles con los filtros aplicados.</p>
                   <p className="mt-2 text-sm text-slate-500">Registra una secuencia para definir el orden entre contenidos.</p>
                 </div>
               ) : (
@@ -1653,6 +1748,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   setModalTemas([]);
                   setModalSubtemas([]);
                   setModalContents([]);
+                  setSequenceCreationContext(null);
                 }}
                 className="app-modal-close"
               >
@@ -1738,7 +1834,9 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   Contenido Origen *
                 </label>
                 {(() => {
-                  const { lockedOriginId } = getModalChainContext();
+                  const lockedOriginId = !isEditMode && !insertAfterSequenceId
+                    ? sequenceCreationContext?.lockedOriginId || null
+                    : getModalChainContext().lockedOriginId;
                   const isOriginLocked = Boolean(lockedOriginId && !isEditMode);
                   return (
                 <select
@@ -1758,7 +1856,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                 </select>
                   );
                 })()}
-                {!isEditMode && getModalChainContext().lockedOriginId && (
+                {!isEditMode && !insertAfterSequenceId && sequenceCreationContext?.lockedOriginId && (
                   <p className="mt-2 text-xs text-gray-500">
                     El origen se definió con base en la secuencia actual.
                   </p>
@@ -1835,6 +1933,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                     setModalTemas([]);
                     setModalSubtemas([]);
                     setModalContents([]);
+                    setSequenceCreationContext(null);
                   }}
                   disabled={isLoading}
                   className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"

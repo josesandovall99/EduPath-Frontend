@@ -1254,7 +1254,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                         ) : isDirectVideoUrl(selectedContentData.url) ? (
                           <video width="100%" height="100%" controls className="w-full h-full object-cover">
                             <source src={selectedContentData.url} type={`video/${(selectedContentData.url.match(/\.(mp4|webm|ogg)(\?|#|$)/i)?.[1] || 'mp4').toLowerCase()}`} />
-                            Tu navegador no soporta el elemento de video
+                            Este navegador no soporta el elemento de video
                           </video>
                         ) : (
                           <div className="flex flex-col items-center justify-center h-full">

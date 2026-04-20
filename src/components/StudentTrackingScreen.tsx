@@ -260,7 +260,7 @@ export function StudentTrackingScreen({ onBack }: StudentTrackingScreenProps) {
               <div className="bg-white rounded-xl shadow-md p-12 text-center">
                 <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-gray-500 text-lg">Selecciona un estudiante</h3>
-                <p className="text-gray-400 text-sm">Haz clic en un estudiante de la lista para ver su información detallada</p>
+                <p className="text-gray-400 text-sm">La selección de un estudiante muestra la información detallada del registro.</p>
               </div>
             )}
           </div>

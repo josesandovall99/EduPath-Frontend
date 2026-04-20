@@ -71,7 +71,7 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
 
     if (result.status === 400) {
       const data: any = result.data || {};
-      setFeedback(data?.retroalimentacion || 'Respuesta incorrecta. Puedes reintentar.');
+      setFeedback(data?.retroalimentacion || 'Respuesta incorrecta. Nuevo intento disponible.');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
       alert(`Incorrecta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
       setAprobado(false);
@@ -261,10 +261,9 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
                   <Lightbulb className="w-5 h-5" style={{ color: subjectColor }} />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-[#3A4A5B] mb-2">¿Necesitas ayuda?</h3>
+                  <h3 className="text-[#3A4A5B] mb-2">Ayuda</h3>
                   <p className="text-gray-600 text-sm mb-3">
-                    Recuerda leer cuidadosamente cada opción. Puedes revisar el material 
-                    teórico antes de responder.
+                    Revisión recomendada de cada opción y del material teórico antes del envío de la respuesta.
                   </p>
                   <button 
                     onClick={() => setShowHint(!showHint)}

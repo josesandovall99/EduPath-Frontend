@@ -30,7 +30,7 @@ interface MiniproyectoApiResponse {
 }
 
 export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMiniproyectoViewProps) {
-  const [code, setCode] = useState('# Escribe tu código aquí\nprint("Hola Mundo")');
+  const [code, setCode] = useState('# Código inicial\nprint("Hola Mundo")');
   const subjectColor = '#4A90E2';
   const [output, setOutput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -44,8 +44,8 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
 
   const lenguajesDisponibles = [
     { id: 62, nombre: 'Java', extension: '.java', ejemplo: 'public class Main {\n  public static void main(String[] args) {\n    System.out.println("Hola Mundo");\n  }\n}' },
-    { id: 71, nombre: 'Python', extension: '.py', ejemplo: '# Escribe tu código aquí\nprint("Hola Mundo")' },
-    { id: 63, nombre: 'JavaScript', extension: '.js', ejemplo: '// Escribe tu código aquí\nconsole.log("Hola Mundo");' },
+    { id: 71, nombre: 'Python', extension: '.py', ejemplo: '# Código inicial\nprint("Hola Mundo")' },
+    { id: 63, nombre: 'JavaScript', extension: '.js', ejemplo: '// Código inicial\nconsole.log("Hola Mundo");' },
     { id: 50, nombre: 'C', extension: '.c', ejemplo: '#include <stdio.h>\n\nint main() {\n  printf("Hola Mundo\\n");\n  return 0;\n}' },
     { id: 54, nombre: 'C++', extension: '.cpp', ejemplo: '#include <iostream>\nusing namespace std;\n\nint main() {\n  cout << "Hola Mundo" << endl;\n  return 0;\n}' },
     { id: 51, nombre: 'C#', extension: '.cs', ejemplo: 'using System;\n\nclass Program {\n  static void Main() {\n    Console.WriteLine("Hola Mundo");\n  }\n}' }
@@ -141,9 +141,9 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
       setAprobado(false);
       const detalleErrores = errores ? `\n\nErrores de sintaxis:\n${errores}` : '';
       const detalleStderr = stderr ? `\n\nErrores del compilador:\n${stderr}` : '';
-      const finalOutput = `Ejercicio NO aprobado\n\nTu salida:\n${salida}\n\nSalida esperada:\n${esperado}${detalleErrores}${detalleStderr}`;
+      const finalOutput = `Ejercicio no aprobado\n\nSalida obtenida:\n${salida}\n\nSalida esperada:\n${esperado}${detalleErrores}${detalleStderr}`;
       setOutput(finalOutput);
-      setFeedback(errores || stderr || 'Respuesta incorrecta. Intenta nuevamente.');
+      setFeedback(errores || stderr || 'Respuesta incorrecta. Nuevo intento disponible.');
       setIsLoading(false);
       alert(`Respuesta incorrecta`);
       return;
@@ -204,7 +204,7 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
                 />
               ) : (
                 <p className="text-gray-700 text-sm mb-3 font-medium text-pretty">
-                  Resuelve el miniproyecto usando el editor de código y ejecuta tu solución para validar el resultado.
+                  Desarrollo del miniproyecto mediante el editor de código y validación del resultado por ejecución.
                 </p>
               )}
             </div>
@@ -267,7 +267,7 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
               <h4 className="text-gray-300 text-sm">Salida del programa</h4>
             </div>
             <div className="text-green-400 font-mono text-sm whitespace-pre-wrap">
-              {output || 'Ejecuta tu código para ver la salida.'}
+              {output || 'La salida del programa se mostrará en este panel.'}
             </div>
           </div>
         </div>
