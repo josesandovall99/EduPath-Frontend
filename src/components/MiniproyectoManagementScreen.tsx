@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ClipboardList, Plus, RefreshCw, Save, Search } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Eye, EyeOff, Plus, RefreshCw, Save, Search } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
 import { createQuillModules, loadQuill } from '../utils/quill';
@@ -26,6 +26,7 @@ interface MiniproyectoManagementScreenProps {
 interface AreaInfo {
   id: number;
   nombre: string;
+  miniproyecto_publicado_id?: number | null;
 }
 
 interface TipoActividadInfo {
@@ -57,6 +58,7 @@ interface MiniproyectoItem {
   actividad_id?: number;
   entregable?: string;
   respuesta_miniproyecto?: string;
+  seleccionadoParaEstudiantes?: boolean;
   Area?: AreaInfo;
   Actividad?: ActividadInfo;
   chatbots?: ChatbotInfo[];
@@ -183,6 +185,8 @@ export function MiniproyectoManagementScreen({
   const [createForm, setCreateForm] = useState<CreateConfigurableFormData>(createEmptyConfigurableForm());
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [selectedAreaFilterId, setSelectedAreaFilterId] = useState<string>(docenteAreaId ? String(docenteAreaId) : '');
 
   const requestHeaders = useMemo(() => {
     const authToken = localStorage.getItem('authToken');
@@ -340,10 +344,13 @@ export function MiniproyectoManagementScreen({
         throw new Error('No se pudieron cargar los miniproyectos');
       }
       const data = await response.json();
-      setMiniproyectos(Array.isArray(data) ? data : []);
+      const nextItems = Array.isArray(data) ? data : [];
+      setMiniproyectos(nextItems);
+      return nextItems;
     } catch (err) {
       console.error('Error en loadMiniproyectos:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar miniproyectos');
+      return [];
     } finally {
       setIsLoading(false);
     }
@@ -351,29 +358,34 @@ export function MiniproyectoManagementScreen({
 
   const filteredMiniproyectos = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return miniproyectos;
+    const areaIdFilter = Number(selectedAreaFilterId);
+
     return miniproyectos.filter((item) => {
       const titulo = item.Actividad?.titulo?.toLowerCase() || '';
       const area = item.Area?.nombre?.toLowerCase() || '';
       const nivel = item.Actividad?.nivel_dificultad?.toLowerCase() || '';
-      return titulo.includes(term) || area.includes(term) || nivel.includes(term);
+      const itemAreaId = Number(item.Area?.id);
+      const matchesArea = !Number.isInteger(areaIdFilter) || areaIdFilter <= 0 || itemAreaId === areaIdFilter;
+      const matchesQuery = !term || titulo.includes(term) || area.includes(term) || nivel.includes(term);
+
+      return matchesArea && matchesQuery;
     });
-  }, [miniproyectos, query]);
+  }, [miniproyectos, query, selectedAreaFilterId]);
 
-  const activeMiniproyectoAreaIds = useMemo(() => {
-    return new Set(
-      miniproyectos
-        .filter((item) => item.Actividad?.estado !== false)
-        .map((item) => Number(item.Area?.id ?? item.Area?.id))
-        .filter((item) => Number.isInteger(item) && item > 0)
-    );
-  }, [miniproyectos]);
+  const availableAreas = useMemo(() => {
+    return [...areas].sort((left, right) => left.nombre.localeCompare(right.nombre));
+  }, [areas]);
 
-  const freeAreas = useMemo(() => {
-    return areas
-      .filter((area) => !activeMiniproyectoAreaIds.has(Number(area.id)))
-      .sort((left, right) => left.nombre.localeCompare(right.nombre));
-  }, [areas, activeMiniproyectoAreaIds]);
+  useEffect(() => {
+    if (!selected) return;
+
+    const selectedItemAreaId = Number(selected.Area?.id);
+    const areaIdFilter = Number(selectedAreaFilterId);
+
+    if (Number.isInteger(areaIdFilter) && areaIdFilter > 0 && selectedItemAreaId !== areaIdFilter) {
+      clearSelectedEditor();
+    }
+  }, [selected, selectedAreaFilterId]);
 
   const selectedCreateAreaId = Number(createForm.areaId);
 
@@ -406,6 +418,30 @@ export function MiniproyectoManagementScreen({
     const typeId = miniproyectos.find((item) => Number(item.Actividad?.tipo?.id))?.Actividad?.tipo?.id;
     return Number(typeId) || null;
   }, [miniproyectos]);
+
+  const groupedMiniproyectos = useMemo(() => {
+    const groups = new Map<number, { area: AreaInfo | null; items: MiniproyectoItem[] }>();
+
+    filteredMiniproyectos.forEach((item) => {
+      const areaId = Number(item.Area?.id) || 0;
+      const current = groups.get(areaId);
+      if (current) {
+        current.items.push(item);
+        return;
+      }
+
+      groups.set(areaId, {
+        area: item.Area || null,
+        items: [item],
+      });
+    });
+
+    return Array.from(groups.values()).sort((left, right) => {
+      const leftName = left.area?.nombre || 'Sin área';
+      const rightName = right.area?.nombre || 'Sin área';
+      return leftName.localeCompare(rightName);
+    });
+  }, [filteredMiniproyectos]);
 
   const parseNumber = (value: string) => {
     const normalized = value.replace(/[^0-9.,]/g, '').replace(',', '.');
@@ -645,6 +681,43 @@ export function MiniproyectoManagementScreen({
     setSelectedChatbotId(configurablePayload?.chatbot?.chatbotId ? String(configurablePayload.chatbot.chatbotId) : '');
   };
 
+  const clearSelectedEditor = () => {
+    setSelected(null);
+    setSelectedEmbeddedExercises([]);
+    setSelectedUseChatbot(false);
+    setSelectedChatbotId('');
+  };
+
+  const handleUpdateStudentPublication = async (item: MiniproyectoItem, visibleParaEstudiantes: boolean) => {
+    setIsPublishing(true);
+    setError(null);
+
+    try {
+      const response = await apiFetch(`/miniproyectos/${item.id}/publicacion-estudiante`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibleParaEstudiantes }),
+      }, docenteAreaId ?? item.Area?.id ?? null);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || 'No fue posible actualizar la asignación del miniproyecto del área.');
+      }
+
+      const refreshedItems = await loadMiniproyectos();
+      const refreshedSelected = refreshedItems.find((current) => Number(current.id) === Number(item.id));
+      if (refreshedSelected) {
+        handleSelect(refreshedSelected);
+      }
+      await loadSupportingData();
+    } catch (err) {
+      console.error('Error actualizando publicación del miniproyecto:', err);
+      setError(err instanceof Error ? err.message : 'Error al actualizar la asignación del miniproyecto del área');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   const addListItem = (value: string, setter: React.Dispatch<React.SetStateAction<string[]>>, reset: () => void) => {
     const trimmed = value.trim();
     if (!trimmed) return;
@@ -686,7 +759,7 @@ export function MiniproyectoManagementScreen({
     setCreateError(null);
     setCreateForm({
       ...createEmptyConfigurableForm(),
-      areaId: freeAreas.length === 1 ? String(freeAreas[0].id) : '',
+      areaId: availableAreas.length === 1 ? String(availableAreas[0].id) : '',
     });
     setShowCreateModal(true);
   };
@@ -706,7 +779,7 @@ export function MiniproyectoManagementScreen({
     }
 
     if (!createForm.areaId) {
-      setCreateError('Debes seleccionar un área libre.');
+      setCreateError('Debes seleccionar un área.');
       return;
     }
 
@@ -914,10 +987,7 @@ export function MiniproyectoManagementScreen({
         setShowExpectedModal(true);
       }
 
-      setSelected(null);
-      setSelectedEmbeddedExercises([]);
-      setSelectedUseChatbot(false);
-      setSelectedChatbotId('');
+      clearSelectedEditor();
     } catch (err) {
       console.error('Error actualizando miniproyecto:', err);
       setError(err instanceof Error ? err.message : 'Error al actualizar el miniproyecto');
@@ -929,8 +999,11 @@ export function MiniproyectoManagementScreen({
   const totalMiniproyectos = miniproyectos.length;
   const resultadosMostrados = filteredMiniproyectos.length;
   const activeMiniproyectos = miniproyectos.filter((item) => item.Actividad?.estado !== false).length;
+  const publishedMiniproyectos = miniproyectos.filter((item) => item.seleccionadoParaEstudiantes).length;
+  const selectedAreaFilterName = availableAreas.find((area) => String(area.id) === selectedAreaFilterId)?.nombre || 'Todas las áreas';
   const selectedMiniproyectoTitle = selected?.Actividad?.titulo || 'Sin selección';
   const selectedMiniproyectoArea = selected?.Area?.nombre || 'Área no definida';
+  const areasRepresented = groupedMiniproyectos.length;
   const selectedEditorMode = isConfigurableMiniproyecto
     ? 'Configurable'
     : isProgrammingMiniproyecto
@@ -997,18 +1070,32 @@ export function MiniproyectoManagementScreen({
                 <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Catálogo visible</p>
-                    <p className="mt-1 text-sm text-slate-600">Filtra por título, área o nivel.</p>
+                    <p className="mt-1 text-sm text-slate-600">Selecciona un área y filtra por título o nivel.</p>
                   </div>
                   <div className="max-w-full truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
                     {resultadosMostrados} visibles
                   </div>
+                </div>
+                <div className="mb-3">
+                  <label className="app-form-label">Área</label>
+                  <select
+                    value={selectedAreaFilterId}
+                    onChange={(event) => setSelectedAreaFilterId(event.target.value)}
+                    className="app-form-select"
+                    disabled={isDocenteMode && Boolean(docenteAreaId)}
+                  >
+                    {!isDocenteMode ? <option value="">Todas las áreas</option> : null}
+                    {availableAreas.map((area) => (
+                      <option key={area.id} value={String(area.id)}>{area.nombre}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="app-search-field">
                   <Search className="app-search-field__icon" />
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Buscar por título, área o nivel"
+                    placeholder="Buscar por título o nivel"
                     className="app-form-input"
                   />
                 </div>
@@ -1019,13 +1106,13 @@ export function MiniproyectoManagementScreen({
             <div className="app-hero-metrics app-miniproyecto-hero-metrics">
               <div className="app-hero-metric">
                 <div className="app-hero-metric__label">Catálogo</div>
-                <div className="app-hero-metric__value">{totalMiniproyectos}</div>
-                <div className="app-hero-metric__help">Miniproyectos registrados.</div>
+                <div className="app-hero-metric__value">{isDocenteMode ? totalMiniproyectos : areasRepresented}</div>
+                <div className="app-hero-metric__help">{isDocenteMode ? 'Miniproyectos registrados.' : 'Áreas con miniproyectos visibles.'}</div>
               </div>
               <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Visibles</div>
-                <div className="app-hero-metric__value">{resultadosMostrados}</div>
-                <div className="app-hero-metric__help">Resultados según la búsqueda actual.</div>
+                <div className="app-hero-metric__label">Asignados</div>
+                <div className="app-hero-metric__value">{publishedMiniproyectos}</div>
+                <div className="app-hero-metric__help">Miniproyecto actual del área.</div>
               </div>
               <div className="app-hero-metric">
                 <div className="app-hero-metric__label">Activos</div>
@@ -1037,7 +1124,8 @@ export function MiniproyectoManagementScreen({
             <div className="app-soft-card app-context-card app-miniproyecto-hero-context">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Proyecto activo</p>
               <p className="app-context-card__title">{selectedMiniproyectoTitle}</p>
-              <p className="app-context-card__text">Área: {selectedMiniproyectoArea}</p>
+              <p className="app-context-card__text">Área seleccionada: {selectedAreaFilterName}</p>
+              <p className="app-context-card__text">Área del registro: {selectedMiniproyectoArea}</p>
               <p className="app-context-card__text">Editor: {selectedEditorMode}</p>
             </div>
             </aside>
@@ -1061,45 +1149,81 @@ export function MiniproyectoManagementScreen({
             ) : filteredMiniproyectos.length === 0 ? (
               <div className="app-empty-panel py-10">No hay miniproyectos que coincidan con la búsqueda.</div>
             ) : (
-              <div className="app-miniproyecto-catalog-grid">
-                {filteredMiniproyectos.map((item, index) => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleSelect(item)}
-                    className={`app-list-card app-list-card--compact app-miniproyecto-catalog-card w-full border-2 ${selected?.id === item.id ? 'shadow-lg translate-y-[-1px]' : ''}`}
-                    style={
-                      selected?.id === item.id
-                        ? {
-                            borderColor: '#4A90E2',
-                            backgroundColor: '#F8FBFF'
-                          }
-                        : {
-                            borderColor: index % 3 === 0 ? '#BFDBFE' : index % 3 === 1 ? '#BBF7D0' : '#FDE68A',
-                            backgroundColor: '#FFFFFF'
-                          }
-                    }
-                  >
-                    <div className="app-list-card__head app-miniproyecto-catalog-card__head">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-3 flex flex-wrap items-center gap-2">
-                          <span className={`app-badge ${item.Actividad?.estado !== false ? 'app-badge--green' : 'app-badge--amber'}`}>
-                            {item.Actividad?.estado !== false ? 'Activo' : 'Inhabilitado'}
-                          </span>
-                          <span className="app-badge app-badge--blue">{item.Actividad?.nivel_dificultad || 'Nivel no definido'}</span>
+              <div className="app-miniproyecto-group-stack">
+                {groupedMiniproyectos.map((group, groupIndex) => (
+                  <section key={group.area?.id || `group-${groupIndex}`} className="app-soft-card app-miniproyecto-area-group">
+                    {(() => {
+                      const hasAssignedMiniproyecto = group.items.some((item) => item.seleccionadoParaEstudiantes);
+
+                      return (
+                        <>
+                    {!isDocenteMode ? (
+                      <div className="app-miniproyecto-area-group__header">
+                        <div>
+                          <p className="app-miniproyecto-area-group__eyebrow">Área académica</p>
+                          <h3 className="app-miniproyecto-area-group__title">{group.area?.nombre || 'Sin área asignada'}</h3>
                         </div>
-                        <h3 className="app-list-card__title uppercase">{item.Actividad?.titulo || 'Sin título'}</h3>
-                        <p className="app-list-card__description mt-1.5">{item.Area?.nombre || 'Sin área asignada'}</p>
+                        <div className="app-miniproyecto-area-group__meta">{group.items.length} miniproyecto(s)</div>
                       </div>
-                      <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#4A90E2] app-miniproyecto-catalog-card__action">
-                        <ClipboardList className="w-4 h-4" />
-                        <span>Editar</span>
+                    ) : null}
+
+                    {!hasAssignedMiniproyecto ? (
+                      <div className="app-miniproyecto-area-group__notice" role="status">
+                        <span className="app-miniproyecto-area-group__notice-chip">No hay miniproyectos del área</span>
+                        <p className="app-miniproyecto-area-group__notice-text">
+                          Esta área todavía no tiene un miniproyecto asignado para estudiantes.
+                        </p>
                       </div>
+                    ) : null}
+
+                    <div className="app-miniproyecto-catalog-grid">
+                      {group.items.map((item, index) => (
+                        <button
+                          key={item.id}
+                          onClick={() => handleSelect(item)}
+                          className={`app-list-card app-list-card--compact app-miniproyecto-catalog-card w-full border-2 ${selected?.id === item.id ? 'shadow-lg translate-y-[-1px]' : ''}`}
+                          style={
+                            selected?.id === item.id
+                              ? {
+                                  borderColor: '#4A90E2',
+                                  backgroundColor: '#F8FBFF'
+                                }
+                              : {
+                                  borderColor: index % 3 === 0 ? '#BFDBFE' : index % 3 === 1 ? '#BBF7D0' : '#FDE68A',
+                                  backgroundColor: '#FFFFFF'
+                                }
+                          }
+                        >
+                          <div className="app-list-card__head app-miniproyecto-catalog-card__head">
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-3 flex flex-wrap items-center gap-2">
+                                <span className={`app-badge ${item.Actividad?.estado !== false ? 'app-badge--green' : 'app-badge--amber'}`}>
+                                  {item.Actividad?.estado !== false ? 'Activo' : 'Inhabilitado'}
+                                </span>
+                                <span className="app-badge app-badge--blue">{item.Actividad?.nivel_dificultad || 'Nivel no definido'}</span>
+                                {item.seleccionadoParaEstudiantes ? (
+                                  <span className="app-badge app-badge--green">Miniproyecto del área</span>
+                                ) : null}
+                              </div>
+                              <h3 className="app-list-card__title uppercase">{item.Actividad?.titulo || 'Sin título'}</h3>
+                              <p className="app-list-card__description mt-1.5">{item.Area?.nombre || 'Sin área asignada'}</p>
+                            </div>
+                            <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#4A90E2] app-miniproyecto-catalog-card__action">
+                              <ClipboardList className="w-4 h-4" />
+                              <span>Editar</span>
+                            </div>
+                          </div>
+                          <div className="app-list-card__footer">
+                            <span className="app-list-card__meta">{item.chatbots?.length ? `${item.chatbots.length} chatbot(s) vinculados` : 'Sin chatbot vinculado'}</span>
+                            <span className="app-list-card__meta">Actividad #{item.actividad_id || item.Actividad?.id || item.id}</span>
+                          </div>
+                        </button>
+                      ))}
                     </div>
-                    <div className="app-list-card__footer">
-                      <span className="app-list-card__meta">{item.chatbots?.length ? `${item.chatbots.length} chatbot(s) vinculados` : 'Sin chatbot vinculado'}</span>
-                      <span className="app-list-card__meta">Actividad #{item.actividad_id || item.Actividad?.id || item.id}</span>
-                    </div>
-                  </button>
+                        </>
+                      );
+                    })()}
+                  </section>
                 ))}
               </div>
             )}
@@ -1741,10 +1865,27 @@ export function MiniproyectoManagementScreen({
                       <div className="app-form-summary-label">Estado</div>
                       <div className="app-form-summary-value">{selected?.Actividad?.estado !== false ? 'Activo' : 'Inhabilitado'}</div>
                     </div>
+                    <div className="app-form-summary-card">
+                      <div className="app-form-summary-label">Estudiantes</div>
+                      <div className="app-form-summary-value">{selected?.seleccionadoParaEstudiantes ? 'Asignado al área' : 'No asignado'}</div>
+                    </div>
                   </div>
                 </section>
 
                 <div className="app-action-row justify-start">
+                  <button
+                    type="button"
+                    disabled={isPublishing || selected?.Actividad?.estado === false}
+                    onClick={() => selected && handleUpdateStudentPublication(selected, !selected.seleccionadoParaEstudiantes)}
+                    className="app-btn app-btn-secondary disabled:opacity-70"
+                  >
+                    {selected?.seleccionadoParaEstudiantes ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {isPublishing
+                      ? 'Actualizando asignación...'
+                      : selected?.seleccionadoParaEstudiantes
+                        ? 'Quitar como miniproyecto del área'
+                        : 'Asignar como miniproyecto del área'}
+                  </button>
                   <button
                     type="submit"
                     disabled={isSaving}
@@ -1764,7 +1905,7 @@ export function MiniproyectoManagementScreen({
       {showCreateModal ? (
         <CreateConfigurableMiniproyectoWorkspace
           formData={createForm}
-          freeAreas={freeAreas}
+          availableAreas={availableAreas}
           eligibleChatbots={createEligibleChatbots}
           error={createError}
           isCreating={isCreating}

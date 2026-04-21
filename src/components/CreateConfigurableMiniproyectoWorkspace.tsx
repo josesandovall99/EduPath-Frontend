@@ -26,7 +26,7 @@ interface ChatbotOption {
 
 interface CreateConfigurableMiniproyectoWorkspaceProps {
   formData: CreateConfigurableFormData;
-  freeAreas: AreaOption[];
+  availableAreas: AreaOption[];
   eligibleChatbots: ChatbotOption[];
   error: string | null;
   isCreating: boolean;
@@ -37,7 +37,7 @@ interface CreateConfigurableMiniproyectoWorkspaceProps {
 
 export function CreateConfigurableMiniproyectoWorkspace({
   formData,
-  freeAreas,
+  availableAreas,
   eligibleChatbots,
   error,
   isCreating,
@@ -46,7 +46,7 @@ export function CreateConfigurableMiniproyectoWorkspace({
   onUpdate,
 }: CreateConfigurableMiniproyectoWorkspaceProps) {
   const exerciseCount = formData.exercises.length;
-  const selectedAreaName = freeAreas.find((area) => String(area.id) === formData.areaId)?.nombre || 'Sin área seleccionada';
+  const selectedAreaName = availableAreas.find((area) => String(area.id) === formData.areaId)?.nombre || 'Sin área seleccionada';
   const selectedChatbotName = eligibleChatbots.find((chatbot) => String(chatbot.id) === formData.chatbotId)?.nombre || 'Sin chatbot asignado';
   const isReadyToCreate = Boolean(formData.titulo.trim() && formData.areaId && exerciseCount > 0 && (!formData.useChatbot || formData.chatbotId));
 
@@ -77,7 +77,7 @@ export function CreateConfigurableMiniproyectoWorkspace({
                 <section className="app-form-section app-form-section--muted">
                   <div className="mb-4 space-y-1.5">
                     <h4 className="app-form-section-title">Información base</h4>
-                    <p className="app-form-section-description">Define el título, el área libre disponible y el entregable esperado del nuevo miniproyecto.</p>
+                    <p className="app-form-section-description">Define el título, el área destino y el entregable esperado del nuevo miniproyecto.</p>
                   </div>
 
                   <div className="app-form-grid app-form-grid-2">
@@ -87,14 +87,14 @@ export function CreateConfigurableMiniproyectoWorkspace({
                     </div>
 
                     <div className="app-form-field md:col-span-2">
-                      <label className="app-form-label">Área libre</label>
+                      <label className="app-form-label">Área</label>
                       <select
                         value={formData.areaId}
                         onChange={(event) => onUpdate((prev) => ({ ...prev, areaId: event.target.value, exercises: [], useChatbot: false, chatbotId: '' }))}
                         className="app-form-select"
                       >
                         <option value="">Selecciona un área</option>
-                        {freeAreas.map((area) => (
+                        {availableAreas.map((area) => (
                           <option key={area.id} value={String(area.id)}>{area.nombre}</option>
                         ))}
                       </select>
@@ -168,7 +168,7 @@ export function CreateConfigurableMiniproyectoWorkspace({
 
                   {!formData.areaId ? (
                     <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">
-                      La selección de un área libre habilita el constructor.
+                      La selección de un área habilita el constructor.
                     </div>
                   ) : (
                     <ConfigurableEmbeddedExerciseEditor

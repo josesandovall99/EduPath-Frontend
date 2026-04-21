@@ -123,7 +123,10 @@ interface BasicArea {
   nombre: string;
 }
 
-const buildFailuresFromItems = (items: FailuresItem[]): FailuresReportData => {
+const buildFailuresFromItems = (
+  items: FailuresItem[],
+  studentMetadata: Map<string, Pick<FailuresByStudent, 'nombre' | 'email'>> = new Map()
+): FailuresReportData => {
   const totals = items.reduce(
     (acc, item) => {
       acc.intentos += item.intentos || 0;
@@ -167,10 +170,11 @@ const buildFailuresFromItems = (items: FailuresItem[]): FailuresReportData => {
     byAreaMap.set(areaKey, currentArea);
 
     const studentKey = String(item.estudiante_id);
+    const studentInfo = studentMetadata.get(studentKey);
     const currentStudent = byStudentMap.get(studentKey) || {
       estudiante_id: item.estudiante_id,
-      nombre: `Estudiante ${item.estudiante_id}`,
-      email: '',
+      nombre: studentInfo?.nombre || `Estudiante ${item.estudiante_id}`,
+      email: studentInfo?.email || '',
       intentos: 0,
       fallos: 0,
       aciertos: 0,
@@ -196,12 +200,22 @@ const buildFailuresFromItems = (items: FailuresItem[]): FailuresReportData => {
 
 const scopeFailuresDataByArea = (data: any, areaId?: number): FailuresReportData => {
   const sourceItems = Array.isArray(data?.items) ? data.items : [];
+  const studentMetadata = new Map<string, Pick<FailuresByStudent, 'nombre' | 'email'>>(
+    (Array.isArray(data?.byStudent) ? data.byStudent : []).map((student: FailuresByStudent) => [
+      String(student.estudiante_id),
+      {
+        nombre: student.nombre,
+        email: student.email,
+      }
+    ])
+  );
+
   if (!areaId) {
-    return buildFailuresFromItems(sourceItems);
+    return buildFailuresFromItems(sourceItems, studentMetadata);
   }
 
   const scopedItems = sourceItems.filter((item: FailuresItem) => Number(item.area_id) === Number(areaId));
-  return buildFailuresFromItems(scopedItems);
+  return buildFailuresFromItems(scopedItems, studentMetadata);
 };
 
 const mergeFailuresWithAreas = (data: FailuresReportData, areas: BasicArea[], scopeAreaId?: number): FailuresReportData => {

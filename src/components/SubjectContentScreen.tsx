@@ -59,6 +59,7 @@ interface MiniproyectoApiItem {
   actividad_id: number;
   entregable?: string;
   respuesta_miniproyecto?: string;
+  seleccionadoParaEstudiantes?: boolean;
   Area?: { id: number; nombre: string };
   Actividad?: { id: number; titulo?: string; descripcion?: string; nivel_dificultad?: string };
 }
@@ -335,11 +336,13 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           if (minisResponse.ok) {
             const minis: MiniproyectoApiItem[] = await minisResponse.json();
             const minisArray = Array.isArray(minis) ? minis : [];
+            const publishedMinis = minisArray.filter((mini) => mini.seleccionadoParaEstudiantes);
+            const studentVisibleMinis = publishedMinis;
             let aprobadosMap = new Map<number, boolean>();
 
-            if (estudianteId && minisArray.length > 0) {
+            if (estudianteId && studentVisibleMinis.length > 0) {
               const aprobados = await Promise.all(
-                minisArray.map(async (mini) => {
+                studentVisibleMinis.map(async (mini) => {
                   try {
                     const configurablePayload = parseConfigurableMiniproyecto(mini.respuesta_miniproyecto);
                     if (configurablePayload && configurablePayload.exercises.length > 0) {
@@ -367,7 +370,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
               aprobadosMap = new Map(aprobados);
             }
 
-            miniproyectosContent = minisArray.map((mini) => {
+            miniproyectosContent = studentVisibleMinis.map((mini) => {
               const configurablePayload = parseConfigurableMiniproyecto(mini.respuesta_miniproyecto);
               const aprobado = aprobadosMap.get(mini.id) || false;
               return {
