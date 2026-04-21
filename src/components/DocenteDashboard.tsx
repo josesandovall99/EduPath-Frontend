@@ -8,6 +8,7 @@ import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
 import { ReportsScreen } from './ReportsScreen';
 import { DocenteChatbotManagementScreen } from './DocenteChatbotManagementScreen';
 import { AdminFlowGuide } from './ui/AdminFlowGuide';
+import { ChatbotButton } from './ChatbotButton';
 
 interface DocenteDashboardProps {
   onLogout: () => void;
@@ -469,6 +470,12 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
           </div>
         </section>
       </main>
+
+      <ChatbotButton
+        chatbotType="GENERAL_DOCENTE"
+        areaId={docente?.areaId}
+        contextLabel={docenteAreaLabel}
+      />
     </div>
   );
 }

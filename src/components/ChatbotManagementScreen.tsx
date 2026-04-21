@@ -55,7 +55,7 @@ interface ChatbotItem {
   id: number;
   nombre: string;
   descripcion?: string | null;
-  tipo: 'GENERAL' | 'MINIPROYECTO';
+  tipo: 'GENERAL' | 'GENERAL_ADMINISTRADOR' | 'GENERAL_DOCENTE' | 'MINIPROYECTO';
   provider?: string | null;
   prompt_base?: string | null;
   area_id?: number | null;
@@ -88,7 +88,7 @@ interface ChatbotFormState {
   id: number | null;
   nombre_chatbot: string;
   descripcion: string;
-  tipo: 'GENERAL' | 'MINIPROYECTO';
+  tipo: 'GENERAL' | 'GENERAL_ADMINISTRADOR' | 'GENERAL_DOCENTE' | 'MINIPROYECTO';
   prompt_base: string;
   area_id: string;
   miniproyecto_id: string;
@@ -175,10 +175,110 @@ function mapChatbotToForm(chatbot: ChatbotItem): ChatbotFormState {
   };
 }
 
+function isRoleScopedGeneralType(type: ChatbotFormState['tipo']) {
+  return type === 'GENERAL_ADMINISTRADOR' || type === 'GENERAL_DOCENTE';
+}
+
+function isGeneralType(type: ChatbotFormState['tipo']) {
+  return type === 'GENERAL' || isRoleScopedGeneralType(type);
+}
+
+function getChatbotTypeLabel(type: ChatbotFormState['tipo'], mode: 'admin' | 'docente' = 'admin') {
+  switch (type) {
+    case 'GENERAL_ADMINISTRADOR':
+      return 'General administrador';
+    case 'GENERAL_DOCENTE':
+      return 'General docente';
+    case 'MINIPROYECTO':
+      return 'Miniproyecto';
+    default:
+      return mode === 'docente' ? 'General de área' : 'General';
+  }
+}
+
+function getChatbotTypePillClass(type: ChatbotFormState['tipo']) {
+  switch (type) {
+    case 'GENERAL_ADMINISTRADOR':
+      return 'chatbot-admin-pill--blue';
+    case 'GENERAL_DOCENTE':
+      return 'chatbot-admin-pill--slate';
+    case 'MINIPROYECTO':
+      return 'chatbot-admin-pill--amber';
+    default:
+      return 'chatbot-admin-pill--green';
+  }
+}
+
+function getChatbotTypeBadgeClass(type: ChatbotFormState['tipo']) {
+  switch (type) {
+    case 'GENERAL_ADMINISTRADOR':
+      return 'chatbot-admin-badge--green';
+    case 'GENERAL_DOCENTE':
+      return 'chatbot-admin-badge--slate';
+    case 'MINIPROYECTO':
+      return 'chatbot-admin-badge--amber';
+    default:
+      return 'chatbot-admin-badge--green';
+  }
+}
+
+function getChatbotLibraryIconClass(type: ChatbotFormState['tipo']) {
+  switch (type) {
+    case 'MINIPROYECTO':
+      return 'chatbot-admin-library-card__icon--amber';
+    default:
+      return 'chatbot-admin-library-card__icon--green';
+  }
+}
+
+function getChatbotVisibilityHint(type: ChatbotFormState['tipo'], mode: 'admin' | 'docente' = 'admin') {
+  if (type === 'GENERAL' && mode === 'docente') {
+    return 'Visible para el estudiante en materia, tema, subtema y contenido del area.';
+  }
+
+  if (type === 'GENERAL' && mode === 'admin') {
+    return 'Visible para el estudiante en el dashboard principal.';
+  }
+
+  if (type === 'GENERAL_ADMINISTRADOR') {
+    return 'Visible en el dashboard del administrador.';
+  }
+
+  if (type === 'GENERAL_DOCENTE') {
+    return 'Visible en el dashboard del docente.';
+  }
+
+  return 'Visible cuando el estudiante entra al miniproyecto asociado.';
+}
+
+function getChatbotUsageContextLabel(type: ChatbotFormState['tipo'], mode: 'admin' | 'docente' = 'admin') {
+  if (type === 'GENERAL' && mode === 'docente') {
+    return 'En uso en area';
+  }
+
+  if (type === 'GENERAL' && mode === 'admin') {
+    return 'En uso en dashboard';
+  }
+
+  if (type === 'GENERAL_ADMINISTRADOR') {
+    return 'En uso en panel admin';
+  }
+
+  if (type === 'GENERAL_DOCENTE') {
+    return 'En uso en panel docente';
+  }
+
+  return 'En uso en miniproyecto';
+}
+
 function enforceDocenteFormMode(formState: ChatbotFormState, docenteAreaId?: number, fallbackAreaId?: number) {
+  const nextType = formState.tipo === 'GENERAL_ADMINISTRADOR' || formState.tipo === 'GENERAL_DOCENTE'
+    ? 'GENERAL'
+    : formState.tipo;
+
   return {
     ...formState,
-    tipo: 'MINIPROYECTO' as const,
+    tipo: nextType,
     area_id: formState.area_id || String(Number(docenteAreaId) || Number(fallbackAreaId) || ''),
   };
 }
@@ -226,7 +326,7 @@ export function ChatbotManagementScreen({
   const [isAsking, setIsAsking] = useState(false);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'GENERAL' | 'MINIPROYECTO'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'GENERAL' | 'GENERAL_ADMINISTRADOR' | 'GENERAL_DOCENTE' | 'MINIPROYECTO'>('all');
   const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [statusMessage, setStatusMessage] = useState('');
 
@@ -278,10 +378,20 @@ export function ChatbotManagementScreen({
   }, []);
 
   useEffect(() => {
-    if (form.tipo === 'GENERAL' && form.miniproyecto_id) {
+    if (isGeneralType(form.tipo) && form.miniproyecto_id) {
       setForm((prev) => ({ ...prev, miniproyecto_id: '' }));
     }
   }, [form.tipo, form.miniproyecto_id]);
+
+  useEffect(() => {
+    if (!isRoleScopedGeneralType(form.tipo)) {
+      return;
+    }
+
+    if (form.area_id || form.miniproyecto_id) {
+      setForm((prev) => ({ ...prev, area_id: '', miniproyecto_id: '' }));
+    }
+  }, [form.tipo, form.area_id, form.miniproyecto_id]);
 
   useEffect(() => {
     if (form.tipo !== 'MINIPROYECTO') {
@@ -364,7 +474,7 @@ export function ChatbotManagementScreen({
   const totalChatbots = chatbots.length;
   const activeChatbots = chatbots.filter((chatbot) => chatbot.estado !== false).length;
   const inactiveChatbots = totalChatbots - activeChatbots;
-  const generalChatbots = chatbots.filter((chatbot) => chatbot.tipo === 'GENERAL').length;
+  const generalChatbots = chatbots.filter((chatbot) => isGeneralType(chatbot.tipo)).length;
   const miniproyectoChatbots = chatbots.filter((chatbot) => chatbot.tipo === 'MINIPROYECTO').length;
   const selectedChatbot = chatbots.find((chatbot) => chatbot.id === selectedChatbotId) || null;
   const selectedChatbotIsActive = selectedChatbot?.estado !== false;
@@ -372,8 +482,16 @@ export function ChatbotManagementScreen({
   const selectedChatbotScope =
     form.tipo === 'GENERAL'
       ? selectedArea?.nombre
-        ? `General con foco en ${selectedArea.nombre}.`
-        : 'Cobertura general.'
+        ? isDocenteMode
+          ? `General del área ${selectedArea.nombre}.`
+          : `General con foco en ${selectedArea.nombre}.`
+        : isDocenteMode
+          ? 'Cobertura general del área asignada.'
+          : 'Cobertura general.'
+      : form.tipo === 'GENERAL_ADMINISTRADOR'
+        ? 'Disponible para el panel de administrador.'
+        : form.tipo === 'GENERAL_DOCENTE'
+          ? 'Disponible para el panel de docente.'
       : selectedMiniproyecto
         ? `Vinculado a ${getMiniproyectoLabel(selectedMiniproyecto)}.`
         : 'Miniproyecto pendiente.';
@@ -398,8 +516,8 @@ export function ChatbotManagementScreen({
     form.descripcion.trim(),
     form.tipo,
     form.model.trim(),
-    form.tipo === 'GENERAL' && !isDocenteMode ? true : form.area_id,
-    form.tipo === 'GENERAL' ? true : form.miniproyecto_id,
+    isGeneralType(form.tipo) && !isDocenteMode ? true : form.area_id,
+    isGeneralType(form.tipo) ? true : form.miniproyecto_id,
   ].filter(Boolean).length;
   const canConfirmPdf = Boolean(selectedChatbotId && selectedFile && !isUploading);
   const canCancelPdf = Boolean(selectedFile);
@@ -577,18 +695,23 @@ export function ChatbotManagementScreen({
       return;
     }
 
+    if (isRoleScopedGeneralType(form.tipo) && (form.area_id || form.miniproyecto_id)) {
+      setStatusMessage('Los chatbots generales por rol no deben asociarse a un área ni a un miniproyecto.');
+      return;
+    }
+
     setIsSaving(true);
     setStatusMessage('Guardando chatbot...');
 
     const payload = {
       nombre_chatbot: form.nombre_chatbot,
       descripcion: form.descripcion,
-      tipo: isDocenteMode ? 'MINIPROYECTO' : form.tipo,
+      tipo: form.tipo,
       prompt_base: form.prompt_base,
       estado: form.estado,
       configuracion: {
-        area_id: form.area_id ? Number(form.area_id) : null,
-        miniproyecto_id: (isDocenteMode || form.tipo === 'MINIPROYECTO') && form.miniproyecto_id ? Number(form.miniproyecto_id) : null,
+        area_id: !isDocenteMode && isRoleScopedGeneralType(form.tipo) ? null : (form.area_id ? Number(form.area_id) : null),
+        miniproyecto_id: form.tipo === 'MINIPROYECTO' && form.miniproyecto_id ? Number(form.miniproyecto_id) : null,
       },
       parametros_rendimiento: {
         model: form.model,
@@ -881,8 +1004,8 @@ export function ChatbotManagementScreen({
                 <div className="chatbot-admin-hero-balance-card__text">{selectedChatbotScope}</div>
 
                 <div className="chatbot-admin-pill-row chatbot-admin-pill-row--compact">
-                  <span className={`chatbot-admin-pill ${form.tipo === 'GENERAL' ? 'chatbot-admin-pill--green' : 'chatbot-admin-pill--amber'}`}>
-                    {form.tipo === 'GENERAL' ? 'General' : 'Miniproyecto'}
+                  <span className={`chatbot-admin-pill ${getChatbotTypePillClass(form.tipo)}`}>
+                    {getChatbotTypeLabel(form.tipo, isDocenteMode ? 'docente' : 'admin')}
                   </span>
                   <span className={`chatbot-admin-pill ${selectedChatbotId && selectedChatbotIsActive ? 'chatbot-admin-pill--green' : 'chatbot-admin-pill--slate'}`}>
                     {selectedChatbotId ? (selectedChatbotIsActive ? 'Activo' : 'Inactivo') : 'Borrador'}
@@ -932,7 +1055,7 @@ export function ChatbotManagementScreen({
             </div>
             <div>
               <div className="chatbot-admin-stat-card__value">{generalChatbots}</div>
-              <div className="chatbot-admin-stat-card__label">Generales</div>
+              <div className="chatbot-admin-stat-card__label">{isDocenteMode ? 'Generales de área' : 'Generales'}</div>
             </div>
           </article>
 
@@ -968,8 +1091,20 @@ export function ChatbotManagementScreen({
                     </button>
                     <button onClick={() => setTypeFilter('GENERAL')} className={`app-filter-chip ${typeFilter === 'GENERAL' ? 'app-filter-chip--green' : ''}`}>
                       <MessageCircle className="w-4 h-4" />
-                      Generales
+                      {isDocenteMode ? 'General de área' : 'Generales'}
                     </button>
+                    {!isDocenteMode ? (
+                      <button onClick={() => setTypeFilter('GENERAL_ADMINISTRADOR')} className={`app-filter-chip ${typeFilter === 'GENERAL_ADMINISTRADOR' ? 'app-filter-chip--blue' : ''}`}>
+                        <Bot className="w-4 h-4" />
+                        Admin
+                      </button>
+                    ) : null}
+                    {!isDocenteMode ? (
+                      <button onClick={() => setTypeFilter('GENERAL_DOCENTE')} className={`app-filter-chip ${typeFilter === 'GENERAL_DOCENTE' ? 'app-filter-chip--green' : ''}`}>
+                        <Bot className="w-4 h-4" />
+                        Docente
+                      </button>
+                    ) : null}
                     <button onClick={() => setTypeFilter('MINIPROYECTO')} className={`app-filter-chip ${typeFilter === 'MINIPROYECTO' ? 'app-filter-chip--amber' : ''}`}>
                       <FileText className="w-4 h-4" />
                       Miniproyecto
@@ -1027,7 +1162,7 @@ export function ChatbotManagementScreen({
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3 min-w-0">
-                            <div className={`chatbot-admin-library-card__icon ${chatbot.tipo === 'GENERAL' ? 'chatbot-admin-library-card__icon--green' : 'chatbot-admin-library-card__icon--amber'}`}>
+                            <div className={`chatbot-admin-library-card__icon ${getChatbotLibraryIconClass(chatbot.tipo)}`}>
                               <Bot className="w-5 h-5" />
                             </div>
                             <div className="min-w-0 text-left">
@@ -1036,8 +1171,11 @@ export function ChatbotManagementScreen({
                             </div>
                           </div>
                           <div className="flex flex-wrap justify-end gap-2">
-                            <span className={`chatbot-admin-badge ${chatbot.tipo === 'GENERAL' ? 'chatbot-admin-badge--green' : 'chatbot-admin-badge--amber'}`}>
-                              {chatbot.tipo === 'GENERAL' ? 'General' : 'Miniproyecto'}
+                            <span className={`chatbot-admin-badge ${getChatbotTypeBadgeClass(chatbot.tipo)}`}>
+                              {getChatbotTypeLabel(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
+                            </span>
+                            <span className="chatbot-admin-badge chatbot-admin-badge--slate">
+                              {getChatbotUsageContextLabel(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
                             </span>
                             <span className={`chatbot-admin-badge ${chatbotIsActive ? 'chatbot-admin-badge--green' : 'chatbot-admin-badge--slate'}`}>
                               {chatbotIsActive ? 'Activo' : 'Inactivo'}
@@ -1047,6 +1185,10 @@ export function ChatbotManagementScreen({
 
                         <p className="chatbot-admin-library-card__description text-left">
                           {chatbot.descripcion?.trim() || 'Sin descripción.'}
+                        </p>
+
+                        <p className="chatbot-admin-library-card__subtitle text-left mt-2">
+                          {getChatbotVisibilityHint(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
                         </p>
 
                         <div className="chatbot-admin-library-card__meta">
@@ -1224,8 +1366,11 @@ export function ChatbotManagementScreen({
                     </div>
                     <p className="chatbot-admin-overview-card__text">{selectedChatbotDescription}</p>
                     <div className="chatbot-admin-pill-row">
-                      <span className={`chatbot-admin-pill ${form.tipo === 'GENERAL' ? 'chatbot-admin-pill--green' : 'chatbot-admin-pill--amber'}`}>
-                        {form.tipo === 'GENERAL' ? 'General' : 'Miniproyecto'}
+                      <span className={`chatbot-admin-pill ${getChatbotTypePillClass(form.tipo)}`}>
+                        {getChatbotTypeLabel(form.tipo, isDocenteMode ? 'docente' : 'admin')}
+                      </span>
+                      <span className="chatbot-admin-pill chatbot-admin-pill--slate">
+                        {getChatbotUsageContextLabel(form.tipo, isDocenteMode ? 'docente' : 'admin')}
                       </span>
                       <span className={`chatbot-admin-pill ${selectedChatbotId && selectedChatbotIsActive ? 'chatbot-admin-pill--green' : 'chatbot-admin-pill--slate'}`}>
                         {selectedChatbotId ? (selectedChatbotIsActive ? 'Disponible' : 'Inactivo') : 'Aun sin guardar'}
@@ -1242,6 +1387,7 @@ export function ChatbotManagementScreen({
                       <div className="chatbot-admin-overview-card__label">Estado de preparación</div>
                       <div className="chatbot-admin-overview-card__text">{selectedChatbotReadiness}</div>
                     </div>
+                    <p className="chatbot-admin-overview-card__text">{getChatbotVisibilityHint(form.tipo, isDocenteMode ? 'docente' : 'admin')}</p>
                   </div>
                 </div>
               </section>
@@ -1352,7 +1498,7 @@ export function ChatbotManagementScreen({
 
                   {isDocenteMode ? (
                     <div className="app-form-note">
-                      En modo docente, solo se gestionan chatbots vinculados al área asignada.
+                      En modo docente, puedes gestionar el chatbot general de tu área y los chatbots de miniproyecto asociados.
                     </div>
                   ) : null}
 
@@ -1371,16 +1517,20 @@ export function ChatbotManagementScreen({
                       <div className="app-form-field">
                         <label className="app-form-label">Tipo</label>
                         <select
-                          value={isDocenteMode ? 'MINIPROYECTO' : form.tipo}
+                          value={form.tipo}
                           onChange={(event) => updateForm('tipo', event.target.value as ChatbotFormState['tipo'])}
-                          disabled={isDocenteMode}
                           className="app-form-select disabled:bg-gray-100 disabled:text-gray-400"
                         >
                           {isDocenteMode ? (
-                            <option value="MINIPROYECTO">Miniproyecto</option>
+                            <>
+                              <option value="GENERAL">General de área</option>
+                              <option value="MINIPROYECTO">Miniproyecto</option>
+                            </>
                           ) : (
                             <>
                               <option value="GENERAL">General</option>
+                              <option value="GENERAL_ADMINISTRADOR">General administrador</option>
+                              <option value="GENERAL_DOCENTE">General docente</option>
                               <option value="MINIPROYECTO">Miniproyecto</option>
                             </>
                           )}
@@ -1422,11 +1572,18 @@ export function ChatbotManagementScreen({
                     <div className="app-form-grid app-form-grid-2">
                       <div className="app-form-field">
                         <label className="app-form-label">Área</label>
-                        <select value={form.area_id} onChange={(event) => updateForm('area_id', event.target.value)} className="app-form-select">
+                        <select
+                          value={form.area_id}
+                          onChange={(event) => updateForm('area_id', event.target.value)}
+                          disabled={isDocenteMode || isRoleScopedGeneralType(form.tipo)}
+                          className="app-form-select disabled:bg-gray-100 disabled:text-gray-400"
+                        >
                           <option value="">
                             {isDocenteMode
                               ? 'Área asignada'
-                              : form.tipo === 'GENERAL'
+                              : isRoleScopedGeneralType(form.tipo)
+                                ? 'No aplica para este tipo'
+                                : form.tipo === 'GENERAL'
                                 ? 'Sin área (global)'
                                 : 'Área requerida'}
                           </option>
@@ -1446,7 +1603,7 @@ export function ChatbotManagementScreen({
                         >
                           <option value="">
                             {form.tipo !== 'MINIPROYECTO'
-                              ? 'No aplica para General'
+                              ? 'No aplica para este tipo'
                               : !form.area_id
                                 ? 'Selección de área requerida'
                                 : miniproyectoOptions.length === 0
@@ -1502,22 +1659,22 @@ export function ChatbotManagementScreen({
                       <div className="app-form-summary-card">
                         <div className="app-form-summary-label">Nombre</div>
                         <div className="app-form-summary-value">{form.nombre_chatbot.trim() || 'Sin nombre definido'}</div>
-                        <div className="app-form-summary-help">{form.tipo === 'GENERAL' ? 'Chatbot transversal' : 'Chatbot de miniproyecto'}</div>
+                        <div className="app-form-summary-help">{isGeneralType(form.tipo) ? (isDocenteMode ? 'Chatbot general del área' : 'Chatbot transversal') : 'Chatbot de miniproyecto'}</div>
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
                         <div className="app-form-summary-card">
                           <div className="app-form-summary-label">Área</div>
-                          <div className="app-form-summary-value">{selectedArea?.nombre || 'Pendiente'}</div>
+                          <div className="app-form-summary-value">{isRoleScopedGeneralType(form.tipo) ? 'No aplica' : selectedArea?.nombre || 'Pendiente'}</div>
                         </div>
                         <div className="app-form-summary-card">
                           <div className="app-form-summary-label">Miniproyecto</div>
-                          <div className="app-form-summary-value">{selectedMiniproyecto ? getMiniproyectoLabel(selectedMiniproyecto) : 'Pendiente'}</div>
+                          <div className="app-form-summary-value">{form.tipo === 'MINIPROYECTO' ? (selectedMiniproyecto ? getMiniproyectoLabel(selectedMiniproyecto) : 'Pendiente') : 'No aplica'}</div>
                         </div>
                       </div>
                       <div className="app-form-note">
                         <div className="app-form-summary-label">Estado del formulario</div>
                         <div className="app-form-summary-value">{selectedChatbotId ? 'Editando configuración existente' : 'Preparando nuevo chatbot'}</div>
-                        <div className="app-form-summary-help">Avance del formulario: {formCompletion}/{form.tipo === 'GENERAL' ? (isDocenteMode ? 6 : 5) : 6} campos clave completos.</div>
+                        <div className="app-form-summary-help">Avance del formulario: {formCompletion}/{isGeneralType(form.tipo) ? (isDocenteMode ? 6 : 5) : 6} campos clave completos.</div>
                       </div>
                     </div>
                   </section>
@@ -1526,6 +1683,7 @@ export function ChatbotManagementScreen({
                     <h4 className="app-form-section-title">Antes de guardar</h4>
                     <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
                       <p>Validación del modelo configurado en el proveedor correspondiente.</p>
+                      {isDocenteMode ? <p>El chatbot general del dashboard estudiantil global sigue siendo exclusivo del administrador.</p> : null}
                       <p>Para chatbots de miniproyecto, área y miniproyecto deben corresponder al contexto configurado.</p>
                       <p>Después del guardado, corresponde cargar la base documental y ejecutar una prueba breve.</p>
                     </div>

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send, Minimize2, MessageCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
+import { buildAuthHeaders } from '../utils/authHeaders';
 
 const CHATBOT_TIMEOUT_MS = 120000;
 
-type ChatbotType = 'GENERAL' | 'MINIPROYECTO';
+type ChatbotType = 'GENERAL' | 'GENERAL_ADMINISTRADOR' | 'GENERAL_DOCENTE' | 'MINIPROYECTO';
 
 interface ChatbotButtonProps {
   chatbotType?: ChatbotType;
@@ -39,6 +40,14 @@ function buildWelcomeMessage(chatbotType: ChatbotType, chatbotName?: string | nu
       return 'No hay un chatbot activo para este miniproyecto en este momento.';
     }
 
+    if (chatbotType === 'GENERAL_ADMINISTRADOR') {
+      return 'No hay un chatbot general de administrador activo en este momento.';
+    }
+
+    if (chatbotType === 'GENERAL_DOCENTE') {
+      return 'No hay un chatbot general de docente activo en este momento.';
+    }
+
     return 'No hay un chatbot general activo para esta vista en este momento.';
   }
 
@@ -48,6 +57,18 @@ function buildWelcomeMessage(chatbotType: ChatbotType, chatbotName?: string | nu
     }
 
     return `Asistente disponible para consultas sobre ${contextLabel || 'este miniproyecto'}.`;
+  }
+
+  if (chatbotType === 'GENERAL_ADMINISTRADOR') {
+    return chatbotName
+      ? `${chatbotName} disponible para consultas del panel administrativo.`
+      : 'Asistente disponible para consultas del panel administrativo.';
+  }
+
+  if (chatbotType === 'GENERAL_DOCENTE') {
+    return chatbotName
+      ? `${chatbotName} disponible para consultas del panel docente.`
+      : 'Asistente disponible para consultas del panel docente.';
   }
 
   if (chatbotName) {
@@ -96,7 +117,9 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
           searchParams.set('miniproyecto_id', String(Number(miniproyectoId)));
         }
 
-        const response = await fetch(`${API_BASE_URL}/chatbots/resolve?${searchParams.toString()}`);
+        const response = await fetch(`${API_BASE_URL}/chatbots/resolve?${searchParams.toString()}`, {
+          headers: buildAuthHeaders(),
+        });
         if (!response.ok) {
           throw new Error(response.status === 404 ? 'not_found' : 'resolve_failed');
         }
@@ -141,7 +164,7 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
 
       const response = await fetch(`${API_BASE_URL}/chatbots/${resolvedChatbot.id}/chat/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
         signal: controller.signal,
         body: JSON.stringify({
           question: userMessage,
@@ -236,7 +259,15 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
               ? resolvedChatbot?.fallback
                 ? 'Usando chatbot general del área'
                 : 'Soporte del miniproyecto'
-              : 'Asistente general'}
+              : chatbotType === 'GENERAL_ADMINISTRADOR'
+                ? resolvedChatbot?.fallback
+                  ? 'Usando chatbot general de respaldo'
+                  : 'Asistente del administrador'
+                : chatbotType === 'GENERAL_DOCENTE'
+                  ? resolvedChatbot?.fallback
+                    ? 'Usando chatbot general de respaldo'
+                    : 'Asistente del docente'
+                  : 'Asistente general'}
           </p>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>

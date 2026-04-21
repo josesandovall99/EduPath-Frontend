@@ -14,6 +14,7 @@ import { ChatbotManagementScreen } from './ChatbotManagementScreen';
 import { DocenteManagementScreen } from './DocenteManagementScreen';
 import { AdminManagementScreen } from './AdminManagementScreen';
 import { AdminFlowGuide } from './ui/AdminFlowGuide';
+import { ChatbotButton } from './ChatbotButton';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -702,6 +703,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           </div>
         </section>
       </main>
+
+      <ChatbotButton chatbotType="GENERAL_ADMINISTRADOR" contextLabel="panel administrativo" />
     </div>
   );
 }
