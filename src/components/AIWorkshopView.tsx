@@ -13,6 +13,7 @@ interface AIWorkshopViewProps {
     actividadId?: number;
     areaId?: number;
     areaNombre?: string;
+    tipoPilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null;
   };
   onBack: () => void;
   estudianteId?: number;
@@ -98,7 +99,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
   const totalTasks = 5;
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
   const normalizedAreaName = normalizeAreaName(workshop.areaNombre || subjectName);
-  const isManagementWorkshop = normalizedAreaName.includes('alcance') || normalizedAreaName.includes('gestion');
+  const isManagementWorkshop = workshop.tipoPilar === 'ATC' || normalizedAreaName.includes('alcance') || normalizedAreaName.includes('gestion');
   const workshopConfig = isManagementWorkshop ? workshopConfigs.management : workshopConfigs.analysis;
 
   const buildScheduleList = (rows: Array<{ activity: string; start: string; end: string }>) =>

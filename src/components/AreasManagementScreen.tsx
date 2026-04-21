@@ -9,8 +9,18 @@ interface Area {
   id: number;
   nombre: string;
   descripcion?: string;
+  es_area_pilar?: boolean;
+  tipo_pilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null;
   estado?: boolean;
 }
+
+type PillarType = 'PROGRAMACION' | 'ANALISIS' | 'ATC';
+
+const PILLAR_OPTIONS: Array<{ value: PillarType; label: string }> = [
+  { value: 'PROGRAMACION', label: 'Programación' },
+  { value: 'ANALISIS', label: 'Análisis' },
+  { value: 'ATC', label: 'ATC' },
+];
 
 interface AreasManagementScreenProps {
   onBack: () => void;
@@ -31,7 +41,9 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
   const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [formData, setFormData] = useState({
     nombre: '',
-    descripcion: ''
+    descripcion: '',
+    esAreaPilar: false,
+    tipoPilar: '' as '' | PillarType,
   });
 
   const isAreaActive = (area: Area) => area.estado !== false;
@@ -43,7 +55,7 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       loadAreas();
-    }, 20000);
+    }, 120000);
 
     return () => {
       window.clearInterval(intervalId);
@@ -118,11 +130,19 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
     return colors[index % colors.length];
   };
 
+  const usedPillarTypes = new Set<PillarType>(
+    areas
+      .filter((area) => area.id !== editingAreaId && isAreaActive(area) && area.es_area_pilar && area.tipo_pilar)
+      .map((area) => area.tipo_pilar as PillarType)
+  );
+
+  const allPillarsTaken = usedPillarTypes.size === PILLAR_OPTIONS.length;
+
   const handleOpenCreate = () => {
     setFormError(null);
     setSuccessMessage(null);
     setEditingAreaId(null);
-    setFormData({ nombre: '', descripcion: '' });
+    setFormData({ nombre: '', descripcion: '', esAreaPilar: false, tipoPilar: '' });
     setShowModal(true);
   };
 
@@ -132,7 +152,9 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
     setEditingAreaId(area.id);
     setFormData({
       nombre: area.nombre,
-      descripcion: area.descripcion || ''
+      descripcion: area.descripcion || '',
+      esAreaPilar: Boolean(area.es_area_pilar),
+      tipoPilar: area.tipo_pilar || ''
     });
     setShowModal(true);
   };
@@ -146,6 +168,11 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
   const handleSaveArea = async () => {
     if (!formData.nombre.trim()) {
       setFormError('El nombre es obligatorio.');
+      return;
+    }
+
+    if (formData.esAreaPilar && !formData.tipoPilar) {
+      setFormError('Debes seleccionar el tipo de área principal.');
       return;
     }
 
@@ -167,7 +194,9 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
         credentials: 'include',
         body: JSON.stringify({
           nombre: formData.nombre.trim(),
-          descripcion: formData.descripcion.trim() || undefined
+          descripcion: formData.descripcion.trim() || undefined,
+          es_area_pilar: formData.esAreaPilar,
+          tipo_pilar: formData.esAreaPilar ? formData.tipoPilar : null,
         })
       });
 
@@ -377,6 +406,11 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                           <span className={`app-badge ${areaIsActive ? 'app-badge--blue' : 'bg-amber-100 text-amber-700'}`}>
                             {areaIsActive ? 'Activa' : 'Inhabilitada'}
                           </span>
+                          {area.es_area_pilar && area.tipo_pilar ? (
+                            <span className="app-badge bg-emerald-100 text-emerald-700">
+                              Principal {PILLAR_OPTIONS.find((option) => option.value === area.tipo_pilar)?.label || area.tipo_pilar}
+                            </span>
+                          ) : null}
                       </div>
                       <span className="app-area-catalog-card__hint">
                         {areaIsActive ? 'Abrir temas' : 'Consultar área'}
@@ -439,7 +473,7 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
               <div>
                 <div className="app-modal-kicker">Áreas</div>
                 <h3 className="app-modal-title">{editingAreaId !== null ? 'Editar área' : 'Crear nueva área'}</h3>
-                <p className="app-modal-description">Define el nombre y la descripción del área.</p>
+                <p className="app-modal-description">Define el nombre, la descripción y si el área pertenece a una de las tres áreas principales.</p>
               </div>
               <button
                 onClick={handleCloseModal}
@@ -480,6 +514,49 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                   rows={3}
                 />
               </div>
+
+              <div className="app-form-field">
+                <label className="app-form-label">Clasificación</label>
+                <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={formData.esAreaPilar}
+                    disabled={!editingAreaId && allPillarsTaken}
+                    onChange={(event) => setFormData((prev) => ({
+                      ...prev,
+                      esAreaPilar: event.target.checked,
+                      tipoPilar: event.target.checked ? prev.tipoPilar : ''
+                    }))}
+                    className="h-4 w-4 rounded border-slate-300 text-[#4A90E2] focus:ring-[#4A90E2]"
+                  />
+                  <span>
+                    Marcar como área principal
+                    {!editingAreaId && allPillarsTaken ? ' (ya existen las tres áreas principales)' : ''}
+                  </span>
+                </label>
+              </div>
+
+              {formData.esAreaPilar ? (
+                <div className="app-form-field">
+                  <label className="app-form-label">Tipo de área principal *</label>
+                  <select
+                    value={formData.tipoPilar}
+                    onChange={(event) => setFormData((prev) => ({ ...prev, tipoPilar: event.target.value as '' | PillarType }))}
+                    className="app-form-select"
+                  >
+                    <option value="">Selecciona el tipo principal</option>
+                    {PILLAR_OPTIONS.map((option) => (
+                      <option
+                        key={option.value}
+                        value={option.value}
+                        disabled={usedPillarTypes.has(option.value) && option.value !== formData.tipoPilar}
+                      >
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
               </section>
             </div>
             </div>

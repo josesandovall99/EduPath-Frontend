@@ -26,6 +26,7 @@ interface Content {
   actividadId?: number;
   areaId?: number;
   areaNombre?: string;
+  tipoPilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null;
   miniproyectoAprobado?: boolean;
   miniproyectoMode?: 'legacy' | 'configurable';
   // Campos opcionales para el sistema de desbloqueo progresivo
@@ -60,7 +61,7 @@ interface MiniproyectoApiItem {
   entregable?: string;
   respuesta_miniproyecto?: string;
   seleccionadoParaEstudiantes?: boolean;
-  Area?: { id: number; nombre: string };
+  Area?: { id: number; nombre: string; tipo_pilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null };
   Actividad?: { id: number; titulo?: string; descripcion?: string; nivel_dificultad?: string };
 }
 
@@ -383,6 +384,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 actividadId: Number(mini.actividad_id),
                 areaId: mini.Area?.id,
                 areaNombre: mini.Area?.nombre,
+                tipoPilar: mini.Area?.tipo_pilar || null,
                 miniproyectoAprobado: aprobado,
                 miniproyectoMode: configurablePayload ? 'configurable' : 'legacy',
                 completo: aprobado

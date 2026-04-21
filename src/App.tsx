@@ -95,6 +95,7 @@ interface Content {
   actividadId?: number;
   areaId?: number;
   areaNombre?: string;
+  tipoPilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null;
   miniproyectoMode?: 'legacy' | 'configurable';
 }
 
@@ -566,7 +567,7 @@ export default function App() {
       }
 
       const normalizedAreaName = normalizeLabel(content.areaNombre || selectedSubject?.name);
-      const isProgrammingMiniproyecto = normalizedAreaName.includes('programacion');
+      const isProgrammingMiniproyecto = content.tipoPilar === 'PROGRAMACION' || normalizedAreaName.includes('programacion');
 
       setCurrentScreen(isProgrammingMiniproyecto ? 'programming-miniproyecto' : 'ai-workshop');
       return;
