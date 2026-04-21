@@ -33,6 +33,20 @@ function updateExerciseAt(exercises: EmbeddedExercise[], index: number, updater:
   return exercises.map((exercise, exerciseIndex) => exerciseIndex === index ? updater(exercise) : exercise);
 }
 
+function buildSingleChoiceExerciseUpdate(exercise: EmbeddedExercise, updates: Record<string, unknown>): Partial<EmbeddedExercise> {
+  const nextConfig = {
+    ...(exercise.configuracion || {}),
+    ...updates,
+  };
+
+  const nextCorrectAnswer = typeof nextConfig.respuestaCorrecta === 'string' ? nextConfig.respuestaCorrecta : '';
+
+  return {
+    configuracion: nextConfig,
+    resultado_ejercicio: nextCorrectAnswer,
+  };
+}
+
 export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, supportPanels }: ConfigurableEmbeddedExerciseEditorProps) {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(exercises[0]?.id || null);
   const [editingTypeExerciseId, setEditingTypeExerciseId] = useState<string | null>(null);
@@ -376,19 +390,33 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                               </div>
                             </div>
                             <div className="app-miniproyecto-visualizer-section__body">
-                              <input value={exercise.configuracion?.enunciado || ''} onChange={(event) => handleUpdateConfig(index, { enunciado: event.target.value })} placeholder="Enunciado" className="app-form-input" />
-                              <div className="grid gap-3 md:grid-cols-2">
+                              <input value={exercise.configuracion?.enunciado || ''} onChange={(event) => handleUpdateExercise(index, buildSingleChoiceExerciseUpdate(exercise, { enunciado: event.target.value }))} placeholder="Enunciado" className="app-form-input" />
+                              <div className="space-y-3">
                                 {options.map((option, optionIndex) => (
-                                  <input
-                                    key={`${exercise.id}-option-${optionIndex}`}
-                                    value={option}
-                                    onChange={(event) => {
-                                      const nextOptions = options.map((item, itemIndex) => itemIndex === optionIndex ? event.target.value : item);
-                                      handleUpdateConfig(index, { opciones: nextOptions });
-                                    }}
-                                    placeholder={`Opción ${optionIndex + 1}`}
-                                    className="app-form-input"
-                                  />
+                                  <label key={`${exercise.id}-option-${optionIndex}`} className="flex items-center gap-3">
+                                    <input
+                                      type="radio"
+                                      name={`single-choice-${exercise.id}`}
+                                      checked={exercise.configuracion?.respuestaCorrecta === option}
+                                      onChange={() => handleUpdateExercise(index, buildSingleChoiceExerciseUpdate(exercise, { respuestaCorrecta: option }))}
+                                      className="h-4 w-4 border-gray-300 text-[#4A90E2] focus:ring-[#4A90E2]"
+                                    />
+                                    <input
+                                      value={option}
+                                      onChange={(event) => {
+                                        const nextOptions = options.map((item, itemIndex) => itemIndex === optionIndex ? event.target.value : item);
+                                        const updates: Record<string, unknown> = { opciones: nextOptions };
+
+                                        if (exercise.configuracion?.respuestaCorrecta === option) {
+                                          updates.respuestaCorrecta = event.target.value;
+                                        }
+
+                                        handleUpdateExercise(index, buildSingleChoiceExerciseUpdate(exercise, updates));
+                                      }}
+                                      placeholder={`Opción ${optionIndex + 1}`}
+                                      className="app-form-input"
+                                    />
+                                  </label>
                                 ))}
                               </div>
                             </div>
@@ -406,17 +434,64 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                             <div className="app-miniproyecto-visualizer-section__body">
                               <input value={exercise.configuracion?.enunciado || ''} onChange={(event) => handleUpdateConfig(index, { enunciado: event.target.value })} placeholder="Enunciado" className="app-form-input" />
                               {orderingItems.map((item, itemIndex) => (
-                                <input
-                                  key={`${exercise.id}-item-${itemIndex}`}
-                                  value={item}
-                                  onChange={(event) => {
-                                    const nextItems = orderingItems.map((currentItem, currentIndex) => currentIndex === itemIndex ? event.target.value : currentItem);
-                                    handleUpdateConfig(index, { items: nextItems });
-                                  }}
-                                  placeholder={`Ítem ${itemIndex + 1}`}
-                                  className="app-form-input"
-                                />
+                                <div key={`${exercise.id}-item-${itemIndex}`} className="flex items-center gap-2">
+                                  <span className="w-6 text-sm text-slate-500">{itemIndex + 1}.</span>
+                                  <input
+                                    value={item}
+                                    onChange={(event) => {
+                                      const nextItems = orderingItems.map((currentItem, currentIndex) => currentIndex === itemIndex ? event.target.value : currentItem);
+                                      handleUpdateConfig(index, { items: nextItems });
+                                    }}
+                                    placeholder={`Ítem ${itemIndex + 1}`}
+                                    className="app-form-input"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="app-btn app-btn-secondary app-btn-sm"
+                                    onClick={() => {
+                                      const nextIndex = itemIndex - 1;
+                                      if (nextIndex < 0) return;
+                                      const nextItems = [...orderingItems];
+                                      const [currentItem] = nextItems.splice(itemIndex, 1);
+                                      nextItems.splice(nextIndex, 0, currentItem);
+                                      handleUpdateConfig(index, { items: nextItems });
+                                    }}
+                                  >
+                                    ↑
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="app-btn app-btn-secondary app-btn-sm"
+                                    onClick={() => {
+                                      const nextIndex = itemIndex + 1;
+                                      if (nextIndex >= orderingItems.length) return;
+                                      const nextItems = [...orderingItems];
+                                      const [currentItem] = nextItems.splice(itemIndex, 1);
+                                      nextItems.splice(nextIndex, 0, currentItem);
+                                      handleUpdateConfig(index, { items: nextItems });
+                                    }}
+                                  >
+                                    ↓
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="app-btn app-btn-danger app-btn-sm"
+                                    onClick={() => {
+                                      const nextItems = orderingItems.filter((_, currentIndex) => currentIndex !== itemIndex);
+                                      handleUpdateConfig(index, { items: nextItems });
+                                    }}
+                                  >
+                                    X
+                                  </button>
+                                </div>
                               ))}
+                              <button
+                                type="button"
+                                className="app-btn app-btn-success app-btn-sm mt-2"
+                                onClick={() => handleUpdateConfig(index, { items: [...orderingItems, `Ítem ${orderingItems.length + 1}`] })}
+                              >
+                                Agregar ítem
+                              </button>
                             </div>
                           </section>
                         ) : null}
@@ -432,7 +507,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                             <div className="app-miniproyecto-visualizer-section__body">
                               <input value={exercise.configuracion?.enunciado || ''} onChange={(event) => handleUpdateConfig(index, { enunciado: event.target.value })} placeholder="Enunciado" className="app-form-input" />
                               {matchingPairs.map((pair, pairIndex) => (
-                                <div key={`${exercise.id}-pair-${pairIndex}`} className="app-miniproyecto-visualizer-mini-card grid gap-3 md:grid-cols-2">
+                                <div key={`${exercise.id}-pair-${pairIndex}`} className="app-miniproyecto-visualizer-mini-card grid items-center gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                                   <input
                                     value={pair.concepto}
                                     onChange={(event) => {
@@ -451,8 +526,22 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                                     placeholder="Definición"
                                     className="app-form-input"
                                   />
+                                  <button
+                                    type="button"
+                                    className="app-btn app-btn-danger app-btn-sm"
+                                    onClick={() => handleUpdateConfig(index, { pares: matchingPairs.filter((_, currentIndex) => currentIndex !== pairIndex) })}
+                                  >
+                                    X
+                                  </button>
                                 </div>
                               ))}
+                              <button
+                                type="button"
+                                className="app-btn app-btn-success app-btn-sm mt-2"
+                                onClick={() => handleUpdateConfig(index, { pares: [...matchingPairs, { concepto: '', definicion: '' }] })}
+                              >
+                                Agregar par
+                              </button>
                             </div>
                           </section>
                         ) : null}

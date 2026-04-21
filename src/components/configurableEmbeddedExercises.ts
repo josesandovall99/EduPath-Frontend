@@ -194,7 +194,7 @@ export function createEmptyEmbeddedExercise(type: ConfigurableExerciseType = 'Op
     descripcion: '',
     tipo_ejercicio: 'Opción única',
     puntos: 100,
-    resultado_ejercicio: '',
+    resultado_ejercicio: 'Opción 1',
     configuracion: {
       enunciado: '',
       opciones: ['Opción 1', 'Opción 2', 'Opción 3', 'Opción 4'],
@@ -210,6 +210,15 @@ function normalizeEmbeddedExercise(rawExercise: any, index: number): EmbeddedExe
       : 'Opción única'
   );
 
+  const mergedConfig = {
+    ...fallback.configuracion,
+    ...(rawExercise?.configuracion || {}),
+  };
+
+  const normalizedResult = rawExercise?.tipo_ejercicio === 'Opción única'
+    ? (rawExercise?.resultado_ejercicio ?? mergedConfig.respuestaCorrecta ?? fallback.resultado_ejercicio)
+    : (rawExercise?.resultado_ejercicio ?? fallback.resultado_ejercicio);
+
   return {
     ...fallback,
     ...rawExercise,
@@ -217,12 +226,9 @@ function normalizeEmbeddedExercise(rawExercise: any, index: number): EmbeddedExe
     titulo: typeof rawExercise?.titulo === 'string' && rawExercise.titulo.trim() ? rawExercise.titulo : `Ejercicio ${index + 1}`,
     descripcion: typeof rawExercise?.descripcion === 'string' ? rawExercise.descripcion : '',
     puntos: Number.isFinite(Number(rawExercise?.puntos)) ? Number(rawExercise.puntos) : fallback.puntos,
-    configuracion: {
-      ...fallback.configuracion,
-      ...(rawExercise?.configuracion || {}),
-    },
+    configuracion: mergedConfig,
     codigoEstructura: rawExercise?.codigoEstructura ?? fallback.codigoEstructura,
-    resultado_ejercicio: rawExercise?.resultado_ejercicio ?? fallback.resultado_ejercicio,
+    resultado_ejercicio: normalizedResult,
   };
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Circle, ClipboardList, MoreVertical, Settings, Target, TrendingUp } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 import { MiniproyectoChatbotPanel } from './MiniproyectoChatbotPanel';
@@ -194,13 +194,22 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
   const miniproyectoEntregable = (miniproyecto?.entregable || '').trim();
   const miniproyectoNivel = (miniproyecto?.Actividad?.nivel_dificultad || '').trim();
 
-  const updateExerciseResponse = (exerciseId: string, response: any) => {
+  const updateExerciseResponse = useCallback((exerciseId: string, response: any) => {
     setExerciseResponses((prev) => {
       const currentResponse = prev[exerciseId];
       if (serializeConfigurableResponse(currentResponse) === serializeConfigurableResponse(response)) return prev;
       return { ...prev, [exerciseId]: response };
     });
-  };
+  }, []);
+
+  const configurableResponseHandlers = useMemo(() => {
+    return Object.fromEntries(
+      exercises.map((exercise) => [
+        String(exercise.id),
+        (response: any) => updateExerciseResponse(String(exercise.id), response),
+      ])
+    ) as Record<string, (response: any) => void>;
+  }, [exercises, updateExerciseResponse]);
 
   const handleEvaluateMiniproyecto = async () => {
     const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
@@ -240,17 +249,17 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
 
     let exerciseContent: React.ReactNode;
     if (normalizedType === 'Compilador') {
-      exerciseContent = <ProgrammingContentView content={contentProps} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={(response: any) => updateExerciseResponse(String(selectedExercise.id), response)} exerciseData={{ id: Number(selectedExercise.id), contenido_id: 0, puntos: selectedExercise.puntos || 100, resultado_ejercicio: selectedExercise.resultado_ejercicio || '', codigoEstructura: selectedExercise.codigoEstructura || undefined, tipo_ejercicio: selectedExercise.tipo_ejercicio, configuracion: selectedExercise.configuracion, actividad: { titulo: selectedExercise.titulo, descripcion: selectedExercise.descripcion } }} executePath={resolvePath} submitPath={submitPath} />;
+      exerciseContent = <ProgrammingContentView content={contentProps} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} exerciseData={{ id: Number(selectedExercise.id), contenido_id: 0, puntos: selectedExercise.puntos || 100, resultado_ejercicio: selectedExercise.resultado_ejercicio || '', codigoEstructura: selectedExercise.codigoEstructura || undefined, tipo_ejercicio: selectedExercise.tipo_ejercicio, configuracion: selectedExercise.configuracion, actividad: { titulo: selectedExercise.titulo, descripcion: selectedExercise.descripcion } }} executePath={resolvePath} submitPath={submitPath} />;
     } else if (normalizedType === 'Opción única') {
-      exerciseContent = <MultipleChoiceExercise activity={{ id: String(selectedExercise.id), title: exerciseTitle }} enunciado={selectedExercise.configuracion?.enunciado} opciones={selectedExercise.configuracion?.opciones} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={(response: any) => updateExerciseResponse(String(selectedExercise.id), response)} resolvePath={resolvePath} submitPath={submitPath} />;
+      exerciseContent = <MultipleChoiceExercise activity={{ id: String(selectedExercise.id), title: exerciseTitle }} enunciado={selectedExercise.configuracion?.enunciado} opciones={selectedExercise.configuracion?.opciones} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} resolvePath={resolvePath} submitPath={submitPath} />;
     } else if (normalizedType === 'Ordenar') {
-      exerciseContent = <OrderingExercise activity={{ id: String(selectedExercise.id), title: exerciseTitle }} enunciado={selectedExercise.configuracion?.enunciado} items={selectedExercise.configuracion?.items} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={(response: any) => updateExerciseResponse(String(selectedExercise.id), response)} resolvePath={resolvePath} submitPath={submitPath} />;
+      exerciseContent = <OrderingExercise activity={{ id: String(selectedExercise.id), title: exerciseTitle }} enunciado={selectedExercise.configuracion?.enunciado} items={selectedExercise.configuracion?.items} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} resolvePath={resolvePath} submitPath={submitPath} />;
     } else if (normalizedType === 'Relacionar') {
-      exerciseContent = <MatchingExercise activity={{ id: String(selectedExercise.id), title: exerciseTitle }} enunciado={selectedExercise.configuracion?.enunciado} pares={selectedExercise.configuracion?.pares} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={(response: any) => updateExerciseResponse(String(selectedExercise.id), response)} resolvePath={resolvePath} submitPath={submitPath} />;
+      exerciseContent = <MatchingExercise activity={{ id: String(selectedExercise.id), title: exerciseTitle }} enunciado={selectedExercise.configuracion?.enunciado} pares={selectedExercise.configuracion?.pares} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} resolvePath={resolvePath} submitPath={submitPath} />;
     } else if (normalizedType === 'Diagramas UML') {
-      exerciseContent = <UMLDiagramView activity={{ id: String(selectedExercise.id), title: exerciseTitle }} onBack={() => undefined} configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={(response: any) => updateExerciseResponse(String(selectedExercise.id), response)} resolvePath={resolvePath} submitPath={submitPath} feedbackPath={feedbackPath} />;
+      exerciseContent = <UMLDiagramView activity={{ id: String(selectedExercise.id), title: exerciseTitle }} onBack={() => undefined} configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} resolvePath={resolvePath} submitPath={submitPath} feedbackPath={feedbackPath} />;
     } else if (normalizedType === 'Preguntas') {
-      exerciseContent = <QuestionnaireExercise activity={{ id: String(selectedExercise.id), title: exerciseTitle }} preguntas={Array.isArray(selectedExercise.configuracion?.preguntas) ? selectedExercise.configuracion?.preguntas : []} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={(response: any) => updateExerciseResponse(String(selectedExercise.id), response)} resolvePath={resolvePath} submitPath={submitPath} />;
+      exerciseContent = <QuestionnaireExercise activity={{ id: String(selectedExercise.id), title: exerciseTitle }} preguntas={Array.isArray(selectedExercise.configuracion?.preguntas) ? selectedExercise.configuracion?.preguntas : []} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} resolvePath={resolvePath} submitPath={submitPath} />;
     } else {
       exerciseContent = <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-sm text-amber-800">El tipo de ejercicio {normalizedType} todavía no está habilitado dentro del miniproyecto configurable.</div>;
     }

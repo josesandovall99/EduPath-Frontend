@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Trash2, XCircle } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { toast } from 'sonner';
@@ -210,6 +210,14 @@ function formatJavaLikeCode(input: string) {
     .join('\n');
 }
 
+function serializeConfigurablePayload(value: unknown) {
+  try {
+    return JSON.stringify(value ?? null);
+  } catch {
+    return String(value);
+  }
+}
+
 export function ProgrammingContentView({ content, onBack, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, exerciseId, exerciseData = null, executePath, submitPath }: ProgrammingContentViewProps) {
   const subjectColor = '#4A90E2';
   const wrapperClassName = embedded ? 'w-full min-w-0 lg:h-full' : 'overflow-hidden rounded-[2rem] bg-[#F2F2F2]';
@@ -227,7 +235,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
     'El botón Ejecutar permite pruebas previas y Enviar registra la calificación de la solución.'
   ];
 
-  const [code, setCode] = useState(DEFAULT_TEMPLATE);
+  const [code, setCode] = useState(configurableMode ? '' : DEFAULT_TEMPLATE);
   const [ejercicio, setEjercicio] = useState<Ejercicio | null>(null);
   const [isLoadingExercise, setIsLoadingExercise] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -237,6 +245,9 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   const [puntos, setPuntos] = useState<number | null>(null);
   const [casosPruebaResultados, setCasosPruebaResultados] = useState<CasoPruebaResultado[]>([]);
   const [resultMode, setResultMode] = useState<ResultMode>('idle');
+  const configurableChangeRef = useRef(onConfigurableResponseChange);
+  const lastEmittedResponseRef = useRef<string>('');
+  const [isConfigurableReady, setIsConfigurableReady] = useState(!configurableMode);
 
   const methodPreview = buildMethodPreview(ejercicio?.configuracion?.metodo);
   const configuredCases = Array.isArray(ejercicio?.configuracion?.casos_prueba)
@@ -247,12 +258,29 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   const visibleEditorLineCount = Math.max(EDITOR_BASE_VISIBLE_LINES, editorLines.length);
 
   useEffect(() => {
+    configurableChangeRef.current = onConfigurableResponseChange;
+  }, [onConfigurableResponseChange]);
+
+  useEffect(() => {
+    lastEmittedResponseRef.current = serializeConfigurablePayload(configurableResponse);
+  }, [configurableResponse]);
+
+  useEffect(() => {
     if (exerciseData) {
+      const template = getInitialTemplate(exerciseData);
+      const embeddedCode = (configurableResponse?.codigo || '').toString();
+
       setEjercicio(exerciseData);
-      setCode(getInitialTemplate(exerciseData));
+      setCode((currentCode) => {
+        const nextCode = embeddedCode || template;
+        return currentCode === nextCode ? currentCode : nextCode;
+      });
       setIsLoadingExercise(false);
+      setIsConfigurableReady(true);
       return;
     }
+
+    setIsConfigurableReady(!configurableMode);
 
     const cargarEjercicio = async () => {
       setIsLoadingExercise(true);
@@ -274,11 +302,12 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
         console.error('Error al cargar ejercicio:', error);
       } finally {
         setIsLoadingExercise(false);
+        setIsConfigurableReady(true);
       }
     };
 
     cargarEjercicio();
-  }, [content.id, exerciseData, exerciseId]);
+  }, [content.id, configurableMode, exerciseId, exerciseData?.id, exerciseData?.codigoEstructura, exerciseData?.configuracion?.metodo?.plantilla, configurableResponse?.codigo]);
 
   useEffect(() => {
     const nextCode = (configurableResponse?.codigo || '').toString();
@@ -287,9 +316,13 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   }, [configurableMode, configurableResponse?.codigo]);
 
   useEffect(() => {
-    if (!configurableMode || !onConfigurableResponseChange) return;
-    onConfigurableResponseChange({ codigo: code, respuesta: { texto: code }, lenguaje_id: 62 });
-  }, [code, configurableMode, onConfigurableResponseChange]);
+    if (!configurableMode || !isConfigurableReady || !configurableChangeRef.current) return;
+    const nextResponse = { codigo: code, respuesta: { texto: code }, lenguaje_id: 62 };
+    const nextSerializedResponse = serializeConfigurablePayload(nextResponse);
+    if (lastEmittedResponseRef.current === nextSerializedResponse) return;
+    lastEmittedResponseRef.current = nextSerializedResponse;
+    configurableChangeRef.current(nextResponse);
+  }, [code, configurableMode, isConfigurableReady]);
 
   const clearResults = () => {
     setFeedback('');
