@@ -335,6 +335,24 @@ export function MiniproyectoManagementScreen({
     }
   };
 
+  const loadChatbots = async () => {
+    try {
+      const chatbotsResponse = await apiFetch('/chatbots');
+      if (!chatbotsResponse.ok) {
+        throw new Error('No se pudieron cargar los chatbots disponibles');
+      }
+      const chatbotsData = await chatbotsResponse.json();
+      setChatbots(Array.isArray(chatbotsData) ? chatbotsData : []);
+    } catch (err) {
+      console.error('Error cargando chatbots:', err);
+    }
+  };
+
+  const handleChatbotCreated = (chatbot: { id: number; nombre: string }) => {
+    // Recargar la lista de chatbots para incluir el recién creado
+    loadChatbots();
+  };
+
   const loadMiniproyectos = async () => {
     setIsLoading(true);
     setError(null);
@@ -1912,6 +1930,8 @@ export function MiniproyectoManagementScreen({
           onClose={closeCreateModal}
           onSubmit={handleCreateConfigurableMiniproyecto}
           onUpdate={setCreateForm}
+          onChatbotCreated={handleChatbotCreated}
+          apiFetch={apiFetch}
         />
       ) : null}
 

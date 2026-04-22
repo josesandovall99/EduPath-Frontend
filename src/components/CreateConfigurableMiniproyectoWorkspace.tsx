@@ -1,6 +1,8 @@
-import { X } from 'lucide-react';
+import { useState } from 'react';
+import { X, Plus } from 'lucide-react';
 import { ConfigurableEmbeddedExerciseEditor } from './ConfigurableEmbeddedExerciseEditor';
 import { EmbeddedExercise } from './configurableEmbeddedExercises';
+import { InlineChatbotCreator } from './InlineChatbotCreator';
 
 export interface CreateConfigurableFormData {
   titulo: string;
@@ -33,6 +35,8 @@ interface CreateConfigurableMiniproyectoWorkspaceProps {
   onClose: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onUpdate: (updater: (prev: CreateConfigurableFormData) => CreateConfigurableFormData) => void;
+  onChatbotCreated: (chatbot: { id: number; nombre: string }) => void;
+  apiFetch: (path: string, init?: RequestInit, areaIdOverride?: number | null) => Promise<Response>;
 }
 
 export function CreateConfigurableMiniproyectoWorkspace({
@@ -44,11 +48,25 @@ export function CreateConfigurableMiniproyectoWorkspace({
   onClose,
   onSubmit,
   onUpdate,
+  onChatbotCreated,
+  apiFetch,
 }: CreateConfigurableMiniproyectoWorkspaceProps) {
+  const [showChatbotCreator, setShowChatbotCreator] = useState(false);
+  
   const exerciseCount = formData.exercises.length;
   const selectedAreaName = availableAreas.find((area) => String(area.id) === formData.areaId)?.nombre || 'Sin área seleccionada';
   const selectedChatbotName = eligibleChatbots.find((chatbot) => String(chatbot.id) === formData.chatbotId)?.nombre || 'Sin chatbot asignado';
   const isReadyToCreate = Boolean(formData.titulo.trim() && formData.areaId && exerciseCount > 0 && (!formData.useChatbot || formData.chatbotId));
+  const selectedAreaId = Number(formData.areaId);
+  const canCreateChatbot = formData.useChatbot && Number.isInteger(selectedAreaId) && selectedAreaId > 0;
+
+  const handleChatbotCreated = (chatbot: { id: number; nombre: string }) => {
+    // Actualizar el formulario para seleccionar el chatbot recién creado
+    onUpdate((prev) => ({ ...prev, chatbotId: String(chatbot.id) }));
+    // Notificar al padre para refrescar la lista de chatbots
+    onChatbotCreated(chatbot);
+    setShowChatbotCreator(false);
+  };
 
   return (
     <div className="app-modal-overlay app-modal-overlay--top z-50">
@@ -147,14 +165,32 @@ export function CreateConfigurableMiniproyectoWorkspace({
                     </label>
 
                     {formData.useChatbot ? (
-                      <div className="app-form-field">
-                        <label className="app-form-label">Chatbot disponible</label>
-                        <select value={formData.chatbotId} onChange={(event) => onUpdate((prev) => ({ ...prev, chatbotId: event.target.value }))} className="app-form-select">
-                          <option value="">Selecciona un chatbot</option>
-                          {eligibleChatbots.map((chatbot) => (
-                            <option key={chatbot.id} value={String(chatbot.id)}>{chatbot.nombre}</option>
-                          ))}
-                        </select>
+                      <div className="space-y-3">
+                        <div className="app-form-field">
+                          <label className="app-form-label">Chatbot disponible</label>
+                          <select value={formData.chatbotId} onChange={(event) => onUpdate((prev) => ({ ...prev, chatbotId: event.target.value }))} className="app-form-select">
+                            <option value="">Selecciona un chatbot</option>
+                            {eligibleChatbots.map((chatbot) => (
+                              <option key={chatbot.id} value={String(chatbot.id)}>{chatbot.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => setShowChatbotCreator(true)}
+                          disabled={!canCreateChatbot}
+                          className="flex items-center gap-2 text-sm font-medium text-[#4A90E2] hover:text-[#357ABD] disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Crear nuevo chatbot para esta área</span>
+                        </button>
+
+                        {!canCreateChatbot && formData.useChatbot && (
+                          <p className="text-xs text-slate-500">
+                            Selecciona un área primero para poder crear un chatbot.
+                          </p>
+                        )}
                       </div>
                     ) : null}
                   </div>
@@ -216,6 +252,15 @@ export function CreateConfigurableMiniproyectoWorkspace({
           </div>
         </form>
       </div>
+
+      {showChatbotCreator && canCreateChatbot && (
+        <InlineChatbotCreator
+          areaId={selectedAreaId}
+          onClose={() => setShowChatbotCreator(false)}
+          onChatbotCreated={handleChatbotCreated}
+          apiFetch={apiFetch}
+        />
+      )}
     </div>
   );
 }

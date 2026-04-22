@@ -36,6 +36,7 @@ interface StudentProgress {
   email: string;
   createdDate: string;
   semester?: string | number;
+  codigo?: string;
   subjects: {
     areaId?: string;
     name: string;
@@ -273,6 +274,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   const [showFilters, setShowFilters] = useState(true);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
+  const [failuresSortBy, setFailuresSortBy] = useState<'fallos' | 'intentos' | 'aciertos' | 'tasa'>('fallos');
+  const [selectedActivity, setSelectedActivity] = useState<{ tipo: string; actividad_id: number; titulo: string } | null>(null);
   const [filters, setFilters] = useState<Filters>({
     contentType: 'all',
     area: 'all',
@@ -585,6 +588,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             email: st.persona?.email || st.email || st.correo || '',
             createdDate: st.createdAt ? st.createdAt.split('T')[0] : (st.createdDate || ''),
             semester: st.semestre ?? st.semester ?? st.persona?.semestre ?? st.semestreActual ?? '',
+            codigo: st.codigoEstudiantil ?? st.codigo ?? '',
             subjects
           } as StudentProgress;
         }));
@@ -667,8 +671,20 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     }
   }, [isDocenteMode, activeTab]);
 
+  const handleStudentSelect = (studentId: string) => {
+    const selected = studentsData.find(s => s.id === studentId);
+    const updates: Partial<Filters> = { student: studentId };
+    if (selected) {
+      if (selected.semester) updates.semester = String(selected.semester);
+      if (selected.codigo) setStudentSearch(selected.codigo);
+    }
+    setFilters(prev => ({ ...prev, ...updates }));
+  };
+
   const clearFilters = () => {
     setStudentSearch('');
+    setFailuresSortBy('fallos');
+    setSelectedActivity(null);
     setFilters({
       contentType: 'all',
       area: 'all',
@@ -928,7 +944,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     return a.localeCompare(b);
   });
   const baseFilteredStudents = hasAppliedFilters ? studentsData.filter(student => {
-    if (normalizedSearch && !student.name.toLowerCase().includes(normalizedSearch)) return false;
+    if (normalizedSearch && !student.name.toLowerCase().includes(normalizedSearch) && !(student.codigo ?? '').toLowerCase().includes(normalizedSearch)) return false;
     if (appliedFilters.student !== 'all' && student.id !== appliedFilters.student) return false;
     if (appliedFilters.semester !== 'all' && String(student.semester ?? '') !== appliedFilters.semester) return false;
     return true;
@@ -1036,6 +1052,14 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     : failuresItems;
 
   const failuresItemsSorted = [...failuresItemsForTable].sort((a, b) => {
+    if (failuresSortBy === 'intentos') return b.intentos - a.intentos;
+    if (failuresSortBy === 'aciertos') return b.aciertos - a.aciertos;
+    if (failuresSortBy === 'tasa') {
+      const tasaA = a.intentos > 0 ? a.fallos / a.intentos : 0;
+      const tasaB = b.intentos > 0 ? b.fallos / b.intentos : 0;
+      return tasaB - tasaA;
+    }
+    // default: 'fallos'
     if (b.fallos !== a.fallos) return b.fallos - a.fallos;
     return b.intentos - a.intentos;
   });
@@ -1279,12 +1303,12 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             
             <div className="grid grid-cols-3 gap-4 mb-4">
               <div className="app-form-field">
-                <label className="app-form-label">Buscar estudiante</label>
+                <label className="app-form-label">Buscar por código</label>
                 <input
                   type="text"
                   value={studentSearch}
                   onChange={(e) => setStudentSearch(e.target.value)}
-                  placeholder="Escribe un nombre..."
+                  placeholder="Ej: 123456..."
                   className="app-form-input"
                 />
               </div>
@@ -1293,12 +1317,12 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                 <label className="app-form-label">Estudiante</label>
                 <select 
                   value={filters.student}
-                  onChange={(e) => setFilters({...filters, student: e.target.value})}
+                  onChange={(e) => handleStudentSelect(e.target.value)}
                   className="app-form-select"
                 >
                   <option value="all">Todos los estudiantes</option>
                   {studentsData.map(student => (
-                    <option key={student.id} value={student.id}>{student.name}</option>
+                    <option key={student.id} value={student.id}>{student.name}{student.codigo ? ` — ${student.codigo}` : ''}</option>
                   ))}
                 </select>
               </div>
@@ -1389,8 +1413,18 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             {activeTab === 'failures' && (
               <div className="grid grid-cols-1 gap-4 mb-4">
-                <div className="app-alert app-alert--warning">
-                  Este informe usa el filtro de estudiante. Si seleccionas "Todos", se mostrara el top 20 de actividades con mas fallos. Si necesitas ver los intentos, aciertos o fallos de ejercicios y miniproyectos de un estudiante en especifico, seleccionalo en el filtro "Estudiante" y aplica los filtros.
+                <div className="app-form-field">
+                  <label className="app-form-label">Ordenar detalle por</label>
+                  <select
+                    value={failuresSortBy}
+                    onChange={(e) => setFailuresSortBy(e.target.value as 'fallos' | 'intentos' | 'aciertos' | 'tasa')}
+                    className="app-form-select"
+                  >
+                    <option value="fallos">Más fallos</option>
+                    <option value="intentos">Más intentos</option>
+                    <option value="aciertos">Más aciertos</option>
+                    <option value="tasa">Mayor tasa de fallo</option>
+                  </select>
                 </div>
               </div>
             )}
@@ -2230,29 +2264,53 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                       <div className="bg-white rounded-xl shadow-md p-6">
                         <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
                           <BarChart3 className="w-5 h-5 text-[#DC2626]" />
-                          Estudiantes con Más Fallos
+                          {isAllStudentsFailuresView ? 'Estudiantes con Más Fallos' : 'Fallos por Tipo'}
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={docenteFailuresStudentChartData} layout="vertical" margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                            <XAxis type="number" tick={{ fontSize: 12 }} />
-                            <YAxis dataKey="shortName" type="category" width={120} tick={{ fontSize: 11 }} />
-                            <Tooltip
-                              formatter={(value: number, dataKey: string) => {
-                                if (dataKey === 'fallos') return [value, 'Fallos'];
-                                if (dataKey === 'intentos') return [value, 'Intentos'];
-                                return [value, dataKey];
-                              }}
-                              labelFormatter={(_, payload) => {
-                                if (Array.isArray(payload) && payload.length > 0) {
-                                  return payload[0]?.payload?.name || 'Estudiante';
-                                }
-                                return 'Estudiante';
-                              }}
-                            />
-                            <Bar dataKey="fallos" fill="#F97316" radius={[0, 8, 8, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        {isAllStudentsFailuresView ? (
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={docenteFailuresStudentChartData} layout="vertical" margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                              <XAxis type="number" tick={{ fontSize: 12 }} />
+                              <YAxis dataKey="shortName" type="category" width={120} tick={{ fontSize: 11 }} />
+                              <Tooltip
+                                formatter={(value: number, dataKey: string) => {
+                                  if (dataKey === 'fallos') return [value, 'Fallos'];
+                                  if (dataKey === 'intentos') return [value, 'Intentos'];
+                                  return [value, dataKey];
+                                }}
+                                labelFormatter={(_, payload) => {
+                                  if (Array.isArray(payload) && payload.length > 0) {
+                                    return payload[0]?.payload?.name || 'Estudiante';
+                                  }
+                                  return 'Estudiante';
+                                }}
+                              />
+                              <Bar dataKey="fallos" fill="#F97316" radius={[0, 8, 8, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={[
+                                  { name: 'Ejercicios', value: failuresByType.ejercicios.fallos },
+                                  { name: 'Miniproyectos', value: failuresByType.miniproyectos.fallos }
+                                ]}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={110}
+                                label={(entry) => `${entry.value}`}
+                              >
+                                <Cell fill="#DC2626" />
+                                <Cell fill="#F87171" />
+                              </Pie>
+                              <Tooltip />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        )}
                       </div>
 
                       <div className="bg-white rounded-xl shadow-md p-6">
@@ -2400,13 +2458,12 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                   </div>
                 </div>
 
+                {isAllStudentsFailuresView && (
                 <div className="app-table-card">
                   <div className="app-table-card__header app-table-card__header--red">
                     <div>
                     <h3 className="app-table-card__title">Fallos por estudiante</h3>
-                    <p className="app-table-card__description">
-                      {appliedFilters.student === 'all' ? 'Top 20 estudiantes con mas fallos' : 'Resumen del estudiante'}
-                    </p>
+                    <p className="app-table-card__description">Top 20 estudiantes con mas fallos</p>
                     </div>
                   </div>
                   <div className="app-table-card__body overflow-x-auto">
@@ -2443,13 +2500,14 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                     </table>
                   </div>
                 </div>
+                )}
 
                 <div className="app-table-card">
                   <div className="app-table-card__header app-table-card__header--red">
                     <div>
                     <h3 className="app-table-card__title">Detalle de fallos por actividad</h3>
                     <p className="app-table-card__description">
-                      {appliedFilters.student === 'all' ? 'Top 20 de actividades con mas fallos' : 'Actividades del estudiante'}
+                      {appliedFilters.student === 'all' ? 'Top 20 de actividades con mas fallos. Haz clic en una fila para ver los estudiantes.' : 'Actividades del estudiante'}
                     </p>
                     </div>
                   </div>
@@ -2476,10 +2534,26 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                             <td className="px-4 py-3 text-sm text-gray-500" colSpan={(!isDocenteMode || isAllStudentsFailuresView) ? 7 : 6}>Sin datos</td>
                           </tr>
                         )}
-                        {failuresItemsDisplay.map((item) => (
-                          <tr key={`${item.tipo}-${item.actividad_id}-${item.estudiante_id}`} className="hover:bg-gray-50 transition-colors">
+                        {failuresItemsDisplay.map((item) => {
+                          const isSelected = isAllStudentsFailuresView &&
+                            selectedActivity?.tipo === item.tipo &&
+                            selectedActivity?.actividad_id === item.actividad_id;
+                          return (
+                          <tr
+                            key={`${item.tipo}-${item.actividad_id}-${item.estudiante_id}`}
+                            className={`transition-colors ${isAllStudentsFailuresView ? 'cursor-pointer' : ''} ${isSelected ? 'bg-red-50' : 'hover:bg-gray-50'}`}
+                            onClick={() => {
+                              if (!isAllStudentsFailuresView) return;
+                              setSelectedActivity(isSelected ? null : { tipo: item.tipo, actividad_id: item.actividad_id, titulo: item.titulo });
+                            }}
+                          >
                             <td className="px-4 py-3 text-[#3A4A5B] text-sm">{item.tipo}</td>
-                            <td className="px-4 py-3 text-gray-600 text-sm">{item.titulo}</td>
+                            <td className="px-4 py-3 text-gray-600 text-sm">
+                              <div className="flex items-center gap-2">
+                                {item.titulo}
+                                {isSelected && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">Seleccionada</span>}
+                              </div>
+                            </td>
                             {(!isDocenteMode || isAllStudentsFailuresView) && (
                               <td className="px-4 py-3 text-gray-600 text-sm">
                                 {isDocenteMode ? (item.estudiantesAfectados || 0) : (item.area_name || 'Sin area')}
@@ -2504,11 +2578,81 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                               )}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 </div>
+
+                {isAllStudentsFailuresView && selectedActivity && (() => {
+                  const studentMap = new Map(failuresByStudent.map(s => [String(s.estudiante_id), s]));
+                  const activityStudents = failuresItems
+                    .filter(i => i.tipo === selectedActivity.tipo && i.actividad_id === selectedActivity.actividad_id)
+                    .sort((a, b) => b.fallos - a.fallos);
+                  return (
+                    <div className="app-table-card border-2 border-red-200">
+                      <div className="app-table-card__header app-table-card__header--red">
+                        <div>
+                          <h3 className="app-table-card__title">Estudiantes en: {selectedActivity.titulo}</h3>
+                          <p className="app-table-card__description">{activityStudents.length} estudiante(s) con intentos registrados</p>
+                        </div>
+                        <button
+                          className="app-btn app-btn-secondary app-btn-sm"
+                          onClick={() => setSelectedActivity(null)}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="app-table-card__body overflow-x-auto">
+                        <table className="app-data-table text-[#111827]">
+                          <thead>
+                            <tr>
+                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
+                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Correo</th>
+                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Intentos</th>
+                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aciertos</th>
+                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Fallos</th>
+                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aprobado</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {activityStudents.length === 0 && (
+                              <tr>
+                                <td className="px-4 py-3 text-sm text-gray-500" colSpan={6}>Sin datos</td>
+                              </tr>
+                            )}
+                            {activityStudents.map((item) => {
+                              const meta = studentMap.get(String(item.estudiante_id));
+                              return (
+                                <tr key={item.estudiante_id} className="hover:bg-gray-50 transition-colors">
+                                  <td className="px-4 py-3 text-[#3A4A5B] text-sm">{meta?.nombre || `Estudiante ${item.estudiante_id}`}</td>
+                                  <td className="px-4 py-3 text-gray-600 text-sm">{meta?.email || '-'}</td>
+                                  <td className="px-4 py-3 text-gray-600 text-sm">{item.intentos}</td>
+                                  <td className="px-4 py-3 text-gray-600 text-sm">{item.aciertos}</td>
+                                  <td className="px-4 py-3 text-gray-600 text-sm">{item.fallos}</td>
+                                  <td className="px-4 py-3">
+                                    {item.aprobado ? (
+                                      <span className="inline-flex items-center gap-1 text-[#7ED6A7] text-sm">
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        Sí
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[#F97316] text-sm">
+                                        <XCircle className="w-4 h-4" />
+                                        No
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
               </>
             )}
           </div>
