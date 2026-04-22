@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, BarChart3, BookOpen, Bot, ClipboardList, GitBranch, LogOut, MapPinned } from 'lucide-react';
+import { ArrowRight, BarChart3, BookOpen, Bot, ClipboardList, FileEdit, GitBranch, LogOut } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
@@ -177,13 +177,13 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
   const actions: DashboardAction[] = [
     {
       id: 'area',
-      title: 'Mis áreas',
-      description: 'Accede a tus áreas asignadas y gestiona su estructura académica completa.',
+      title: 'Gestión de Área',
+      description: 'Administra el área asignada y sus contenidos disponibles.',
       icon: MapPinned,
       color: '#4A90E2',
       gradient: 'from-[#4A90E2] to-[#5B9FED]',
       group: 'workflow',
-      badge: 'Ruta docente',
+      badge: 'Ruta base',
       tone: 'blue',
       onClick: onManageArea
     },
@@ -195,7 +195,7 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
       color: '#0EA5E9',
       gradient: 'from-[#0EA5E9] to-[#38BDF8]',
       group: 'workflow',
-      badge: 'Práctica',
+      badge: 'Complemento',
       tone: 'blue',
       onClick: () => setCurrentScreen('ejercicios')
     },
@@ -207,26 +207,26 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
       color: '#0EA5E9',
       gradient: 'from-[#0EA5E9] to-[#38BDF8]',
       group: 'workflow',
-      badge: 'Proyecto',
+      badge: 'Complemento',
       tone: 'green',
       onClick: () => setCurrentScreen('miniproyectos')
     },
     {
       id: 'chatbot',
-      title: 'Gestión de Chatbots',
-      description: 'Administración de chatbots asociados al área y a los miniproyectos disponibles.',
+      title: 'Gestión del Chatbot',
+      description: 'Administración del asistente educativo vinculado al área y a los miniproyectos disponibles.',
       icon: Bot,
-      color: '#14B8A6',
-      gradient: 'from-[#14B8A6] to-[#2DD4BF]',
+      color: '#6366F1',
+      gradient: 'from-[#6366F1] to-[#818CF8]',
       group: 'support',
-      badge: 'Asistente',
+      badge: 'Soporte',
       tone: 'slate',
       onClick: () => setCurrentScreen('chatbot')
     },
     {
       id: 'reports',
-      title: 'Informes de Materia',
-      description: 'Consulta de progreso por estudiante y reporte de fallos del área asignada.',
+      title: 'Generación de Informes',
+      description: 'Consulta del progreso por estudiante y del estado operativo del área asignada.',
       icon: BarChart3,
       color: '#F5A97F',
       gradient: 'from-[#F5A97F] to-[#F7B98F]',
@@ -241,14 +241,14 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
     {
       label: 'Áreas asignadas',
       value: statsData.assignedAreas,
-      icon: MapPinned,
+      icon: BookOpen,
       color: '#4A90E2',
       deferToLoad: true
     },
     {
       label: 'Temas de sus áreas',
       value: statsData.areaTemas,
-      icon: GitBranch,
+      icon: FileEdit,
       color: '#7ED6A7',
       deferToLoad: true
     },
@@ -262,7 +262,7 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
     {
       label: 'Módulos del panel',
       value: actions.length,
-      icon: BookOpen,
+      icon: BarChart3,
       color: '#8B5CF6'
     }
   ];
@@ -297,7 +297,7 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
         </div>
         <div className="app-list-card__footer">
           <span className="app-list-card__meta">
-            {action.group === 'workflow' ? 'Gestión docente' : 'Seguimiento y soporte'}
+            {action.group === 'workflow' ? 'Ruta principal' : 'Soporte operativo'}
           </span>
           <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#2563eb]">
             Abrir
@@ -361,7 +361,7 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-[#3A4A5B]">Panel de Docente</h1>
+                <h1 className="text-[#3A4A5B]">Panel docente</h1>
                 <p className="text-gray-500 text-sm">Acceso a los módulos del rol docente.</p>
               </div>
             </div>
@@ -418,8 +418,8 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
               status: hasAssignedArea ? 'upcoming' : 'upcoming'
             },
             {
-              label: 'Informes y chatbot',
-              helper: 'Seguimiento académico y apoyo conversacional del área.',
+              label: 'Informes y acompañamiento',
+              helper: 'Seguimiento académico y soporte educativo del área.',
               status: hasAssignedArea ? 'upcoming' : 'upcoming'
             }
           ]}
@@ -461,7 +461,7 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
           <div className="app-section-head">
             <div>
               <h3 className="app-section-title">Seguimiento y soporte</h3>
-              <p className="app-section-description">Herramientas para informes académicos y soporte conversacional del área.</p>
+              <p className="app-section-description">Herramientas para informes académicos y acompañamiento del área.</p>
             </div>
           </div>
 
