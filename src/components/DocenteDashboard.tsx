@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, BarChart3, BookOpen, Bot, ClipboardList, FileEdit, GitBranch, LogOut } from 'lucide-react';
+import { ArrowRight, BarChart3, BookOpen, Bot, ClipboardList, FileEdit, GitBranch, LogOut, MapPinned } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
