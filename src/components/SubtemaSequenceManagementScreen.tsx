@@ -43,6 +43,7 @@ interface SubtemaSequenceManagementScreenProps {
   areaName?: string;
   temaId?: number;
   temaName?: string;
+  mode?: 'admin' | 'docente';
 }
 
 export function SubtemaSequenceManagementScreen({ 
@@ -52,7 +53,8 @@ export function SubtemaSequenceManagementScreen({
   areaId,
   areaName,
   temaId,
-  temaName
+  temaName,
+  mode = 'admin'
 }: SubtemaSequenceManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
@@ -103,6 +105,7 @@ export function SubtemaSequenceManagementScreen({
     : currentModalTema
       ? [currentModalTema]
       : [];
+  const isDocenteMode = mode === 'docente';
 
   // Cargar datos al montar
   useEffect(() => {
@@ -912,7 +915,7 @@ export function SubtemaSequenceManagementScreen({
                   <p className="text-gray-500 text-sm">Área: {areaName}</p>
                 )}
                 {!areaName && !temaName && (
-                  <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                  <p className="text-gray-500 text-sm">{isDocenteMode ? 'Panel docente - EduPath' : 'Panel de Administrador - EduPath'}</p>
                 )}
               </div>
             </div>
@@ -926,14 +929,14 @@ export function SubtemaSequenceManagementScreen({
           className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>{temaId ? 'Volver a Temas' : 'Volver al Panel'}</span>
+          <span>{temaId ? 'Volver a Temas' : (isDocenteMode ? 'Volver a Mis áreas' : 'Volver al Panel')}</span>
         </button>
 
         <AdminFlowGuide
           title="Secuencia de subtemas"
           description="Organización del orden de subtemas dentro del tema seleccionado."
           breadcrumbs={[
-            { label: 'Panel admin' },
+            { label: isDocenteMode ? 'Panel docente' : 'Panel admin' },
             { label: areaName || 'Áreas' },
             { label: temaName || 'Temas' },
             { label: 'Secuencia de subtemas', current: true }

@@ -67,9 +67,10 @@ interface SequenceManagementScreenProps {
   areaName?: string;
   temaName?: string;
   subtemaNombre?: string;
+  mode?: 'admin' | 'docente';
 }
 
-export function SequenceManagementScreen({ onBack, onHome, onGoToContentManagement, subtemaId, temaId, areaId, areaName, temaName, subtemaNombre }: SequenceManagementScreenProps) {
+export function SequenceManagementScreen({ onBack, onHome, onGoToContentManagement, subtemaId, temaId, areaId, areaName, temaName, subtemaNombre, mode = 'admin' }: SequenceManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
   const [subtemas, setSubtemas] = useState<Subtema[]>([]);
@@ -116,6 +117,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
   const isSubtemaActive = (subtema: Subtema) => subtema.estado !== false;
   const isContentActive = (content: ContentItem) => content.estado !== false;
   const scopedSubtemaQuery = incomingSubtemaValue ? `?subtemaId=${incomingSubtemaValue}` : '';
+  const isDocenteMode = mode === 'docente';
 
   const apiFetch = (path: string, init: RequestInit = {}) => {
     const headers = buildAuthHeaders(init.headers || {});
@@ -1341,7 +1343,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   </p>
                 )}
                 {!subtemaId && (
-                  <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>
+                  <p className="text-gray-500 text-sm">{isDocenteMode ? 'Panel docente - EduPath' : 'Panel de Administrador - EduPath'}</p>
                 )}
               </div>
             </div>
@@ -1356,7 +1358,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
             className="app-back-button"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>{subtemaId ? 'Volver a Secuencias de Subtemas' : 'Volver al Panel'}</span>
+            <span>{subtemaId ? 'Volver a Secuencias de Subtemas' : (isDocenteMode ? 'Volver a Mis áreas' : 'Volver al Panel')}</span>
           </button>
         </div>
 
@@ -1364,7 +1366,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           title="Secuencia de contenidos"
           description="Organización del orden de contenidos dentro del subtema seleccionado."
           breadcrumbs={[
-            { label: 'Panel admin' },
+            { label: isDocenteMode ? 'Panel docente' : 'Panel admin' },
             { label: areaName || 'Áreas' },
             { label: temaName || 'Temas' },
             { label: subtemaNombre || 'Subtema' },

@@ -26,9 +26,11 @@ interface AreasManagementScreenProps {
   onBack: () => void;
   onHome?: () => void;
   onSelectArea: (areaId: number, areaName: string) => void;
+  mode?: 'admin' | 'docente';
+  readOnly?: boolean;
 }
 
-export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasManagementScreenProps) {
+export function AreasManagementScreen({ onBack, onHome, onSelectArea, mode = 'admin', readOnly = false }: AreasManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
     esAreaPilar: false,
     tipoPilar: '' as '' | PillarType,
   });
+  const isDocenteMode = mode === 'docente';
 
   const isAreaActive = (area: Area) => area.estado !== false;
 
@@ -251,8 +254,8 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </button>
               <div>
-                <h1 className="text-[#3A4A5B]">Gestión de Áreas - Subtemas - Contenidos</h1>
-                <p className="text-gray-500 text-sm">Mapa académico y entrada a la estructura de contenidos de EduPath.</p>
+                <h1 className="text-[#3A4A5B]">{isDocenteMode ? 'Mis áreas - Temas - Subtemas - Contenidos' : 'Gestión de Áreas - Subtemas - Contenidos'}</h1>
+                <p className="text-gray-500 text-sm">{isDocenteMode ? 'Ruta docente para navegar la estructura académica asignada.' : 'Mapa académico y entrada a la estructura de contenidos de EduPath.'}</p>
               </div>
             </div>
           </div>
@@ -266,15 +269,15 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
           className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver al Panel</span>
+          <span>{isDocenteMode ? 'Volver al panel docente' : 'Volver al Panel'}</span>
         </button>
 
         <AdminFlowGuide
-          title="Gestión de áreas académicas"
-          description="Registro y selección de áreas dentro de la estructura académica."
+          title={isDocenteMode ? 'Mis áreas académicas' : 'Gestión de áreas académicas'}
+          description={isDocenteMode ? 'Selección de las áreas asignadas dentro de la estructura académica.' : 'Registro y selección de áreas dentro de la estructura académica.'}
           breadcrumbs={[
-            { label: 'Panel admin' },
-            { label: 'Áreas', current: true }
+            { label: isDocenteMode ? 'Panel docente' : 'Panel admin' },
+            { label: isDocenteMode ? 'Mis áreas' : 'Áreas', current: true }
           ]}
           steps={[
             { label: 'Áreas', helper: 'Registro o selección del área base.', status: 'current' },
@@ -290,9 +293,9 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
           <div className="app-page-hero__content">
             <div className="app-page-hero__copy">
               <div className="app-page-hero__eyebrow">Arquitectura académica</div>
-              <h2 className="app-page-hero__title">Gestión de áreas</h2>
+              <h2 className="app-page-hero__title">{isDocenteMode ? 'Mis áreas' : 'Gestión de áreas'}</h2>
               <p className="app-page-hero__description">
-                Consulta áreas y accede a sus temas.
+                {isDocenteMode ? 'Consulta tus áreas asignadas y accede a sus temas.' : 'Consulta áreas y accede a sus temas.'}
               </p>
             </div>
           </div>
@@ -303,13 +306,15 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                 <div className="app-hero-panel__header">
                   <div className="app-hero-panel__copy">
                     <p className="app-hero-panel__eyebrow">Catálogo</p>
-                    <h3 className="app-hero-panel__title">Estado del catálogo</h3>
+                    <h3 className="app-hero-panel__title">{isDocenteMode ? 'Áreas asignadas' : 'Estado del catálogo'}</h3>
                     <p className="app-hero-panel__description">Filtra por estado.</p>
                   </div>
-                  <button onClick={handleOpenCreate} className="app-btn app-primary-btn">
-                    <Plus className="w-4 h-4" />
-                    <span>Nueva área</span>
-                  </button>
+                  {!readOnly && (
+                    <button onClick={handleOpenCreate} className="app-btn app-primary-btn">
+                      <Plus className="w-4 h-4" />
+                      <span>Nueva área</span>
+                    </button>
+                  )}
                 </div>
                 <div className="app-hero-panel__body">
                   <div className="app-filter-row">
@@ -375,8 +380,8 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
           </div>
         ) : areas.length === 0 ? (
           <div className="app-empty-panel py-12">
-            <p className="text-base text-slate-600">No hay áreas disponibles todavía.</p>
-            <p className="mt-2 text-sm text-slate-500">El registro del primer área habilita la organización de temas, subtemas y contenidos.</p>
+            <p className="text-base text-slate-600">{isDocenteMode ? 'No hay áreas asignadas disponibles.' : 'No hay áreas disponibles todavía.'}</p>
+            <p className="mt-2 text-sm text-slate-500">{isDocenteMode ? 'Cuando se te asigne un área podrás continuar con temas, subtemas y contenidos.' : 'El registro del primer área habilita la organización de temas, subtemas y contenidos.'}</p>
           </div>
         ) : filteredAreas.length === 0 ? (
           <div className="app-empty-panel py-12">
@@ -422,8 +427,8 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                       </h2>
                       <p className="app-list-card__description app-area-catalog-card__summary">
                         {areaIsActive
-                          ? 'Gestión de temas, subtemas y recursos vinculados.'
-                          : 'Registro inhabilitado, disponible para consulta o reactivación.'}
+                          ? (isDocenteMode ? 'Acceso a temas, subtemas, secuencias y contenidos del área asignada.' : 'Gestión de temas, subtemas y recursos vinculados.')
+                          : (isDocenteMode ? 'Área inhabilitada, disponible solo para consulta.' : 'Registro inhabilitado, disponible para consulta o reactivación.')}
                       </p>
                     </div>
                     <div className="app-area-catalog-card__body">
@@ -432,32 +437,34 @@ export function AreasManagementScreen({ onBack, onHome, onSelectArea }: AreasMan
                         {area.descripcion || 'Sin descripción registrada.'}
                       </p>
                     </div>
-                    <div className="app-list-card__footer app-area-catalog-card__footer">
-                      <div className="app-action-row">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleToggleArea(area);
-                          }}
-                          className={`app-btn app-btn-sm ${areaIsActive ? 'app-btn-secondary' : 'app-btn-success'}`}
-                        >
-                          {areaIsActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          <span>{areaIsActive ? 'Inhabilitar' : 'Habilitar'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleOpenEdit(area);
-                          }}
-                          className="app-btn app-btn-sm app-btn-ghost"
-                        >
-                          <Pencil className="w-4 h-4" />
-                          <span>Editar</span>
-                        </button>
+                    {!readOnly && (
+                      <div className="app-list-card__footer app-area-catalog-card__footer">
+                        <div className="app-action-row">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleToggleArea(area);
+                            }}
+                            className={`app-btn app-btn-sm ${areaIsActive ? 'app-btn-secondary' : 'app-btn-success'}`}
+                          >
+                            {areaIsActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            <span>{areaIsActive ? 'Inhabilitar' : 'Habilitar'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleOpenEdit(area);
+                            }}
+                            className="app-btn app-btn-sm app-btn-ghost"
+                          >
+                            <Pencil className="w-4 h-4" />
+                            <span>Editar</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}

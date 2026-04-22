@@ -177,13 +177,13 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
   const actions: DashboardAction[] = [
     {
       id: 'area',
-      title: 'Gestión de Área',
-      description: 'Administra el área asignada y sus contenidos disponibles.',
+      title: 'Mis áreas',
+      description: 'Accede a tus áreas asignadas y gestiona su estructura académica completa.',
       icon: MapPinned,
       color: '#4A90E2',
       gradient: 'from-[#4A90E2] to-[#5B9FED]',
       group: 'workflow',
-      badge: 'Ruta base',
+      badge: 'Ruta docente',
       tone: 'blue',
       onClick: onManageArea
     },

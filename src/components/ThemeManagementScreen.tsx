@@ -45,6 +45,8 @@ interface ThemeManagementScreenProps {
   };
   embedded?: boolean;
   backLabel?: string;
+  mode?: 'admin' | 'docente';
+  lockAreaSelection?: boolean;
 }
 
 interface Area {
@@ -88,7 +90,7 @@ const subjectColors: Record<string, { primary: string; light: string; icon: any 
   'alcance': { primary: '#F5A97F', light: '#FFF3E0', icon: BarChart3 }
 };
 
-export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, embedded = false, backLabel }: ThemeManagementScreenProps) {
+export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, embedded = false, backLabel, mode = 'admin', lockAreaSelection = false }: ThemeManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
   const [subtemas, setSubtemas] = useState<Record<string, Subtema[]>>({});
@@ -112,6 +114,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const initialAreaIdValue = initialAreaId !== undefined && initialAreaId !== null ? String(initialAreaId) : '';
+  const isDocenteMode = mode === 'docente';
 
   // Cargar áreas del backend
   useEffect(() => {
@@ -496,7 +499,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   const currentColorKey = areaIndex >= 0 ? getColorByIndex(areaIndex) : Object.keys(subjectColors)[0];
   const currentColor = subjectColors[currentColorKey];
   const currentSubject = areas.find(s => s.id === selectedSubject);
-  const hasFixedAreaContext = Boolean(initialAreaIdValue || initialEditTema?.area_id);
+  const hasFixedAreaContext = Boolean(initialAreaIdValue || initialEditTema?.area_id || lockAreaSelection);
   const activeTemasCount = temas.filter((tema) => tema.estado !== false).length;
   const inactiveTemasCount = temas.filter((tema) => tema.estado === false).length;
 
@@ -541,7 +544,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                 </button>
                 <div>
                   <h1 className="text-[#3A4A5B]">Gestión de temas</h1>
-                  <p className="text-gray-500 text-sm">{currentSubject ? `Área activa: ${currentSubject.nombre}` : 'Panel de administrador - EduPath'}</p>
+                  <p className="text-gray-500 text-sm">{currentSubject ? `Área activa: ${currentSubject.nombre}` : (isDocenteMode ? 'Panel docente - EduPath' : 'Panel de administrador - EduPath')}</p>
                 </div>
               </div>
             </div>

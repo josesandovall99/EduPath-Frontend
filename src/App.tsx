@@ -669,11 +669,8 @@ export default function App() {
         />
       )}
 
-      {currentScreen === 'docente-area-management' && docenteSession?.areaId && (
+      {currentScreen === 'docente-area-management' && docenteSession && (
         <DocenteAreaManagementScreen
-          docenteId={docenteSession.id}
-          areaId={docenteSession.areaId}
-          areaNombre={docenteSession.areaNombre}
           onBack={() => setCurrentScreen('docente-dashboard')}
         />
       )}

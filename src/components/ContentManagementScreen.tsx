@@ -16,6 +16,7 @@ interface ContentManagementScreenProps {
   initialTemaName?: string;
   initialSubtemaId?: number;
   initialSubtemaName?: string;
+  mode?: 'admin' | 'docente';
 }
 
 interface ContentItem {
@@ -100,11 +101,13 @@ export function ContentManagementScreen({
   initialTemaName,
   initialSubtemaId,
   initialSubtemaName,
+  mode = 'admin',
 }: ContentManagementScreenProps) {
   const scopeAreaId = initialAreaId ? String(initialAreaId) : '';
   const scopeTemaId = initialTemaId ? String(initialTemaId) : '';
   const scopeSubtemaId = initialSubtemaId ? String(initialSubtemaId) : '';
   const isFlowScoped = scopeMode === 'flow' && Boolean(scopeAreaId || scopeTemaId || scopeSubtemaId);
+  const isDocenteMode = mode === 'docente';
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
@@ -630,7 +633,7 @@ export function ContentManagementScreen({
         : 'recorrido actual';
   const flowBreadcrumbs = isFlowScoped
     ? [
-        { label: 'Panel admin' },
+        { label: isDocenteMode ? 'Panel docente' : 'Panel admin' },
         ...(initialAreaName ? [{ label: initialAreaName }] : []),
         ...(initialTemaName ? [{ label: initialTemaName }] : []),
         ...(initialSubtemaName ? [{ label: initialSubtemaName }] : []),
@@ -672,7 +675,7 @@ export function ContentManagementScreen({
               </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Contenidos</h1>
-                <p className="text-gray-500 text-sm">Catálogo, búsqueda y mantenimiento de recursos dentro del mismo entorno administrativo.</p>
+                <p className="text-gray-500 text-sm">{isDocenteMode ? 'Catálogo, búsqueda y mantenimiento de recursos dentro del flujo docente.' : 'Catálogo, búsqueda y mantenimiento de recursos dentro del mismo entorno administrativo.'}</p>
               </div>
             </div>
           </div>
@@ -685,7 +688,7 @@ export function ContentManagementScreen({
           className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver al Panel</span>
+          <span>{isDocenteMode ? 'Volver a Secuencia de contenidos' : 'Volver al Panel'}</span>
         </button>
 
         <section className="app-page-hero mb-6">
@@ -706,7 +709,7 @@ export function ContentManagementScreen({
 
           <div className="app-page-hero__content">
             <div className="app-page-hero__copy">
-              <div className="app-page-hero__eyebrow">Biblioteca administrativa</div>
+              <div className="app-page-hero__eyebrow">{isDocenteMode ? 'Biblioteca docente' : 'Biblioteca administrativa'}</div>
               <h2 className="app-page-hero__title">Gestión de contenidos</h2>
               <p className="app-page-hero__description">
                 {isFlowScoped

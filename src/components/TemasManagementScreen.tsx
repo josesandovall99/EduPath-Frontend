@@ -20,15 +20,17 @@ interface TemasManagementScreenProps {
   onBack: () => void;
   onHome?: () => void;
   onSelectTema: (temaId: number, temaName: string) => void;
+  mode?: 'admin' | 'docente';
 }
 
-export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSelectTema }: TemasManagementScreenProps) {
+export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSelectTema, mode = 'admin' }: TemasManagementScreenProps) {
   const [temas, setTemas] = useState<Tema[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showThemeManager, setShowThemeManager] = useState(false);
   const [editingTema, setEditingTema] = useState<Tema | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const isDocenteMode = mode === 'docente';
 
   useEffect(() => {
     loadTemas();
@@ -105,6 +107,8 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
         initialAreaId={editingTema?.area_id ?? areaId}
         initialEditTema={editingTema ?? undefined}
         backLabel="Volver a Temas"
+        mode={mode}
+        lockAreaSelection={isDocenteMode}
       />
     );
   }
@@ -125,7 +129,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
               </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Temas del área</h1>
-                <p className="text-gray-500 text-sm">Área seleccionada: {areaName}</p>
+                <p className="text-gray-500 text-sm">{isDocenteMode ? `Área asignada: ${areaName}` : `Área seleccionada: ${areaName}`}</p>
               </div>
             </div>
           </div>
@@ -145,7 +149,7 @@ export function TemasManagementScreen({ areaId, areaName, onBack, onHome, onSele
           title="Gestión de temas"
           description="Selección y administración temática dentro del área registrada."
           breadcrumbs={[
-            { label: 'Panel admin' },
+            { label: isDocenteMode ? 'Panel docente' : 'Panel admin' },
             { label: 'Áreas' },
             { label: areaName },
             { label: 'Temas', current: true }

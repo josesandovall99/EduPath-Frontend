@@ -11,6 +11,7 @@ interface SubThemeManagementScreenProps {
   initialAreaId?: number;
   initialTemaId?: number;
   onManageSequences?: (areaId: number, areaName: string, temaId: number, temaName: string) => void;
+  mode?: 'admin' | 'docente';
 }
 
 interface Area {
@@ -47,7 +48,8 @@ export function SubThemeManagementScreen({
   onHome,
   initialAreaId,
   initialTemaId,
-  onManageSequences
+  onManageSequences,
+  mode = 'admin'
 }: SubThemeManagementScreenProps) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
@@ -72,6 +74,7 @@ export function SubThemeManagementScreen({
   const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const isDocenteMode = mode === 'docente';
   const isSubtemaActive = (subtema: Subtema) => subtema.estado !== false;
 
   // Cargar áreas del backend
@@ -494,14 +497,14 @@ export function SubThemeManagementScreen({
           className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver al Panel</span>
+          <span>{isDocenteMode ? 'Volver a Temas' : 'Volver al Panel'}</span>
         </button>
 
         <AdminFlowGuide
           title="Gestión de subtemas"
           description={hasLockedAreaContext ? 'Administración de tema y subtemas dentro del área seleccionada.' : 'Administración de área, tema y subtemas asociados.'}
           breadcrumbs={[
-            { label: 'Panel admin' },
+            { label: isDocenteMode ? 'Panel docente' : 'Panel admin' },
             { label: currentArea?.nombre || 'Áreas' },
             { label: currentTemaObj?.nombre || 'Temas' },
             { label: 'Subtemas', current: true }
