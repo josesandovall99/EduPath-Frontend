@@ -5,5 +5,5 @@ const rawApiBaseUrl = String((import.meta as any)?.env?.VITE_API_BASE_URL || '')
 const normalizedApiBaseUrl = rawApiBaseUrl.replace(/\/$/, '');
 const isDev = Boolean((import.meta as any)?.env?.DEV);
 
-export const API_BASE_URL = normalizedApiBaseUrl || (isDev ? DEFAULT_API_BASE_URL : '/api');
+export const API_BASE_URL = normalizedApiBaseUrl || DEFAULT_API_BASE_URL;
 export const API_PROXY_TARGET = normalizedApiBaseUrl || DEFAULT_API_BASE_URL;

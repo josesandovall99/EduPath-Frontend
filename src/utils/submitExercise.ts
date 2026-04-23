@@ -8,13 +8,7 @@ export interface SubmitResult<T = any> {
 
 function getApiBaseUrl() {
   const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-  if (rawApiBaseUrl) {
-    return rawApiBaseUrl.replace(/\/$/, '');
-  }
-
-  return import.meta.env.PROD
-    ? 'https://edupath-backend-xch1.onrender.com'
-    : '/api';
+  return rawApiBaseUrl.replace(/\/$/, '');
 }
 
 /**
