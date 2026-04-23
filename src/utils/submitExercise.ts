@@ -50,7 +50,8 @@ export async function submitExercise(
     const res = await fetch(`${API_BASE_URL}${targetPath}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      credentials: 'include'
     });
 
     let data: any = null;
@@ -87,7 +88,8 @@ export async function executeExercise(
     const res = await fetch(`${API_BASE_URL}${targetPath}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      credentials: 'include'
     });
 
     let data: any = null;

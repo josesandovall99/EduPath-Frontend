@@ -26,7 +26,8 @@ export async function submitMiniproyecto(
     const res = await fetch(`${API_BASE_URL}/miniproyectos/${miniproyectoId}/enviar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      credentials: 'include'
     });
 
     let data: any = null;
