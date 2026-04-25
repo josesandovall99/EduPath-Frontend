@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, Send } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { preprocessForMarkdown } from '../utils/markdown';
 
 const CHATBOT_TIMEOUT_MS = 120000;
 
@@ -215,7 +218,11 @@ export function MiniproyectoChatbotPanel({
         {messages.map((message, index) => (
           <div key={index} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
             <div className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${message.isBot ? 'bg-white border border-gray-200 text-gray-800' : 'bg-[#4A90E2] text-white'}`}>
-              {message.text || (message.isBot && isLoading ? '...' : '')}
+              {message.isBot ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{preprocessForMarkdown(String(message.text || ''))}</ReactMarkdown>
+              ) : (
+                message.text || (message.isBot && isLoading ? '...' : '')
+              )}
             </div>
           </div>
         ))}

@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Send, Minimize2, MessageCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 import { buildAuthHeaders } from '../utils/authHeaders';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { preprocessForMarkdown } from '../utils/markdown';
 
 const CHATBOT_TIMEOUT_MS = 120000;
 
@@ -288,7 +291,11 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
                 padding: "10px 14px", borderRadius: "12px", maxWidth: "80%",
                 fontSize: "14px", lineHeight: "1.4"
               }}>
-                {msg.text}
+                {msg.isBot ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{preprocessForMarkdown(String(msg.text || ''))}</ReactMarkdown>
+                ) : (
+                  msg.text
+                )}
               </div>
             ))}
             {(isLoading || isResolving) && <div style={{ alignSelf: "flex-start", color: "#999", fontSize: "12px" }}>{isResolving ? 'Cargando chatbot...' : 'Escribiendo...'}</div>}
@@ -313,3 +320,5 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
     </div>
   );
 }
+
+// using shared preprocessForMarkdown from utils/markdown

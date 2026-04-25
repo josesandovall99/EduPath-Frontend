@@ -1,9 +1,9 @@
 
 //Par aq probremos en render
-export const DEFAULT_API_BASE_URL = 'https://edupath-backend-xch1.onrender.com';
+//export const DEFAULT_API_BASE_URL = 'https://edupath-backend-xch1.onrender.com';
 
 //Par aq probremos en local
-//export const DEFAULT_API_BASE_URL = 'http://localhost:4000';
+export const DEFAULT_API_BASE_URL = 'http://localhost:4000';
 
 
 const rawApiBaseUrl = String((import.meta as any)?.env?.VITE_API_BASE_URL || '').trim();

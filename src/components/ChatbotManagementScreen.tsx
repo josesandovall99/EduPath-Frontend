@@ -15,6 +15,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { preprocessForMarkdown } from '../utils/markdown';
 
 const CHATBOT_TIMEOUT_MS = 120000;
 const MODEL_OPTIONS = ['qwen2.5:0.5b', 'llama3.2:1b', 'llama3.2'];
@@ -1425,7 +1428,11 @@ export function ChatbotManagementScreen({
                               </span>
                             </div>
                             <div className={`chatbot-admin-message ${message.isBot ? 'chatbot-admin-message--bot' : 'chatbot-admin-message--user'}`}>
-                              {message.text || (message.isBot && isAsking ? 'Procesando respuesta...' : '')}
+                              {message.isBot ? (
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{preprocessForMarkdown(String(message.text || ''))}</ReactMarkdown>
+                              ) : (
+                                message.text || (message.isBot && isAsking ? 'Procesando respuesta...' : '')
+                              )}
                             </div>
                           </div>
                         ))
