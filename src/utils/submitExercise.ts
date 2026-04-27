@@ -6,13 +6,8 @@ export interface SubmitResult<T = any> {
   message?: string;
 }
 
-function getApiBaseUrl() {
-  const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-  return rawApiBaseUrl.replace(/\/$/, '');
-}
-
 /**
- * POST an exercise submission to the backend using the new contract.
+ * POST an exercise submission to the backend.
  * Endpoint: POST /ejercicios/:id/enviar
  * Body: { estudiante_id, respuesta }
  */
@@ -38,8 +33,6 @@ export async function submitExercise(
     }
 
     const body = { estudiante_id: resolvedEstudianteId, respuesta, lenguaje_id: 62, ...(extraBody || {}) };
-    const API_BASE_URL = getApiBaseUrl();
-    console.log('Enviando ejercicio:', ejercicioId, 'Body:', JSON.stringify(body, null, 2));
     const targetPath = endpointPath || `/ejercicios/${ejercicioId}/enviar`;
     const res = await fetch(`${API_BASE_URL}${targetPath}`, {
       method: 'POST',
@@ -69,7 +62,6 @@ export async function executeExercise(
   extraBody?: Record<string, unknown>
 ): Promise<SubmitResult> {
   try {
-    const API_BASE_URL = getApiBaseUrl();
     const targetPath = endpointPath || '/evaluaciones/compilador/ejecutar';
     const payload = endpointPath
       ? { lenguaje_id: lenguajeId, codigo: respuesta, ...(extraBody || {}) }

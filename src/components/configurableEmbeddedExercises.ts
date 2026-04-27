@@ -115,9 +115,15 @@ export function createEmptyEmbeddedExercise(type: ConfigurableExerciseType = 'Op
       descripcion: '',
       tipo_ejercicio: 'Compilador',
       puntos: 100,
-      codigoEstructura: 'public static int resolver() {\n    return 0;\n}',
       resultado_ejercicio: '',
-      configuracion: createDefaultCompilerConfig(),
+      configuracion: {
+        tipo: 'mvc',
+        nombreModelo: 'Modelo',
+        templateMain: '',
+        templateModelo: '',
+        esperado: '',
+        lenguajesPermitidos: [62],
+      },
     };
   }
 

@@ -575,8 +575,9 @@ export default function App() {
     
     // Determine which view to show based on subject and content type
     if (selectedSubject?.name === 'Fundamentos de Programación') {
-      // Programming subject uses the programming view for all content
-      setCurrentScreen('programming-content');
+      // Pasa por TheoryContentView para que el estudiante pueda navegar
+      // Subtema → Contenido → Ejercicio (ProgrammingContentView embebido)
+      setCurrentScreen('theory-content');
     } else if (selectedSubject?.name === 'Análisis de Sistemas') {
       // Analysis Systems subject
       if (content.type === 'workshop') {

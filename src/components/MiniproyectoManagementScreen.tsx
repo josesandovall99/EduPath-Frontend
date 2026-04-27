@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ClipboardList, Eye, EyeOff, Plus, RefreshCw, Save, Search } from 'lucide-react';
+import { JavaEditor } from './JavaEditor';
+import { CONSOLA_IO_SOURCE } from '../utils/consolaIOSource';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
 import { createQuillModules, loadQuill } from '../utils/quill';
@@ -14,6 +16,8 @@ import {
   parseMethodTemplate,
   formatJavaLikeTemplate,
 } from './configurableEmbeddedExercises';
+
+// CONSOLA_IO_SOURCE is imported from consolaIOSource.ts — única fuente de verdad
 
 interface MiniproyectoManagementScreenProps {
   onBack: () => void;
@@ -157,6 +161,14 @@ export function MiniproyectoManagementScreen({
   const [compilerTemplate, setCompilerTemplate] = useState('');
   const [compilerCases, setCompilerCases] = useState<CompilerCase[]>(createDefaultCompilerConfig().casos_prueba);
   const [sintaxisRequerida, setSintaxisRequerida] = useState<string[]>([]);
+  const [mvcNombreModelo, setMvcNombreModelo] = useState('SeguridadBancaria');
+  const [mvcTemplateMain, setMvcTemplateMain] = useState('');
+  const [mvcTemplateModelo, setMvcTemplateModelo] = useState('');
+  const [mvcEsperado, setMvcEsperado] = useState(''); // kept for backward compat
+  const [mvcCasosPrueba, setMvcCasosPrueba] = useState<{ inputs: string; output: string }[]>([
+    { inputs: '', output: '' }, { inputs: '', output: '' }, { inputs: '', output: '' }
+  ]);
+  const [mvcActiveTab, setMvcActiveTab] = useState<'main' | 'modelo' | 'consolaIO'>('main');
   const [stakeholdersList, setStakeholdersList] = useState<string[]>([]);
   const [functionalList, setFunctionalList] = useState<string[]>([]);
   const [nonFunctionalList, setNonFunctionalList] = useState<string[]>([]);
@@ -542,6 +554,13 @@ export function MiniproyectoManagementScreen({
     let parsedTemplate = '';
     let parsedCases = createDefaultCompilerConfig().casos_prueba;
     let parsedSintaxis: string[] = [];
+    let parsedMvcNombreModelo = 'SeguridadBancaria';
+    let parsedMvcTemplateMain = '';
+    let parsedMvcTemplateModelo = '';
+    let parsedMvcEsperado = '';
+    let parsedMvcCasosPrueba: { inputs: string; output: string }[] = [
+      { inputs: '', output: '' }, { inputs: '', output: '' }, { inputs: '', output: '' }
+    ];
 
     if (item.respuesta_miniproyecto) {
       try {
@@ -577,6 +596,18 @@ export function MiniproyectoManagementScreen({
               : '';
           parsedCases = normalizeCompilerCases(parsed?.casos_prueba, parsed?.esperado || '');
           parsedSintaxis = Array.isArray(parsed?.sintaxis) ? parsed.sintaxis : [];
+        }
+        if (parsed?.tipo === 'mvc') {
+          parsedMvcNombreModelo = typeof parsed?.nombreModelo === 'string' ? parsed.nombreModelo : 'SeguridadBancaria';
+          parsedMvcTemplateMain = typeof parsed?.templateMain === 'string' ? parsed.templateMain : '';
+          parsedMvcTemplateModelo = typeof parsed?.templateModelo === 'string' ? parsed.templateModelo : '';
+          parsedMvcEsperado = typeof parsed?.esperado === 'string' ? parsed.esperado : '';
+          if (Array.isArray(parsed?.casos_prueba) && parsed.casos_prueba.length > 0) {
+            parsedMvcCasosPrueba = [0,1,2].map((i) => ({
+              inputs: parsed.casos_prueba[i]?.inputs || '',
+              output: parsed.casos_prueba[i]?.output || ''
+            }));
+          }
         }
         const cronogramaRaw = Array.isArray(parsed?.cronograma) ? parsed.cronograma : [];
         parsedSchedule = cronogramaRaw.map((entry: any) => {
@@ -688,10 +719,21 @@ export function MiniproyectoManagementScreen({
       setCompilerTemplate(parsedTemplate);
       setCompilerCases(parsedCases);
       setSintaxisRequerida(parsedSintaxis);
+      setMvcNombreModelo(parsedMvcNombreModelo);
+      setMvcTemplateMain(parsedMvcTemplateMain);
+      setMvcTemplateModelo(parsedMvcTemplateModelo);
+      setMvcEsperado(parsedMvcEsperado);
+      setMvcCasosPrueba(parsedMvcCasosPrueba);
+      setMvcActiveTab('main');
     } else {
       setCompilerTemplate('');
       setCompilerCases(createDefaultCompilerConfig().casos_prueba);
       setSintaxisRequerida([]);
+      setMvcNombreModelo('SeguridadBancaria');
+      setMvcTemplateMain('');
+      setMvcTemplateModelo('');
+      setMvcEsperado('');
+      setMvcCasosPrueba([{ inputs: '', output: '' }, { inputs: '', output: '' }, { inputs: '', output: '' }]);
     }
 
     setSelectedEmbeddedExercises(configurablePayload?.exercises || []);
@@ -902,42 +944,26 @@ export function MiniproyectoManagementScreen({
         },
       });
     } else if (isProgrammingMiniproyecto) {
-      const plantilla = compilerTemplate.trim();
-      const metodoDerivado = parseMethodTemplate(plantilla);
+      const nombreModelo = mvcNombreModelo.trim() || 'SeguridadBancaria';
+      const casosNormalizados = mvcCasosPrueba.map((c) => ({
+        inputs: c.inputs.trim(),
+        output: c.output.trim(),
+      }));
 
-      if (!plantilla || !metodoDerivado) {
-        setError('La plantilla del método es obligatoria y debe incluir una firma Java válida.');
+      if (casosNormalizados.every((c) => !c.output)) {
+        setError('Define la salida esperada en al menos un caso de prueba para que el sistema pueda evaluar al estudiante.');
         return;
-      }
-
-      if (compilerCases.length !== 3) {
-        setError('Debes definir exactamente 3 casos de prueba para el miniproyecto.');
-        return;
-      }
-
-      for (let index = 0; index < compilerCases.length; index += 1) {
-        if (!compilerCases[index]?.output?.trim()) {
-          setError(`El caso ${index + 1} debe tener output esperado.`);
-          return;
-        }
       }
 
       programmingPayload = JSON.stringify({
-        ...createDefaultCompilerConfig(),
-        sintaxis: sintaxisRequerida,
+        tipo: 'mvc',
+        nombreModelo,
+        templateMain: mvcTemplateMain.trim(),
+        templateModelo: mvcTemplateModelo.trim(),
+        esperado: casosNormalizados[0]?.output || mvcEsperado.trim(),
+        casos_prueba: casosNormalizados,
         lenguajesPermitidos: [JAVA_LANGUAGE_ID],
-        metodo: { ...metodoDerivado, plantilla },
-        casos_prueba: compilerCases.map((caseItem) => ({
-          inputs: (caseItem.inputs || '').trim(),
-          output: (caseItem.output || '').trim(),
-        })),
-        esperado: (compilerCases[0]?.output || '').trim(),
       });
-
-      if (!JSON.parse(programmingPayload).esperado) {
-        setError('El primer caso debe tener un output esperado para sincronizar la evaluación.');
-        return;
-      }
     }
 
     setIsSaving(true);
@@ -1390,101 +1416,115 @@ export function MiniproyectoManagementScreen({
                   </section>
                 ) : isProgrammingMiniproyecto ? (
                   <section className="app-form-section app-miniproyecto-mode-section">
-                    <div className="space-y-4">
+                    <div className="space-y-5">
+                      {/* Header */}
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <h4 className="app-form-section-title">Configuración de compilador</h4>
-                          <p className="mt-1 text-xs text-gray-500">Este miniproyecto se editará como ejercicio de programación: método Java, restricciones y 3 casos de prueba.</p>
+                          <h4 className="app-form-section-title">Configuración MVC del compilador</h4>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Define el código de plantilla que verá el estudiante en cada archivo y la salida esperada para la evaluación automática.
+                          </p>
                         </div>
-                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-                          Java
-                        </span>
+                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">Java · MVC</span>
                       </div>
 
+                      {/* Model name */}
                       <div>
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <label className="block text-sm font-medium text-[#3A4A5B]">Plantilla del método *</label>
-                          <button
-                            type="button"
-                            onClick={handleFormatCompilerTemplate}
-                            className="app-btn app-btn-secondary app-btn-sm text-violet-700"
-                          >
-                            Dar formato
-                          </button>
-                        </div>
-                        <textarea
-                          value={compilerTemplate}
-                          onChange={(event) => handleCompilerTemplateChange(event.target.value)}
-                          placeholder={"public static int sumar(int a, int b) {\n    // TODO\n}"}
-                          rows={10}
-                          className="w-full min-h-64 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono text-sm leading-7 bg-white resize-y"
+                        <label className="block text-sm font-medium text-[#3A4A5B] mb-1">
+                          Nombre de la clase Modelo *
+                        </label>
+                        <input
+                          type="text"
+                          value={mvcNombreModelo}
+                          onChange={(e) => setMvcNombreModelo(e.target.value.trim() || 'SeguridadBancaria')}
+                          placeholder="SeguridadBancaria"
+                          className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] font-mono text-sm"
                         />
-                        <p className="mt-2 text-xs text-gray-500">El backend envolverá este método y ejecutará automáticamente los 3 casos de prueba, igual que en ejercicios.</p>
+                        <p className="mt-1 text-xs text-gray-500">El nombre en Java debe iniciar con mayúscula y no tener espacios.</p>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
-                          <div className="text-xs text-gray-500 mb-1">Método derivado</div>
-                          <div className="text-sm font-semibold text-[#3A4A5B]">{compilerMethod?.nombre || 'Pendiente de derivar'}</div>
-                        </div>
-                        <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
-                          <div className="text-xs text-gray-500 mb-1">Retorno</div>
-                          <div className="text-sm font-semibold text-[#3A4A5B]">{compilerMethod?.retorno || 'Pendiente de derivar'}</div>
-                        </div>
-                        <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
-                          <div className="text-xs text-gray-500 mb-1">Parámetros</div>
-                          <div className="text-sm font-semibold text-[#3A4A5B] break-words">
-                            {compilerMethod?.parametros?.length
-                              ? compilerMethod?.parametros.map((param) => `${param.tipo} ${param.nombre}`).join(', ')
-                              : 'Pendiente de derivar'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-sm text-gray-600">Restricciones técnicas (opcionales)</label>
-                        <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
-                          {sintaxisDisponibles.map((sintaxis) => (
-                            <label key={sintaxis} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={sintaxisRequerida.includes(sintaxis)}
-                                onChange={() => toggleSintaxis(sintaxis)}
-                                className="h-4 w-4"
-                              />
-                              <span className="font-mono">{sintaxis}</span>
-                            </label>
+                      {/* Tab editor for Main + Modelo + ConsolaIO preview */}
+                      <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                        {/* Tab bar */}
+                        <div className="flex border-b border-gray-700 bg-[#1E1E1E]">
+                          {(
+                            [
+                              { id: 'main' as const, label: 'Main.java' },
+                              { id: 'modelo' as const, label: `${mvcNombreModelo || 'Modelo'}.java` },
+                              { id: 'consolaIO' as const, label: 'ConsolaIO.java (fija)' },
+                            ]
+                          ).map((tab) => (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              onClick={() => setMvcActiveTab(tab.id)}
+                              className={`px-4 py-2.5 text-xs font-mono transition-colors border-r border-gray-700 ${
+                                mvcActiveTab === tab.id
+                                  ? 'bg-[#2D2D2D] text-white border-t-2 border-t-[#4A90E2]'
+                                  : 'text-gray-400 hover:text-gray-200 hover:bg-[#252525]'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
                           ))}
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">Si no defines restricciones, la evaluación validará únicamente los casos de prueba.</p>
+
+                        {/* Monaco — renderizado condicional para que el editor siempre monte con el valor correcto */}
+                        <div style={{ minHeight: '280px' }}>
+                          {mvcActiveTab === 'main' && (
+                            <JavaEditor key="mini-main" value={mvcTemplateMain} readOnly={false} onChange={(v) => setMvcTemplateMain(v)} height={280} />
+                          )}
+                          {mvcActiveTab === 'modelo' && (
+                            <JavaEditor key="mini-modelo" value={mvcTemplateModelo} readOnly={false} onChange={(v) => setMvcTemplateModelo(v)} height={280} />
+                          )}
+                          {mvcActiveTab === 'consolaIO' && (
+                            <JavaEditor key="mini-consolaIO" value={CONSOLA_IO_SOURCE} readOnly readOnlyLabel="ConsolaIO.java — solo lectura, clase fija del sistema" height={280} />
+                          )}
+                        </div>
+                        <p className="bg-[#1E1E1E] border-t border-gray-700 px-3 py-1.5 text-gray-500 text-[11px] font-mono">
+                          {mvcActiveTab === 'consolaIO'
+                            ? 'ConsolaIO.java es fija e inamovible — el sistema la incluye automáticamente en cada compilación.'
+                            : 'Este contenido es la plantilla de inicio que verá el estudiante. Puede editarlo durante la resolución.'}
+                        </p>
                       </div>
 
+                      {/* Casos de prueba */}
                       <div>
-                        <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Casos de prueba obligatorios *</label>
-                        <p className="text-xs text-gray-500 mb-3">Los inputs aceptan valores separados por comas. El output del caso 1 también se usa como referencia resumida del esperado.</p>
+                        <label className="block text-sm font-medium text-[#3A4A5B] mb-1">Casos de prueba *</label>
+                        <p className="text-xs text-gray-500 mb-3">
+                          <strong>Inputs</strong>: valores separados por coma (ej: <code className="font-mono">4,12000,10</code>).<br />
+                          <strong>Output</strong>: una línea por cada <code className="font-mono">println</code> del programa.
+                        </p>
                         <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-                          {compilerCases.map((caseItem, index) => (
-                            <div key={index} className="space-y-3 bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
-                              <div className="text-xs font-semibold uppercase tracking-wide text-[#3A4A5B]">Caso {index + 1}</div>
+                          {mvcCasosPrueba.map((caso, idx) => (
+                            <div key={idx} className="space-y-2 bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
+                              <div className="text-xs font-semibold uppercase tracking-wide text-[#3A4A5B]">Caso {idx + 1}</div>
                               <div>
-                                <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Inputs</label>
+                                <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Inputs (stdin)</label>
                                 <input
                                   type="text"
-                                  value={caseItem.inputs}
-                                  onChange={(event) => handleCompilerCaseChange(index, 'inputs', event.target.value)}
-                                  placeholder="Ej: 5,3"
-                                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
+                                  value={caso.inputs}
+                                  onChange={(e) => {
+                                    const next = mvcCasosPrueba.map((c, i) => i === idx ? { ...c, inputs: e.target.value } : c);
+                                    setMvcCasosPrueba(next);
+                                  }}
+                                  placeholder="Ej: 4,12000,10"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] text-sm font-mono"
                                 />
                               </div>
                               <div>
                                 <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Output esperado *</label>
-                                <input
-                                  type="text"
-                                  value={caseItem.output}
-                                  onChange={(event) => handleCompilerCaseChange(index, 'output', event.target.value)}
-                                  placeholder="Resultado esperado"
-                                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
+                                <textarea
+                                  rows={4}
+                                  value={caso.output}
+                                  onChange={(e) => {
+                                    const next = mvcCasosPrueba.map((c, i) => i === idx ? { ...c, output: e.target.value } : c);
+                                    setMvcCasosPrueba(next);
+                                  }}
+                                  placeholder={"Total: 48000.0\nDescuento: 4800.0\nTotal a pagar: 43200.0"}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] text-sm font-mono resize-none"
                                 />
+                                <p className="mt-0.5 text-[10px] text-gray-400 font-mono">una línea por cada println</p>
                               </div>
                             </div>
                           ))}

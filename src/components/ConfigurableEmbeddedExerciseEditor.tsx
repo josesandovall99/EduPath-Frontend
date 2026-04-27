@@ -1,21 +1,21 @@
-import { ClipboardList, Code2, GitBranchPlus, Grip, ListChecks, MessagesSquare, Plus, Shapes, Trash2 } from 'lucide-react';
+import { ClipboardList, Code2, GitBranchPlus, Grip, ListChecks, Lock, MessagesSquare, Plus, Shapes, Trash2 } from 'lucide-react';
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import {
-  CompilerCase,
   ConfigurableExerciseType,
   EmbeddedExercise,
   EmbeddedQuestion,
-  createDefaultCompilerConfig,
   createEmptyEmbeddedExercise,
-  formatJavaLikeTemplate,
-  parseMethodTemplate,
 } from './configurableEmbeddedExercises';
+import { JavaEditor } from './JavaEditor';
+import { CONSOLA_IO_SOURCE } from '../utils/consolaIOSource';
 
 interface ConfigurableEmbeddedExerciseEditorProps {
   exercises: EmbeddedExercise[];
   onChange: (exercises: EmbeddedExercise[]) => void;
   supportPanels?: ReactNode;
 }
+
+// CONSOLA_IO_SOURCE is imported — full official source, single source of truth
 
 const EXERCISE_TYPES: ConfigurableExerciseType[] = ['Compilador', 'Diagramas UML', 'Preguntas', 'Opción única', 'Ordenar', 'Relacionar'];
 const ADDABLE_EXERCISE_TYPES: ConfigurableExerciseType[] = EXERCISE_TYPES.filter((type) => type !== 'Preguntas');
@@ -50,6 +50,7 @@ function buildSingleChoiceExerciseUpdate(exercise: EmbeddedExercise, updates: Re
 export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, supportPanels }: ConfigurableEmbeddedExerciseEditorProps) {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(exercises[0]?.id || null);
   const [editingTypeExerciseId, setEditingTypeExerciseId] = useState<string | null>(null);
+  const [activeCompilerTab, setActiveCompilerTab] = useState<'main' | 'modelo' | 'consolaIO'>('main');
 
   useEffect(() => {
     if (exercises.length === 0) {
@@ -254,10 +255,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                 {selectedExercise ? (() => {
                   const exercise = selectedExercise;
                   const index = selectedIndex;
-                  const compilerConfig = exercise.tipo_ejercicio === 'Compilador' ? { ...createDefaultCompilerConfig(), ...(exercise.configuracion || {}) } : null;
-                  const methodTemplate = exercise.codigoEstructura || compilerConfig?.metodo?.plantilla || '';
-                  const derivedMethod = compilerConfig ? parseMethodTemplate(methodTemplate) : null;
-                  const compilerCases: CompilerCase[] = compilerConfig?.casos_prueba || [];
+                  const compilerConfig = exercise.tipo_ejercicio === 'Compilador' ? { ...(exercise.configuracion || {}) } : null;
                   const questions: EmbeddedQuestion[] = Array.isArray(exercise.configuracion?.preguntas) ? exercise.configuracion.preguntas : [];
                   const options: string[] = Array.isArray(exercise.configuracion?.opciones) ? exercise.configuracion.opciones : [];
                   const orderingItems: string[] = Array.isArray(exercise.configuracion?.items) ? exercise.configuracion.items : [];
@@ -336,47 +334,107 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                             <div className="app-miniproyecto-visualizer-section__head">
                               <div>
                                 <div className="app-miniproyecto-visualizer-section__eyebrow">Configuración</div>
-                                <h4 className="app-miniproyecto-visualizer-section__title">Plantilla Java</h4>
+                                <h4 className="app-miniproyecto-visualizer-section__title">Estructura MVC · Java</h4>
                               </div>
-                              <button type="button" onClick={() => handleUpdateExercise(index, { codigoEstructura: formatJavaLikeTemplate(methodTemplate) })} className="app-btn app-btn-secondary app-btn-sm">Dar formato</button>
+                              <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700">Java · MVC</span>
                             </div>
-                            <div className="app-miniproyecto-visualizer-section__body">
-                              <textarea
-                                value={methodTemplate}
-                                onChange={(event) => {
-                                  const plantilla = event.target.value;
-                                  const metodo = parseMethodTemplate(plantilla);
-                                  handleUpdateExercise(index, { codigoEstructura: plantilla, configuracion: { ...compilerConfig, metodo: metodo ? { ...metodo, plantilla } : null } });
-                                }}
-                                rows={7}
-                                className="app-form-textarea font-mono text-sm leading-6"
-                              />
-                              <div className="app-form-note">Método derivado: {derivedMethod ? `${derivedMethod.retorno} ${derivedMethod.nombre}(${derivedMethod.parametros.map((param) => `${param.tipo} ${param.nombre}`).join(', ')})` : 'Firma pendiente de detectar'}</div>
-                              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                                {(compilerCases.length ? compilerCases : createDefaultCompilerConfig().casos_prueba).map((caseItem, caseIndex) => (
-                                  <div key={`${exercise.id}-case-${caseIndex}`} className="app-miniproyecto-visualizer-mini-card">
-                                    <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Caso {caseIndex + 1}</div>
-                                    <input
-                                      value={caseItem.inputs || ''}
-                                      onChange={(event) => {
-                                        const nextCases = (compilerCases.length ? compilerCases : createDefaultCompilerConfig().casos_prueba).map((item, itemIndex) => itemIndex === caseIndex ? { ...item, inputs: event.target.value } : item);
-                                        handleUpdateConfig(index, { casos_prueba: nextCases });
-                                      }}
-                                      placeholder="Inputs"
-                                      className="app-form-input mb-2"
-                                    />
-                                    <input
-                                      value={caseItem.output || ''}
-                                      onChange={(event) => {
-                                        const nextCases = (compilerCases.length ? compilerCases : createDefaultCompilerConfig().casos_prueba).map((item, itemIndex) => itemIndex === caseIndex ? { ...item, output: event.target.value } : item);
-                                        handleUpdateExercise(index, { resultado_ejercicio: nextCases[0]?.output || '', configuracion: { ...compilerConfig, casos_prueba: nextCases } });
-                                      }}
-                                      placeholder="Output esperado"
-                                      className="app-form-input"
-                                    />
-                                  </div>
-                                ))}
+                            <div className="app-miniproyecto-visualizer-section__body space-y-4">
+
+                              {/* Nombre del modelo */}
+                              <div>
+                                <label className="block text-xs font-medium text-slate-600 mb-1">Nombre de la clase Modelo</label>
+                                <input
+                                  type="text"
+                                  value={compilerConfig?.nombreModelo || ''}
+                                  onChange={(e) => handleUpdateConfig(index, { tipo: 'mvc', nombreModelo: e.target.value })}
+                                  placeholder="Ej: SeguridadBancaria"
+                                  className="app-form-input font-mono max-w-xs"
+                                />
                               </div>
+
+                              {/* Tab editor */}
+                              <div className="rounded-xl overflow-hidden border border-gray-700">
+                                {/* Tab bar */}
+                                <div className="flex bg-[#1E1E1E] border-b border-gray-700">
+                                  {(
+                                    [
+                                      { id: 'main' as const, label: 'Main.java' },
+                                      { id: 'modelo' as const, label: `${compilerConfig?.nombreModelo || 'Modelo'}.java` },
+                                      { id: 'consolaIO' as const, label: 'ConsolaIO.java' },
+                                    ] as const
+                                  ).map((tab) => (
+                                    <button
+                                      key={tab.id}
+                                      type="button"
+                                      onClick={() => setActiveCompilerTab(tab.id)}
+                                      className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-mono border-r border-gray-700 transition-colors ${
+                                        activeCompilerTab === tab.id
+                                          ? 'bg-[#2D2D2D] text-white border-t-2 border-t-sky-400'
+                                          : 'text-gray-400 hover:text-gray-200 hover:bg-[#252525]'
+                                      }`}
+                                    >
+                                      {tab.id === 'consolaIO' && <Lock className="w-3 h-3 text-yellow-400" />}
+                                      {tab.label}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {/* Monaco — renderizado condicional para que el editor monte con el valor correcto */}
+                                <div className="min-h-[260px]">
+                                  {activeCompilerTab === 'main' && (
+                                    <JavaEditor key={`cfg-main-${exercise.id}`} value={compilerConfig?.templateMain || ''} readOnly={false} onChange={(v) => handleUpdateConfig(index, { tipo: 'mvc', templateMain: v })} height={260} />
+                                  )}
+                                  {activeCompilerTab === 'modelo' && (
+                                    <JavaEditor key={`cfg-modelo-${exercise.id}`} value={compilerConfig?.templateModelo || ''} readOnly={false} onChange={(v) => handleUpdateConfig(index, { tipo: 'mvc', templateModelo: v })} height={260} />
+                                  )}
+                                  {activeCompilerTab === 'consolaIO' && (
+                                    <JavaEditor key="cfg-consolaIO" value={CONSOLA_IO_SOURCE} readOnly readOnlyLabel="ConsolaIO.java — solo lectura, clase fija del sistema" height={260} />
+                                  )}
+                                </div>
+                                <p className="bg-[#1E1E1E] border-t border-gray-700 px-3 py-1.5 text-gray-500 text-[10px] font-mono">
+                                  {activeCompilerTab === 'consolaIO'
+                                    ? 'ConsolaIO.java es fija — no se edita y siempre se compila junto con los demás archivos.'
+                                    : 'Este contenido es la plantilla de inicio que verá el estudiante en esta pestaña.'}
+                                </p>
+                              </div>
+
+                              {/* Casos de prueba */}
+                              <div>
+                                <label className="app-miniproyecto-visualizer-card__label mb-2 block">Casos de prueba *</label>
+                                <p className="app-form-note mb-3">Define los inputs (stdin) y el output esperado para cada caso. El sistema ejecuta el programa completo con cada input y compara el resultado.</p>
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                  {([0, 1, 2] as const).map((caseIndex) => {
+                                    const casos: { inputs: string; output: string }[] = Array.isArray(compilerConfig?.casos_prueba) ? compilerConfig.casos_prueba : [];
+                                    const caseItem = casos[caseIndex] || { inputs: '', output: '' };
+                                    const updateCase = (field: 'inputs' | 'output', value: string) => {
+                                      const next = [0, 1, 2].map((i) => ({ ...(casos[i] || { inputs: '', output: '' }), ...(i === caseIndex ? { [field]: value } : {}) }));
+                                      handleUpdateConfig(index, { tipo: 'mvc', casos_prueba: next });
+                                    };
+                                    return (
+                                      <div key={caseIndex} className="app-miniproyecto-visualizer-mini-card space-y-2">
+                                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Caso {caseIndex + 1}</div>
+                                        <div>
+                                          <label className="block text-[11px] text-slate-500 mb-1">Inputs (stdin)</label>
+                                          <input value={caseItem.inputs} onChange={(e) => updateCase('inputs', e.target.value)} placeholder="Ej: 4,12000,10" className="app-form-input font-mono text-xs" />
+                                          <p className="mt-0.5 text-[10px] text-slate-400 font-mono">valores separados por coma</p>
+                                        </div>
+                                        <div>
+                                          <label className="block text-[11px] text-slate-500 mb-1">Output esperado *</label>
+                                          <textarea
+                                            rows={3}
+                                            value={caseItem.output}
+                                            onChange={(e) => updateCase('output', e.target.value)}
+                                            placeholder={"Total: 48000.0\nDescuento: 4800.0\nTotal a pagar: 43200.0"}
+                                            className="app-form-textarea font-mono text-xs resize-none"
+                                          />
+                                          <p className="mt-0.5 text-[10px] text-slate-400 font-mono">una línea por cada println</p>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
                             </div>
                           </section>
                         ) : null}

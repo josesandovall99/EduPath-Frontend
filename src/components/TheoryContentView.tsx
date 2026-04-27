@@ -1180,6 +1180,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     }}
                     onBack={onBack}
                     embedded={true}
+                    exerciseData={ejercicioAsociado}
+                    exerciseId={ejercicioAsociado.id}
                   />
                 )}
 

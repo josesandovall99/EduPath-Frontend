@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Plus, Edit, Eye, EyeOff, Search, Loader, Trash2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Eye, EyeOff, Search, Loader, Trash2, AlertCircle, Lock } from 'lucide-react';
+import { JavaEditor } from './JavaEditor';
+import { CONSOLA_IO_SOURCE } from '../utils/consolaIOSource';
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
@@ -139,199 +141,131 @@ function formatJavaLikeTemplate(input: string) {
 
 // Componente para configuración de Compilador
 function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormData; setFormData: React.Dispatch<React.SetStateAction<ExerciseFormData>> }) {
-  const compilerConfig = {
-    ...createDefaultCompilerConfig(),
-    ...(formData.ejercicio.configuracion || {}),
-  };
-  const casosPrueba = Array.isArray(compilerConfig.casos_prueba) && compilerConfig.casos_prueba.length === 3
-    ? compilerConfig.casos_prueba
+  const cfg = formData.ejercicio.configuracion || {};
+  const nombreModelo: string = (cfg as any).nombreModelo || 'Modelo';
+  const templateMain: string = (cfg as any).templateMain || '';
+  const templateModelo: string = (cfg as any).templateModelo || '';
+  const casosPrueba: { inputs: string; output: string }[] = Array.isArray((cfg as any).casos_prueba)
+    ? (cfg as any).casos_prueba
     : [emptyCompilerCase(), emptyCompilerCase(), emptyCompilerCase()];
-  const plantillaMetodo = formData.ejercicio.codigoEstructura || compilerConfig.metodo?.plantilla || '';
-  const metodoDerivado = parseMethodTemplate(plantillaMetodo);
+  const [activeTab, setActiveTab] = useState<'main' | 'modelo' | 'consolaIO'>('main');
 
-  const updateCompilerConfig = (updates: Record<string, any>, extraEjercicio: Partial<ExerciseFormData['ejercicio']> = {}) => {
+  const updateCfg = (updates: Record<string, any>) => {
     setFormData((prev) => ({
       ...prev,
       ejercicio: {
         ...prev.ejercicio,
-        ...extraEjercicio,
-        configuracion: {
-          ...createDefaultCompilerConfig(),
-          ...prev.ejercicio.configuracion,
-          ...updates,
-        }
-      }
+        configuracion: { ...prev.ejercicio.configuracion, tipo: 'mvc', ...updates },
+      },
     }));
   };
 
-  const handleTemplateChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const plantilla = e.target.value;
-    const metodo = parseMethodTemplate(plantilla);
-
-    updateCompilerConfig({
-      metodo: metodo ? { ...metodo, plantilla } : null,
-      lenguajesPermitidos: [62],
-      casos_prueba: casosPrueba,
-    }, {
-      codigoEstructura: plantilla,
-    });
+  const updateCase = (index: number, field: 'inputs' | 'output', value: string) => {
+    const next = [0, 1, 2].map((i) => ({
+      ...(casosPrueba[i] || emptyCompilerCase()),
+      ...(i === index ? { [field]: value } : {}),
+    }));
+    updateCfg({ casos_prueba: next });
   };
 
-  const handleFormatTemplate = () => {
-    const plantillaFormateada = formatJavaLikeTemplate(plantillaMetodo || '');
-    const metodo = parseMethodTemplate(plantillaFormateada);
-
-    updateCompilerConfig({
-      metodo: metodo ? { ...metodo, plantilla: plantillaFormateada } : null,
-      lenguajesPermitidos: [62],
-      casos_prueba: casosPrueba,
-    }, {
-      codigoEstructura: plantillaFormateada,
-    });
-
-    toast.success('Plantilla formateada');
-  };
-
-  const handleSintaxisChange = (sintaxis: string) => {
-    const currentSintaxis = compilerConfig?.sintaxis || [];
-    const newSintaxis = currentSintaxis.includes(sintaxis)
-      ? currentSintaxis.filter((s: string) => s !== sintaxis)
-      : [...currentSintaxis, sintaxis];
-
-    updateCompilerConfig({ sintaxis: newSintaxis, casos_prueba: casosPrueba });
-  };
-
-  const handleCaseChange = (index: number, field: 'inputs' | 'output', value: string) => {
-    const nuevosCasos = casosPrueba.map((caso: any, caseIndex: number) =>
-      caseIndex === index ? { ...caso, [field]: value } : caso
-    );
-
-    updateCompilerConfig({
-      casos_prueba: nuevosCasos,
-      metodo: metodoDerivado ? { ...metodoDerivado, plantilla: plantillaMetodo } : compilerConfig.metodo,
-    }, {
-      resultado_ejercicio: nuevosCasos[0]?.output || 'Ejercicio con 3 casos de prueba'
-    });
-  };
-
-  const sintaxisDisponibles = ['while', 'for', 'if', 'switch'];
-  const sintaxisSeleccionadas = compilerConfig?.sintaxis || [];
 
   return (
-    <div className="space-y-4 p-4 lg:p-5 bg-blue-50 rounded-xl border border-blue-200">
-      <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración de Compilador</h3>
+    <div className="space-y-5 p-4 lg:p-5 bg-blue-50 rounded-xl border border-blue-200">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración de Compilador · MVC</h3>
+        <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700">Java · MVC</span>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)] gap-4 items-start">
-        <div className="space-y-4 min-w-0">
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <label className="block text-sm font-medium text-[#3A4A5B]">Plantilla del método *</label>
-              <button
-                type="button"
-                onClick={handleFormatTemplate}
-                className="app-btn app-btn-secondary app-btn-sm text-violet-700"
-              >
-                Dar formato
-              </button>
-            </div>
-            <textarea
-              value={plantillaMetodo}
-              onChange={handleTemplateChange}
-              placeholder={"public static int sumar(int a, int b) {\n    // TODO\n}"}
-              rows={12}
-              className="w-full min-h-64 lg:min-h-72 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono text-sm leading-7 bg-white resize-y"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-2">La plantilla del método es el campo principal. El backend encapsulará este método dentro de una clase Main y ejecutará los 3 casos automáticamente.</p>
-          </div>
+      {/* Nombre del modelo */}
+      <div>
+        <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Nombre de la clase Modelo *</label>
+        <input
+          type="text"
+          value={nombreModelo}
+          onChange={(e) => updateCfg({ nombreModelo: e.target.value || 'Modelo' })}
+          placeholder="Ej: SeguridadBancaria"
+          className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] font-mono text-sm"
+        />
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
-              <div className="text-xs text-gray-500 mb-1">Método derivado</div>
-              <div className="text-sm font-semibold text-[#3A4A5B]">{metodoDerivado?.nombre || 'Pendiente de derivar'}</div>
-            </div>
-            <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
-              <div className="text-xs text-gray-500 mb-1">Retorno</div>
-              <div className="text-sm font-semibold text-[#3A4A5B]">{metodoDerivado?.retorno || 'Pendiente de derivar'}</div>
-            </div>
-            <div className="bg-white rounded-xl border border-blue-100 p-3 shadow-sm">
-              <div className="text-xs text-gray-500 mb-1">Parámetros</div>
-              <div className="text-sm font-semibold text-[#3A4A5B] break-words">
-                {metodoDerivado?.parametros?.length
-                  ? metodoDerivado.parametros.map((param) => `${param.tipo} ${param.nombre}`).join(', ')
-                  : 'Pendiente de derivar'}
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-blue-100/80 bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF6FF] p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <label className="text-sm font-semibold text-[#3A4A5B]">Restricciones técnicas (opcionales)</label>
-              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-                {sintaxisSeleccionadas.length} activas
-              </span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {sintaxisDisponibles.map(sintaxis => {
-                const active = sintaxisSeleccionadas.includes(sintaxis);
-                return (
-                  <label
-                    key={sintaxis}
-                    className={`group flex items-center gap-3.5 cursor-pointer rounded-xl border px-3 py-2.5 transition-all ${
-                      active
-                        ? 'border-blue-300 bg-blue-50 shadow-[0_6px_16px_rgba(74,144,226,0.12)]'
-                        : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={() => handleSintaxisChange(sintaxis)}
-                      className="h-4 w-4 rounded border-gray-300 text-[#4A90E2] focus:ring-[#4A90E2]"
-                    />
-                    <span className={`ml-2 text-sm font-mono ${active ? 'text-blue-800 font-semibold' : 'text-[#3A4A5B]'}`}>
-                      {sintaxis}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-            <p className="mt-3 text-xs leading-5 text-slate-600">Solo se validan si el ejercicio las define. Si quedan vacías, el backend evaluará únicamente los 3 casos de prueba.</p>
-          </div>
+      {/* Tab editor Monaco — tres instancias montadas siempre, ocultas con display:none para no perder contenido al cambiar pestaña */}
+      <div className="rounded-xl overflow-hidden border border-gray-700 shadow-sm">
+        <div className="flex bg-[#1E1E1E] border-b border-gray-700">
+          {([
+            { id: 'main' as const, label: 'Main.java' },
+            { id: 'modelo' as const, label: `${nombreModelo || 'Modelo'}.java` },
+            { id: 'consolaIO' as const, label: 'ConsolaIO.java' },
+          ] as const).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-mono border-r border-gray-700 transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-[#2D2D2D] text-white border-t-2 border-t-[#4A90E2]'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-[#252525]'
+              }`}
+            >
+              {tab.id === 'consolaIO' && <Lock className="w-3 h-3 text-yellow-400" />}
+              {tab.label}
+            </button>
+          ))}
         </div>
+        <div style={{ minHeight: '260px' }}>
+          {activeTab === 'main' && (
+            <JavaEditor key="ex-main" value={templateMain} readOnly={false} onChange={(v) => updateCfg({ templateMain: v })} height={260} />
+          )}
+          {activeTab === 'modelo' && (
+            <JavaEditor key="ex-modelo" value={templateModelo} readOnly={false} onChange={(v) => updateCfg({ templateModelo: v })} height={260} />
+          )}
+          {activeTab === 'consolaIO' && (
+            <JavaEditor key="ex-consolaIO" value={CONSOLA_IO_SOURCE} readOnly readOnlyLabel="ConsolaIO.java — solo lectura, clase fija del sistema" height={260} />
+          )}
+        </div>
+        <p className="bg-[#1E1E1E] border-t border-gray-700 px-3 py-1.5 text-gray-500 text-[10px] font-mono">
+          {activeTab === 'consolaIO'
+            ? 'ConsolaIO.java es fija — se compila siempre junto con los demás archivos.'
+            : 'Plantilla de inicio que verá el estudiante al abrir el ejercicio.'}
+        </p>
+      </div>
 
-        <div className="space-y-3 min-w-0">
-          <div>
-            <label className="block text-sm font-medium text-[#3A4A5B] mb-2">Casos de prueba obligatorios *</label>
-            <p className="text-xs text-gray-500 mb-3">Los inputs aceptan valores separados por comas, por ejemplo: 5,3</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {casosPrueba.map((caso: any, index: number) => (
+      {/* Casos de prueba */}
+      <div>
+        <label className="block text-sm font-medium text-[#3A4A5B] mb-1">Casos de prueba obligatorios *</label>
+        <p className="text-xs text-gray-500 mb-3">
+          Inputs separados por coma (ej: <code className="font-mono">5,3</code>). El programa se ejecuta una vez por caso con esos valores como entrada estándar.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {[0, 1, 2].map((index) => {
+            const caso = casosPrueba[index] || emptyCompilerCase();
+            return (
               <div key={index} className="space-y-3 bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
                 <div className="text-xs font-semibold uppercase tracking-wide text-[#3A4A5B]">Caso {index + 1}</div>
                 <div>
-                  <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Inputs *</label>
+                  <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Inputs (stdin)</label>
                   <input
                     type="text"
                     value={caso.inputs || ''}
-                    onChange={(e) => handleCaseChange(index, 'inputs', e.target.value)}
-                    placeholder="Ej: 5,3"
+                    onChange={(e) => updateCase(index, 'inputs', e.target.value)}
+                    placeholder="Ej: 4,12000,10"
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
                   />
+                  <p className="mt-1 text-[10px] text-gray-400 font-mono">valores separados por coma</p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Output esperado *</label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={3}
                     value={caso.output || ''}
-                    onChange={(e) => handleCaseChange(index, 'output', e.target.value)}
-                    placeholder="Resultado esperado"
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
+                    onChange={(e) => updateCase(index, 'output', e.target.value)}
+                    placeholder={"Total: 48000.0\nDescuento: 4800.0\nTotal a pagar: 43200.0"}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono resize-none"
                   />
+                  <p className="mt-1 text-[10px] text-gray-400 font-mono">una línea por cada println del programa</p>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -1034,14 +968,13 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
             emptyCompilerCase()
           ];
       configuracion = {
-        ...createDefaultCompilerConfig(),
-        ...configuracion,
+        tipo: 'mvc',
+        nombreModelo: configuracion.nombreModelo || 'Modelo',
+        templateMain: configuracion.templateMain || '',
+        templateModelo: configuracion.templateModelo || '',
+        lenguajesPermitidos: [62],
         casos_prueba: casos,
-        metodo: configuracion.metodo || (item.codigoEstructura ? {
-          ...(parseMethodTemplate(item.codigoEstructura) || {}),
-          plantilla: item.codigoEstructura,
-        } : null),
-        lenguajesPermitidos: [62]
+        esperado: casos[0]?.output || '',
       };
     } else if (item.tipo_ejercicio === 'Diagramas UML') {
       configuracion = {
@@ -1216,38 +1149,34 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         return;
       }
     } else if (formData.ejercicio.tipo_ejercicio === 'Compilador') {
-      const plantilla = formData.ejercicio.codigoEstructura.trim();
-      const metodoDerivado = parseMethodTemplate(plantilla);
-      const casosPrueba = formData.ejercicio.configuracion?.casos_prueba || [];
+      const cfg = formData.ejercicio.configuracion || {};
+      const casosPrueba: any[] = Array.isArray((cfg as any).casos_prueba) ? (cfg as any).casos_prueba : [];
 
-      if (!plantilla || !metodoDerivado) {
-        toast.error('Plantilla inválida', { description: 'La plantilla del método es obligatoria y debe incluir una firma Java válida.' });
-        return;
-      }
-      if (!Array.isArray(casosPrueba) || casosPrueba.length !== 3) {
+      if (casosPrueba.length !== 3) {
         toast.error('Casos de prueba requeridos', { description: 'Debes definir exactamente 3 casos de prueba.' });
         return;
       }
       for (let i = 0; i < casosPrueba.length; i += 1) {
-        const caso = casosPrueba[i];
-        if (!caso.output?.trim()) {
+        if (!casosPrueba[i]?.output?.trim()) {
           toast.error('Caso de prueba incompleto', { description: `El caso ${i + 1} debe tener output esperado.` });
           return;
         }
       }
 
       const normalizedConfig = {
-        ...createDefaultCompilerConfig(),
-        ...formData.ejercicio.configuracion,
+        tipo: 'mvc',
+        nombreModelo: (cfg as any).nombreModelo || 'Modelo',
+        templateMain: (cfg as any).templateMain || '',
+        templateModelo: (cfg as any).templateModelo || '',
         lenguajesPermitidos: [62],
-        metodo: { ...metodoDerivado, plantilla },
         casos_prueba: casosPrueba.map((caso: any) => ({
           inputs: (caso.inputs || '').toString().trim(),
           output: (caso.output || '').toString().trim(),
-        }))
+        })),
+        esperado: casosPrueba[0]?.output?.trim() || '',
       };
       compilerConfigForSubmit = normalizedConfig;
-      compilerResultForSubmit = normalizedConfig.casos_prueba[0]?.output || 'Ejercicio con 3 casos de prueba';
+      compilerResultForSubmit = normalizedConfig.esperado || 'Ejercicio MVC con 3 casos de prueba';
     } else if (formData.ejercicio.tipo_ejercicio === 'Opción única') {
       const cfg = formData.ejercicio.configuracion;
       if (!cfg?.enunciado || !Array.isArray(cfg.opciones) || cfg.opciones.some((o: string) => !o) || !cfg?.respuestaCorrecta) {

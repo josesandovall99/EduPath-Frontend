@@ -1,9 +1,12 @@
 ﻿import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Trash2, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Lock, Trash2, XCircle } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { toast } from 'sonner';
 import { executeExercise, submitExercise } from '../utils/submitExercise';
 import { API_BASE_URL } from '../utils/constants';
+import { JavaEditor } from './JavaEditor';
+import { CONSOLA_IO_SOURCE } from '../utils/consolaIOSource';
+import { mergeMvcFiles } from '../utils/mergeMvcFiles';
 
 interface Content {
   id: string;
@@ -46,8 +49,18 @@ interface Ejercicio {
   codigoEstructura?: string;
   tipo_ejercicio: string;
   configuracion?: {
+    // MVC fields
+    tipo?: string;
+    nombreModelo?: string;
+    templateMain?: string;
+    templateModelo?: string;
+    esperado?: string;
+    // Legacy fields
     metodo?: MetodoConfiguracion;
     casos_prueba?: CasoPruebaConfigurado[];
+    lenguajesPermitidos?: number[];
+    sintaxis?: string[];
+    [key: string]: unknown;
   };
   actividad?: {
     titulo: string;
@@ -228,11 +241,11 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   const sectionLabelClass = 'mb-1 inline-flex border-l-2 border-[#4A90E2] pl-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500';
 
   const guideItems = [
-    'Implementa unicamente la logica dentro del metodo proporcionado.',
-    'No modifiques el nombre del metodo ni sus parametros.',
-    'No escribas el metodo main.',
-    'Los casos visibles permiten revisar el criterio de evaluación de la solución.',
-    'El botón Ejecutar permite pruebas previas y Enviar registra la calificación de la solución.'
+    'Implementa únicamente la lógica solicitada en el enunciado o en las clases indicadas.',
+    'No modifiques `ConsolaIO.java` — es la plantilla que maneja stdin/stdout para el juez.',
+    'Usa el botón Ejecutar para pruebas rápidas y Enviar para someter la solución a la evaluación definitiva.',
+    'Para ejercicios MVC: edita Main.java y el modelo; no cambies la firma pública de los métodos indicados.',
+    'Si algo falla, activa Debug desde la interfaz (o agrega "debug: true" en la petición) para ver stdout/stderr completos.'
   ];
 
   const [code, setCode] = useState(configurableMode ? '' : DEFAULT_TEMPLATE);
@@ -245,11 +258,19 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   const [puntos, setPuntos] = useState<number | null>(null);
   const [casosPruebaResultados, setCasosPruebaResultados] = useState<CasoPruebaResultado[]>([]);
   const [resultMode, setResultMode] = useState<ResultMode>('idle');
+  // MVC mode state
+  const [isMvcMode, setIsMvcMode] = useState(false);
+  const [mvcNombreModelo, setMvcNombreModelo] = useState('Modelo');
+  const [mvcActiveTab, setMvcActiveTab] = useState<'main' | 'modelo' | 'consolaIO'>('main');
+  const [mvcMainCode, setMvcMainCode] = useState('');
+  const [mvcModeloCode, setMvcModeloCode] = useState('');
+  const [mvcStdin, setMvcStdin] = useState('');
+  const [mvcFreeOutput, setMvcFreeOutput] = useState<{ stdout: string; stderr: string } | null>(null);
   const configurableChangeRef = useRef(onConfigurableResponseChange);
   const lastEmittedResponseRef = useRef<string>('');
   const [isConfigurableReady, setIsConfigurableReady] = useState(!configurableMode);
 
-  const methodPreview = buildMethodPreview(ejercicio?.configuracion?.metodo);
+  
   const configuredCases = Array.isArray(ejercicio?.configuracion?.casos_prueba)
     ? ejercicio.configuracion.casos_prueba
     : [];
@@ -275,6 +296,30 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
         const nextCode = embeddedCode || template;
         return currentCode === nextCode ? currentCode : nextCode;
       });
+
+      // Initialize MVC tabs from teacher templates when exercise is MVC type
+      // configuracion can come as object (JSONB) or string (TEXT) — handle both
+      const rawCfg = exerciseData.configuracion;
+      const cfg = typeof rawCfg === 'string' ? (() => { try { return JSON.parse(rawCfg); } catch { return {}; } })() : (rawCfg ?? {});
+
+      console.log('[MVC Init] configuracion:', cfg);
+
+      if (cfg.tipo === 'mvc') {
+        const nombreModelo = cfg.nombreModelo || 'Modelo';
+        const mainTemplate = cfg.templateMain && cfg.templateMain.trim()
+          ? cfg.templateMain
+          : `public class Main {\n\n    public static void main(String[] args) {\n        ConsolaIO consola = new ConsolaIO();\n        ${nombreModelo} modelo = new ${nombreModelo}(consola);\n        // Tu código aquí\n    }\n}`;
+        const modeloTemplate = cfg.templateModelo && cfg.templateModelo.trim()
+          ? cfg.templateModelo
+          : `public class ${nombreModelo} {\n\n    private ConsolaIO consola;\n\n    public ${nombreModelo}(ConsolaIO consola) {\n        this.consola = consola;\n    }\n\n    // Implementa los métodos aquí\n}`;
+
+        setIsMvcMode(true);
+        setMvcNombreModelo(nombreModelo);
+        setMvcMainCode(mainTemplate);
+        setMvcModeloCode(modeloTemplate);
+        setMvcActiveTab('main');
+      }
+
       setIsLoadingExercise(false);
       setIsConfigurableReady(true);
       return;
@@ -333,12 +378,27 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   };
 
   const handleClear = () => {
-    setCode(getInitialTemplate(ejercicio));
+    if (isMvcMode) {
+      const cfg = ejercicio?.configuracion as any;
+      if (mvcActiveTab === 'main') {
+        setMvcMainCode(cfg?.templateMain || `public class Main {\n\n    public static void main(String[] args) {\n        ConsolaIO consola = new ConsolaIO();\n        ${mvcNombreModelo} modelo = new ${mvcNombreModelo}(consola);\n        // Tu código aquí\n    }\n}`);
+      } else if (mvcActiveTab === 'modelo') {
+        setMvcModeloCode(cfg?.templateModelo || `public class ${mvcNombreModelo} {\n\n    private ConsolaIO consola;\n\n    public ${mvcNombreModelo}(ConsolaIO consola) {\n        this.consola = consola;\n    }\n\n    // Implementa los métodos aquí\n}`);
+      }
+    } else {
+      setCode(getInitialTemplate(ejercicio));
+    }
     clearResults();
   };
 
   const handleFormatCode = () => {
-    setCode((previousCode) => formatJavaLikeCode(previousCode));
+    const cfg = ejercicio?.configuracion as any;
+    if (cfg?.tipo === 'mvc') {
+      if (mvcActiveTab === 'main') setMvcMainCode((prev) => formatJavaLikeCode(prev));
+      else if (mvcActiveTab === 'modelo') setMvcModeloCode((prev) => formatJavaLikeCode(prev));
+    } else {
+      setCode((previousCode) => formatJavaLikeCode(previousCode));
+    }
     toast.success('Codigo formateado', { description: 'Se aplico indentacion automatica en el editor.' });
   };
 
@@ -354,20 +414,44 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
     setCasosPruebaResultados([]);
     setResultMode('execution');
 
-    const result = await executeExercise(ejercicio.id, code, 62, executePath);
-    const data: any = result.data || {};
+    const rawCfg = typeof ejercicio.configuracion === 'string'
+      ? (() => { try { return JSON.parse(ejercicio.configuracion as any); } catch { return {}; } })()
+      : (ejercicio.configuracion ?? {});
+    const esMvc = isMvcMode || rawCfg.tipo === 'mvc';
 
-    if (result.status === 200) {
-      setCasosPruebaResultados(Array.isArray(data?.casos) ? data.casos : []);
-      setFeedback(data?.resumen || 'La ejecucion finalizo correctamente.');
-      toast.success('Ejecucion completada', { description: 'Se mostraron resultados sin calificar.' });
+    // MVC: merge los 3 archivos en el frontend y enviar como `codigo` normal
+    const codigoAEnviar = esMvc
+      ? mergeMvcFiles(mvcMainCode || rawCfg.templateMain || '', mvcModeloCode || rawCfg.templateModelo || '', CONSOLA_IO_SOURCE)
+      : code;
+
+    const result = await executeExercise(ejercicio.id, codigoAEnviar, 62, executePath, { debug: true });
+    const data: any = result.data || {};
+    if (data?.debug) {
+      console.log('DEBUG ejecución compilador:', data.debug);
+      toast.info('Debug: revisa la consola (Network → Response) para más detalles');
+    }
+    const casosList = Array.isArray(data?.casos) ? data.casos
+      : Array.isArray(data?.casosPrueba) ? data.casosPrueba : [];
+
+    // 200 = todos los casos pasaron | 400 con casos = algunos fallaron (ambos son resultados válidos)
+    if (result.status === 200 || (result.status === 400 && casosList.length > 0)) {
+      setCasosPruebaResultados(casosList);
+      const resumen = data?.resumen || (result.status === 200 ? 'Todos los casos pasaron.' : 'Algunos casos no pasaron. Revisa tu código.');
+      setFeedback(resumen);
+      if (result.status === 200) {
+        toast.success('Ejecución completada', { description: resumen });
+      } else {
+        toast.info('Ejecución completada', { description: resumen });
+      }
       setIsRunning(false);
       return;
     }
 
-    setFeedback(data?.message || result.message || 'No fue posible ejecutar la solucion.');
-    setCasosPruebaResultados(Array.isArray(data?.casos) ? data.casos : []);
-    toast.error('Error al ejecutar', { description: data?.message || result.message || 'No fue posible ejecutar la solucion.' });
+    // Error técnico real (500, red error, etc.)
+    const errMsg = data?.message || result.message || 'No fue posible ejecutar la solución.';
+    setFeedback(errMsg);
+    setCasosPruebaResultados(casosList);
+    toast.error('Error al ejecutar', { description: errMsg });
     setIsRunning(false);
   };
 
@@ -390,7 +474,18 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
       return;
     }
 
-    const result = await submitExercise(ejercicio.id, { texto: code }, estudianteId, submitPath, executePath ? { codigo: code } : undefined);
+    const rawCfgSubmit = typeof ejercicio.configuracion === 'string'
+      ? (() => { try { return JSON.parse(ejercicio.configuracion as any); } catch { return {}; } })()
+      : (ejercicio.configuracion ?? {});
+    const esMvcSubmit = isMvcMode || rawCfgSubmit.tipo === 'mvc';
+
+    // MVC: merge en frontend, enviar como texto normal
+    const codigoSubmit = esMvcSubmit
+      ? mergeMvcFiles(mvcMainCode || rawCfgSubmit.templateMain || '', mvcModeloCode || rawCfgSubmit.templateModelo || '', CONSOLA_IO_SOURCE)
+      : code;
+
+    const mvcSubmitExtra = executePath && !esMvcSubmit ? { codigo: code } : undefined;
+    const result = await submitExercise(ejercicio.id, { texto: codigoSubmit }, estudianteId, submitPath, mvcSubmitExtra);
     const data: any = result.data || {};
 
     if (result.status === 429) {
@@ -408,7 +503,9 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
       return;
     }
 
-    if (Array.isArray(data?.casosPrueba)) setCasosPruebaResultados(data.casosPrueba);
+    // Soportar tanto casos (MVC) como casosPrueba (legacy)
+    const casosSubmit = Array.isArray(data?.casos) ? data.casos : (Array.isArray(data?.casosPrueba) ? data.casosPrueba : []);
+    if (casosSubmit.length > 0) setCasosPruebaResultados(casosSubmit);
 
     if (result.status === 400) {
       setFeedback(data?.retroalimentacion || data?.resumen || 'La solucion no supero la validacion.');
@@ -482,11 +579,11 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
           <p className="mt-4 border-t border-slate-100 pt-4 text-[14px] leading-6 text-gray-600">{ejercicio?.actividad?.descripcion || 'Sin descripcion disponible.'}</p>
         </section>
 
-        <section className="grid grid-cols-2 gap-5">
+        <section className="grid grid-cols-1 gap-5">
           <div className={`${cardClass} relative flex min-w-0 flex-col overflow-hidden`}>
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4A90E2]/25 via-transparent to-[#7ED6A7]/25" />
             <div className="mb-4 border-b border-slate-100 pb-3">
-              <span className={sectionLabelClass}>Guia</span>
+              <span className={sectionLabelClass}>Guía</span>
               <h3 className="text-[1.1rem] font-bold text-[#3A4A5B]">Instrucciones</h3>
             </div>
             <ul className="space-y-3 text-sm leading-7 text-gray-700">
@@ -497,33 +594,6 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div className={`${cardClass} relative flex min-w-0 flex-col overflow-hidden`}>
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4A90E2]/25 via-transparent to-[#7ED6A7]/25" />
-            <div className="mb-4 border-b border-slate-100 pb-3">
-              <span className={sectionLabelClass}>Metodo</span>
-              <h3 className="text-[1.1rem] font-bold text-[#3A4A5B]">Firma del metodo</h3>
-            </div>
-            <div className="flex-1 overflow-hidden rounded-[1.2rem] border border-slate-200 bg-slate-50">
-              <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                </div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Java</div>
-              </div>
-              <div className="flex min-h-full py-4 font-mono text-sm">
-                <div className="shrink-0 border-r border-slate-200 px-3 text-right text-slate-400 select-none">
-                  {methodPreview.split('\n').map((_, index) => <div key={index} className="leading-7">{index + 1}</div>)}
-                </div>
-                <div className="min-w-0 flex-1 px-4 text-slate-700">
-                  <div className="mb-3 text-xs uppercase tracking-[0.16em] text-slate-400">Vista previa</div>
-                  <pre className="whitespace-pre-wrap break-words leading-7 text-slate-700">{methodPreview}</pre>
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -609,22 +679,131 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
           </div>
 
           <div className="flex flex-col lg:min-h-0 lg:flex-1">
-            <div className="min-h-[920px] w-full overflow-auto bg-slate-950 p-6 lg:min-h-[78vh] lg:flex-1" style={{ backgroundImage: 'radial-gradient(circle at top left, rgba(74,144,226,0.18), transparent 28%), radial-gradient(circle at bottom right, rgba(126,214,167,0.12), transparent 24%), linear-gradient(180deg, rgba(15,23,42,0.96) 0%, rgba(15,23,42,1) 100%)' }}>
-              <div className="flex min-h-full w-full">
-                <div className="mr-5 shrink-0 border-r border-slate-700/90 pr-4 text-right font-mono text-sm text-slate-400 select-none">
-                  {Array.from({ length: visibleEditorLineCount }, (_, index) => <div key={index}>{index + 1}</div>)}
-                </div>
-                <textarea
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  rows={EDITOR_BASE_VISIBLE_LINES}
-                  className="min-h-full w-full flex-1 resize-none bg-transparent font-mono text-[15px] leading-7 text-white outline-none"
-                  spellCheck={false}
-                />
-              </div>
-            </div>
+            {isMvcMode ? (
+              <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 320px)' }}>
 
-            <div className="border-t border-slate-200 bg-white p-5 lg:max-h-[260px] lg:overflow-y-auto">
+                {/* ── Barra de pestañas MVC — mismo gradiente que el toolbar ── */}
+                <div className="shrink-0 border-b border-slate-200 bg-[linear-gradient(90deg,rgba(74,144,226,0.06)_0%,rgba(255,255,255,1)_50%,rgba(126,214,167,0.06)_100%)] px-2">
+                  <div className="flex items-end gap-1">
+                    {(
+                      [
+                        { id: 'main' as const, label: 'Main.java', icon: null },
+                        { id: 'modelo' as const, label: `${mvcNombreModelo}.java`, icon: null },
+                        { id: 'consolaIO' as const, label: 'ConsolaIO.java', icon: <Lock className="h-3 w-3 text-amber-500" /> },
+                      ] as const
+                    ).map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setMvcActiveTab(tab.id)}
+                        className={`flex items-center gap-1.5 rounded-t-xl px-4 py-2.5 text-xs font-mono font-semibold transition-all ${
+                          mvcActiveTab === tab.id
+                            ? 'border-b-2 bg-white text-[#3A4A5B] shadow-sm'
+                            : 'text-slate-400 hover:bg-white/60 hover:text-slate-600'
+                        }`}
+                        style={mvcActiveTab === tab.id ? { borderBottomColor: '#4A90E2' } : {}}
+                      >
+                        {tab.icon}
+                        {tab.label}
+                      </button>
+                    ))}
+                    <div className="ml-auto self-center pr-2">
+                      <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: 'rgba(74,144,226,0.10)', color: '#4A90E2' }}>
+                        Java · MVC
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Área Monaco — altura fija en px para que Monaco pueda calcularla ── */}
+                <div
+                  style={{
+                    backgroundImage: 'radial-gradient(circle at top left, rgba(74,144,226,0.18), transparent 28%), radial-gradient(circle at bottom right, rgba(126,214,167,0.12), transparent 24%), linear-gradient(180deg, rgba(15,23,42,0.96) 0%, rgba(15,23,42,1) 100%)'
+                  }}
+                >
+                  {mvcActiveTab === 'main' && (
+                    <JavaEditor key={`main-${ejercicio?.id}`} value={mvcMainCode} readOnly={false} onChange={(v) => setMvcMainCode(v)} height={520} />
+                  )}
+                  {mvcActiveTab === 'modelo' && (
+                    <JavaEditor key={`modelo-${ejercicio?.id}`} value={mvcModeloCode} readOnly={false} onChange={(v) => setMvcModeloCode(v)} height={520} />
+                  )}
+                  {mvcActiveTab === 'consolaIO' && (
+                    <JavaEditor key="consolaIO" value={CONSOLA_IO_SOURCE} readOnly readOnlyLabel="ConsolaIO.java — solo lectura, clase de utilidad fija del sistema" height={520} />
+                  )}
+                </div>
+
+                {/* ── Panel de resultados de casos de prueba (igual que ejercicios normales) ── */}
+                <div className="shrink-0 border-t border-slate-200 bg-white p-5 max-h-[280px] overflow-y-auto">
+                  <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-3">
+                      <span className={sectionLabelClass}>Resultado</span>
+                      <h4 className="text-sm font-bold text-[#3A4A5B]">Casos de prueba</h4>
+                    </div>
+                    {puntos !== null && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">Puntos: {puntos}</span>}
+                  </div>
+                  {normalizedFeedback && (
+                    <div className={`mb-4 rounded-xl border px-4 py-3 text-sm leading-6 ${aprobado ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                      {normalizedFeedback}
+                    </div>
+                  )}
+                  {casosPruebaResultados.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                      Presiona <strong>Ejecutar</strong> para probar tu código contra los casos del docente, o <strong>Enviar</strong> para calificar.
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {casosPruebaResultados.map((caso) => {
+                        const visual = getCaseVisualState(caso);
+                        const Icon = visual.icon;
+                        return (
+                          <div key={caso.caseNum} className={`rounded-xl border p-4 ${visual.cardClass}`}>
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                                <Icon className={`h-4 w-4 ${visual.iconClass}`} />
+                                Caso {caso.caseNum}
+                              </div>
+                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${visual.badgeClass}`}>{visual.label}</span>
+                            </div>
+                            <p className={`text-sm leading-6 ${caso.paso ? 'text-emerald-700' : (caso.omitido ? 'text-amber-600' : 'text-rose-700')}`}>{getCaseMessage(caso)}</p>
+                            {(caso.outputObtenido || caso.stdout) && (
+                              <div className="mt-3">
+                                <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Salida del compilador (stdout)</div>
+                                <pre className="whitespace-pre-wrap break-words rounded-md bg-white px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">{caso.outputObtenido || caso.stdout}</pre>
+                              </div>
+                            )}
+                            {caso.error && (
+                              <div className="mt-2">
+                                <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-rose-600">Stderr / Error</div>
+                                <pre className="whitespace-pre-wrap break-words rounded-md bg-rose-50 px-3 py-2 font-mono text-xs text-rose-700 ring-1 ring-rose-100">{caso.error}</pre>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            ) : (
+              <div className="min-h-[920px] w-full overflow-auto bg-slate-950 p-6 lg:min-h-[78vh] lg:flex-1" style={{ backgroundImage: 'radial-gradient(circle at top left, rgba(74,144,226,0.18), transparent 28%), radial-gradient(circle at bottom right, rgba(126,214,167,0.12), transparent 24%), linear-gradient(180deg, rgba(15,23,42,0.96) 0%, rgba(15,23,42,1) 100%)' }}>
+                <div className="flex min-h-full w-full">
+                  <div className="mr-5 shrink-0 border-r border-slate-700/90 pr-4 text-right font-mono text-sm text-slate-400 select-none">
+                    {Array.from({ length: visibleEditorLineCount }, (_, index) => <div key={index}>{index + 1}</div>)}
+                  </div>
+                  <textarea
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    rows={EDITOR_BASE_VISIBLE_LINES}
+                    className="min-h-full w-full flex-1 resize-none bg-transparent font-mono text-[15px] leading-7 text-white outline-none"
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+            )}
+
+            {!isMvcMode && (
+              <div className="border-t border-slate-200 bg-white p-5 lg:max-h-[260px] lg:overflow-y-auto">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-600">Resultado</h3>
                 {puntos !== null && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">Puntos: {puntos}</span>}
@@ -656,13 +835,26 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                           </div>
                           <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${visual.badgeClass}`}>{visual.label}</span>
                         </div>
-                        <p className="text-sm leading-6 text-slate-700">{getCaseMessage(caso)}</p>
+                        <p className={`text-sm leading-6 ${caso.paso ? 'text-emerald-700' : (caso.omitido ? 'text-amber-600' : 'text-rose-700')}`}>{getCaseMessage(caso)}</p>
+                        {(caso.outputObtenido || caso.stdout) && (
+                          <div className="mt-3">
+                            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Salida del compilador (stdout)</div>
+                            <pre className="whitespace-pre-wrap break-words rounded-md bg-white px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">{caso.outputObtenido || caso.stdout}</pre>
+                          </div>
+                        )}
+                        {caso.error && (
+                          <div className="mt-2">
+                            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-rose-600">Stderr / Error</div>
+                            <pre className="whitespace-pre-wrap break-words rounded-md bg-rose-50 px-3 py-2 font-mono text-xs text-rose-700 ring-1 ring-rose-100">{caso.error}</pre>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               )}
-            </div>
+              </div>
+            )}
           </div>
         </section>
 
