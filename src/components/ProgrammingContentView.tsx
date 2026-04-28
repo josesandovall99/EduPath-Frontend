@@ -183,13 +183,269 @@ function getCaseVisualState(caso: CasoPruebaResultado) {
   };
 }
 
-function getCaseMessage(caso: CasoPruebaResultado) {
-  if (caso.statusDescription && !caso.paso && !caso.error && caso.outputObtenido) {
-    return `Salida obtenida: ${caso.outputObtenido}`;
+// ── Terminal output ───────────────────────────────────────────────────────────
+
+function TerminalOutput({ output }: { output: string }) {
+  if (!output) return null;
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border border-slate-700">
+      {/* Chrome bar */}
+      <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-rose-400/80" />
+        <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
+        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
+        <span className="ml-2 font-mono text-[10px] text-slate-400">Salida del compilador</span>
+      </div>
+      {/* Output body */}
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words bg-slate-900 px-4 py-3 font-mono text-[12px] leading-6 text-slate-100">
+        {output.split('\n').map((line, i) => {
+          // Highlight input values (appended after prompts ending in ':')
+          const promptMatch = line.match(/^(.*:\s*)(.+)$/);
+          if (promptMatch) {
+            return (
+              <div key={i}>
+                <span className="text-slate-300">{promptMatch[1]}</span>
+                <span className="text-emerald-300 font-semibold">{promptMatch[2]}</span>
+              </div>
+            );
+          }
+          // Section separators like "--- RESULTADOS ---"
+          if (/^-{2,}/.test(line.trim())) {
+            return <div key={i} className="text-slate-500">{line}</div>;
+          }
+          // Key: value pairs
+          const kvMatch = line.match(/^([^:]+):\s*(.+)$/);
+          if (kvMatch) {
+            return (
+              <div key={i}>
+                <span className="text-slate-400">{kvMatch[1]}:</span>
+                <span className="text-sky-300"> {kvMatch[2]}</span>
+              </div>
+            );
+          }
+          return <div key={i} className="text-slate-200">{line || ' '}</div>;
+        })}
+      </pre>
+    </div>
+  );
+}
+
+// ── Diagnóstico de compilación ──────────────────────────────────────────────
+
+function isCompilerError(error: string | null | undefined): boolean {
+  if (!error) return false;
+  return /Main\.java:\d+|cannot find symbol|Exception|error:/i.test(error);
+}
+
+// ── Offsets MVC (cuántas líneas hay ANTES de cada sección en el merged file) ──
+
+function _mvcParts(consolaIOCode: string, modeloCode: string, mainCode: string) {
+  function extractParts(code: string) {
+    const lines = (code || '').split('\n');
+    const imports: string[] = [];
+    const body: string[] = [];
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^package\s/.test(t) || /^import\s/.test(t)) imports.push(t);
+      else body.push(line);
+    }
+    return { imports, body: body.join('\n') };
   }
-  if (caso.omitido) return caso.error || 'La revision se detuvo antes de ejecutar este caso.';
-  if (caso.paso) return 'La solucion cumplio correctamente con este caso.';
-  return caso.error || 'La solucion no produjo el resultado esperado para este caso.';
+  function removePublic(c: string) {
+    return c.replace(/^(\s*)public\s+(class|interface|enum)\s+/gm, '$1$2 ');
+  }
+  const cio  = extractParts(removePublic(consolaIOCode || ''));
+  const mod  = extractParts(removePublic(modeloCode || ''));
+  const main = extractParts(mainCode || '');
+  const seen = new Set<string>();
+  const allImports: string[] = [];
+  for (const imp of [...cio.imports, ...mod.imports, ...main.imports]) {
+    if (imp && !seen.has(imp)) { seen.add(imp); allImports.push(imp); }
+  }
+  return { cio, mod, main, allImports };
+}
+
+/** Líneas ANTES del cuerpo de Main en el merged file. */
+function calcMvcMainOffset(consolaIOCode: string, modeloCode: string, mainCode: string): number {
+  const { cio, mod, allImports } = _mvcParts(consolaIOCode, modeloCode, mainCode);
+  const prefix = [allImports.join('\n'), cio.body.trim(), mod.body.trim()].filter(Boolean).join('\n\n');
+  return prefix ? prefix.split('\n').length + 1 : 0;
+}
+
+/** Líneas ANTES del cuerpo de Modelo en el merged file. */
+function calcMvcModeloOffset(consolaIOCode: string, modeloCode: string, mainCode: string): number {
+  const { cio, allImports } = _mvcParts(consolaIOCode, modeloCode, mainCode);
+  const prefix = [allImports.join('\n'), cio.body.trim()].filter(Boolean).join('\n\n');
+  return prefix ? prefix.split('\n').length + 1 : 0;
+}
+
+/**
+ * Detecta si el error pertenece a Modelo o Main y devuelve el studentCode + offset correcto.
+ */
+function resolveMvcErrorSource(
+  error: string,
+  consolaIOCode: string,
+  modeloCode: string,
+  mainCode: string
+): { studentCode: string; offset: number; file: 'main' | 'modelo' } {
+  const mainOffset   = calcMvcMainOffset(consolaIOCode, modeloCode, mainCode);
+  const modeloOffset = calcMvcModeloOffset(consolaIOCode, modeloCode, mainCode);
+  const lineMatch    = error.match(/Main\.java:(\d+)/i);
+  if (lineMatch) {
+    const mergedLine = Number(lineMatch[1]);
+    if (mergedLine <= mainOffset) {
+      // La línea cae antes del Main → pertenece al Modelo
+      return { studentCode: modeloCode, offset: modeloOffset, file: 'modelo' };
+    }
+  }
+  return { studentCode: mainCode, offset: mainOffset, file: 'main' };
+}
+
+/** Wrapper de DiagnosticBlock que resuelve automáticamente la fuente (Main vs Modelo). */
+function MvcDiagnosticBlock({ error, consolaIOCode, modeloCode, mainCode, className }: {
+  error: string; consolaIOCode: string; modeloCode: string; mainCode: string; className?: string;
+}) {
+  const { studentCode, offset } = resolveMvcErrorSource(error, consolaIOCode, modeloCode, mainCode);
+  return <DiagnosticBlock error={error} studentCode={studentCode} offset={offset} className={className} />;
+}
+
+function parseCompilerError(error: string, offset = 0): {
+  mergedLine: number | null;
+  studentLine: number | null;
+  errorType: string;
+  symbol: string | null;
+  location: string | null;
+  compilerCodeLine: string | null;
+  caretLine: string | null;
+} {
+  const lineMatch = error.match(/Main\.java:(\d+)/i);
+  const mergedLine = lineMatch ? Number(lineMatch[1]) : null;
+  const studentLine = mergedLine !== null ? Math.max(1, mergedLine - offset) : null;
+  const errorTypeMatch = error.match(/error:\s*([^\n^]+)/i);
+  const errorType = (errorTypeMatch ? errorTypeMatch[1] : error.split('\n')[0]).trim().slice(0, 100);
+  const symbolMatch = error.match(/symbol:\s*([^\n]+)/i);
+  const locationMatch = error.match(/location:\s*([^\n]+)/i);
+  // Extrae la línea de código y el caret que muestra el compilador
+  const caretMatch = error.match(/error:[^\n]+\n([^\n]+)\n(\s*\^)/);
+  return {
+    mergedLine, studentLine, errorType,
+    symbol: symbolMatch ? symbolMatch[1].trim() : null,
+    location: locationMatch ? locationMatch[1].trim() : null,
+    compilerCodeLine: caretMatch ? caretMatch[1] : null,
+    caretLine: caretMatch ? caretMatch[2] : null,
+  };
+}
+
+function getCodeSnippet(code: string, lineNum: number): Array<{ n: number; text: string; isError: boolean }> {
+  if (!code || lineNum < 1) return [];
+  const lines = code.split('\n');
+  const idx = lineNum - 1;
+  if (idx < 0 || idx >= lines.length) return [];
+  const start = Math.max(0, idx - 1);
+  const end = Math.min(lines.length - 1, idx + 1);
+  return lines.slice(start, end + 1).map((text, i) => ({ n: start + i + 1, text, isError: start + i + 1 === lineNum }));
+}
+
+function DiagnosticBlock({ error, className = '', studentCode, offset = 0 }: { error: string; className?: string; studentCode?: string; offset?: number }) {
+  const parsed = parseCompilerError(error, offset);
+  const snippetLines = parsed.studentLine && studentCode ? getCodeSnippet(studentCode, parsed.studentLine) : [];
+
+  // Columna relativa del ^ respecto al contenido trimmeado de la línea de error
+  let caretRelCol = -1;
+  if (parsed.compilerCodeLine && parsed.caretLine) {
+    const compilerIndent = parsed.compilerCodeLine.match(/^(\s*)/)?.[1].length ?? 0;
+    caretRelCol = Math.max(0, parsed.caretLine.indexOf('^') - compilerIndent);
+  }
+
+  const accion = [parsed.symbol, parsed.location].filter(Boolean).join(' — ') || parsed.errorType || 'Revisa la firma del método o campo referenciado.';
+
+  return (
+    <div className={`rounded-xl border border-rose-200 bg-rose-50/80 p-3 space-y-1.5 ${className}`}>
+      <div className="font-mono text-xs"><span className="font-bold text-rose-700">[ESTADO]:</span> <span className="text-rose-800">Error de compilación</span></div>
+      {parsed.studentLine !== null && <div className="font-mono text-xs"><span className="font-bold text-rose-700">[LÍNEA]:</span> <span className="text-rose-800">{parsed.studentLine}</span></div>}
+      <div className="font-mono text-xs"><span className="font-bold text-rose-700">[ERROR]:</span> <span className="text-rose-800">{parsed.errorType}</span></div>
+
+      {snippetLines.length > 0 && (
+        <pre className="overflow-x-auto rounded-md bg-rose-100/60 ring-1 ring-rose-200 px-3 py-1 font-mono text-[11px] leading-[1.6]">
+          {snippetLines.map(({ n, text, isError }) => {
+            const prefix = `${isError ? '→' : ' '} ${String(n).padStart(2)}: `;
+            const studentIndent = text.match(/^(\s*)/)?.[1].length ?? 0;
+            return (
+              <div key={n}>
+                <span className={`select-none ${isError ? 'text-rose-500' : 'text-rose-400'}`}>{prefix}</span>
+                <span className={isError ? 'font-semibold text-rose-900' : 'text-rose-700'}>{text}</span>
+                {/* ^ inlineado en la misma zona, una línea después de la línea de error */}
+                {isError && caretRelCol >= 0 && (
+                  <div className="select-none text-rose-500">
+                    {' '.repeat(prefix.length + studentIndent + caretRelCol)}
+                    <span className="font-bold text-rose-600">^</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </pre>
+      )}
+
+      <div className="font-mono text-xs"><span className="font-bold text-rose-700">[ACCIÓN]:</span> <span className="text-rose-800">{accion}</span></div>
+    </div>
+  );
+}
+
+// ── Protección de estructura del docente ────────────────────────────────────
+
+/** Verifica que TODAS las líneas no triviales del template del docente sigan presentes. */
+/**
+ * Simula el echo del terminal: inserta los valores de entrada del caso
+ * después de cada línea de prompt (líneas que terminan en ':').
+ * Judge0 no hace echo del stdin — esto lo reconstruye visualmente.
+ */
+function interleaveInputsWithOutput(output: string, inputs: string): string {
+  if (!output || !inputs) return output || '';
+  const inputValues = inputs.split(/,|\n/).map((v) => v.trim()).filter(Boolean);
+  if (inputValues.length === 0) return output;
+  let idx = 0;
+  return output
+    .split('\n')
+    .map((line) => {
+      if (/:\s*$/.test(line.trimEnd()) && idx < inputValues.length) {
+        return line.trimEnd() + inputValues[idx++];
+      }
+      return line;
+    })
+    .join('\n');
+}
+
+/**
+ * LCS order check — las líneas del docente deben aparecer EN ORDEN en el código.
+ * Protege líneas duplicadas (ej: dos '}') y evita reordenamientos o eliminaciones.
+ */
+function isStructureIntact(currentCode: string, templateCode: string): boolean {
+  if (!templateCode) return true;
+  const required = templateCode
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !/^\/\/\s*(Tu\s+c[oó]digo|implementa|agrega|aqu[ií]|here|TODO|FIXME|\.\.\.|your\s+code)/i.test(l));
+  if (required.length === 0) return true;
+  const currentTrimmed = currentCode.split('\n').map((l) => l.trim());
+  let idx = 0;
+  for (const line of currentTrimmed) {
+    if (idx < required.length && line === required[idx]) idx++;
+  }
+  return idx === required.length;
+}
+
+// ── Mensajes de caso ─────────────────────────────────────────────────────────
+
+function getCaseMessage(caso: CasoPruebaResultado) {
+  if (caso.statusDescription && /accepted/i.test(caso.statusDescription)) {
+    return 'Ejecutado correctamente.';
+  }
+  if (caso.omitido) return 'La revisión se detuvo — un caso anterior no cumplió.';
+  if (caso.paso) return 'La solución cumplió correctamente con este caso.';
+  if (isCompilerError(caso.error)) return 'Error de compilación — revisa el diagnóstico.';
+  if (caso.outputObtenido) return 'La salida obtenida no coincide con el resultado esperado.';
+  return 'La solución no produjo el resultado esperado para este caso.';
 }
 
 function getCaseAccent(_index: number) {
@@ -241,11 +497,11 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   const sectionLabelClass = 'mb-1 inline-flex border-l-2 border-[#4A90E2] pl-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500';
 
   const guideItems = [
-    'Implementa únicamente la lógica solicitada en el enunciado o en las clases indicadas.',
-    'No modifiques `ConsolaIO.java` — es la plantilla que maneja stdin/stdout para el juez.',
-    'Usa el botón Ejecutar para pruebas rápidas y Enviar para someter la solución a la evaluación definitiva.',
-    'Para ejercicios MVC: edita Main.java y el modelo; no cambies la firma pública de los métodos indicados.',
-    'Si algo falla, activa Debug desde la interfaz (o agrega "debug: true" en la petición) para ver stdout/stderr completos.'
+    'Firma inalterarable: la estructura base del ejercicio (clases y métodos definidos por el docente) no se puede borrar ni modificar. Solo tienes permiso para editar o eliminar el código que tú mismo hayas escrito dentro de esa estructura.',
+    'Archivos permitidos: realiza modificaciones exclusivamente en los archivos indicados en el enunciado del ejercicio.',
+    'ConsolaIO.java es el núcleo que gestiona la comunicación con el evaluador. Es de solo lectura — consúltala para entender el flujo de entrada/Salida del compilador.',
+    'Salida del compilador: toda referencia a resultados de ejecución se muestra bajo esa etiqueta. Usa Ejecutar para validar tu lógica y Enviar para la evaluación final.',
+    'Si el código falla, revisa el diagnóstico: [ESTADO] · [LÍNEA] · [ACCIÓN] — aplica la corrección indicada antes de volver a Ejecutar.'
   ];
 
   const [code, setCode] = useState(configurableMode ? '' : DEFAULT_TEMPLATE);
@@ -277,6 +533,10 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   const normalizedFeedback = normalizeCompilerMessage(feedback, code);
   const editorLines = code.split('\n');
   const visibleEditorLineCount = Math.max(EDITOR_BASE_VISIBLE_LINES, editorLines.length);
+  // Offset dinámico: cuántas líneas hay ANTES del cuerpo de Main en el archivo MVC fusionado
+  const mvcMainOffset = isMvcMode
+    ? calcMvcMainOffset(CONSOLA_IO_SOURCE, mvcModeloCode, mvcMainCode)
+    : COMPILER_WRAPPER_LINE_OFFSET;
 
   useEffect(() => {
     configurableChangeRef.current = onConfigurableResponseChange;
@@ -414,6 +674,29 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
     setCasosPruebaResultados([]);
     setResultMode('execution');
 
+    // ── Guarda de estructura ────────────────────────────────────────────────
+    const rawCfgGuard = typeof ejercicio.configuracion === 'string'
+      ? (() => { try { return JSON.parse(ejercicio.configuracion as any); } catch { return {}; } })()
+      : (ejercicio.configuracion ?? {});
+
+    if (isMvcMode || rawCfgGuard.tipo === 'mvc') {
+      if (rawCfgGuard.templateMain && !isStructureIntact(mvcMainCode, rawCfgGuard.templateMain)) {
+        toast.error('[ESTADO]: Estructura comprometida — Main.java', { description: '[ACCIÓN]: La firma del docente fue modificada. Usa "Restaurar plantilla".', duration: 6000 });
+        setIsRunning(false); setResultMode('idle'); return;
+      }
+      if (rawCfgGuard.templateModelo && !isStructureIntact(mvcModeloCode, rawCfgGuard.templateModelo)) {
+        toast.error(`[ESTADO]: Estructura comprometida — ${mvcNombreModelo}.java`, { description: '[ACCIÓN]: La firma del docente fue modificada. Usa "Restaurar plantilla".', duration: 6000 });
+        setIsRunning(false); setResultMode('idle'); return;
+      }
+    } else {
+      const tpl = getInitialTemplate(ejercicio);
+      if (tpl && !isStructureIntact(code, tpl)) {
+        toast.error('[ESTADO]: Estructura comprometida', { description: '[ACCIÓN]: La firma del docente fue modificada. Usa "Restaurar plantilla".', duration: 6000 });
+        setIsRunning(false); setResultMode('idle'); return;
+      }
+    }
+    // ───────────────────────────────────────────────────────────────────────
+
     const rawCfg = typeof ejercicio.configuracion === 'string'
       ? (() => { try { return JSON.parse(ejercicio.configuracion as any); } catch { return {}; } })()
       : (ejercicio.configuracion ?? {});
@@ -466,6 +749,29 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
     setPuntos(null);
     setCasosPruebaResultados([]);
     setResultMode('evaluation');
+
+    // ── Guarda de estructura ────────────────────────────────────────────────
+    const rawCfgGuardSubmit = typeof ejercicio.configuracion === 'string'
+      ? (() => { try { return JSON.parse(ejercicio.configuracion as any); } catch { return {}; } })()
+      : (ejercicio.configuracion ?? {});
+
+    if (isMvcMode || rawCfgGuardSubmit.tipo === 'mvc') {
+      if (rawCfgGuardSubmit.templateMain && !isStructureIntact(mvcMainCode, rawCfgGuardSubmit.templateMain)) {
+        toast.error('[ESTADO]: Estructura comprometida — Main.java', { description: '[ACCIÓN]: La firma del docente fue modificada. Usa "Restaurar plantilla".', duration: 6000 });
+        setIsSubmitting(false); setResultMode('idle'); return;
+      }
+      if (rawCfgGuardSubmit.templateModelo && !isStructureIntact(mvcModeloCode, rawCfgGuardSubmit.templateModelo)) {
+        toast.error(`[ESTADO]: Estructura comprometida — ${mvcNombreModelo}.java`, { description: '[ACCIÓN]: La firma del docente fue modificada. Usa "Restaurar plantilla".', duration: 6000 });
+        setIsSubmitting(false); setResultMode('idle'); return;
+      }
+    } else {
+      const tplSubmit = getInitialTemplate(ejercicio);
+      if (tplSubmit && !isStructureIntact(code, tplSubmit)) {
+        toast.error('[ESTADO]: Estructura comprometida', { description: '[ACCIÓN]: La firma del docente fue modificada. Usa "Restaurar plantilla".', duration: 6000 });
+        setIsSubmitting(false); setResultMode('idle'); return;
+      }
+    }
+    // ───────────────────────────────────────────────────────────────────────
 
     const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
     if (!estudianteId) {
@@ -722,10 +1028,24 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                   }}
                 >
                   {mvcActiveTab === 'main' && (
-                    <JavaEditor key={`main-${ejercicio?.id}`} value={mvcMainCode} readOnly={false} onChange={(v) => setMvcMainCode(v)} height={520} />
+                    <JavaEditor
+                      key={`main-${ejercicio?.id}`}
+                      value={mvcMainCode}
+                      readOnly={false}
+                      onChange={(v) => setMvcMainCode(v)}
+                      height={520}
+                      protectedTemplate={(ejercicio?.configuracion as any)?.templateMain || undefined}
+                    />
                   )}
                   {mvcActiveTab === 'modelo' && (
-                    <JavaEditor key={`modelo-${ejercicio?.id}`} value={mvcModeloCode} readOnly={false} onChange={(v) => setMvcModeloCode(v)} height={520} />
+                    <JavaEditor
+                      key={`modelo-${ejercicio?.id}`}
+                      value={mvcModeloCode}
+                      readOnly={false}
+                      onChange={(v) => setMvcModeloCode(v)}
+                      height={520}
+                      protectedTemplate={(ejercicio?.configuracion as any)?.templateModelo || undefined}
+                    />
                   )}
                   {mvcActiveTab === 'consolaIO' && (
                     <JavaEditor key="consolaIO" value={CONSOLA_IO_SOURCE} readOnly readOnlyLabel="ConsolaIO.java — solo lectura, clase de utilidad fija del sistema" height={520} />
@@ -733,7 +1053,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                 </div>
 
                 {/* ── Panel de resultados de casos de prueba (igual que ejercicios normales) ── */}
-                <div className="shrink-0 border-t border-slate-200 bg-white p-5 max-h-[280px] overflow-y-auto">
+                <div className="shrink-0 border-t border-slate-200 bg-white p-5">
                   <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-3">
                       <span className={sectionLabelClass}>Resultado</span>
@@ -741,10 +1061,10 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                     </div>
                     {puntos !== null && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">Puntos: {puntos}</span>}
                   </div>
-                  {normalizedFeedback && (
-                    <div className={`mb-4 rounded-xl border px-4 py-3 text-sm leading-6 ${aprobado ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
-                      {normalizedFeedback}
-                    </div>
+                  {(normalizedFeedback || feedback) && (
+                    isCompilerError(feedback)
+                      ? <MvcDiagnosticBlock error={feedback} consolaIOCode={CONSOLA_IO_SOURCE} modeloCode={mvcModeloCode} mainCode={mvcMainCode} className="mb-4" />
+                      : <div className={`mb-4 rounded-xl border px-4 py-3 text-sm leading-6 ${aprobado ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>{normalizedFeedback || feedback}</div>
                   )}
                   {casosPruebaResultados.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
@@ -765,17 +1085,14 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                               <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${visual.badgeClass}`}>{visual.label}</span>
                             </div>
                             <p className={`text-sm leading-6 ${caso.paso ? 'text-emerald-700' : (caso.omitido ? 'text-amber-600' : 'text-rose-700')}`}>{getCaseMessage(caso)}</p>
-                            {(caso.outputObtenido || caso.stdout) && (
-                              <div className="mt-3">
-                                <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Salida del compilador (stdout)</div>
-                                <pre className="whitespace-pre-wrap break-words rounded-md bg-white px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">{caso.outputObtenido || caso.stdout}</pre>
-                              </div>
+                            {!caso.omitido && (caso.outputObtenido || (caso as any).stdout) && (
+                              <TerminalOutput output={interleaveInputsWithOutput(
+                                caso.outputObtenido || (caso as any).stdout || '',
+                                configuredCases[caso.caseNum - 1]?.inputs || ''
+                              )} />
                             )}
-                            {caso.error && (
-                              <div className="mt-2">
-                                <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-rose-600">Stderr / Error</div>
-                                <pre className="whitespace-pre-wrap break-words rounded-md bg-rose-50 px-3 py-2 font-mono text-xs text-rose-700 ring-1 ring-rose-100">{caso.error}</pre>
-                              </div>
+                            {!caso.omitido && isCompilerError(caso.error) && (
+                              <MvcDiagnosticBlock error={caso.error!} consolaIOCode={CONSOLA_IO_SOURCE} modeloCode={mvcModeloCode} mainCode={mvcMainCode} className="mt-3" />
                             )}
                           </div>
                         );
@@ -793,7 +1110,18 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                   </div>
                   <textarea
                     value={code}
-                    onChange={(e) => setCode(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      const tpl = getInitialTemplate(ejercicio);
+                      if (tpl && !isStructureIntact(next, tpl)) {
+                        toast.error('[ESTADO]: Línea protegida', {
+                          description: '[ACCIÓN]: Esta línea es parte de la estructura del docente y no puede eliminarse.',
+                          duration: 2500,
+                        });
+                        return; // descarta el cambio
+                      }
+                      setCode(next);
+                    }}
                     rows={EDITOR_BASE_VISIBLE_LINES}
                     className="min-h-full w-full flex-1 resize-none bg-transparent font-mono text-[15px] leading-7 text-white outline-none"
                     spellCheck={false}
@@ -803,16 +1131,16 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
             )}
 
             {!isMvcMode && (
-              <div className="border-t border-slate-200 bg-white p-5 lg:max-h-[260px] lg:overflow-y-auto">
+              <div className="border-t border-slate-200 bg-white p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-600">Resultado</h3>
                 {puntos !== null && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">Puntos: {puntos}</span>}
               </div>
 
-              {normalizedFeedback && (
-                <div className={`mb-4 rounded-xl border px-4 py-3 text-sm leading-6 ${aprobado ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
-                  {normalizedFeedback}
-                </div>
+              {(normalizedFeedback || feedback) && (
+                isCompilerError(feedback)
+                  ? <DiagnosticBlock error={feedback} studentCode={code} offset={COMPILER_WRAPPER_LINE_OFFSET} className="mb-4" />
+                  : <div className={`mb-4 rounded-xl border px-4 py-3 text-sm leading-6 ${aprobado ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>{normalizedFeedback || feedback}</div>
               )}
 
               {isLoadingExercise ? (
@@ -836,17 +1164,14 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                           <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${visual.badgeClass}`}>{visual.label}</span>
                         </div>
                         <p className={`text-sm leading-6 ${caso.paso ? 'text-emerald-700' : (caso.omitido ? 'text-amber-600' : 'text-rose-700')}`}>{getCaseMessage(caso)}</p>
-                        {(caso.outputObtenido || caso.stdout) && (
-                          <div className="mt-3">
-                            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Salida del compilador (stdout)</div>
-                            <pre className="whitespace-pre-wrap break-words rounded-md bg-white px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">{caso.outputObtenido || caso.stdout}</pre>
-                          </div>
+                        {!caso.omitido && (caso.outputObtenido || (caso as any).stdout) && (
+                          <TerminalOutput output={interleaveInputsWithOutput(
+                            caso.outputObtenido || (caso as any).stdout || '',
+                            configuredCases[caso.caseNum - 1]?.inputs || ''
+                          )} />
                         )}
-                        {caso.error && (
-                          <div className="mt-2">
-                            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-rose-600">Stderr / Error</div>
-                            <pre className="whitespace-pre-wrap break-words rounded-md bg-rose-50 px-3 py-2 font-mono text-xs text-rose-700 ring-1 ring-rose-100">{caso.error}</pre>
-                          </div>
+                        {!caso.omitido && isCompilerError(caso.error) && (
+                          <DiagnosticBlock error={caso.error!} studentCode={code} offset={COMPILER_WRAPPER_LINE_OFFSET} className="mt-3" />
                         )}
                       </div>
                     );

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Plus, Edit, Eye, EyeOff, Search, Loader, Trash2, AlertCircle, Lock } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Plus, Edit, Eye, EyeOff, Search, Loader, Trash2, AlertCircle, Lock, Info } from 'lucide-react';
 import { JavaEditor } from './JavaEditor';
 import { CONSOLA_IO_SOURCE } from '../utils/consolaIOSource';
 import { toast } from 'sonner';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
+import { loadQuill, createQuillModules } from '../utils/quill';
 
 interface ExerciseManagementScreenProps {
   onBack: () => void;
@@ -139,12 +140,61 @@ function formatJavaLikeTemplate(input: string) {
     .join('\n');
 }
 
+// ── Constructos Java disponibles para restricciones ──────────────────────────
+const SYNTAX_GROUPS = [
+  {
+    group: 'Condicionales',
+    color: 'violet',
+    items: [
+      { key: 'if',      label: 'if / else' },
+      { key: 'else if', label: 'else if' },
+      { key: 'switch',  label: 'switch / case' },
+      { key: 'ternary', label: 'Ternario (? :)' },
+    ],
+  },
+  {
+    group: 'Bucles',
+    color: 'sky',
+    items: [
+      { key: 'for',      label: 'for' },
+      { key: 'for each', label: 'for-each' },
+      { key: 'while',    label: 'while' },
+      { key: 'do while', label: 'do-while' },
+    ],
+  },
+  {
+    group: 'Excepciones',
+    color: 'rose',
+    items: [
+      { key: 'try',   label: 'try / catch' },
+      { key: 'throw', label: 'throw' },
+    ],
+  },
+  {
+    group: 'Control',
+    color: 'amber',
+    items: [
+      { key: 'return',   label: 'return' },
+      { key: 'break',    label: 'break' },
+      { key: 'continue', label: 'continue' },
+    ],
+  },
+] as const;
+
+const GROUP_BADGE: Record<string, string> = {
+  violet: 'bg-violet-100 text-violet-700 border-violet-200',
+  sky:    'bg-sky-100 text-sky-700 border-sky-200',
+  rose:   'bg-rose-100 text-rose-700 border-rose-200',
+  amber:  'bg-amber-100 text-amber-700 border-amber-200',
+};
+
 // Componente para configuración de Compilador
 function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormData; setFormData: React.Dispatch<React.SetStateAction<ExerciseFormData>> }) {
   const cfg = formData.ejercicio.configuracion || {};
   const nombreModelo: string = (cfg as any).nombreModelo || 'Modelo';
   const templateMain: string = (cfg as any).templateMain || '';
   const templateModelo: string = (cfg as any).templateModelo || '';
+  const sintaxis: string[] = Array.isArray((cfg as any).sintaxis) ? (cfg as any).sintaxis : [];
   const casosPrueba: { inputs: string; output: string }[] = Array.isArray((cfg as any).casos_prueba)
     ? (cfg as any).casos_prueba
     : [emptyCompilerCase(), emptyCompilerCase(), emptyCompilerCase()];
@@ -168,39 +218,49 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
     updateCfg({ casos_prueba: next });
   };
 
+  const toggleSyntax = (key: string) => {
+    const next = sintaxis.includes(key) ? sintaxis.filter((s) => s !== key) : [...sintaxis, key];
+    updateCfg({ sintaxis: next });
+  };
 
   return (
-    <div className="space-y-5 p-4 lg:p-5 bg-blue-50 rounded-xl border border-blue-200">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="font-semibold text-[#3A4A5B] text-sm">Configuración de Compilador · MVC</h3>
-        <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700">Java · MVC</span>
+    <div className="space-y-6 p-5 lg:p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200">
+        <div>
+          <h3 className="font-bold text-[#3A4A5B] text-base">Configuración de Compilador · MVC</h3>
+          <p className="text-xs text-slate-400 mt-0.5">Define las plantillas, restricciones y casos de prueba del ejercicio</p>
+        </div>
+        <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 border border-sky-200">Java · MVC</span>
       </div>
 
       {/* Nombre del modelo */}
-      <div>
-        <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Nombre de la clase Modelo *</label>
-        <input
-          type="text"
-          value={nombreModelo}
-          onChange={(e) => updateCfg({ nombreModelo: e.target.value || 'Modelo' })}
-          placeholder="Ej: SeguridadBancaria"
-          className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] font-mono text-sm"
-        />
+      <div className="flex items-end gap-4">
+        <div className="flex-1 max-w-xs">
+          <label className="block text-xs font-semibold text-[#3A4A5B] mb-1.5">Nombre de la clase Modelo *</label>
+          <input
+            type="text"
+            value={nombreModelo}
+            onChange={(e) => updateCfg({ nombreModelo: e.target.value || 'Modelo' })}
+            placeholder="Ej: Estudiante"
+            className="w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] font-mono text-sm bg-white"
+          />
+        </div>
       </div>
 
-      {/* Tab editor Monaco — tres instancias montadas siempre, ocultas con display:none para no perder contenido al cambiar pestaña */}
-      <div className="rounded-xl overflow-hidden border border-gray-700 shadow-sm">
+      {/* Editor MVC */}
+      <div className="rounded-xl overflow-hidden border border-slate-700 shadow-md">
         <div className="flex bg-[#1E1E1E] border-b border-gray-700">
           {([
-            { id: 'main' as const, label: 'Main.java' },
-            { id: 'modelo' as const, label: `${nombreModelo || 'Modelo'}.java` },
-            { id: 'consolaIO' as const, label: 'ConsolaIO.java' },
+            { id: 'main'     as const, label: 'Main.java' },
+            { id: 'modelo'   as const, label: `${nombreModelo || 'Modelo'}.java` },
+            { id: 'consolaIO'as const, label: 'ConsolaIO.java' },
           ] as const).map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-mono border-r border-gray-700 transition-colors ${
+              className={`flex items-center gap-1.5 px-5 py-3 text-xs font-mono border-r border-gray-700 transition-colors ${
                 activeTab === tab.id
                   ? 'bg-[#2D2D2D] text-white border-t-2 border-t-[#4A90E2]'
                   : 'text-gray-400 hover:text-gray-200 hover:bg-[#252525]'
@@ -211,57 +271,120 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
             </button>
           ))}
         </div>
-        <div style={{ minHeight: '260px' }}>
+        <div>
           {activeTab === 'main' && (
-            <JavaEditor key="ex-main" value={templateMain} readOnly={false} onChange={(v) => updateCfg({ templateMain: v })} height={260} />
+            <JavaEditor key="ex-main"     value={templateMain}    readOnly={false} onChange={(v) => updateCfg({ templateMain: v })}    height={460} />
           )}
           {activeTab === 'modelo' && (
-            <JavaEditor key="ex-modelo" value={templateModelo} readOnly={false} onChange={(v) => updateCfg({ templateModelo: v })} height={260} />
+            <JavaEditor key="ex-modelo"   value={templateModelo}  readOnly={false} onChange={(v) => updateCfg({ templateModelo: v })}  height={460} />
           )}
           {activeTab === 'consolaIO' && (
-            <JavaEditor key="ex-consolaIO" value={CONSOLA_IO_SOURCE} readOnly readOnlyLabel="ConsolaIO.java — solo lectura, clase fija del sistema" height={260} />
+            <JavaEditor key="ex-consolaIO" value={CONSOLA_IO_SOURCE} readOnly readOnlyLabel="ConsolaIO.java — solo lectura, clase fija del sistema" height={460} />
           )}
         </div>
-        <p className="bg-[#1E1E1E] border-t border-gray-700 px-3 py-1.5 text-gray-500 text-[10px] font-mono">
+        <p className="bg-[#1E1E1E] border-t border-gray-700 px-4 py-2 text-gray-500 text-[10px] font-mono">
           {activeTab === 'consolaIO'
-            ? 'ConsolaIO.java es fija — se compila siempre junto con los demás archivos.'
-            : 'Plantilla de inicio que verá el estudiante al abrir el ejercicio.'}
+            ? 'ConsolaIO.java es fija — se compila siempre con los demás archivos.'
+            : 'Plantilla que verá el estudiante al abrir el ejercicio. Las líneas aquí serán protegidas y no podrán eliminarse.'}
         </p>
+      </div>
+
+      {/* Restricciones de sintaxis */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <label className="block text-xs font-semibold text-[#3A4A5B]">Estructuras obligatorias</label>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              El alumno debe usar estas estructuras en su código real — los comentarios (<code className="font-mono">// for</code>) no cuentan.
+            </p>
+          </div>
+          {sintaxis.length > 0 && (
+            <button
+              type="button"
+              onClick={() => updateCfg({ sintaxis: [] })}
+              className="text-[11px] text-slate-400 hover:text-rose-500 transition-colors"
+            >
+              Limpiar todo
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {SYNTAX_GROUPS.map((group) => (
+            <div key={group.group} className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm space-y-2">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{group.group}</div>
+              {group.items.map((item) => {
+                const checked = sintaxis.includes(item.key);
+                return (
+                  <label key={item.key} className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleSyntax(item.key)}
+                      className="h-3.5 w-3.5 rounded text-[#4A90E2] border-slate-300 cursor-pointer"
+                    />
+                    <span className={`text-[11px] font-mono transition-colors ${checked ? 'text-[#3A4A5B] font-semibold' : 'text-slate-500 group-hover:text-slate-700'}`}>
+                      {item.label}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {sintaxis.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {sintaxis.map((s) => {
+              const group = SYNTAX_GROUPS.find((g) => g.items.some((i) => i.key === s));
+              const badgeClass = group ? GROUP_BADGE[group.color] : 'bg-slate-100 text-slate-700 border-slate-200';
+              return (
+                <span key={s} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-mono font-semibold ${badgeClass}`}>
+                  {s}
+                  <button type="button" onClick={() => toggleSyntax(s)} className="ml-0.5 opacity-60 hover:opacity-100">×</button>
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Casos de prueba */}
       <div>
-        <label className="block text-sm font-medium text-[#3A4A5B] mb-1">Casos de prueba obligatorios *</label>
-        <p className="text-xs text-gray-500 mb-3">
-          Inputs separados por coma (ej: <code className="font-mono">5,3</code>). El programa se ejecuta una vez por caso con esos valores como entrada estándar.
+        <label className="block text-xs font-semibold text-[#3A4A5B] mb-1">Casos de prueba obligatorios *</label>
+        <p className="text-[11px] text-slate-400 mb-3">
+          Inputs separados por coma (ej: <code className="font-mono text-[11px]">Juan,4.0,3.0</code>). El programa se ejecuta una vez por caso con esos valores como stdin.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[0, 1, 2].map((index) => {
             const caso = casosPrueba[index] || emptyCompilerCase();
             return (
-              <div key={index} className="space-y-3 bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-[#3A4A5B]">Caso {index + 1}</div>
+              <div key={index} className="space-y-3 bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#3A4A5B]">Caso {index + 1}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-mono text-slate-500">stdin</span>
+                </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Inputs (stdin)</label>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Inputs (stdin)</label>
                   <input
                     type="text"
                     value={caso.inputs || ''}
                     onChange={(e) => updateCase(index, 'inputs', e.target.value)}
-                    placeholder="Ej: 4,12000,10"
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono"
+                    placeholder="Juan,4.0,3.0"
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] text-sm font-mono bg-slate-50"
                   />
-                  <p className="mt-1 text-[10px] text-gray-400 font-mono">valores separados por coma</p>
+                  <p className="mt-1 text-[10px] text-slate-400 font-mono">valores separados por coma</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Output esperado *</label>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Output esperado *</label>
                   <textarea
-                    rows={3}
+                    rows={4}
                     value={caso.output || ''}
                     onChange={(e) => updateCase(index, 'output', e.target.value)}
-                    placeholder={"Total: 48000.0\nDescuento: 4800.0\nTotal a pagar: 43200.0"}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent text-sm font-mono resize-none"
+                    placeholder={"Nombre del estudiante: Juan\nNota 1: 4.0\n--- RESULTADOS ---\nEstado: APROBADO"}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] text-sm font-mono resize-none bg-slate-50"
                   />
-                  <p className="mt-1 text-[10px] text-gray-400 font-mono">una línea por cada println del programa</p>
+                  <p className="mt-1 text-[10px] text-slate-400 font-mono">una línea por cada println del programa</p>
                 </div>
               </div>
             );
