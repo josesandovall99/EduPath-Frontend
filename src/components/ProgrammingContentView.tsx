@@ -346,6 +346,66 @@ function getCodeSnippet(code: string, lineNum: number): Array<{ n: number; text:
   return lines.slice(start, end + 1).map((text, i) => ({ n: start + i + 1, text, isError: start + i + 1 === lineNum }));
 }
 
+function buildFriendlyCompilerAction(rawError: string, parsed: {
+  errorType: string;
+  symbol: string | null;
+  location: string | null;
+}, studentCode?: string, studentLine?: number | null) {
+  const errorLower = (rawError || '').toLowerCase();
+  const errorTypeLower = (parsed.errorType || '').toLowerCase();
+  const sourceLines = (studentCode || '').split('\n');
+  const currentLine = studentLine && studentLine > 0 ? (sourceLines[studentLine - 1] || '') : '';
+  const previousLine = studentLine && studentLine > 1 ? (sourceLines[studentLine - 2] || '') : '';
+  const currentTrim = currentLine.trim();
+  const previousTrim = previousLine.trim();
+  const isLonelyToken = (text: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(text);
+  const isIgnorableLine = (text: string) => !text || text.startsWith('//');
+
+  if (errorTypeLower.includes('not a statement')) {
+    return 'Hay texto suelto que Java no entiende como instruccion (por ejemplo una letra sola). Elimina ese fragmento o conviertelo en una sentencia valida.';
+  }
+
+  // Heurística: cuando Java reporta "';' expected" pero realmente hay una cadena/carácter suelto en la línea actual o anterior.
+  if (errorTypeLower.includes("';' expected") || errorLower.includes("';' expected")) {
+    if (isLonelyToken(currentTrim) || isLonelyToken(previousTrim)) {
+      const token = isLonelyToken(currentTrim) ? currentTrim : previousTrim;
+      return `Hay una cadena/carácter suelto ("${token}") que rompe la sintaxis. Si fue accidental, elimínalo; si era una variable, úsala dentro de una instrucción válida.`;
+    }
+
+    // Si no está en la línea reportada, buscar hacia arriba (hasta 5 líneas),
+    // ignorando comentarios/espacios para detectar cadenas sueltas tipo "www".
+    if (studentLine && studentLine > 1) {
+      for (let i = studentLine - 2; i >= Math.max(0, studentLine - 6); i -= 1) {
+        const candidate = (sourceLines[i] || '').trim();
+        if (isIgnorableLine(candidate)) continue;
+        if (isLonelyToken(candidate)) {
+          return `Hay una cadena/carácter suelto ("${candidate}") que rompe la sintaxis. Si fue accidental, elimínalo; si era una variable, úsala dentro de una instrucción válida.`;
+        }
+        // Si encontramos una línea de código real no-token, detenemos la búsqueda.
+        break;
+      }
+    }
+  }
+
+  if (errorTypeLower.includes('cannot find symbol')) {
+    if (parsed.symbol) {
+      return `No existe o no es visible este simbolo: ${parsed.symbol}. Revisa nombre, mayusculas/minusculas o si falta declararlo/importarlo.`;
+    }
+    return 'Se referencia un simbolo que Java no reconoce. Revisa nombre, mayusculas/minusculas o si falta declararlo/importarlo.';
+  }
+
+  if (errorTypeLower.includes("';' expected") || errorLower.includes("';' expected")) {
+    return 'Falta un punto y coma (;). Revisa la linea marcada y la instruccion anterior.';
+  }
+
+  if (errorTypeLower.includes('reached end of file while parsing') || errorLower.includes('reached end of file while parsing')) {
+    return 'Falta cerrar una llave, parentesis o bloque. Revisa que todas las aperturas tengan su cierre.';
+  }
+
+  const fallback = [parsed.symbol, parsed.location].filter(Boolean).join(' — ');
+  return fallback || parsed.errorType || 'Revisa la firma del método o campo referenciado.';
+}
+
 function DiagnosticBlock({ error, className = '', studentCode, offset = 0 }: { error: string; className?: string; studentCode?: string; offset?: number }) {
   const parsed = parseCompilerError(error, offset);
   const snippetLines = parsed.studentLine && studentCode ? getCodeSnippet(studentCode, parsed.studentLine) : [];
@@ -357,28 +417,35 @@ function DiagnosticBlock({ error, className = '', studentCode, offset = 0 }: { e
     caretRelCol = Math.max(0, parsed.caretLine.indexOf('^') - compilerIndent);
   }
 
-  const accion = [parsed.symbol, parsed.location].filter(Boolean).join(' — ') || parsed.errorType || 'Revisa la firma del método o campo referenciado.';
+  const accion = buildFriendlyCompilerAction(error, parsed, studentCode, parsed.studentLine);
 
   return (
-    <div className={`rounded-xl border border-rose-200 bg-rose-50/80 p-3 space-y-1.5 ${className}`}>
-      <div className="font-mono text-xs"><span className="font-bold text-rose-700">[ESTADO]:</span> <span className="text-rose-800">Error de compilación</span></div>
-      {parsed.studentLine !== null && <div className="font-mono text-xs"><span className="font-bold text-rose-700">[LÍNEA]:</span> <span className="text-rose-800">{parsed.studentLine}</span></div>}
-      <div className="font-mono text-xs"><span className="font-bold text-rose-700">[ERROR]:</span> <span className="text-rose-800">{parsed.errorType}</span></div>
+    <div className={`rounded-2xl border border-rose-200/80 bg-gradient-to-br from-rose-50/80 via-white to-white p-5 shadow-[0_8px_24px_rgba(190,24,93,0.08)] space-y-3 ${className}`}>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="inline-flex items-center rounded-full border border-rose-300 bg-rose-100 px-2.5 py-1 font-semibold text-rose-700">Error de compilación</span>
+        {parsed.studentLine !== null && (
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-700">Línea {parsed.studentLine}</span>
+        )}
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5">
+        <span className="font-bold text-rose-700">Detalle:</span>{' '}
+        <span className="font-mono text-slate-800">{parsed.errorType}</span>
+      </div>
 
       {snippetLines.length > 0 && (
-        <pre className="overflow-x-auto rounded-md bg-rose-100/60 ring-1 ring-rose-200 px-3 py-1 font-mono text-[11px] leading-[1.6]">
+        <pre className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 font-mono text-[12px] leading-[1.65] text-slate-100">
           {snippetLines.map(({ n, text, isError }) => {
             const prefix = `${isError ? '→' : ' '} ${String(n).padStart(2)}: `;
             const studentIndent = text.match(/^(\s*)/)?.[1].length ?? 0;
             return (
               <div key={n}>
-                <span className={`select-none ${isError ? 'text-rose-500' : 'text-rose-400'}`}>{prefix}</span>
-                <span className={isError ? 'font-semibold text-rose-900' : 'text-rose-700'}>{text}</span>
+                <span className={`select-none ${isError ? 'text-rose-300' : 'text-slate-500'}`}>{prefix}</span>
+                <span className={isError ? 'font-semibold text-rose-200' : 'text-slate-200'}>{text}</span>
                 {/* ^ inlineado en la misma zona, una línea después de la línea de error */}
                 {isError && caretRelCol >= 0 && (
-                  <div className="select-none text-rose-500">
+                  <div className="select-none text-rose-300">
                     {' '.repeat(prefix.length + studentIndent + caretRelCol)}
-                    <span className="font-bold text-rose-600">^</span>
+                    <span className="font-bold text-rose-300">^</span>
                   </div>
                 )}
               </div>
@@ -387,7 +454,10 @@ function DiagnosticBlock({ error, className = '', studentCode, offset = 0 }: { e
         </pre>
       )}
 
-      <div className="font-mono text-xs"><span className="font-bold text-rose-700">[ACCIÓN]:</span> <span className="text-rose-800">{accion}</span></div>
+      <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-xs leading-6">
+        <span className="font-semibold text-amber-800">Acción sugerida:</span>{' '}
+        <span className="text-amber-900">{accion}</span>
+      </div>
     </div>
   );
 }
@@ -487,6 +557,17 @@ function serializeConfigurablePayload(value: unknown) {
   }
 }
 
+function parseExerciseConfig(configuracion: Ejercicio['configuracion'] | string | undefined) {
+  if (typeof configuracion === 'string') {
+    try {
+      return JSON.parse(configuracion);
+    } catch {
+      return {};
+    }
+  }
+  return configuracion ?? {};
+}
+
 export function ProgrammingContentView({ content, onBack, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, exerciseId, exerciseData = null, executePath, submitPath }: ProgrammingContentViewProps) {
   const subjectColor = '#4A90E2';
   const wrapperClassName = embedded ? 'w-full min-w-0 lg:h-full' : 'overflow-hidden rounded-[2rem] bg-[#F2F2F2]';
@@ -511,6 +592,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   const [isRunning, setIsRunning] = useState(false);
   const [aprobado, setAprobado] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [syntaxValidationErrors, setSyntaxValidationErrors] = useState<string[]>([]);
   const [puntos, setPuntos] = useState<number | null>(null);
   const [casosPruebaResultados, setCasosPruebaResultados] = useState<CasoPruebaResultado[]>([]);
   const [resultMode, setResultMode] = useState<ResultMode>('idle');
@@ -531,6 +613,10 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
     ? ejercicio.configuracion.casos_prueba
     : [];
   const normalizedFeedback = normalizeCompilerMessage(feedback, code);
+  const hasSyntaxRestrictionErrors = syntaxValidationErrors.length > 0;
+  const shouldHideGenericSyntaxFeedback =
+    hasSyntaxRestrictionErrors
+    && /no satisface las restricciones o la estructura requerida/i.test(feedback || '');
   const editorLines = code.split('\n');
   const visibleEditorLineCount = Math.max(EDITOR_BASE_VISIBLE_LINES, editorLines.length);
   // Offset dinámico: cuántas líneas hay ANTES del cuerpo de Main en el archivo MVC fusionado
@@ -541,6 +627,32 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   useEffect(() => {
     configurableChangeRef.current = onConfigurableResponseChange;
   }, [onConfigurableResponseChange]);
+
+  const applyMvcStateFromExercise = (targetExercise: Ejercicio | null) => {
+    const cfg = parseExerciseConfig(targetExercise?.configuracion);
+    if (cfg.tipo === 'mvc') {
+      const nombreModelo = cfg.nombreModelo || 'Modelo';
+      const mainTemplate = cfg.templateMain && cfg.templateMain.trim()
+        ? cfg.templateMain
+        : `public class Main {\n\n    public static void main(String[] args) {\n        ConsolaIO consola = new ConsolaIO();\n        ${nombreModelo} modelo = new ${nombreModelo}(consola);\n        // Tu código aquí\n    }\n}`;
+      const modeloTemplate = cfg.templateModelo && cfg.templateModelo.trim()
+        ? cfg.templateModelo
+        : `public class ${nombreModelo} {\n\n    private ConsolaIO consola;\n\n    public ${nombreModelo}(ConsolaIO consola) {\n        this.consola = consola;\n    }\n\n    // Implementa los métodos aquí\n}`;
+
+      setIsMvcMode(true);
+      setMvcNombreModelo(nombreModelo);
+      setMvcMainCode(mainTemplate);
+      setMvcModeloCode(modeloTemplate);
+      setMvcActiveTab('main');
+      return;
+    }
+
+    setIsMvcMode(false);
+    setMvcNombreModelo('Modelo');
+    setMvcMainCode('');
+    setMvcModeloCode('');
+    setMvcActiveTab('main');
+  };
 
   useEffect(() => {
     lastEmittedResponseRef.current = serializeConfigurablePayload(configurableResponse);
@@ -557,28 +669,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
         return currentCode === nextCode ? currentCode : nextCode;
       });
 
-      // Initialize MVC tabs from teacher templates when exercise is MVC type
-      // configuracion can come as object (JSONB) or string (TEXT) — handle both
-      const rawCfg = exerciseData.configuracion;
-      const cfg = typeof rawCfg === 'string' ? (() => { try { return JSON.parse(rawCfg); } catch { return {}; } })() : (rawCfg ?? {});
-
-      console.log('[MVC Init] configuracion:', cfg);
-
-      if (cfg.tipo === 'mvc') {
-        const nombreModelo = cfg.nombreModelo || 'Modelo';
-        const mainTemplate = cfg.templateMain && cfg.templateMain.trim()
-          ? cfg.templateMain
-          : `public class Main {\n\n    public static void main(String[] args) {\n        ConsolaIO consola = new ConsolaIO();\n        ${nombreModelo} modelo = new ${nombreModelo}(consola);\n        // Tu código aquí\n    }\n}`;
-        const modeloTemplate = cfg.templateModelo && cfg.templateModelo.trim()
-          ? cfg.templateModelo
-          : `public class ${nombreModelo} {\n\n    private ConsolaIO consola;\n\n    public ${nombreModelo}(ConsolaIO consola) {\n        this.consola = consola;\n    }\n\n    // Implementa los métodos aquí\n}`;
-
-        setIsMvcMode(true);
-        setMvcNombreModelo(nombreModelo);
-        setMvcMainCode(mainTemplate);
-        setMvcModeloCode(modeloTemplate);
-        setMvcActiveTab('main');
-      }
+      applyMvcStateFromExercise(exerciseData);
 
       setIsLoadingExercise(false);
       setIsConfigurableReady(true);
@@ -600,8 +691,10 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
         if (ejercicioCargado) {
           setEjercicio(ejercicioCargado);
           setCode(getInitialTemplate(ejercicioCargado));
+          applyMvcStateFromExercise(ejercicioCargado);
         } else {
           setCode(DEFAULT_TEMPLATE);
+          applyMvcStateFromExercise(null);
         }
       } catch (error) {
         console.error('Error al cargar ejercicio:', error);
@@ -631,6 +724,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
 
   const clearResults = () => {
     setFeedback('');
+    setSyntaxValidationErrors([]);
     setPuntos(null);
     setCasosPruebaResultados([]);
     setResultMode('idle');
@@ -670,6 +764,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
 
     setIsRunning(true);
     setFeedback('');
+    setSyntaxValidationErrors([]);
     setPuntos(null);
     setCasosPruebaResultados([]);
     setResultMode('execution');
@@ -707,8 +802,19 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
       ? mergeMvcFiles(mvcMainCode || rawCfg.templateMain || '', mvcModeloCode || rawCfg.templateModelo || '', CONSOLA_IO_SOURCE)
       : code;
 
-    const result = await executeExercise(ejercicio.id, codigoAEnviar, 62, executePath, { debug: true });
+    const mvcArchivosPayload = esMvc
+      ? {
+          archivos: {
+            main: mvcMainCode || rawCfg.templateMain || '',
+            modelo: mvcModeloCode || rawCfg.templateModelo || '',
+            consolaIO: CONSOLA_IO_SOURCE,
+          },
+        }
+      : {};
+    const result = await executeExercise(ejercicio.id, codigoAEnviar, 62, executePath, { debug: true, ...mvcArchivosPayload });
     const data: any = result.data || {};
+    const syntaxErrorsRun = Array.isArray(data?.erroresSintaxis) ? data.erroresSintaxis : [];
+    setSyntaxValidationErrors(syntaxErrorsRun);
     if (data?.debug) {
       console.log('DEBUG ejecución compilador:', data.debug);
       toast.info('Debug: revisa la consola (Network → Response) para más detalles');
@@ -746,6 +852,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
 
     setIsSubmitting(true);
     setFeedback('');
+    setSyntaxValidationErrors([]);
     setPuntos(null);
     setCasosPruebaResultados([]);
     setResultMode('evaluation');
@@ -790,9 +897,19 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
       ? mergeMvcFiles(mvcMainCode || rawCfgSubmit.templateMain || '', mvcModeloCode || rawCfgSubmit.templateModelo || '', CONSOLA_IO_SOURCE)
       : code;
 
-    const mvcSubmitExtra = executePath && !esMvcSubmit ? { codigo: code } : undefined;
+    const mvcSubmitExtra = esMvcSubmit
+      ? {
+          archivos: {
+            main: mvcMainCode || rawCfgSubmit.templateMain || '',
+            modelo: mvcModeloCode || rawCfgSubmit.templateModelo || '',
+            consolaIO: CONSOLA_IO_SOURCE,
+          },
+        }
+      : (executePath ? { codigo: code } : undefined);
     const result = await submitExercise(ejercicio.id, { texto: codigoSubmit }, estudianteId, submitPath, mvcSubmitExtra);
     const data: any = result.data || {};
+    const syntaxErrorsSubmit = Array.isArray(data?.erroresSintaxis) ? data.erroresSintaxis : [];
+    setSyntaxValidationErrors(syntaxErrorsSubmit);
 
     if (result.status === 429) {
       toast.warning('Evaluacion en curso', { description: result.message || 'Intenta nuevamente en unos segundos.' });
@@ -1061,10 +1178,21 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                     </div>
                     {puntos !== null && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">Puntos: {puntos}</span>}
                   </div>
-                  {(normalizedFeedback || feedback) && (
+                  {(normalizedFeedback || feedback) && !shouldHideGenericSyntaxFeedback && (
                     isCompilerError(feedback)
                       ? <MvcDiagnosticBlock error={feedback} consolaIOCode={CONSOLA_IO_SOURCE} modeloCode={mvcModeloCode} mainCode={mvcMainCode} className="mb-4" />
                       : <div className={`mb-4 rounded-xl border px-4 py-3 text-sm leading-6 ${aprobado ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>{normalizedFeedback || feedback}</div>
+                  )}
+                  {!aprobado && syntaxValidationErrors.length > 0 && (
+                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+                      <div className="mb-1 font-semibold text-amber-800">Restricciones no cumplidas</div>
+                      <div className="mb-2 text-amber-700">Ajusta tu solución para incluir estas estructuras obligatorias:</div>
+                      <ul className="space-y-1 text-amber-900">
+                        {syntaxValidationErrors.map((error, index) => (
+                          <li key={`${error}-${index}`}>- {error}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                   {casosPruebaResultados.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
@@ -1137,10 +1265,21 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                 {puntos !== null && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">Puntos: {puntos}</span>}
               </div>
 
-              {(normalizedFeedback || feedback) && (
+              {(normalizedFeedback || feedback) && !shouldHideGenericSyntaxFeedback && (
                 isCompilerError(feedback)
                   ? <DiagnosticBlock error={feedback} studentCode={code} offset={COMPILER_WRAPPER_LINE_OFFSET} className="mb-4" />
                   : <div className={`mb-4 rounded-xl border px-4 py-3 text-sm leading-6 ${aprobado ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>{normalizedFeedback || feedback}</div>
+              )}
+              {!aprobado && syntaxValidationErrors.length > 0 && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+                  <div className="mb-1 font-semibold text-amber-800">Restricciones no cumplidas</div>
+                  <div className="mb-2 text-amber-700">Ajusta tu solución para incluir estas estructuras obligatorias:</div>
+                  <ul className="space-y-1 text-amber-900">
+                    {syntaxValidationErrors.map((error, index) => (
+                      <li key={`${error}-${index}`}>- {error}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
 
               {isLoadingExercise ? (

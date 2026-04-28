@@ -1090,12 +1090,14 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
             emptyCompilerCase(),
             emptyCompilerCase()
           ];
+      const sintaxis = Array.isArray(configuracion.sintaxis) ? configuracion.sintaxis : [];
       configuracion = {
         tipo: 'mvc',
         nombreModelo: configuracion.nombreModelo || 'Modelo',
         templateMain: configuracion.templateMain || '',
         templateModelo: configuracion.templateModelo || '',
         lenguajesPermitidos: [62],
+        sintaxis,
         casos_prueba: casos,
         esperado: casos[0]?.output || '',
       };
@@ -1292,6 +1294,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
         templateMain: (cfg as any).templateMain || '',
         templateModelo: (cfg as any).templateModelo || '',
         lenguajesPermitidos: [62],
+        sintaxis: Array.isArray((cfg as any).sintaxis) ? (cfg as any).sintaxis : [],
         casos_prueba: casosPrueba.map((caso: any) => ({
           inputs: (caso.inputs || '').toString().trim(),
           output: (caso.output || '').toString().trim(),
