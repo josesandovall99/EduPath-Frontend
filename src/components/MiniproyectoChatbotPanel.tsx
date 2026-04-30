@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, Send } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
+import { buildAuthHeaders } from '../utils/authHeaders';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { preprocessForMarkdown } from '../utils/markdown';
@@ -92,6 +93,7 @@ export function MiniproyectoChatbotPanel({
       try {
         const searchParams = new URLSearchParams();
         searchParams.set('tipo', chatbotType);
+        searchParams.set('allow_fallback', 'false');
 
         if (Number.isFinite(Number(areaId))) {
           searchParams.set('area_id', String(Number(areaId)));
@@ -101,7 +103,9 @@ export function MiniproyectoChatbotPanel({
           searchParams.set('miniproyecto_id', String(Number(miniproyectoId)));
         }
 
-        const response = await fetch(`${API_BASE_URL}/chatbots/resolve?${searchParams.toString()}`);
+        const response = await fetch(`${API_BASE_URL}/chatbots/resolve?${searchParams.toString()}`, {
+          headers: buildAuthHeaders(),
+        });
         if (!response.ok) {
           throw new Error(response.status === 404 ? 'not_found' : 'resolve_failed');
         }
@@ -145,9 +149,17 @@ export function MiniproyectoChatbotPanel({
 
       const response = await fetch(`${API_BASE_URL}/chatbots/${resolvedChatbot.id}/chat/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
         signal: controller.signal,
-        body: JSON.stringify({ question: userMessage, topK: 1 }),
+        body: JSON.stringify({
+          question: userMessage,
+          topK: 3,
+          tipo: chatbotType,
+          area_id: Number.isFinite(Number(areaId)) ? Number(areaId) : undefined,
+          miniproyecto_id: chatbotType === 'MINIPROYECTO' && Number.isFinite(Number(miniproyectoId))
+            ? Number(miniproyectoId)
+            : undefined,
+        }),
       });
 
       if (!response.ok) {

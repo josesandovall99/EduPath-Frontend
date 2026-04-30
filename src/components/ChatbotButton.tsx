@@ -111,6 +111,7 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
       try {
         const searchParams = new URLSearchParams();
         searchParams.set('tipo', chatbotType);
+        searchParams.set('allow_fallback', 'false');
 
         if (Number.isFinite(Number(areaId))) {
           searchParams.set('area_id', String(Number(areaId)));
@@ -171,7 +172,12 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
         signal: controller.signal,
         body: JSON.stringify({
           question: userMessage,
-          topK: 1
+          topK: 3,
+          tipo: chatbotType,
+          area_id: Number.isFinite(Number(areaId)) ? Number(areaId) : undefined,
+          miniproyecto_id: chatbotType === 'MINIPROYECTO' && Number.isFinite(Number(miniproyectoId))
+            ? Number(miniproyectoId)
+            : undefined,
         })
       });
 
