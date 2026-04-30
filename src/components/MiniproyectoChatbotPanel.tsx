@@ -103,7 +103,8 @@ export function MiniproyectoChatbotPanel({
         searchParams.set('allow_fallback', 'false');
 
         const parsedAreaId = toOptionalPositiveId(areaId);
-        if (parsedAreaId !== undefined) {
+        const shouldSendAreaId = chatbotType === 'GENERAL' || chatbotType === 'MINIPROYECTO';
+        if (shouldSendAreaId && parsedAreaId !== undefined) {
           searchParams.set('area_id', String(parsedAreaId));
         }
 
@@ -156,6 +157,9 @@ export function MiniproyectoChatbotPanel({
       let receivedFirstChunk = false;
       const timeoutId = window.setTimeout(() => controller.abort(), CHATBOT_TIMEOUT_MS);
 
+      const payloadAreaId = (chatbotType === 'GENERAL' || chatbotType === 'MINIPROYECTO')
+        ? toOptionalPositiveId(areaId)
+        : undefined;
       const response = await fetch(`${API_BASE_URL}/chatbots/${resolvedChatbot.id}/chat/stream`, {
         method: 'POST',
         headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -164,7 +168,7 @@ export function MiniproyectoChatbotPanel({
           question: userMessage,
           topK: 3,
           tipo: chatbotType,
-          area_id: toOptionalPositiveId(areaId),
+          area_id: payloadAreaId,
           miniproyecto_id: chatbotType === 'MINIPROYECTO'
             ? toOptionalPositiveId(miniproyectoId)
             : undefined,
