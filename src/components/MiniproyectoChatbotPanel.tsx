@@ -26,6 +26,13 @@ interface ResolvedChatbot {
   fallback?: boolean;
 }
 
+function toOptionalPositiveId(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return parsed;
+}
+
 interface ChatMessage {
   text: string;
   isBot: boolean;
@@ -95,12 +102,14 @@ export function MiniproyectoChatbotPanel({
         searchParams.set('tipo', chatbotType);
         searchParams.set('allow_fallback', 'false');
 
-        if (Number.isFinite(Number(areaId))) {
-          searchParams.set('area_id', String(Number(areaId)));
+        const parsedAreaId = toOptionalPositiveId(areaId);
+        if (parsedAreaId !== undefined) {
+          searchParams.set('area_id', String(parsedAreaId));
         }
 
-        if (chatbotType === 'MINIPROYECTO' && Number.isFinite(Number(miniproyectoId))) {
-          searchParams.set('miniproyecto_id', String(Number(miniproyectoId)));
+        const parsedMiniproyectoId = toOptionalPositiveId(miniproyectoId);
+        if (chatbotType === 'MINIPROYECTO' && parsedMiniproyectoId !== undefined) {
+          searchParams.set('miniproyecto_id', String(parsedMiniproyectoId));
         }
 
         const response = await fetch(`${API_BASE_URL}/chatbots/resolve?${searchParams.toString()}`, {
@@ -155,9 +164,9 @@ export function MiniproyectoChatbotPanel({
           question: userMessage,
           topK: 3,
           tipo: chatbotType,
-          area_id: Number.isFinite(Number(areaId)) ? Number(areaId) : undefined,
-          miniproyecto_id: chatbotType === 'MINIPROYECTO' && Number.isFinite(Number(miniproyectoId))
-            ? Number(miniproyectoId)
+          area_id: toOptionalPositiveId(areaId),
+          miniproyecto_id: chatbotType === 'MINIPROYECTO'
+            ? toOptionalPositiveId(miniproyectoId)
             : undefined,
         }),
       });
