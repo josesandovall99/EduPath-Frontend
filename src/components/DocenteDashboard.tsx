@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, BarChart3, BookOpen, Bot, ClipboardList, FileEdit, GitBranch, LogOut, MapPinned } from 'lucide-react';
+import { ArrowRight, BarChart3, BookOpen, Bot, ClipboardList, FileEdit, GitBranch, LogOut, MapPinned, TrendingUp } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
+import { ContentManagementScreen } from './ContentManagementScreen';
 import { ExerciseManagementScreen } from './ExerciseManagementScreen';
 import { MiniproyectoManagementScreen } from './MiniproyectoManagementScreen';
 import { ReportsScreen } from './ReportsScreen';
@@ -78,7 +79,7 @@ const EMPTY_STATS: DashboardStats = {
 const isActiveFlag = (value: unknown) => value !== false;
 
 export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDashboardProps) {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'ejercicios' | 'miniproyectos' | 'chatbot' | 'reports'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'contenidos' | 'ejercicios' | 'miniproyectos' | 'chatbot' | 'reports'>('dashboard');
   const [statsData, setStatsData] = useState<DashboardStats>(EMPTY_STATS);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
 
@@ -186,6 +187,18 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
       badge: 'Ruta base',
       tone: 'blue',
       onClick: onManageArea
+    },
+    {
+      id: 'contenidos',
+      title: 'Gestionar Contenidos',
+      description: 'Administración del catálogo de contenidos, recursos y actividades del área asignada.',
+      icon: TrendingUp,
+      color: '#0F766E',
+      gradient: 'from-[#0F766E] to-[#14B8A6]',
+      group: 'workflow',
+      badge: 'Contenido',
+      tone: 'green',
+      onClick: () => setCurrentScreen('contenidos')
     },
     {
       id: 'ejercicios',
@@ -307,6 +320,18 @@ export function DocenteDashboard({ onLogout, onManageArea, docente }: DocenteDas
       </button>
     );
   };
+
+  if (currentScreen === 'contenidos') {
+    return (
+      <ContentManagementScreen
+        onBack={() => setCurrentScreen('dashboard')}
+        mode="docente"
+        initialAreaId={docente?.areaId}
+        initialAreaName={docente?.areaNombre}
+        scopeMode={docente?.areaId ? 'flow' : 'catalog'}
+      />
+    );
+  }
 
   if (currentScreen === 'ejercicios') {
     return (

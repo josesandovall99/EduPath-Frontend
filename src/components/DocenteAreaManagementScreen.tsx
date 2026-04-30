@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AreasManagementScreen } from './AreasManagementScreen';
 import { TemasManagementScreen } from './TemasManagementScreen';
 import { SubThemeManagementScreen } from './SubThemeManagementScreen';
@@ -12,17 +12,52 @@ interface DocenteAreaManagementScreenProps {
 
 type DocenteFlowScreen = 'areas' | 'temas' | 'subtemas' | 'subtema-secuencias' | 'contenido-secuencias' | 'contenidos';
 
+const DOCENTE_FLOW_STATE_KEY = 'docenteAreaFlowState';
+
 export function DocenteAreaManagementScreen({ onBack }: DocenteAreaManagementScreenProps) {
   const [currentScreen, setCurrentScreen] = useState<DocenteFlowScreen>('areas');
   const [selectedArea, setSelectedArea] = useState<{ id: number; name: string } | null>(null);
   const [selectedTema, setSelectedTema] = useState<{ id: number; name: string } | null>(null);
   const [selectedSubtema, setSelectedSubtema] = useState<{ id: number; name: string } | null>(null);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DOCENTE_FLOW_STATE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        currentScreen?: DocenteFlowScreen;
+        selectedArea?: { id: number; name: string } | null;
+        selectedTema?: { id: number; name: string } | null;
+        selectedSubtema?: { id: number; name: string } | null;
+      };
+      if (saved.currentScreen) setCurrentScreen(saved.currentScreen);
+      if (saved.selectedArea !== undefined) setSelectedArea(saved.selectedArea);
+      if (saved.selectedTema !== undefined) setSelectedTema(saved.selectedTema);
+      if (saved.selectedSubtema !== undefined) setSelectedSubtema(saved.selectedSubtema);
+    } catch {
+      // estado corrupto — ignorar
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(DOCENTE_FLOW_STATE_KEY, JSON.stringify({
+      currentScreen,
+      selectedArea,
+      selectedTema,
+      selectedSubtema,
+    }));
+  }, [currentScreen, selectedArea, selectedTema, selectedSubtema]);
+
+  const handleBack = () => {
+    localStorage.removeItem(DOCENTE_FLOW_STATE_KEY);
+    onBack();
+  };
+
   if (currentScreen === 'areas') {
     return (
       <AreasManagementScreen
-        onBack={onBack}
-        onHome={onBack}
+        onBack={handleBack}
+        onHome={handleBack}
         onSelectArea={(areaId, areaName) => {
           setSelectedArea({ id: areaId, name: areaName });
           setSelectedTema(null);
@@ -41,7 +76,7 @@ export function DocenteAreaManagementScreen({ onBack }: DocenteAreaManagementScr
         areaId={selectedArea.id}
         areaName={selectedArea.name}
         onBack={() => setCurrentScreen('areas')}
-        onHome={onBack}
+        onHome={handleBack}
         onSelectTema={(temaId, temaName) => {
           setSelectedTema({ id: temaId, name: temaName });
           setSelectedSubtema(null);
@@ -56,7 +91,7 @@ export function DocenteAreaManagementScreen({ onBack }: DocenteAreaManagementScr
     return (
       <SubThemeManagementScreen
         onBack={() => setCurrentScreen('temas')}
-        onHome={onBack}
+        onHome={handleBack}
         initialAreaId={selectedArea.id}
         initialTemaId={selectedTema.id}
         onManageSequences={(areaId, areaName, temaId, temaName) => {
@@ -74,7 +109,7 @@ export function DocenteAreaManagementScreen({ onBack }: DocenteAreaManagementScr
     return (
       <SubtemaSequenceManagementScreen
         onBack={() => setCurrentScreen('subtemas')}
-        onHome={onBack}
+        onHome={handleBack}
         areaId={selectedArea.id}
         areaName={selectedArea.name}
         temaId={selectedTema.id}
@@ -92,7 +127,7 @@ export function DocenteAreaManagementScreen({ onBack }: DocenteAreaManagementScr
     return (
       <SequenceManagementScreen
         onBack={() => setCurrentScreen('subtema-secuencias')}
-        onHome={onBack}
+        onHome={handleBack}
         onGoToContentManagement={() => setCurrentScreen('contenidos')}
         areaId={selectedArea.id}
         areaName={selectedArea.name}
@@ -109,7 +144,7 @@ export function DocenteAreaManagementScreen({ onBack }: DocenteAreaManagementScr
     return (
       <ContentManagementScreen
         onBack={() => setCurrentScreen('contenido-secuencias')}
-        onHome={onBack}
+        onHome={handleBack}
         scopeMode="flow"
         initialAreaId={selectedArea.id}
         initialAreaName={selectedArea.name}

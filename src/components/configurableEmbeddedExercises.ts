@@ -123,6 +123,7 @@ export function createEmptyEmbeddedExercise(type: ConfigurableExerciseType = 'Op
         templateModelo: '',
         esperado: '',
         lenguajesPermitidos: [62],
+        sintaxis: [],
       },
     };
   }

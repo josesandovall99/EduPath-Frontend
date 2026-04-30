@@ -191,3 +191,109 @@
 html {
   font-size: var(--font-size);
 }
+
+/* ─── Renderizado de HTML generado por Quill (vista estudiante) ─────────────
+   Replica fielmente el comportamiento de .ql-editor (quill snow) para que
+   el estudiante vea exactamente el mismo texto que el docente/admin diseñó.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Base: mismos valores que .ql-editor en quill.snow.css */
+.quill-render {
+  font-size: 1rem;        /* 16 px — igual que el editor */
+  line-height: 1.42;      /* line-height por defecto de Quill */
+  tab-size: 4;
+  -moz-tab-size: 4;
+  word-break: break-word;
+}
+
+/* Quill resetea margin/padding en todos los bloques de contenido */
+.quill-render p,
+.quill-render ol,
+.quill-render ul,
+.quill-render pre,
+.quill-render blockquote,
+.quill-render h1,
+.quill-render h2,
+.quill-render h3,
+.quill-render h4,
+.quill-render h5,
+.quill-render h6 {
+  margin: 0;
+  padding: 0;
+}
+
+/* Headings: Tailwind Preflight los resetea a font-size:inherit.
+   Restauramos los tamaños que el navegador aplica normalmente en el editor
+   (y que Quill no sobreescribe porque carga fuera de Preflight). */
+.quill-render h1 { font-size: 2em;     font-weight: bold; }
+.quill-render h2 { font-size: 1.5em;   font-weight: bold; }
+.quill-render h3 { font-size: 1.17em;  font-weight: bold; }
+.quill-render h4 { font-size: 1em;     font-weight: bold; }
+.quill-render h5 { font-size: 0.83em;  font-weight: bold; }
+.quill-render h6 { font-size: 0.67em;  font-weight: bold; }
+
+/* Clases de tamaño del toolbar de Quill (Pequeño / Grande / Enorme) */
+.quill-render .ql-size-small  { font-size: 0.75em; }
+.quill-render .ql-size-large  { font-size: 1.5em;  }
+.quill-render .ql-size-huge   { font-size: 2.5em;  }
+
+/* Fuentes del toolbar de Quill */
+.quill-render .ql-font-serif     { font-family: Georgia, 'Times New Roman', serif; }
+.quill-render .ql-font-monospace { font-family: Monaco, 'Courier New', monospace; }
+
+/* Alineaciones */
+.quill-render .ql-align-center  { text-align: center; }
+.quill-render .ql-align-right   { text-align: right;  }
+.quill-render .ql-align-justify { text-align: justify; }
+
+/* Indentación (Quill usa 3em por nivel) */
+.quill-render .ql-indent-1 { padding-left: 3em; }
+.quill-render .ql-indent-2 { padding-left: 6em; }
+.quill-render .ql-indent-3 { padding-left: 9em; }
+.quill-render .ql-indent-4 { padding-left: 12em; }
+.quill-render .ql-indent-5 { padding-left: 15em; }
+.quill-render .ql-indent-6 { padding-left: 18em; }
+.quill-render .ql-indent-7 { padding-left: 21em; }
+.quill-render .ql-indent-8 { padding-left: 24em; }
+
+/* Listas — Tailwind Preflight quita list-style, lo restauramos */
+.quill-render ol { list-style-type: decimal; padding-left: 1.5em; }
+.quill-render ul { list-style-type: disc;    padding-left: 1.5em; }
+
+/* Blockquote */
+.quill-render blockquote {
+  border-left: 4px solid #ccc;
+  margin-bottom: 5px;
+  margin-top: 5px;
+  padding-left: 16px;
+}
+
+/* Código inline y bloque */
+.quill-render code,
+.quill-render pre {
+  font-family: ui-monospace, 'Courier New', Courier, monospace;
+  font-size: 0.85em;
+}
+.quill-render pre {
+  background-color: #23241f;
+  color: #f8f8f2;
+  overflow: visible;
+  white-space: pre-wrap;
+  margin-bottom: 5px;
+  margin-top: 5px;
+  padding: 5px 10px;
+  border-radius: 3px;
+}
+
+/* Imágenes — centrar las que Quill alinea con text-align:center en el <p> padre */
+.quill-render img {
+  max-width: 100%;
+  height: auto;
+  display: inline-block; /* Quill las deja inline dentro de un <p> centrado */
+}
+
+/* Links */
+.quill-render a {
+  color: #06c;
+  text-decoration: underline;
+}

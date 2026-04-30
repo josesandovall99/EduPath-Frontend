@@ -17,6 +17,53 @@ interface ConfigurableEmbeddedExerciseEditorProps {
 
 // CONSOLA_IO_SOURCE is imported — full official source, single source of truth
 
+const SYNTAX_GROUPS = [
+  {
+    group: 'Condicionales',
+    color: 'violet',
+    items: [
+      { key: 'if',      label: 'if / else' },
+      { key: 'else if', label: 'else if' },
+      { key: 'switch',  label: 'switch / case' },
+      { key: 'ternary', label: 'Ternario (? :)' },
+    ],
+  },
+  {
+    group: 'Bucles',
+    color: 'sky',
+    items: [
+      { key: 'for',      label: 'for' },
+      { key: 'for each', label: 'for-each' },
+      { key: 'while',    label: 'while' },
+      { key: 'do while', label: 'do-while' },
+    ],
+  },
+  {
+    group: 'Excepciones',
+    color: 'rose',
+    items: [
+      { key: 'try',   label: 'try / catch' },
+      { key: 'throw', label: 'throw' },
+    ],
+  },
+  {
+    group: 'Control',
+    color: 'amber',
+    items: [
+      { key: 'return',   label: 'return' },
+      { key: 'break',    label: 'break' },
+      { key: 'continue', label: 'continue' },
+    ],
+  },
+] as const;
+
+const GROUP_BADGE: Record<string, string> = {
+  violet: 'bg-violet-100 text-violet-700 border-violet-200',
+  sky:    'bg-sky-100 text-sky-700 border-sky-200',
+  rose:   'bg-rose-100 text-rose-700 border-rose-200',
+  amber:  'bg-amber-100 text-amber-700 border-amber-200',
+};
+
 const EXERCISE_TYPES: ConfigurableExerciseType[] = ['Compilador', 'Diagramas UML', 'Preguntas', 'Opción única', 'Ordenar', 'Relacionar'];
 const ADDABLE_EXERCISE_TYPES: ConfigurableExerciseType[] = EXERCISE_TYPES.filter((type) => type !== 'Preguntas');
 
@@ -396,6 +443,83 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                                     ? 'ConsolaIO.java es fija — no se edita y siempre se compila junto con los demás archivos.'
                                     : 'Este contenido es la plantilla de inicio que verá el estudiante en esta pestaña.'}
                                 </p>
+                              </div>
+
+                              {/* Estructuras obligatorias */}
+                              <div>
+                                <div className="flex items-center justify-between mb-3">
+                                  <div>
+                                    <label className="block text-xs font-semibold text-[#3A4A5B]">Estructuras obligatorias</label>
+                                    <p className="text-[11px] text-slate-400 mt-0.5">
+                                      El alumno debe usar estas estructuras en su código real — los comentarios (<code className="font-mono">// for</code>) no cuentan.
+                                    </p>
+                                  </div>
+                                  {(Array.isArray(compilerConfig?.sintaxis) && compilerConfig.sintaxis.length > 0) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateConfig(index, { tipo: 'mvc', sintaxis: [] })}
+                                      className="text-[11px] text-slate-400 hover:text-rose-500 transition-colors"
+                                    >
+                                      Limpiar todo
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                  {SYNTAX_GROUPS.map((group) => {
+                                    const sintaxis: string[] = Array.isArray(compilerConfig?.sintaxis) ? compilerConfig.sintaxis : [];
+                                    return (
+                                      <div key={group.group} className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm space-y-2">
+                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{group.group}</div>
+                                        {group.items.map((item) => {
+                                          const checked = sintaxis.includes(item.key);
+                                          return (
+                                            <label key={item.key} className="flex items-center gap-2 cursor-pointer group">
+                                              <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() => {
+                                                  const next = checked
+                                                    ? sintaxis.filter((s) => s !== item.key)
+                                                    : [...sintaxis, item.key];
+                                                  handleUpdateConfig(index, { tipo: 'mvc', sintaxis: next });
+                                                }}
+                                                className="h-3.5 w-3.5 rounded text-[#4A90E2] border-slate-300 cursor-pointer"
+                                              />
+                                              <span className={`text-[11px] font-mono transition-colors ${checked ? 'text-[#3A4A5B] font-semibold' : 'text-slate-500 group-hover:text-slate-700'}`}>
+                                                {item.label}
+                                              </span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {(Array.isArray(compilerConfig?.sintaxis) && compilerConfig.sintaxis.length > 0) && (
+                                  <div className="mt-3 flex flex-wrap gap-1.5">
+                                    {(compilerConfig.sintaxis as string[]).map((s) => {
+                                      const group = SYNTAX_GROUPS.find((g) => g.items.some((i) => i.key === s));
+                                      const badgeClass = group ? GROUP_BADGE[group.color] : 'bg-slate-100 text-slate-700 border-slate-200';
+                                      return (
+                                        <span key={s} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-mono font-semibold ${badgeClass}`}>
+                                          {s}
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const sintaxis: string[] = Array.isArray(compilerConfig?.sintaxis) ? compilerConfig.sintaxis : [];
+                                              handleUpdateConfig(index, { tipo: 'mvc', sintaxis: sintaxis.filter((x) => x !== s) });
+                                            }}
+                                            className="ml-0.5 opacity-60 hover:opacity-100"
+                                          >
+                                            ×
+                                          </button>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
 
                               {/* Casos de prueba */}

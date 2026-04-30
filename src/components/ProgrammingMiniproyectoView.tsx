@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Play, Trash2, Lock } from 'lucide-react';
+import { ArrowLeft, Loader2, Trash2, Lock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { submitMiniproyecto } from '../utils/submitMiniproyecto';
 import { API_BASE_URL } from '../utils/constants';
@@ -234,6 +234,45 @@ interface ProgrammingMiniproyectoViewProps {
   onBack: () => void;
 }
 
+interface CasoPrueba {
+  inputs?: string;
+  output?: string;
+}
+
+interface CasoPruebaResultado {
+  caseNum: number;
+  paso?: boolean;
+  error?: string | null;
+  omitido?: boolean;
+  outputObtenido?: string;
+  stdout?: string;
+  statusDescription?: string;
+}
+
+type ResultMode = 'idle' | 'execution' | 'evaluation';
+
+function getCaseVisualState(caso: CasoPruebaResultado) {
+  if (caso.omitido) return {
+    label: 'Omitido', icon: AlertCircle, iconClass: 'text-amber-500',
+    cardClass: 'border-amber-200 bg-amber-50/40', badgeClass: 'bg-amber-100 text-amber-700'
+  };
+  if (caso.paso) return {
+    label: 'Correcto', icon: CheckCircle2, iconClass: 'text-emerald-600',
+    cardClass: 'border-emerald-200 bg-emerald-50/40', badgeClass: 'bg-emerald-100 text-emerald-700'
+  };
+  return {
+    label: 'Incorrecto', icon: XCircle, iconClass: 'text-rose-600',
+    cardClass: 'border-rose-200 bg-rose-50/40', badgeClass: 'bg-rose-100 text-rose-700'
+  };
+}
+
+function getCaseResultMessage(caso: CasoPruebaResultado) {
+  if (caso.omitido) return 'La revisión se detuvo — un caso anterior no cumplió.';
+  if (caso.paso) return 'La solución cumplió correctamente con este caso.';
+  if (caso.outputObtenido || caso.stdout) return 'La salida obtenida no coincide con el resultado esperado.';
+  return caso.error || 'La solución no produjo el resultado esperado para este caso.';
+}
+
 interface MiniproyectoConfig {
   tipo?: string;
   esperado?: string;
@@ -244,7 +283,7 @@ interface MiniproyectoConfig {
   templateModelo?: string;
   // Legacy fields — exercises created before MVC became the standard
   metodo?: unknown;
-  casos_prueba?: unknown[];
+  casos_prueba?: CasoPrueba[];
 }
 
 interface MiniproyectoApiResponse {
@@ -263,6 +302,7 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
   const [config, setConfig] = useState<MiniproyectoConfig | null>(null);
   const [descripcion, setDescripcion] = useState('');
   const [nivel, setNivel] = useState('Basica');
+  const [isLoadingInfo, setIsLoadingInfo] = useState(true);
 
   const nombreModelo = config?.nombreModelo || 'SeguridadBancaria';
   // MVC is the standard for all programming miniproyectos.
@@ -285,13 +325,14 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
   const [singleCode, setSingleCode] = useState('# Código inicial\nprint("Hola Mundo")');
   const [lenguajeSeleccionado, setLenguajeSeleccionado] = useState<number>(71);
 
-  const [output, setOutput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);   // enviar (evaluación)
+  const [isRunning, setIsRunning] = useState(false);   // ejecutar (prueba libre)
   const [aprobado, setAprobado] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [puntos, setPuntos] = useState<number | null>(null);
+  const [casosPruebaResultados, setCasosPruebaResultados] = useState<CasoPruebaResultado[]>([]);
+  const [resultMode, setResultMode] = useState<ResultMode>('idle');
   const [mvcStdin, setMvcStdin] = useState('');
-  const [mvcFreeOutput, setMvcFreeOutput] = useState<{ stdout: string; stderr: string } | null>(null);
 
   const lenguajesDisponibles = [
     { id: 62, nombre: 'Java', extension: '.java', ejemplo: 'public class Main {\n  public static void main(String[] args) {\n    System.out.println("Hola Mundo");\n  }\n}' },
@@ -332,6 +373,8 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
         }
       } catch (error) {
         console.error('Error al cargar miniproyecto:', error);
+      } finally {
+        setIsLoadingInfo(false);
       }
     };
 
@@ -355,10 +398,42 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
     }
   };
 
-  const handleExecute = async () => {
+  // ── Ejecutar: prueba libre sin calificar, muestra casos ─────────────────────
+  const handleEjecutar = async () => {
+    setIsRunning(true);
+    setFeedback('');
+    setCasosPruebaResultados([]);
+    setResultMode('execution');
+
+    const codigo = isMvc
+      ? mergeMvcFiles(mainCode, modeloCode, CONSOLA_IO_SOURCE)
+      : singleCode;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/miniproyectos/${content.id}/ejecutar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo, lenguaje_id: isMvc ? 62 : lenguajeSeleccionado }),
+        credentials: 'include',
+      });
+      const data: any = await res.json().catch(() => ({}));
+      const casos: CasoPruebaResultado[] = Array.isArray(data?.casos) ? data.casos : [];
+      setCasosPruebaResultados(casos);
+      setFeedback(data?.resumen || (res.ok ? 'Ejecución completada.' : 'Error al ejecutar.'));
+    } catch {
+      setFeedback('No se pudo conectar con el servidor.');
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  // ── Enviar: evaluación definitiva con calificación ───────────────────────────
+  const handleEnviar = async () => {
     setIsLoading(true);
     setFeedback('');
     setPuntos(null);
+    setCasosPruebaResultados([]);
+    setResultMode('evaluation');
 
     const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
     if (!estudianteId) {
@@ -367,58 +442,42 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
       return;
     }
 
-    setMvcFreeOutput(null);
-
-    // MVC: merge en frontend → enviar como codigo normal, sin depender de archivos
     const payload = isMvc
       ? { codigo: mergeMvcFiles(mainCode, modeloCode, CONSOLA_IO_SOURCE), lenguaje_id: 62 }
       : { codigo: singleCode, lenguaje_id: lenguajeSeleccionado };
 
     const result = await submitMiniproyecto(content.id, payload, estudianteId);
-
-    // Ejecución libre MVC (stdin_manual) — muestra salida directa sin calificar
-    if (isMvc && result.status === 200 && (result.data as any)?.modo === 'ejecucion_libre') {
-      const d = result.data as any;
-      setMvcFreeOutput({ stdout: d.stdout || '', stderr: d.stderr || '' });
-      setIsLoading(false);
-      return;
-    }
+    const data: any = result.data || {};
 
     if (result.status === 409) {
       setAprobado(true);
-      alert(`${result.message || 'Miniproyecto ya aprobado'}`);
+      setFeedback(data?.message || 'Miniproyecto ya aprobado.');
+      if (Array.isArray(data?.casos)) setCasosPruebaResultados(data.casos);
       setIsLoading(false);
       return;
     }
 
-    if (result.status === 400 || result.status === 200) {
-      const data: any = result.data || {};
-      const esperado = data?.esperado || config?.esperado || '';
-      const salida = data?.stdout || data?.obtenido || '';
-      const stderr = data?.stderr || '';
-      const errores = Array.isArray(data?.erroresSintaxis) ? data.erroresSintaxis.join('\n') : '';
+    const casos: CasoPruebaResultado[] = Array.isArray(data?.casos) ? data.casos
+      : Array.isArray(data?.casosPrueba) ? data.casosPrueba : [];
+    if (casos.length > 0) setCasosPruebaResultados(casos);
 
-      if (result.status === 200) {
-        setAprobado(true);
-        setFeedback('¡Correcto!');
-        if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
-        setOutput(`EJERCICIO APROBADO!\n\nSalida del programa:\n${salida}\n\nPuntos obtenidos: ${data.puntosObtenidos || 0}`);
-        setIsLoading(false);
-        alert(`Correcto${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}`);
-        return;
-      }
+    if (result.status === 200) {
+      setAprobado(true);
+      setFeedback('¡Miniproyecto aprobado! Todos los casos pasaron.');
+      if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
+      setIsLoading(false);
+      return;
+    }
 
+    if (result.status === 400) {
       setAprobado(false);
-      const detalleErrores = errores ? `\n\nErrores de sintaxis:\n${errores}` : '';
-      const detalleStderr = stderr ? `\n\nErrores del compilador:\n${stderr}` : '';
-      setOutput(`Ejercicio no aprobado\n\nSalida obtenida:\n${salida}\n\nSalida esperada:\n${esperado}${detalleErrores}${detalleStderr}`);
-      setFeedback(errores || stderr || 'Respuesta incorrecta. Nuevo intento disponible.');
+      const stderr = data?.stderr || '';
+      setFeedback(data?.resumen || stderr || 'La solución no superó todos los casos. Revisa tu código.');
       setIsLoading(false);
-      alert(`Respuesta incorrecta`);
       return;
     }
 
-    alert(`Error del servidor: ${result.message || 'Error desconocido'}`);
+    setFeedback(result.message || 'Error del servidor.');
     setIsLoading(false);
   };
 
@@ -429,9 +488,32 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
     } else {
       setSingleCode('');
     }
-    setOutput('');
     setFeedback('');
     setPuntos(null);
+    setCasosPruebaResultados([]);
+    setResultMode('idle');
+  };
+
+  const formatJavaLikeCode = (input: string) => {
+    const lines = input.split('\n');
+    let indentLevel = 0;
+    return lines.map((rawLine) => {
+      const trimmed = rawLine.trim();
+      if (!trimmed) return '';
+      const leadingClosers = (trimmed.match(/^\}+/) || [''])[0].length;
+      indentLevel = Math.max(0, indentLevel - leadingClosers);
+      const formattedLine = `${'    '.repeat(indentLevel)}${trimmed}`;
+      const openBraces = (trimmed.match(/\{/g) || []).length;
+      const closeBraces = (trimmed.match(/\}/g) || []).length;
+      indentLevel = Math.max(0, indentLevel + openBraces - closeBraces + leadingClosers);
+      return formattedLine;
+    }).join('\n');
+  };
+
+  const handleFormatCode = () => {
+    if (!isMvc) return;
+    if (activeTab === 'main') setMainCode((prev) => formatJavaLikeCode(prev));
+    else if (activeTab === 'modelo') setModeloCode((prev) => formatJavaLikeCode(prev));
   };
 
   const activeTabDef = tabs.find((t) => t.id === activeTab);
@@ -455,89 +537,197 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
     }
   };
 
+  const cardClass = 'min-w-0 rounded-[1.6rem] border border-slate-200/85 bg-white p-5 shadow-[0_14px_32px_rgba(58,74,91,0.08)]';
+  const sectionLabelClass = 'mb-1 inline-flex border-l-2 border-[#4A90E2] pl-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500';
+
+  const guideItems = isMvc
+    ? [
+        `Edita ${nombreModelo}.java con la lógica del modelo solicitada en el enunciado.`,
+        'En Main.java instancia el modelo y llama sus métodos usando la ConsolaIO proporcionada.',
+        'No modifiques ConsolaIO.java — es la clase de entrada/salida fija del sistema.',
+        'Usa Ejecutar para pruebas libres con tus datos de entrada; usa Evaluar para calificación final.',
+        'No cambies la firma pública de los métodos indicados en el enunciado.',
+      ]
+    : [
+        'Lee el enunciado completo antes de comenzar a programar.',
+        'Implementa la lógica en el lenguaje seleccionado.',
+        'Usa Evaluar para enviar tu solución a calificación.',
+        'Revisa la salida obtenida vs la salida esperada en el panel de resultados.',
+      ];
+
+  const resultIcon = aprobado ? CheckCircle2 : feedback ? XCircle : AlertCircle;
+  const ResultIcon = resultIcon;
+  const configuredCases: CasoPrueba[] = Array.isArray(config?.casos_prueba) ? config.casos_prueba : [];
+
   return (
-    <div className="bg-[#F2F2F2] rounded-lg overflow-hidden">
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-full mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
-              <div>
-                <h1 className="text-[#3A4A5B] font-bold">Miniproyecto de Programación</h1>
-                <p className="text-gray-500 text-sm">{content.title}</p>
-              </div>
+    <div className="overflow-hidden rounded-[2rem] bg-[linear-gradient(180deg,#F7FAFF_0%,#F5F7FB_48%,#F3F4F6_100%)]">
+      {/* Header */}
+      <header className="border-b border-slate-200 bg-white/95 shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+        <div className="mx-auto flex max-w-full items-center justify-between gap-4 px-8 py-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white p-2.5 shadow-md">
+              <img src={logoImage} alt="EduPath" className="h-full w-full object-contain" />
+            </div>
+            <div>
+              <h1 className="font-bold text-[#3A4A5B]">Miniproyecto de Programación</h1>
+              <p className="text-sm text-gray-500">{content.title}</p>
             </div>
           </div>
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Volver
+          </button>
         </div>
       </header>
 
-      <div className="flex" style={{ minHeight: '600px' }}>
-        {/* Left panel — instructions */}
-        <div className="w-1/2 border-r border-gray-200 bg-white overflow-y-auto">
-          <div className="p-6">
-            <button onClick={onBack} className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-              <span>Volver</span>
-            </button>
+      {/* Contenido centrado con ancho máximo */}
+      <div className="mx-auto max-w-[1280px] space-y-5 px-6 py-6">
 
-            <div className="border-b border-gray-200 pb-4 mb-6">
-              <h2 className="text-[#3A4A5B] text-xl font-bold mb-2">{content.title}</h2>
-              <div className="flex gap-4 text-sm text-gray-600">
-                <span>Miniproyecto</span>
-                <span>•</span>
-                <span>Dificultad: {nivel}</span>
-                {isMvc && (
+        {/* ── 1. Descripción — ancho completo ── */}
+        <section className={`${cardClass} relative overflow-hidden`}>
+          <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-[#4A90E2] via-[#5B9FED] to-[#7ED6A7]" />
+
+          {/* Cabecera centrada + badges */}
+          <div className="mx-auto max-w-[860px]">
+            <div className="mb-6 flex flex-col gap-3 border-b border-slate-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <span className={sectionLabelClass}>Descripción del miniproyecto</span>
+                <h2 className="mt-1 text-[1.5rem] font-bold leading-tight text-[#3A4A5B]">{content.title}</h2>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                {isLoadingInfo ? (
+                  <div className="flex gap-2 animate-pulse">
+                    <div className="h-6 w-16 rounded-full bg-slate-200" />
+                    <div className="h-6 w-24 rounded-full bg-slate-200" />
+                  </div>
+                ) : (
                   <>
-                    <span>•</span>
-                    <span className="text-blue-600 font-medium">Arquitectura MVC</span>
+                    <div className="inline-flex rounded-full px-3 py-1 text-xs font-semibold shadow-sm" style={{ background: 'linear-gradient(135deg, rgba(74,144,226,0.12) 0%, rgba(126,214,167,0.14) 100%)', color: subjectColor }}>
+                      {nivel}
+                    </div>
+                    {isMvc && (
+                      <div className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                        Arquitectura MVC
+                      </div>
+                    )}
                   </>
                 )}
               </div>
             </div>
-
-            <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-blue-50 to-white p-6 mb-6 shadow-sm">
-              <h3 className="text-[#3A4A5B] font-bold mb-3">Instrucciones</h3>
-              {descripcion ? (
-                <div
-                  className="text-gray-700 text-sm mb-3 font-medium text-pretty"
-                  dangerouslySetInnerHTML={{ __html: descripcion }}
-                />
-              ) : (
-                <p className="text-gray-700 text-sm mb-3 font-medium text-pretty">
-                  Desarrollo del miniproyecto mediante el editor de código y validación del resultado por ejecución.
-                </p>
-              )}
-            </div>
-
-            {isMvc && (
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-                <p className="font-semibold mb-1">Estructura del proyecto</p>
-                <ul className="list-disc list-inside space-y-1 text-blue-700">
-                  <li><span className="font-mono">Main.java</span> — punto de entrada (editable)</li>
-                  <li><span className="font-mono">{nombreModelo}.java</span> — lógica del modelo (editable)</li>
-                  <li><span className="font-mono">ConsolaIO.java</span> — utilidad de E/S (solo lectura)</li>
-                </ul>
-              </div>
-            )}
           </div>
-        </div>
 
-        {/* Right panel — editor */}
-        <div className="w-1/2 bg-white flex flex-col">
+          {/* Descripción HTML — centrada, ancho de lectura cómodo */}
+          {isLoadingInfo ? (
+            <div className="mx-auto max-w-[860px] space-y-3 animate-pulse">
+              <div className="h-6 w-2/3 rounded-lg bg-slate-200" />
+              <div className="h-3 w-full rounded bg-slate-100" />
+              <div className="h-3 w-5/6 rounded bg-slate-100" />
+              <div className="h-3 w-4/6 rounded bg-slate-100" />
+              <div className="mt-4 h-48 w-full rounded-xl bg-slate-100" />
+            </div>
+          ) : descripcion ? (
+            <div
+              className="quill-render mx-auto max-w-[860px] break-words"
+              dangerouslySetInnerHTML={{ __html: descripcion }}
+            />
+          ) : (
+            <p className="mx-auto max-w-[860px] text-sm leading-6 text-slate-500">Este miniproyecto no tiene una descripción adicional configurada.</p>
+          )}
+        </section>
+
+        {/* ── 2. Casos de prueba (solo si están configurados) ── */}
+        {configuredCases.length > 0 && (
+          <section className={`${cardClass} relative overflow-hidden`}>
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4A90E2]/30 via-[#5B9FED]/20 to-transparent" />
+            <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className={sectionLabelClass}>Validación</span>
+                <h3 className="text-lg font-bold text-[#3A4A5B]">Casos de prueba</h3>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {configuredCases.length} {configuredCases.length === 1 ? 'caso' : 'casos'}
+              </span>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {configuredCases.map((caso, index) => (
+                <div key={index} className="min-w-[280px] flex-1 rounded-[1.25rem] border border-blue-100 bg-blue-50/40 p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="rounded-full border border-blue-200 bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                      Caso {index + 1}
+                    </span>
+                    <div className="h-2.5 w-2.5 rounded-full bg-[#3B82F6]" />
+                  </div>
+                  <div className="grid gap-3">
+                    <div>
+                      <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Entrada</div>
+                      <pre className="whitespace-pre-wrap break-words rounded-xl bg-white px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">
+                        {caso.inputs?.trim() || 'Sin datos'}
+                      </pre>
+                    </div>
+                    <div>
+                      <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Salida esperada</div>
+                      <pre className="whitespace-pre-wrap break-words rounded-xl bg-white px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">
+                        {caso.output?.trim() || 'Sin datos'}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── 3. Layout dos columnas: instrucciones + editor ── */}
+        <div className="flex gap-6">
+
+          {/* Columna izquierda — instrucciones sticky */}
+          <aside className="w-[320px] shrink-0 self-start sticky top-6">
+            <section className={`${cardClass} relative overflow-hidden`}>
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#4A90E2]/25 via-transparent to-[#7ED6A7]/25" />
+              <div className="mb-4 border-b border-slate-100 pb-3">
+                <span className={sectionLabelClass}>Guía</span>
+                <h3 className="text-[1rem] font-bold text-[#3A4A5B]">Instrucciones</h3>
+              </div>
+              <ul className="space-y-3 text-sm leading-6 text-gray-700">
+                {guideItems.map((item, index) => (
+                  <li key={index} className="flex items-start gap-3">
+                    <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#4A90E2]" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              {isMvc && (
+                <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-sm text-blue-800">
+                  <p className="mb-2 font-semibold">Archivos del proyecto</p>
+                  <ul className="space-y-1 text-blue-700">
+                    <li><code className="font-mono font-medium">Main.java</code> — punto de entrada</li>
+                    <li><code className="font-mono font-medium">{nombreModelo}.java</code> — modelo</li>
+                    <li><code className="font-mono font-medium">ConsolaIO.java</code> — solo lectura</li>
+                  </ul>
+                </div>
+              )}
+            </section>
+          </aside>
+
+          {/* Columna derecha — editor */}
+          <div className="min-w-0 flex-1">
+        {/* Editor principal */}
+        <section className="w-full overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_16px_36px_rgba(58,74,91,0.10)]">
           {/* Toolbar */}
-          <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+          <div className="flex flex-col gap-4 border-b border-slate-200 bg-[linear-gradient(90deg,rgba(74,144,226,0.07)_0%,rgba(255,255,255,1)_42%,rgba(126,214,167,0.07)_100%)] px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
             {isMvc ? (
-              <div className="rounded-2xl px-4 py-2 font-mono text-sm shadow-sm ring-1 ring-blue-100" style={{ background: 'linear-gradient(135deg, rgba(74,144,226,0.12) 0%, rgba(126,214,167,0.10) 100%)', color: '#4A90E2' }}>
-                Java · MVC
+              <div className="rounded-2xl px-4 py-2 font-mono text-sm shadow-sm ring-1 ring-blue-100" style={{ background: 'linear-gradient(135deg, rgba(74,144,226,0.12) 0%, rgba(126,214,167,0.10) 100%)', color: subjectColor }}>
+                Editor Java
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <select
                   value={lenguajeSeleccionado}
                   onChange={(e) => cambiarLenguaje(parseInt(e.target.value, 10))}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-[#3A4A5B] focus:outline-none focus:ring-2 focus:ring-[#4A90E2] cursor-pointer"
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-[#3A4A5B] focus:outline-none focus:ring-2 focus:ring-[#4A90E2] cursor-pointer"
                 >
                   {lenguajesDisponibles.map((lenguaje) => (
                     <option
@@ -549,32 +739,51 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
                     </option>
                   ))}
                 </select>
-                <div className="px-4 py-2 rounded-lg shadow-sm font-mono text-sm" style={{ backgroundColor: `${subjectColor}15`, color: subjectColor }}>
+                <div className="rounded-lg px-4 py-2 font-mono text-sm shadow-sm" style={{ backgroundColor: `${subjectColor}15`, color: subjectColor }}>
                   script{lenguajeActual.extension}
                 </div>
               </div>
             )}
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button
                 onClick={handleClear}
                 className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
               >
                 <Trash2 className="h-4 w-4" />
-                Restaurar
+                Restaurar plantilla
               </button>
+              {isMvc && (
+                <button
+                  onClick={handleFormatCode}
+                  disabled={isLoading || isRunning || activeTab === 'consolaIO'}
+                  className="flex min-w-[130px] items-center justify-center gap-2 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-5 py-2.5 text-sm font-semibold text-violet-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:from-violet-100 hover:to-fuchsia-100 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Dar formato
+                </button>
+              )}
+              {/* Ejecutar: prueba libre */}
               <button
-                onClick={handleExecute}
-                disabled={isLoading}
-                className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ background: isLoading ? '#94a3b8' : 'linear-gradient(135deg, #4A90E2 0%, #5B9FED 55%, #7ED6A7 100%)' }}
+                onClick={handleEjecutar}
+                disabled={isRunning || isLoading}
+                className="flex items-center gap-2 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 px-5 py-2.5 text-sm font-semibold text-blue-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:from-blue-100 hover:to-cyan-100 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Play className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                {isLoading ? 'Evaluando...' : 'Evaluar'}
+                {isRunning && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isRunning ? 'Ejecutando...' : 'Ejecutar'}
+              </button>
+              {/* Enviar: evaluación definitiva */}
+              <button
+                onClick={handleEnviar}
+                disabled={isLoading || isRunning || aprobado}
+                className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: isLoading || isRunning || aprobado ? '#94a3b8' : 'linear-gradient(135deg, #4A90E2 0%, #5B9FED 55%, #7ED6A7 100%)' }}
+              >
+                {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {aprobado ? 'Aprobado' : isLoading ? 'Enviando...' : 'Enviar'}
               </button>
             </div>
           </div>
 
-          {/* Pestañas MVC — mismo gradiente del toolbar */}
+          {/* Pestañas MVC */}
           {isMvc && (
             <div className="border-b border-slate-200 bg-[linear-gradient(90deg,rgba(74,144,226,0.06)_0%,rgba(255,255,255,1)_50%,rgba(126,214,167,0.06)_100%)] px-2">
               <div className="flex items-end gap-1">
@@ -594,85 +803,101 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
                     {tab.label}
                   </button>
                 ))}
+                <div className="ml-auto self-center pr-2">
+                  <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: 'rgba(74,144,226,0.10)', color: '#4A90E2' }}>
+                    Java · MVC
+                  </span>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Monaco — altura fija en px (height:100% no funciona con minHeight) */}
+          {/* Monaco */}
           <div
             style={{
               backgroundImage: isMvc
                 ? 'radial-gradient(circle at top left, rgba(74,144,226,0.18), transparent 28%), radial-gradient(circle at bottom right, rgba(126,214,167,0.12), transparent 24%), linear-gradient(180deg, rgba(15,23,42,0.96) 0%, rgba(15,23,42,1) 100%)'
-                : undefined
+                : undefined,
             }}
           >
             {isMvc ? (
               <>
-                {activeTab === 'main' && (
-                  <JavaEditor key="mp-main" value={mainCode} readOnly={false} onChange={(v) => setMainCode(v)} height={520} />
-                )}
-                {activeTab === 'modelo' && (
-                  <JavaEditor key="mp-modelo" value={modeloCode} readOnly={false} onChange={(v) => setModeloCode(v)} height={520} />
-                )}
-                {activeTab === 'consolaIO' && (
-                  <JavaEditor key="mp-consolaIO" value={CONSOLA_IO_SOURCE} readOnly readOnlyLabel="ConsolaIO.java — solo lectura, clase de utilidad fija del sistema" height={520} />
-                )}
+                {activeTab === 'main' && <JavaEditor key="mp-main" value={mainCode} readOnly={false} onChange={(v) => setMainCode(v)} height={520} />}
+                {activeTab === 'modelo' && <JavaEditor key="mp-modelo" value={modeloCode} readOnly={false} onChange={(v) => setModeloCode(v)} height={520} />}
+                {activeTab === 'consolaIO' && <JavaEditor key="mp-consolaIO" value={CONSOLA_IO_SOURCE} readOnly readOnlyLabel="ConsolaIO.java — solo lectura, clase de utilidad fija del sistema" height={520} />}
               </>
             ) : (
               <JavaEditor value={singleCode} readOnly={false} onChange={(v) => setSingleCode(v)} height="100%" />
             )}
           </div>
 
-          {/* Consola interactiva — mismo estilo que panel de Resultado del resto de la app */}
-          <div className="shrink-0 border-t border-slate-200 bg-white">
-            <div className="grid grid-cols-1 divide-y divide-slate-100 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
-              {/* stdin */}
-              <div className="p-5">
-                <div className="mb-3 flex items-center gap-3 border-b border-slate-100 pb-3">
-                  <span className="mb-1 inline-flex border-l-2 border-[#4A90E2] pl-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Entrada</span>
-                  <h4 className="text-sm font-bold text-[#3A4A5B]">Datos de prueba (stdin)</h4>
-                </div>
-                <textarea
-                  value={mvcStdin}
-                  onChange={(e) => setMvcStdin(e.target.value)}
-                  placeholder={"Ej: 4,12000,10\n(valores separados por coma → un valor por línea de entrada)"}
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-700 outline-none transition focus:border-[#4A90E2] focus:ring-2 focus:ring-[#4A90E2]/20 resize-none"
-                  spellCheck={false}
-                />
-                <p className="mt-2 text-xs text-slate-400">Cada valor separado por coma es una entrada secuencial del <code className="font-mono">Scanner</code>.</p>
+          {/* ── Panel de resultados por casos de prueba ── */}
+          <div className="border-t border-slate-200 bg-white p-5">
+            <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <span className={sectionLabelClass}>Resultado</span>
+                <h4 className="text-sm font-bold text-[#3A4A5B]">Casos de prueba</h4>
               </div>
-              {/* stdout */}
-              <div className="p-5">
-                <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="mb-1 inline-flex border-l-2 border-[#4A90E2] pl-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Salida</span>
-                    <h4 className="text-sm font-bold text-[#3A4A5B]">Resultado del programa</h4>
-                  </div>
-                  {feedback && (
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${aprobado ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                      {feedback}
-                    </span>
-                  )}
-                </div>
-                <div
-                  className="min-h-[80px] rounded-xl border border-slate-200 bg-slate-950 px-4 py-3 font-mono text-sm whitespace-pre-wrap overflow-y-auto"
-                  style={{ maxHeight: '140px' }}
-                >
-                  {mvcFreeOutput
-                    ? (mvcFreeOutput.stderr
-                        ? <span className="text-red-400">{mvcFreeOutput.stderr}</span>
-                        : <span className="text-emerald-400">{mvcFreeOutput.stdout || '(programa sin salida)'}</span>)
-                    : output
-                      ? <span className="text-emerald-400">{output}</span>
-                      : <span className="text-slate-600 text-xs">Presiona <strong className="text-slate-400">Evaluar</strong> para ver la salida aquí.</span>
-                  }
-                </div>
-              </div>
+              {puntos !== null && (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  Puntos: {puntos}
+                </span>
+              )}
             </div>
+
+            {/* Mensaje de resumen */}
+            {feedback && (
+              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm leading-6 ${
+                aprobado ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                : resultMode === 'execution' ? 'border-slate-200 bg-slate-50 text-slate-700'
+                : 'border-rose-200 bg-rose-50 text-rose-800'
+              }`}>
+                {feedback}
+              </div>
+            )}
+
+            {/* Casos */}
+            {casosPruebaResultados.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                Presiona <strong className="text-slate-700">Ejecutar</strong> para probar tu código, o{' '}
+                <strong className="text-slate-700">Enviar</strong> para calificar.
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {casosPruebaResultados.map((caso) => {
+                  const visual = getCaseVisualState(caso);
+                  const Icon = visual.icon;
+                  return (
+                    <div key={caso.caseNum} className={`rounded-xl border p-4 ${visual.cardClass}`}>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                          <Icon className={`h-4 w-4 ${visual.iconClass}`} />
+                          Caso {caso.caseNum}
+                        </div>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${visual.badgeClass}`}>
+                          {visual.label}
+                        </span>
+                      </div>
+                      <p className={`text-sm leading-6 ${caso.paso ? 'text-emerald-700' : caso.omitido ? 'text-amber-600' : 'text-rose-700'}`}>
+                        {getCaseResultMessage(caso)}
+                      </p>
+                      {!caso.omitido && (caso.outputObtenido || caso.stdout) && (
+                        <pre className="mt-3 whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-700">
+                          {caso.outputObtenido || caso.stdout}
+                        </pre>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
-      </div>
+        </section>
+        </div>{/* fin columna derecha */}
+
+        </div>{/* fin layout dos columnas */}
+
+      </div>{/* fin contenedor principal */}
     </div>
   );
 }

@@ -1650,9 +1650,23 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
             <div className="space-y-4">
               {filteredSequences.length === 0 ? (
-                <div className="app-empty-panel py-12">
-                  <p className="text-base text-slate-600">No hay secuencias disponibles con los filtros aplicados.</p>
-                  <p className="mt-2 text-sm text-slate-500">Registra una secuencia para definir el orden entre contenidos.</p>
+                <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+                  {onGoToContentManagement && (
+                    <div className="flex justify-end px-6 pt-5">
+                      <button
+                        type="button"
+                        onClick={onGoToContentManagement}
+                        className="app-btn app-btn-primary"
+                      >
+                        <ArrowRight className="w-5 h-5" />
+                        <span>Gestionar contenidos</span>
+                      </button>
+                    </div>
+                  )}
+                  <div className="app-empty-panel py-10">
+                    <p className="text-base text-slate-600">No hay secuencias disponibles con los filtros aplicados.</p>
+                    <p className="mt-2 text-sm text-slate-500">Registra una secuencia para definir el orden entre contenidos.</p>
+                  </div>
                 </div>
               ) : (
                 filteredSequences.map((sequence) => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Circle, ClipboardList, MoreVertical, Settings, Target, TrendingUp } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Circle, ClipboardList, Settings } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 import { MiniproyectoChatbotPanel } from './MiniproyectoChatbotPanel';
 import { ProgrammingContentView } from './ProgrammingContentView';
@@ -265,129 +265,193 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
     }
 
     return (
-      <article key={selectedExercise.id} className={`overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_14px_34px_rgba(58,74,91,0.08)] ${isLargeExercise ? 'md:col-span-2' : ''}`}>
-        <div className="border-b border-slate-100 px-6 py-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <div className="inline-flex rounded-full bg-[#EAF2FF] px-3 py-1 text-xs font-semibold text-[#3978E8]">Ejercicio {index + 1}</div>
-              <h3 className="mt-4 text-[1.65rem] font-semibold leading-tight text-[#213547]">{exerciseTitle}</h3>
-              <div className="mt-3 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{normalizedType}</div>
-              {selectedExercise.descripcion ? <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">{selectedExercise.descripcion}</p> : null}
+      <article
+        key={selectedExercise.id}
+        className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+        style={isLargeExercise ? { gridColumn: '1 / -1' } : undefined}
+      >
+        <div className="border-b border-slate-100 px-5 py-3" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span className="text-sm font-semibold" style={{ color: '#2563EB' }}>Ejercicio {index + 1}</span>
+              <span className="rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ backgroundColor: '#f1f5f9', color: '#64748b' }}>{normalizedType}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-2 md:justify-end">
-              <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${approved ? 'bg-emerald-50 text-emerald-700' : hasDraft ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
-                {approved ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
-                {approved ? 'Correcto' : hasDraft ? 'Respondido' : 'Pendiente'}
-              </span>
-              <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{selectedExercise.puntos || 100} pts</span>
-            </div>
+            {exerciseTitle !== `Ejercicio ${selectedExercise.id}` && (
+              <p className="mt-0.5 text-sm font-medium text-[#1e293b] truncate">{exerciseTitle}</p>
+            )}
+            {selectedExercise.descripcion ? (
+              <p className="mt-0.5 text-xs leading-5 text-slate-400" style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{selectedExercise.descripcion}</p>
+            ) : null}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+            <span className="text-xs font-medium text-slate-400">{selectedExercise.puntos || 100} pts</span>
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+              style={approved ? { backgroundColor: '#f0fdf4', color: '#16a34a' } : hasDraft ? { backgroundColor: '#fffbeb', color: '#d97706' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
+            >
+              {approved ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+              {approved ? 'Correcto' : hasDraft ? 'Respondido' : 'Pendiente'}
+            </span>
           </div>
         </div>
-        <div className="bg-white p-0">{exerciseContent}</div>
+        <div>{exerciseContent}</div>
       </article>
     );
   };
 
+  const containerStyle: React.CSSProperties = {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '0 2rem',
+    width: '100%',
+  };
+
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#F7FAFF_0%,#F5F7FB_48%,#F3F4F6_100%)]">
-      <header className="border-b border-slate-200 bg-white/95 shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[900px] items-center justify-between gap-4 px-4 py-3 lg:px-5">
+    <div className="min-h-screen bg-[#F5F7FB]">
+      {/* Header */}
+      <header className="border-b border-slate-200 bg-white shadow-sm">
+        <div style={containerStyle} className="flex items-center justify-between gap-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <button onClick={onBack} className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900" aria-label="Volver">
+            <button onClick={onBack} className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800" aria-label="Volver">
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <div className="flex shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#14B8E6_0%,#2563EB_100%)] text-sm font-semibold text-white" style={{ width: '32px', height: '32px' }}>MP</div>
+            <div className="flex shrink-0 items-center justify-center rounded-xl bg-[#2563EB] text-sm font-bold text-white" style={{ width: '36px', height: '36px' }}>MP</div>
             <div className="min-w-0">
-              <h1 className="truncate text-[1.05rem] font-semibold leading-5 text-[#223449]">{miniproyecto?.Actividad?.titulo || content.title}</h1>
-              <p className="truncate text-sm text-slate-500">Miniproyecto configurado por opciones</p>
+              <h1 className="truncate text-[0.95rem] font-semibold leading-5 text-[#1e293b]">{miniproyecto?.Actividad?.titulo || content.title}</h1>
+              <p className="truncate text-xs text-slate-400">Miniproyecto configurado por opciones</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button type="button" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Configuracion</span>
-            </button>
-            <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800" aria-label="Mas opciones">
-              <MoreVertical className="h-4 w-4" />
+            <button type="button" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50">
+              <Settings className="h-3.5 w-3.5" />
+              <span>Configuración</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[900px] px-4 py-6 lg:px-5 lg:py-6">
+      {/* ── escala: 16px · 24px · 32px · 40px ── */}
+      <main style={{ paddingTop: '40px', paddingBottom: '40px' }}>
+        <div style={containerStyle}>
         {isLoading ? (
           <div className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-500 shadow-sm">Cargando miniproyecto configurable...</div>
         ) : error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-10 text-center text-red-700 shadow-sm">{error}</div>
         ) : (
-          <div className="space-y-7">
-            <section className="pt-3">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <article className="rounded-[22px] bg-[linear-gradient(135deg,#3B82F6_0%,#2563EB_100%)] px-6 py-5 text-white shadow-[0_18px_34px_rgba(37,99,235,0.28)]"><div className="flex items-start justify-between gap-4"><div><div className="text-sm font-medium text-white/80">Ejercicios</div><div className="mt-2 text-[2.15rem] font-semibold leading-none">{totalExercises}</div></div><div className="rounded-2xl bg-white/16 p-3"><ClipboardList className="h-5 w-5" /></div></div></article>
-                <article className="rounded-[22px] bg-[linear-gradient(135deg,#22C55E_0%,#05B34B_100%)] px-6 py-5 text-white shadow-[0_18px_34px_rgba(5,179,75,0.25)]"><div className="flex items-start justify-between gap-4"><div><div className="text-sm font-medium text-white/80">Completados</div><div className="mt-2 text-[2.15rem] font-semibold leading-none">{correctExercises}/{totalExercises}</div></div><div className="rounded-2xl bg-white/16 p-3"><Target className="h-5 w-5" /></div></div></article>
-                <article className="rounded-[22px] bg-[linear-gradient(135deg,#C026D3_0%,#7C3AED_100%)] px-6 py-5 text-white shadow-[0_18px_34px_rgba(124,58,237,0.24)]"><div className="flex items-start justify-between gap-4"><div><div className="text-sm font-medium text-white/80">Precisión</div><div className="mt-2 text-[2.15rem] font-semibold leading-none">{accuracy}%</div></div><div className="rounded-2xl bg-white/16 p-3"><TrendingUp className="h-5 w-5" /></div></div></article>
-              </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+
+            {/* ── Stats cards ── */}
+            <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+              <article style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderRadius: '16px', borderLeft: '5px solid #2563EB', padding: '24px 28px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: 500, color: '#94a3b8', marginBottom: '8px' }}>Total ejercicios</p>
+                  <p style={{ fontSize: '2.25rem', fontWeight: 700, color: '#1e293b', lineHeight: 1 }}>{totalExercises}</p>
+                </div>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#EAF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <ClipboardList style={{ width: '22px', height: '22px', color: '#2563EB' }} />
+                </div>
+              </article>
+
+              <article style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderRadius: '16px', borderLeft: '5px solid #16a34a', padding: '24px 28px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: 500, color: '#94a3b8', marginBottom: '8px' }}>Respuestas correctas</p>
+                  <p style={{ fontSize: '2.25rem', fontWeight: 700, color: '#1e293b', lineHeight: 1 }}>{correctExercises}</p>
+                </div>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <CheckCircle2 style={{ width: '22px', height: '22px', color: '#16a34a' }} />
+                </div>
+              </article>
+
+              <article style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderRadius: '16px', borderLeft: '5px solid #dc2626', padding: '24px 28px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+                <div>
+                  <p style={{ fontSize: '13px', fontWeight: 500, color: '#94a3b8', marginBottom: '8px' }}>Respuestas incorrectas</p>
+                  <p style={{ fontSize: '2.25rem', fontWeight: 700, color: '#1e293b', lineHeight: 1 }}>{incorrectExercises}</p>
+                </div>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#fff1f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Circle style={{ width: '22px', height: '22px', color: '#dc2626' }} />
+                </div>
+              </article>
             </section>
 
-            <section className="rounded-[24px] border border-[#C9E2FF] bg-[linear-gradient(180deg,#EEF7FF_0%,#F2FBFF_100%)] px-5 py-6 shadow-[0_16px_36px_rgba(80,140,220,0.12)]">
-              <h2 className="text-[1.7rem] font-semibold text-[#213547]">Ruta del miniproyecto</h2>
-              <p className="mt-8 text-sm leading-6 text-slate-500">En esta categoría resuelves cada ejercicio y luego estudias el miniproyecto completo como un solo resultado final.</p>
-              <div className="mt-6 grid gap-4 md:grid-cols-[minmax(0,1.45fr)_minmax(240px,0.75fr)]">
-                <div className="rounded-[22px] bg-white px-5 py-5 shadow-sm ring-1 ring-slate-100">
-                  <div className="text-sm font-semibold text-[#243447]">Descripción del miniproyecto</div>
-                  {hasRenderableDescription(miniproyectoDescripcion) ? (
-                    <div className="prose prose-sm mt-4 max-w-none text-slate-600 prose-headings:text-[#243447] prose-p:text-slate-600 prose-li:text-slate-600" dangerouslySetInnerHTML={{ __html: miniproyectoDescripcion }} />
-                  ) : (
-                    <p className="mt-4 text-sm leading-6 text-slate-500">Este miniproyecto no tiene una descripción adicional configurada.</p>
+            {/* ── Descripción / Nivel / Entregable ── */}
+            {(hasRenderableDescription(miniproyectoDescripcion) || miniproyectoNivel || miniproyectoEntregable) && (
+              <section style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '32px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+                <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  {hasRenderableDescription(miniproyectoDescripcion) && (
+                    <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+                      <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '10px' }}>Descripción</p>
+                      <div className="prose prose-sm max-w-none text-slate-600" dangerouslySetInnerHTML={{ __html: miniproyectoDescripcion }} />
+                    </div>
+                  )}
+                  {miniproyectoNivel && (
+                    <div style={{ flex: '0 0 auto', minWidth: '90px' }}>
+                      <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '10px' }}>Nivel</p>
+                      <p style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>{miniproyectoNivel}</p>
+                    </div>
+                  )}
+                  {miniproyectoEntregable && (
+                    <div style={{ flex: '0 0 auto', maxWidth: '220px' }}>
+                      <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '10px' }}>Entregable</p>
+                      <p style={{ fontSize: '14px', color: '#475569' }}>{miniproyectoEntregable}</p>
+                    </div>
                   )}
                 </div>
-                <div className="space-y-4">
-                  <div className="rounded-[22px] bg-white px-5 py-4 shadow-sm ring-1 ring-slate-100"><div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Nivel</div><div className="mt-2 text-base font-semibold text-[#243447]">{miniproyectoNivel || 'No definido'}</div></div>
-                  <div className="rounded-[22px] bg-white px-5 py-4 shadow-sm ring-1 ring-slate-100"><div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Entregable esperado</div><div className="mt-2 text-sm leading-6 text-slate-600">{miniproyectoEntregable || 'No se definió un entregable para este miniproyecto.'}</div></div>
-                </div>
-              </div>
-              <div className="mt-9 rounded-[22px] bg-white px-4 py-5 shadow-sm ring-1 ring-slate-100">
-                <div className="text-sm font-semibold text-[#243447]">Resumen global</div>
-                <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  <div className="flex items-center gap-3 rounded-2xl px-2 py-1"><CheckCircle2 className="h-5 w-5 text-emerald-500" /><div><div className="text-xs text-slate-400">Correctas</div><div className="text-[1.65rem] font-semibold leading-none text-emerald-600">{correctExercises}/{totalExercises}</div></div></div>
-                  <div className="flex items-center gap-3 rounded-2xl px-2 py-1"><Circle className="h-5 w-5 text-[#4A90E2]" /><div><div className="text-xs text-slate-400">Respondidas</div><div className="text-[1.65rem] font-semibold leading-none text-[#3779F1]">{answeredExercises}/{totalExercises}</div></div></div>
-                  <div className="flex items-center gap-3 rounded-2xl px-2 py-1"><Circle className="h-5 w-5 text-rose-500" /><div><div className="text-xs text-slate-400">Incorrectas</div><div className="text-[1.65rem] font-semibold leading-none text-rose-500">{incorrectExercises}</div></div></div>
-                </div>
-              </div>
-              <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,#3B82F6_0%,#2F74E8_100%)] px-4 py-3 text-sm font-medium text-white shadow-sm">Evaluación final unificada del miniproyecto. {readyToEvaluate ? 'El botón principal de evaluación ya está habilitado.' : `Restan ${Math.max(totalExercises - answeredExercises, 0)} ejercicios por responder.`}</div>
-            </section>
-
-            {showChatbot ? (
-              <section className="space-y-4">
-                <div className="rounded-[24px] border border-sky-100 bg-[linear-gradient(135deg,#F2F8FF_0%,#F8FCFF_100%)] px-5 py-4 text-sm leading-6 text-slate-600 shadow-sm"><span className="font-semibold text-[#1F3A5F]">Soporte del chatbot</span> para consulta del contexto del caso, aclaración de dudas del cliente simulado y apoyo al desarrollo del miniproyecto.</div>
-                <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_16px_34px_rgba(58,74,91,0.08)]">
-                  <MiniproyectoChatbotPanel chatbotType="MINIPROYECTO" areaId={miniproyecto?.Area?.id || content.areaId || null} miniproyectoId={miniproyecto?.id || content.id} title="Petitbot" subtitle="Chatbot configurado para este miniproyecto" contextLabel={miniproyecto?.Actividad?.titulo || content.title} />
-                </div>
               </section>
-            ) : null}
+            )}
 
-            <section className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {exercises.map((exercise, index) => renderExerciseCard(exercise, index))}
+            {/* ── Chatbot ── */}
+            {showChatbot && (
+              <section style={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+                <MiniproyectoChatbotPanel chatbotType="MINIPROYECTO" areaId={miniproyecto?.Area?.id || content.areaId || null} miniproyectoId={miniproyecto?.id || content.id} title="Petitbot" subtitle="Chatbot configurado para este miniproyecto" contextLabel={miniproyecto?.Actividad?.titulo || content.title} />
+              </section>
+            )}
+
+            {/* ── Ejercicios ── */}
+            <section>
+              <p style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', marginBottom: '16px' }}>Ejercicios</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: '24px' }}>
+                {exercises.map((exercise, index) => renderExerciseCard(exercise, index))}
+              </div>
             </section>
 
-            <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-[0_16px_34px_rgba(58,74,91,0.08)]">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            {/* ── Evaluación ── */}
+            <section style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '32px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '24px', flexWrap: 'wrap' }}>
                 <div>
-                  <h3 className="text-[1.65rem] font-semibold text-[#213547]">Evaluación del miniproyecto</h3>
-                  <p className="mt-2 text-sm text-slate-500">El botón de evaluación se habilita cuando todos los ejercicios del proyecto han sido resueltos.</p>
+                  <p style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}>Evaluación del miniproyecto</p>
+                  <p style={{ fontSize: '13px', color: '#94a3b8' }}>
+                    {readyToEvaluate ? 'Todos los ejercicios han sido respondidos. Puedes evaluar.' : `Restan ${Math.max(totalExercises - answeredExercises, 0)} ejercicio(s) por responder.`}
+                  </p>
                 </div>
-                <button onClick={handleEvaluateMiniproyecto} disabled={!readyToEvaluate || isEvaluating || isCompleted} className="inline-flex items-center justify-center rounded-full border-2 border-[#3779F1] px-5 py-2.5 text-sm font-semibold text-[#3779F1] transition-colors hover:bg-[#EFF5FF] disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400">
+                <button
+                  onClick={handleEvaluateMiniproyecto}
+                  disabled={!readyToEvaluate || isEvaluating || isCompleted}
+                  style={{ flexShrink: 0, padding: '10px 24px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: readyToEvaluate && !isEvaluating && !isCompleted ? 'pointer' : 'not-allowed', background: readyToEvaluate && !isCompleted ? '#2563EB' : '#e2e8f0', color: readyToEvaluate && !isCompleted ? '#fff' : '#94a3b8', border: 'none', transition: 'background 0.2s' }}
+                >
                   {isCompleted ? 'Miniproyecto evaluado' : isEvaluating ? 'Evaluando...' : 'Evaluar miniproyecto'}
                 </button>
               </div>
-              <div className="mt-8">
-                <div className="mb-2 flex items-center justify-between gap-3 text-sm text-slate-500"><span>Progreso</span><span className="font-semibold text-[#111827]">{correctExercises}/{totalExercises} completado</span></div>
-                <div className="h-3 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[linear-gradient(90deg,#0F172A_0%,#111827_45%,#334155_100%)] transition-all duration-300" style={{ width: `${completionProgress}%` }} /></div>
-                {typeof progressSummary?.retroalimentacionGeneral === 'string' && progressSummary.retroalimentacionGeneral.trim() ? <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">{progressSummary.retroalimentacionGeneral}</div> : null}
+
+              <div style={{ marginTop: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94a3b8', marginBottom: '8px' }}>
+                  <span>Progreso</span>
+                  <span style={{ fontWeight: 600, color: '#1e293b' }}>{correctExercises}/{totalExercises} completado</span>
+                </div>
+                <div style={{ height: '8px', borderRadius: '99px', background: '#f1f5f9', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: '99px', background: '#2563EB', width: `${completionProgress}%`, transition: 'width 0.3s' }} />
+                </div>
               </div>
+
+              {typeof progressSummary?.retroalimentacionGeneral === 'string' && progressSummary.retroalimentacionGeneral.trim() ? (
+                <div style={{ marginTop: '16px', background: '#f8fafc', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', color: '#475569', lineHeight: 1.6 }}>
+                  {progressSummary.retroalimentacionGeneral}
+                </div>
+              ) : null}
             </section>
+
           </div>
         )}
+        </div>
       </main>
     </div>
   );

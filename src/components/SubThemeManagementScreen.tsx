@@ -786,7 +786,11 @@ export function SubThemeManagementScreen({
                 {filteredSubtemas.map((subtema) => (
                   <div
                     key={subtema.id}
-                    className={`app-list-card app-list-card--compact app-subtema-catalog-card ${isSubtemaActive(subtema) ? '' : 'opacity-75'}`}
+                    onClick={() => {
+                      if (!canManageSequences || !onManageSequences || !currentArea || !currentTemaObj) return;
+                      onManageSequences(Number(selectedArea), currentArea.nombre, Number(selectedTema), currentTemaObj.nombre);
+                    }}
+                    className={`app-list-card app-list-card--compact app-subtema-catalog-card ${isSubtemaActive(subtema) ? '' : 'opacity-75'} ${canManageSequences ? 'cursor-pointer hover:ring-2 hover:ring-[#4A90E2] hover:ring-offset-1 transition-shadow' : ''}`}
                   >
                     <div className="app-subtema-catalog-card__top">
                       <span className={`app-badge ${isSubtemaActive(subtema) ? 'app-badge--green' : 'bg-amber-100 text-amber-700'}`}>
@@ -794,14 +798,14 @@ export function SubThemeManagementScreen({
                       </span>
                       <div className="app-action-row app-subtema-catalog-card__actions">
                         <button
-                          onClick={() => handleEditSubtema(subtema)}
+                          onClick={(e) => { e.stopPropagation(); handleEditSubtema(subtema); }}
                           className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
                           title="Editar subtema"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleToggleSubtema(subtema)}
+                          onClick={(e) => { e.stopPropagation(); handleToggleSubtema(subtema); }}
                           className={`app-btn app-btn-sm ${isSubtemaActive(subtema) ? 'app-btn-secondary' : 'app-btn-success'}`}
                           title={isSubtemaActive(subtema) ? 'Inhabilitar subtema' : 'Habilitar subtema'}
                         >

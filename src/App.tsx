@@ -699,7 +699,7 @@ export default function App() {
       )}
 
       {currentScreen === 'admin-sequences' && (
-        <SequenceManagementScreen 
+        <SequenceManagementScreen
           onBack={() => {
             // Si viene de subtemas, volver a la pantalla de subtemas
             if (selectedSubtemaId) {
@@ -708,6 +708,7 @@ export default function App() {
               setCurrentScreen('admin-dashboard');
             }
           }}
+          onGoToContentManagement={() => setCurrentScreen('admin-contents')}
           subtemaId={selectedSubtemaId || undefined}
           temaId={selectedTemaId ? parseInt(selectedTemaId) : undefined}
         />
