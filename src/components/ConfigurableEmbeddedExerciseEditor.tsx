@@ -186,6 +186,9 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
     </header>
   );
 
+  const MAX_EXERCISES = 8;
+  const isAtLimit = exercises.length >= MAX_EXERCISES;
+
   const builderActionsPanel = (
     <section className="app-miniproyecto-builder-panel app-miniproyecto-builder-panel--actions">
       <div className="app-miniproyecto-builder-panel__intro">
@@ -194,6 +197,12 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
           <p className="mt-1 text-xs leading-5 text-slate-500">Bloques disponibles para extender el flujo activo.</p>
         </div>
       </div>
+
+      {isAtLimit ? (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
+          Límite de {MAX_EXERCISES} ejercicios alcanzado. Elimina uno para agregar otro.
+        </div>
+      ) : null}
 
       <div className="app-miniproyecto-builder-actions-menu">
         {ADDABLE_EXERCISE_TYPES.map((type) => {
@@ -205,7 +214,8 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
               key={type}
               type="button"
               onClick={() => handleAddExercise(type)}
-              className="app-miniproyecto-builder-type-button"
+              disabled={isAtLimit}
+              className="app-miniproyecto-builder-type-button disabled:pointer-events-none disabled:opacity-40"
             >
               <span className="app-miniproyecto-builder-type-button__content">
                 <span className={`app-miniproyecto-builder-type-button__icon ${meta.soft}`}>
