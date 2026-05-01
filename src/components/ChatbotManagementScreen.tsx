@@ -112,10 +112,10 @@ const emptyForm = (): ChatbotFormState => ({
   area_id: '',
   miniproyecto_id: '',
   model: 'qwen2.5:0.5b',
-  topK: '1',
-  max_context_chars: '600',
-  max_tokens: '256',
-  temperature: '0.2',
+  topK: '40',
+  max_context_chars: '4000',
+  max_tokens: '512',
+  temperature: '0.1',
   estado: true,
 });
 
@@ -160,6 +160,17 @@ function getMiniproyectoLabel(item: MiniproyectoItem) {
   return `Miniproyecto ${item.id}`;
 }
 
+const TEMPERATURE_OPTIONS = ['0.1', '0.4', '0.7', '1.0'];
+const TOPK_OPTIONS = ['10', '40', '100'];
+const MAX_TOKENS_OPTIONS = ['256', '512', '1024', '2048'];
+const MAX_CONTEXT_CHARS_OPTIONS = ['1000', '4000', '8000'];
+
+function snapToNearest(value: number, options: string[]): string {
+  const nums = options.map(Number);
+  const closest = nums.reduce((prev, curr) => Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev);
+  return String(closest);
+}
+
 function mapChatbotToForm(chatbot: ChatbotItem): ChatbotFormState {
   return {
     id: chatbot.id,
@@ -170,10 +181,10 @@ function mapChatbotToForm(chatbot: ChatbotItem): ChatbotFormState {
     area_id: chatbot.area_id ? String(chatbot.area_id) : '',
     miniproyecto_id: chatbot.miniproyecto_id ? String(chatbot.miniproyecto_id) : '',
     model: chatbot.model_name || 'qwen2.5:0.5b',
-    topK: String(chatbot.top_k || 1),
-    max_context_chars: String(chatbot.max_context_chars || 600),
-    max_tokens: String(chatbot.max_tokens || 256),
-    temperature: String(chatbot.temperature ?? 0.2),
+    topK: snapToNearest(Number(chatbot.top_k || 40), TOPK_OPTIONS),
+    max_context_chars: snapToNearest(Number(chatbot.max_context_chars || 4000), MAX_CONTEXT_CHARS_OPTIONS),
+    max_tokens: snapToNearest(Number(chatbot.max_tokens || 512), MAX_TOKENS_OPTIONS),
+    temperature: snapToNearest(Number(chatbot.temperature ?? 0.1), TEMPERATURE_OPTIONS),
     estado: chatbot.estado !== false,
   };
 }
@@ -650,6 +661,18 @@ export function ChatbotManagementScreen({
       return;
     }
 
+    const selectedChatbot = chatbots.find((item) => item.id === selectedChatbotId);
+    if (!selectedChatbot) {
+      setStatusMessage('No se encontró el chatbot seleccionado.');
+      return;
+    }
+
+    // Garantizar que form.id corresponde al chatbot seleccionado antes de abrir el formulario.
+    setForm(
+      isDocenteMode
+        ? enforceDocenteFormMode(mapChatbotToForm(selectedChatbot), docenteAreaId, Number(areaOptions[0]?.id))
+        : mapChatbotToForm(selectedChatbot)
+    );
     setIsFormVisible(true);
     setStatusMessage('Editando configuración del chatbot seleccionado.');
   }
@@ -1640,20 +1663,75 @@ export function ChatbotManagementScreen({
 
                     <div className="app-form-grid app-form-grid-2">
                       <div className="app-form-field">
-                        <label className="app-form-label flex items-center gap-2">topK <InfoBadge text="Cantidad de fragmentos recuperados del PDF antes de responder." /></label>
-                        <input type="number" min={1} value={form.topK} onChange={(event) => updateForm('topK', event.target.value)} className="app-form-input" />
+                        <label className="app-form-label flex items-center gap-2">
+                          Temperatura
+                          <InfoBadge text="Controla la creatividad o aleatoriedad de la respuesta." />
+                        </label>
+                        <select value={form.temperature} onChange={(e) => updateForm('temperature', e.target.value)} className="app-form-select">
+                          <option value="0.1">0.1 – Determinista (Recomendado para Tesis)</option>
+                          <option value="0.4">0.4 – Balanceado</option>
+                          <option value="0.7">0.7 – Creativo</option>
+                          <option value="1.0">1.0 – Aleatorio (no recomendado para académico)</option>
+                        </select>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {form.temperature === '0.1' && 'Ideal para ceñirse estrictamente a los documentos sin inventar.'}
+                          {form.temperature === '0.4' && 'Da respuestas fluidas pero mantiene precisión técnica.'}
+                          {form.temperature === '0.7' && 'Útil para lluvia de ideas o redacción de textos generales.'}
+                          {form.temperature === '1.0' && 'Aumenta el riesgo de alucinaciones. Evítalo en fines académicos.'}
+                        </p>
                       </div>
+
                       <div className="app-form-field">
-                        <label className="app-form-label flex items-center gap-2">Máx. chars de contexto <InfoBadge text="Límite de texto de apoyo que se envía al modelo en cada consulta." /></label>
-                        <input type="number" min={200} value={form.max_context_chars} onChange={(event) => updateForm('max_context_chars', event.target.value)} className="app-form-input" />
+                        <label className="app-form-label flex items-center gap-2">
+                          Top-K
+                          <InfoBadge text="Define cuántos fragmentos del PDF considera el sistema antes de elegir la respuesta." />
+                        </label>
+                        <select value={form.topK} onChange={(e) => updateForm('topK', e.target.value)} className="app-form-select">
+                          <option value="10">10 – Muy estricto</option>
+                          <option value="40">40 – Estándar (Recomendado)</option>
+                          <option value="100">100 – Divergente</option>
+                        </select>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {form.topK === '10' && 'Respuestas muy predecibles y enfocadas.'}
+                          {form.topK === '40' && 'Buen balance entre precisión y variedad. Valor por defecto en Llama y Gemma.'}
+                          {form.topK === '100' && 'Considera palabras menos comunes; respuestas más variadas.'}
+                        </p>
                       </div>
+
                       <div className="app-form-field">
-                        <label className="app-form-label flex items-center gap-2">Máx. tokens <InfoBadge text="Cantidad máxima de texto que puede generar el chatbot en su respuesta." /></label>
-                        <input type="number" min={64} value={form.max_tokens} onChange={(event) => updateForm('max_tokens', event.target.value)} className="app-form-input" />
+                        <label className="app-form-label flex items-center gap-2">
+                          Máx. Tokens
+                          <InfoBadge text="Longitud máxima de la respuesta generada por la IA." />
+                        </label>
+                        <select value={form.max_tokens} onChange={(e) => updateForm('max_tokens', e.target.value)} className="app-form-select">
+                          <option value="256">256 – Corto</option>
+                          <option value="512">512 – Medio (Recomendado)</option>
+                          <option value="1024">1024 – Largo</option>
+                          <option value="2048">2048 – Muy largo</option>
+                        </select>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {form.max_tokens === '256' && 'Ideal para respuestas rápidas o definiciones breves.'}
+                          {form.max_tokens === '512' && 'Perfecto para explicar conceptos académicos sin saturar el servidor.'}
+                          {form.max_tokens === '1024' && 'Para resúmenes extensos o explicaciones detalladas de procesos.'}
+                          {form.max_tokens === '2048' && 'Útil para generación de código o artículos completos.'}
+                        </p>
                       </div>
+
                       <div className="app-form-field">
-                        <label className="app-form-label flex items-center gap-2">Temperatura <InfoBadge text="Define qué tan creativa o estable será la respuesta del chatbot." /></label>
-                        <input type="number" step="0.1" min={0} max={1} value={form.temperature} onChange={(event) => updateForm('temperature', event.target.value)} className="app-form-input" />
+                        <label className="app-form-label flex items-center gap-2">
+                          Máx. Chars de Contexto
+                          <InfoBadge text="Límite de texto del PDF que el sistema RAG le pasa a la IA antes de responder." />
+                        </label>
+                        <select value={form.max_context_chars} onChange={(e) => updateForm('max_context_chars', e.target.value)} className="app-form-select">
+                          <option value="1000">1000 – Enfocado</option>
+                          <option value="4000">4000 – Estándar (Recomendado)</option>
+                          <option value="8000">8000 – Amplio</option>
+                        </select>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {form.max_context_chars === '1000' && 'Solo el párrafo más relevante del documento.'}
+                          {form.max_context_chars === '4000' && 'Aprox. 2-3 páginas de texto. Suficiente para entender el tema.'}
+                          {form.max_context_chars === '8000' && 'Para documentos con mucha información técnica relacionada. Consume más memoria.'}
+                        </p>
                       </div>
                     </div>
                   </section>

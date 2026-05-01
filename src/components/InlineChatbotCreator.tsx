@@ -27,10 +27,10 @@ export function InlineChatbotCreator({ areaId, onClose, onChatbotCreated, apiFet
     descripcion: '',
     prompt_base: '',
     model: 'qwen2.5:0.5b',
-    topK: '1',
-    max_context_chars: '600',
-    max_tokens: '256',
-    temperature: '0.2',
+    topK: '40',
+    max_context_chars: '4000',
+    max_tokens: '512',
+    temperature: '0.1',
   });
 
   const [isCreating, setIsCreating] = useState(false);
@@ -64,10 +64,10 @@ export function InlineChatbotCreator({ areaId, onClose, onChatbotCreated, apiFet
       },
       parametros_rendimiento: {
         model: formData.model,
-        topK: Number(formData.topK) || 1,
-        max_context_chars: Number(formData.max_context_chars) || 600,
-        max_tokens: Number(formData.max_tokens) || 256,
-        temperature: Number(formData.temperature) || 0.2,
+        topK: Number(formData.topK) || 40,
+        max_context_chars: Number(formData.max_context_chars) || 4000,
+        max_tokens: Number(formData.max_tokens) || 512,
+        temperature: Number(formData.temperature) || 0.1,
       },
     };
 
@@ -185,7 +185,7 @@ export function InlineChatbotCreator({ areaId, onClose, onChatbotCreated, apiFet
                 </div>
 
                 <div className="app-form-grid app-form-grid-2">
-                  <div className="app-form-field">
+                  <div className="app-form-field md:col-span-2">
                     <label className="app-form-label">Modelo</label>
                     <select
                       value={formData.model}
@@ -194,55 +194,95 @@ export function InlineChatbotCreator({ areaId, onClose, onChatbotCreated, apiFet
                       disabled={isCreating}
                     >
                       {MODEL_OPTIONS.map((model) => (
-                        <option key={model} value={model}>
-                          {model}
-                        </option>
+                        <option key={model} value={model}>{model}</option>
                       ))}
                     </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formData.model === 'qwen2.5:0.5b' && 'Ligero y estable, recomendado para la mayoría de casos.'}
+                      {formData.model === 'llama3.2:1b' && 'Más rápido pero consume más memoria del servidor.'}
+                      {formData.model === 'llama3.2' && 'Respuestas más completas, mayor costo computacional.'}
+                    </p>
                   </div>
 
                   <div className="app-form-field">
-                    <label className="app-form-label">Temperature</label>
-                    <input
-                      type="text"
+                    <label className="app-form-label">Temperatura</label>
+                    <select
                       value={formData.temperature}
                       onChange={(e) => updateField('temperature', e.target.value)}
-                      className="app-form-input"
-                      placeholder="0.2"
+                      className="app-form-select"
                       disabled={isCreating}
-                    />
+                    >
+                      <option value="0.1">0.1 – Determinista (Recomendado para Tesis)</option>
+                      <option value="0.4">0.4 – Balanceado</option>
+                      <option value="0.7">0.7 – Creativo</option>
+                      <option value="1.0">1.0 – Aleatorio (no recomendado para académico)</option>
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formData.temperature === '0.1' && 'Ideal para ceñirse estrictamente a los documentos sin inventar.'}
+                      {formData.temperature === '0.4' && 'Da respuestas fluidas pero mantiene precisión técnica.'}
+                      {formData.temperature === '0.7' && 'Útil para lluvia de ideas o redacción de textos generales.'}
+                      {formData.temperature === '1.0' && 'Aumenta el riesgo de alucinaciones. Evítalo en fines académicos.'}
+                    </p>
                   </div>
 
                   <div className="app-form-field">
-                    <label className="app-form-label">Max Tokens</label>
-                    <input
-                      type="text"
-                      value={formData.max_tokens}
-                      onChange={(e) => updateField('max_tokens', e.target.value)}
-                      className="app-form-input"
-                      placeholder="256"
-                      disabled={isCreating}
-                    />
-                  </div>
-
-                  <div className="app-form-field">
-                    <label className="app-form-label">Top K</label>
-                    <input
-                      type="text"
+                    <label className="app-form-label">Top-K</label>
+                    <select
                       value={formData.topK}
                       onChange={(e) => updateField('topK', e.target.value)}
-                      className="app-form-input"
-                      placeholder="1"
+                      className="app-form-select"
                       disabled={isCreating}
-                    />
+                    >
+                      <option value="10">10 – Muy estricto</option>
+                      <option value="40">40 – Estándar (Recomendado)</option>
+                      <option value="100">100 – Divergente</option>
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formData.topK === '10' && 'Respuestas muy predecibles y enfocadas.'}
+                      {formData.topK === '40' && 'Buen balance entre precisión y variedad.'}
+                      {formData.topK === '100' && 'Considera palabras menos comunes; respuestas más variadas.'}
+                    </p>
                   </div>
-                </div>
 
-                <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-700">
-                  <p className="font-medium mb-1">💡 Recomendaciones de modelo:</p>
-                  <p><strong>qwen2.5:0.5b:</strong> Ligero y estable, recomendado para la mayoría de casos.</p>
-                  <p><strong>llama3.2:1b:</strong> Más rápido pero consume más memoria.</p>
-                  <p><strong>llama3.2:</strong> Respuestas más completas, mayor costo computacional.</p>
+                  <div className="app-form-field">
+                    <label className="app-form-label">Máx. Tokens</label>
+                    <select
+                      value={formData.max_tokens}
+                      onChange={(e) => updateField('max_tokens', e.target.value)}
+                      className="app-form-select"
+                      disabled={isCreating}
+                    >
+                      <option value="256">256 – Corto</option>
+                      <option value="512">512 – Medio (Recomendado)</option>
+                      <option value="1024">1024 – Largo</option>
+                      <option value="2048">2048 – Muy largo</option>
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formData.max_tokens === '256' && 'Ideal para respuestas rápidas o definiciones breves.'}
+                      {formData.max_tokens === '512' && 'Perfecto para explicar conceptos académicos sin saturar el servidor.'}
+                      {formData.max_tokens === '1024' && 'Para resúmenes extensos o explicaciones detalladas.'}
+                      {formData.max_tokens === '2048' && 'Útil para generación de código o artículos completos.'}
+                    </p>
+                  </div>
+
+                  <div className="app-form-field">
+                    <label className="app-form-label">Máx. Chars de Contexto</label>
+                    <select
+                      value={formData.max_context_chars}
+                      onChange={(e) => updateField('max_context_chars', e.target.value)}
+                      className="app-form-select"
+                      disabled={isCreating}
+                    >
+                      <option value="1000">1000 – Enfocado</option>
+                      <option value="4000">4000 – Estándar (Recomendado)</option>
+                      <option value="8000">8000 – Amplio</option>
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formData.max_context_chars === '1000' && 'Solo el párrafo más relevante del documento.'}
+                      {formData.max_context_chars === '4000' && 'Aprox. 2-3 páginas de texto. Suficiente para entender el tema.'}
+                      {formData.max_context_chars === '8000' && 'Para documentos con mucha información técnica. Consume más memoria.'}
+                    </p>
+                  </div>
                 </div>
               </section>
             </div>
