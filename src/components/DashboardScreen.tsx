@@ -1,4 +1,4 @@
-import { LogOut, Code, Database, BarChart3, BookOpen, Clock, CheckCircle2, TrendingUp, User } from 'lucide-react';
+import { LogOut, Code, BookOpen, TrendingUp, User } from 'lucide-react';
 import { ChatbotButton } from './ChatbotButton';
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../utils/constants';
@@ -58,45 +58,21 @@ const getRestrictedAreaCategory = (areaName?: string | null): RestrictedAreaCate
   return null;
 };
 
-// Fallback data por si falla el fetch
-const FALLBACK_SUBJECTS = [
-  {
-    id: '1',
-    name: 'Fundamentos de Programación',
-    icon: Code,
-    color: '#4A90E2',
-    progress: 65,
-    topics: 12,
-    completed: 8,
-    nextTopic: 'Funciones y Procedimientos'
-  },
-  {
-    id: '2',
-    name: 'Análisis de Sistemas',
-    icon: Database,
-    color: '#7ED6A7',
-    progress: 45,
-    topics: 10,
-    completed: 4,
-    nextTopic: 'Diagramas de Secuencia'
-  },
-  {
-    id: '3',
-    name: 'Alcance, Tiempo y Costo',
-    icon: BarChart3,
-    color: '#F5A97F',
-    progress: 30,
-    topics: 8,
-    completed: 2,
-    nextTopic: 'Estimación inicial del proyecto'
-  }
-];
+// Si el fetch de áreas falla, mostramos lista vacía + alerta — no se inventan datos.
 
 export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudianteId }: DashboardScreenProps) {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [progresosPorArea, setProgresosPorArea] = useState<Map<number, number>>(new Map());
+  // Mapa areaId → datos reales del progreso del backend
+  type AreaProgress = {
+    porcentaje: number;
+    temasTotal: number;
+    temasCompletados: number;
+    temasPendientes: number;
+    siguienteTema: string;
+  };
+  const [progresosPorArea, setProgresosPorArea] = useState<Map<number, AreaProgress>>(new Map());
   const [loadingProgresos, setLoadingProgresos] = useState(false);
 
   // Función para obtener áreas permitidas según el semestre
@@ -111,28 +87,28 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
     return []; // Si el semestre está fuera de rango
   };
 
-  // Obtener progreso de una área específica
-  const obtenerProgresoArea = async (areaId: number) => {
-    if (!estudianteId) {
-      console.warn('No hay estudiante_id disponible');
-      return 0;
-    }
-
+  // Obtener progreso real de un área (porcentaje + info de temas)
+  const obtenerProgresoArea = async (areaId: number): Promise<AreaProgress> => {
+    const empty: AreaProgress = {
+      porcentaje: 0, temasTotal: 0, temasCompletados: 0, temasPendientes: 0,
+      siguienteTema: 'Sin temas registrados'
+    };
+    if (!estudianteId) return empty;
     try {
       const url = `${API_BASE_URL}/progresos/por-area?area_id=${areaId}&estudiante_id=${estudianteId}`;
       const response = await fetch(url);
-      
-      if (!response.ok) {
-        console.warn(`Error al obtener progreso del área ${areaId}:`, response.status);
-        return 0;
-      }
-      
+      if (!response.ok) return empty;
       const data = await response.json();
-      const porcentaje = data.resumen?.porcentajeTotalArea || 0;
-      return Math.round(porcentaje);
+      return {
+        porcentaje: Math.round(data.resumen?.porcentajeTotalArea || 0),
+        temasTotal: Number(data.temas?.total ?? 0),
+        temasCompletados: Number(data.temas?.completados ?? 0),
+        temasPendientes: Number(data.temas?.pendientes ?? 0),
+        siguienteTema: data.temas?.siguiente || 'Sin temas registrados',
+      };
     } catch (err) {
       console.error(`Error al obtener progreso del área ${areaId}:`, err);
-      return 0;
+      return empty;
     }
   };
 
@@ -180,16 +156,12 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         console.log(`Semestre ${semestre} - Áreas permitidas:`, areasPermitidas);
         console.log('Áreas filtradas:', areasFiltradas);
 
-        // Transformar áreas a formato de subjects
+        // Transformar áreas a formato de subjects (los temas/progreso se cargan después desde el backend)
         const transformedSubjects = areasFiltradas.map((area: Area, index: number) => ({
           id: area.id.toString(),
           name: area.nombre,
           icon: Code,
           color: colorPalette[index % colorPalette.length],
-          progress: 0, // Se cargará dinámicamente después
-          topics: Math.floor(Math.random() * 15) + 5,
-          completed: Math.floor(Math.random() * 10) + 1,
-          nextTopic: 'Próximo tema disponible'
         }));
 
         setSubjects(transformedSubjects);
@@ -198,9 +170,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         console.error('Error fetching areas:', errorMessage);
         setError(`No se pudieron cargar las áreas: ${errorMessage}`);
         
-        // Usar fallback data
-        console.log('Using fallback data');
-        setSubjects(FALLBACK_SUBJECTS);
+        // No se inventan datos: lista vacía + alerta para que el estudiante sepa que algo falló
+        setSubjects([]);
       } finally {
         setLoading(false);
       }
@@ -209,23 +180,21 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
     fetchAreas();
   }, []);
 
-  // Cargar progreso de todas las áreas cuando se carguen
+  // Cargar progreso real (en paralelo) cuando las áreas se carguen
   useEffect(() => {
     if (subjects.length > 0 && estudianteId) {
       setLoadingProgresos(true);
       const cargarProgresos = async () => {
-        const nuevosProgresos = new Map<number, number>();
-        
-        for (const subject of subjects) {
-          const areaId = parseInt(subject.id);
-          const progreso = await obtenerProgresoArea(areaId);
-          nuevosProgresos.set(areaId, progreso);
-        }
-        
-        setProgresosPorArea(nuevosProgresos);
+        const entries = await Promise.all(
+          subjects.map(async (s) => {
+            const areaId = parseInt(s.id);
+            const progreso = await obtenerProgresoArea(areaId);
+            return [areaId, progreso] as const;
+          })
+        );
+        setProgresosPorArea(new Map(entries));
         setLoadingProgresos(false);
       };
-      
       cargarProgresos();
     }
   }, [subjects, estudianteId]);
@@ -292,7 +261,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           {error && (
             <div className="app-alert app-alert--warning lg:col-span-3">
               <p className="text-yellow-700 text-sm">{error}</p>
-              <p className="text-yellow-600 text-xs mt-2">Se están mostrando datos de prueba.</p>
+              <p className="text-yellow-600 text-xs mt-2">Verifica que el servidor esté disponible y vuelve a intentarlo.</p>
             </div>
           )}
           
@@ -304,7 +273,11 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           subjects.map((subject) => {
             const Icon = subject.icon;
             const areaId = parseInt(subject.id);
-            const progresoReal = progresosPorArea.get(areaId) || 0;
+            const data = progresosPorArea.get(areaId);
+            const porcentaje = data?.porcentaje ?? 0;
+            const temasTotal = data?.temasTotal ?? 0;
+            const temasPendientes = data?.temasPendientes ?? 0;
+            const siguienteTema = data?.siguienteTema ?? 'Sin temas registrados';
             return (
               <button
                 key={subject.id}
@@ -312,7 +285,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
                 className="app-list-card group"
               >
                 <div className="app-list-card__head">
-                  <div 
+                  <div
                     className="app-list-card__icon"
                     style={{ backgroundColor: `${subject.color}15` }}
                   >
@@ -333,31 +306,30 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
                   <div className="flex items-center justify-between mb-2 app-list-card__meta">
                     <span>Progreso</span>
                     <span className="text-sm" style={{ color: subject.color }}>
-                      {loadingProgresos ? '...' : `${progresoReal}%`}
+                      {loadingProgresos && !data ? '...' : `${porcentaje}%`}
                     </span>
                   </div>
                   <div className="app-progress-track">
-                    <div 
+                    <div
                       className="app-progress-bar"
-                      style={{ 
-                        width: `${progresoReal}%`,
+                      style={{
+                        width: `${porcentaje}%`,
                         backgroundColor: subject.color
                       }}
                     ></div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <span>{subject.completed} de {subject.topics} temas</span>
+                <div className="flex items-center justify-end text-sm text-gray-600">
                   <span className="app-badge app-badge--slate">
-                    {subject.topics - subject.completed} pendientes
+                    {loadingProgresos && !data ? '...' : `${temasPendientes} de ${temasTotal} pendientes`}
                   </span>
                 </div>
 
                 <div className="app-list-card__footer">
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Siguiente tema</p>
-                    <p className="text-sm text-[#3A4A5B]">{subject.nextTopic}</p>
+                    <p className="text-sm text-[#3A4A5B]">{loadingProgresos && !data ? 'Cargando…' : siguienteTema}</p>
                   </div>
                   <TrendingUp className="w-5 h-5 text-slate-300 group-hover:text-[#4A90E2] transition-colors" />
                 </div>
@@ -367,38 +339,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           )}
         </div>
 
-        <div className="app-panel p-6 mt-8">
-          <h3 className="app-section-title mb-4">Actividad reciente</h3>
-          <div className="app-activity-list">
-            <div className="app-activity-item">
-              <div className="app-metric-icon app-metric-icon--green w-10 h-10 rounded-full">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <div className="app-activity-item__meta flex-1">
-                <p>Contenido completado: “Variables y Tipos de Datos”</p>
-                <p>Fundamentos de Programación • Hace 2 horas</p>
-              </div>
-            </div>
-            <div className="app-activity-item">
-              <div className="app-metric-icon app-metric-icon--blue w-10 h-10 rounded-full">
-                <BookOpen className="w-5 h-5" />
-              </div>
-              <div className="app-activity-item__meta flex-1">
-                <p>Nuevo contenido registrado en Análisis de Sistemas</p>
-                <p>Diagramas UML • Hace 5 horas</p>
-              </div>
-            </div>
-            <div className="app-activity-item">
-              <div className="app-metric-icon app-metric-icon--amber w-10 h-10 rounded-full">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div className="app-activity-item__meta flex-1">
-                <p>Actividad pendiente: Gestión del Alcance</p>
-                <p>Alcance, Tiempo y Costo • Vence en 3 días</p>
-              </div>
-            </div>
-          </div>
-        </div>
       </main>
       <ChatbotButton contextLabel="panel del estudiante" />
     </div>

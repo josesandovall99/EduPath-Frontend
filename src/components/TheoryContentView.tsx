@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Play, FileText, CheckCircle2, SkipBack, SkipForward, BookOpen, ChevronDown, ChevronRight, Loader, Lock } from 'lucide-react';
+import { ArrowLeft, Play, FileText, CheckCircle2, BookOpen, ChevronDown, ChevronRight, Loader, Lock } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ProgrammingContentView } from './ProgrammingContentView';
 import { UMLDiagramView } from './UMLDiagramView';
@@ -772,42 +772,24 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       // Filtrar solo contenidos que forman parte de alguna secuencia
       const contenidosSecuenciados = contenidos.filter(c => sequencedIds.has(c.id));
 
-      // Transform contenidosSecuenciados to ModuleItem format
+      // Transform contenidosSecuenciados to ModuleItem format (sin gating todavía;
+      // el gating se aplica DESPUÉS de mezclar contenidos + ejercicios en orden)
       const items: ModuleItem[] = await Promise.all(
         contenidosSecuenciados.map(async (contenido: Contenido, idx: number) => {
-          // Cargar estado de visualización para cada contenido
           const visualizado = await obtenerEstadoVisualizacion(contenido.id.toString());
           const estadoProgreso = contenidosConEstadoProgreso.get(String(contenido.id));
-          
-          // Determinar si está desbloqueado
-          let desbloqueado: boolean;
-          if (estadoProgreso?.desbloqueado !== undefined) {
-            desbloqueado = estadoProgreso.desbloqueado;
-          } else {
-            // Calcular localmente: primer contenido siempre desbloqueado
-            if (idx === 0) {
-              desbloqueado = true;
-            } else {
-              // El siguiente se desbloquea si el anterior fue visualizado
-              const contenidoAnterior = contenidosSecuenciados[idx - 1];
-              const visualizadoAnterior = await obtenerEstadoVisualizacion(contenidoAnterior.id.toString());
-              desbloqueado = visualizadoAnterior;
-            }
-          }
-          
           const completo = estadoProgreso?.completo ?? visualizado;
-          
           return {
             id: contenido.id.toString(),
             title: contenido.titulo,
             duration: undefined,
             type: mapTipoToType(contenido.tipo),
             completed: false,
-            visualizado: visualizado,
+            visualizado,
             descripcion: contenido.descripcion,
             url: contenido.url,
             recommended: idx === 0,
-            desbloqueado,
+            desbloqueado: false, // se calcula al final
             completo,
           };
         })
@@ -841,42 +823,69 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
           
           console.log(`Encontrados ${ejerciciosDeEsteSubtema.length} ejercicios para este subtema`, ejerciciosDeEsteSubtema);
           
-          // Crear nuevo array con contenidos y ejercicios intercalados
+          // Cargar estado de aprobación real de cada ejercicio en paralelo
+          const aprobadosMap = new Map<number, boolean>();
+          if (estudianteId) {
+            await Promise.all(
+              ejerciciosDeEsteSubtema.map(async (ej) => {
+                try {
+                  const r = await fetch(
+                    `${API_BASE_URL}/respuestasEstudianteEjercicio/verificar-completado?ejercicio_id=${ej.id}&estudiante_id=${estudianteId}`
+                  );
+                  if (!r.ok) { aprobadosMap.set(ej.id, false); return; }
+                  const data = await r.json();
+                  aprobadosMap.set(ej.id, Boolean(data?.completado));
+                } catch {
+                  aprobadosMap.set(ej.id, false);
+                }
+              })
+            );
+          }
+
+          // Mezclar contenidos + ejercicios en orden (ejercicios DESPUÉS de su contenido)
           const itemsConEjercicios: ModuleItem[] = [];
-          
           items.forEach(contenidoItem => {
-            // Agregar el contenido
             itemsConEjercicios.push(contenidoItem);
-            
-            // Buscar ejercicios asociados a este contenido
-            const ejerciciosDeEsteContenido = ejerciciosDeEsteSubtema.filter(ej => 
+            const ejerciciosDeEsteContenido = ejerciciosDeEsteSubtema.filter(ej =>
               Number(ej.contenido_id) === Number(contenidoItem.id)
             );
-            
-            // Agregar cada ejercicio justo después del contenido
             ejerciciosDeEsteContenido.forEach(ejercicio => {
-              console.log(`   Agregando ejercicio "${ejercicio.actividad?.titulo}" después del contenido "${contenidoItem.title}"`);
-              
+              const aprobado = aprobadosMap.get(ejercicio.id) || false;
               const ejercicioItem: ModuleItem = {
                 id: `ejercicio-${ejercicio.id}`,
-                title: `${ejercicio.actividad?.titulo || 'Ejercicio Práctico'}`,
+                title: ejercicio.actividad?.titulo || 'Ejercicio Práctico',
                 duration: undefined,
                 type: 'activity',
-                completed: false,
-                visualizado: false,
+                completed: aprobado,        // ← estado real
+                visualizado: aprobado,      // checkbox marcado solo si aprobado
+                completo: aprobado,
                 descripcion: ejercicio.actividad?.descripcion || '',
                 url: undefined,
                 recommended: false,
-                ejercicioData: ejercicio
+                desbloqueado: false,        // se calcula al final
+                ejercicioData: ejercicio,
               };
-              
               itemsConEjercicios.push(ejercicioItem);
             });
           });
-          
-          console.log(`Total de ítems en menú: ${itemsConEjercicios.length} (${items.length} contenidos + ${ejerciciosDeEsteSubtema.length} ejercicios)`);
-          
-          // Reemplazar el array items con el nuevo que incluye ejercicios
+
+          // Gating secuencial: el primero siempre desbloqueado;
+          // los demás se desbloquean SOLO si el anterior está realmente completo.
+          // - Contenido: completo = visualizado
+          // - Ejercicio: completo = aprobado
+          for (let i = 0; i < itemsConEjercicios.length; i++) {
+            if (i === 0) {
+              itemsConEjercicios[i].desbloqueado = true;
+              continue;
+            }
+            const prev = itemsConEjercicios[i - 1];
+            const prevDone = prev.ejercicioData
+              ? Boolean(prev.completo)        // ejercicio: APROBADO
+              : Boolean(prev.visualizado);    // contenido: VISUALIZADO
+            itemsConEjercicios[i].desbloqueado = prevDone;
+          }
+
+          // Reemplazar el array items
           items.length = 0;
           items.push(...itemsConEjercicios);
         }
@@ -970,14 +979,19 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     <div className="min-h-screen bg-[#F2F2F2] flex">
       {/* Left Sidebar - Course Modules */}
       <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto shadow-sm">
-        {/* Sidebar Header */}
-        <div 
-          className="p-4 border-b border-gray-200 text-white"
+        {/* Sidebar Header — alineado en altura con el header derecho (px-8 py-4 + ícono 48x48) */}
+        <div
+          className="px-6 py-4 border-b border-gray-200 text-white shadow-sm"
           style={{ background: `linear-gradient(135deg, ${subjectColor} 0%, ${subjectColor}dd 100%)` }}
         >
           <div className="flex items-center gap-3">
-            <BookOpen className="w-5 h-5" />
-            <span className="text-sm">Módulos del Curso</span>
+            <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="font-semibold text-base leading-tight">Módulos del Curso</p>
+              <p className="text-white/80 text-xs">Navega entre subtemas</p>
+            </div>
           </div>
         </div>
 
@@ -1091,11 +1105,20 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                             <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                               <Lock className="w-4 h-4 text-gray-400" />
                             </div>
-                          ) : (
-                            <div className="w-5 h-5 border-2 rounded flex items-center justify-center flex-shrink-0" style={{ borderColor: item.completed || item.visualizado ? subjectColor : isSelected ? subjectColor : '#E5E7EB' }}>
-                              {(item.completed || item.visualizado) && <CheckCircle2 className="w-4 h-4" style={{ color: subjectColor }} />}
-                            </div>
-                          )}
+                          ) : (() => {
+                            // Distinción clara: ejercicio = COMPLETADO (aprobado) | contenido = VISTO (visualizado)
+                            const isDone = item.ejercicioData
+                              ? Boolean(item.completo)        // ejercicio: aprobado
+                              : Boolean(item.visualizado);    // contenido: visualizado
+                            return (
+                              <div
+                                className="w-5 h-5 border-2 rounded flex items-center justify-center flex-shrink-0"
+                                style={{ borderColor: isDone ? subjectColor : isSelected ? subjectColor : '#E5E7EB' }}
+                              >
+                                {isDone && <CheckCircle2 className="w-4 h-4" style={{ color: subjectColor }} />}
+                              </div>
+                            );
+                          })()}
                           <div className="flex-1 min-w-0">
                             <div className={`transition-colors truncate ${
                               isItemLocked 
@@ -1240,9 +1263,9 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
               <>
                 {/* Mostrar SIEMPRE el contenido primero */}
                 {selectedContentData.type === 'video' ? (
-                  <div className="mb-6">
+                  <div className="mb-6 -mx-2 sm:mx-0">
                     {selectedContentData.url ? (
-                      <div className="w-full aspect-video rounded-2xl overflow-hidden shadow-lg bg-gray-900">
+                      <div className="w-full aspect-video min-h-[420px] lg:min-h-[560px] rounded-2xl overflow-hidden shadow-lg bg-gray-900">
                         {getYouTubeEmbedUrl(selectedContentData.url) ? (
                           <iframe
                             width="100%"
@@ -1367,42 +1390,6 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                   </div>
                 )}
 
-                {/* Additional Resources */}
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 mb-6 shadow-md">
-                  <h3 className="text-[#3A4A5B] mb-4">Recursos Complementarios</h3>
-                  <div className="space-y-3">
-                    <a 
-                      href="#" 
-                      className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:shadow-md transition-all group"
-                    >
-                      <div 
-                        className="w-10 h-10 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: `${subjectColor}15` }}
-                      >
-                        <FileText className="w-5 h-5" style={{ color: subjectColor }} />
-                      </div>
-                      <span className="text-gray-700 text-sm flex-1">Documento complementario</span>
-                      <svg className="w-5 h-5 text-gray-400 group-hover:text-[#4A90E2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </a>
-                  </div>
-                </div>
-
-                {/* Navigation Buttons */}
-                <div className="flex gap-4">
-                  <button className="flex-1 flex items-center justify-center gap-2 border-2 border-gray-300 py-3 rounded-xl bg-white hover:bg-gray-50 transition-colors">
-                    <SkipBack className="w-4 h-4 text-gray-600" />
-                    <span className="text-gray-700">Anterior</span>
-                  </button>
-                  <button 
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white shadow-md hover:shadow-lg transition-all"
-                    style={{ backgroundColor: subjectColor }}
-                  >
-                    <span>Siguiente</span>
-                    <SkipForward className="w-4 h-4" />
-                  </button>
-                </div>
               </>
             )}
           </div>
