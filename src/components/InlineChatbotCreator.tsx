@@ -27,7 +27,7 @@ export function InlineChatbotCreator({ areaId, onClose, onChatbotCreated, apiFet
     descripcion: '',
     prompt_base: '',
     model: 'qwen2.5:0.5b',
-    topK: '40',
+    topK: '5',
     max_context_chars: '4000',
     max_tokens: '512',
     temperature: '0.1',
@@ -64,7 +64,7 @@ export function InlineChatbotCreator({ areaId, onClose, onChatbotCreated, apiFet
       },
       parametros_rendimiento: {
         model: formData.model,
-        topK: Number(formData.topK) || 40,
+        topK: Number(formData.topK) || 5,
         max_context_chars: Number(formData.max_context_chars) || 4000,
         max_tokens: Number(formData.max_tokens) || 512,
         temperature: Number(formData.temperature) || 0.1,
@@ -212,35 +212,35 @@ export function InlineChatbotCreator({ areaId, onClose, onChatbotCreated, apiFet
                       className="app-form-select"
                       disabled={isCreating}
                     >
-                      <option value="0.1">0.1 – Determinista (Recomendado para Tesis)</option>
+                      <option value="0.1">0.1 – Determinista (Recomendado)</option>
                       <option value="0.4">0.4 – Balanceado</option>
                       <option value="0.7">0.7 – Creativo</option>
-                      <option value="1.0">1.0 – Aleatorio (no recomendado para académico)</option>
+                      <option value="1.0">1.0 – Aleatorio (no recomendado)</option>
                     </select>
                     <p className="mt-1 text-xs text-slate-500">
                       {formData.temperature === '0.1' && 'Ideal para ceñirse estrictamente a los documentos sin inventar.'}
                       {formData.temperature === '0.4' && 'Da respuestas fluidas pero mantiene precisión técnica.'}
                       {formData.temperature === '0.7' && 'Útil para lluvia de ideas o redacción de textos generales.'}
-                      {formData.temperature === '1.0' && 'Aumenta el riesgo de alucinaciones. Evítalo en fines académicos.'}
+                      {formData.temperature === '1.0' && 'Aumenta el riesgo de alucinaciones. Úsalo solo si sabes lo que haces.'}
                     </p>
                   </div>
 
                   <div className="app-form-field">
-                    <label className="app-form-label">Top-K</label>
+                    <label className="app-form-label">Fragmentos RAG (Top-K)</label>
                     <select
                       value={formData.topK}
                       onChange={(e) => updateField('topK', e.target.value)}
                       className="app-form-select"
                       disabled={isCreating}
                     >
-                      <option value="10">10 – Muy estricto</option>
-                      <option value="40">40 – Estándar (Recomendado)</option>
-                      <option value="100">100 – Divergente</option>
+                      <option value="3">3 – Mínimo (más rápido)</option>
+                      <option value="5">5 – Estándar (Recomendado)</option>
+                      <option value="10">10 – Amplio</option>
                     </select>
                     <p className="mt-1 text-xs text-slate-500">
-                      {formData.topK === '10' && 'Respuestas muy predecibles y enfocadas.'}
-                      {formData.topK === '40' && 'Buen balance entre precisión y variedad.'}
-                      {formData.topK === '100' && 'Considera palabras menos comunes; respuestas más variadas.'}
+                      {formData.topK === '3' && 'Solo los 3 fragmentos más relevantes del PDF. Más rápido pero con menos contexto.'}
+                      {formData.topK === '5' && 'Buen balance: suficiente contexto del documento sin sobrecargar el modelo.'}
+                      {formData.topK === '10' && 'Recupera más contexto del PDF. Útil para documentos técnicos con mucha información relacionada.'}
                     </p>
                   </div>
 
@@ -259,7 +259,7 @@ export function InlineChatbotCreator({ areaId, onClose, onChatbotCreated, apiFet
                     </select>
                     <p className="mt-1 text-xs text-slate-500">
                       {formData.max_tokens === '256' && 'Ideal para respuestas rápidas o definiciones breves.'}
-                      {formData.max_tokens === '512' && 'Perfecto para explicar conceptos académicos sin saturar el servidor.'}
+                      {formData.max_tokens === '512' && 'Buen balance entre detalle y velocidad de respuesta.'}
                       {formData.max_tokens === '1024' && 'Para resúmenes extensos o explicaciones detalladas.'}
                       {formData.max_tokens === '2048' && 'Útil para generación de código o artículos completos.'}
                     </p>

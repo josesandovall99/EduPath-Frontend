@@ -112,7 +112,7 @@ const emptyForm = (): ChatbotFormState => ({
   area_id: '',
   miniproyecto_id: '',
   model: 'qwen2.5:0.5b',
-  topK: '40',
+  topK: '5',
   max_context_chars: '4000',
   max_tokens: '512',
   temperature: '0.1',
@@ -161,7 +161,7 @@ function getMiniproyectoLabel(item: MiniproyectoItem) {
 }
 
 const TEMPERATURE_OPTIONS = ['0.1', '0.4', '0.7', '1.0'];
-const TOPK_OPTIONS = ['10', '40', '100'];
+const TOPK_OPTIONS = ['3', '5', '10'];
 const MAX_TOKENS_OPTIONS = ['256', '512', '1024', '2048'];
 const MAX_CONTEXT_CHARS_OPTIONS = ['1000', '4000', '8000'];
 
@@ -173,7 +173,7 @@ function snapToNearest(value: number, options: string[]): string {
 
 function mapChatbotToForm(chatbot: ChatbotItem): ChatbotFormState {
   return {
-    id: chatbot.id,
+    id: Number(chatbot.id) || null,
     nombre_chatbot: chatbot.nombre || '',
     descripcion: chatbot.descripcion || '',
     tipo: chatbot.tipo || 'GENERAL',
@@ -181,7 +181,7 @@ function mapChatbotToForm(chatbot: ChatbotItem): ChatbotFormState {
     area_id: chatbot.area_id ? String(chatbot.area_id) : '',
     miniproyecto_id: chatbot.miniproyecto_id ? String(chatbot.miniproyecto_id) : '',
     model: chatbot.model_name || 'qwen2.5:0.5b',
-    topK: snapToNearest(Number(chatbot.top_k || 40), TOPK_OPTIONS),
+    topK: snapToNearest(Number(chatbot.top_k || 5), TOPK_OPTIONS),
     max_context_chars: snapToNearest(Number(chatbot.max_context_chars || 4000), MAX_CONTEXT_CHARS_OPTIONS),
     max_tokens: snapToNearest(Number(chatbot.max_tokens || 512), MAX_TOKENS_OPTIONS),
     temperature: snapToNearest(Number(chatbot.temperature ?? 0.1), TEMPERATURE_OPTIONS),
@@ -343,6 +343,7 @@ export function ChatbotManagementScreen({
   const [typeFilter, setTypeFilter] = useState<'all' | 'GENERAL' | 'GENERAL_ADMINISTRADOR' | 'GENERAL_DOCENTE' | 'MINIPROYECTO'>('all');
   const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [statusMessage, setStatusMessage] = useState('');
+  const [pdfSizeError, setPdfSizeError] = useState('');
 
   const requestHeaders = useMemo(() => {
     const authToken = localStorage.getItem('authToken');
@@ -392,12 +393,16 @@ export function ChatbotManagementScreen({
   }, []);
 
   useEffect(() => {
+    // No limpiar campos automáticamente si el usuario está editando un chatbot existente.
+    if (form.id !== null) return;
     if (isGeneralType(form.tipo) && form.miniproyecto_id) {
       setForm((prev) => ({ ...prev, miniproyecto_id: '' }));
     }
-  }, [form.tipo, form.miniproyecto_id]);
+  }, [form.id, form.tipo, form.miniproyecto_id]);
 
   useEffect(() => {
+    // No limpiar campos automáticamente si el usuario está editando un chatbot existente.
+    if (form.id !== null) return;
     if (!isRoleScopedGeneralType(form.tipo)) {
       return;
     }
@@ -405,9 +410,11 @@ export function ChatbotManagementScreen({
     if (form.area_id || form.miniproyecto_id) {
       setForm((prev) => ({ ...prev, area_id: '', miniproyecto_id: '' }));
     }
-  }, [form.tipo, form.area_id, form.miniproyecto_id]);
+  }, [form.id, form.tipo, form.area_id, form.miniproyecto_id]);
 
   useEffect(() => {
+    // No limpiar campos automáticamente si el usuario está editando un chatbot existente.
+    if (form.id !== null) return;
     if (form.tipo !== 'MINIPROYECTO') {
       return;
     }
@@ -435,7 +442,7 @@ export function ChatbotManagementScreen({
     if (miniproyectoAreaId !== selectedAreaId) {
       setForm((prev) => ({ ...prev, miniproyecto_id: '' }));
     }
-  }, [form.tipo, form.area_id, form.miniproyecto_id, miniproyectos]);
+  }, [form.id, form.tipo, form.area_id, form.miniproyecto_id, miniproyectos]);
 
   const searchedChatbots = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -749,8 +756,10 @@ export function ChatbotManagementScreen({
     };
 
     try {
-      const isEditing = typeof form.id === 'number' && Number.isFinite(form.id) && form.id > 0;
-      const response = await apiFetch(isEditing ? `/chatbots/${form.id}` : '/chatbots', {
+      // La API devuelve BIGINT como string; forzar conversión numérica antes de validar.
+      const parsedFormId = Number(form.id);
+      const isEditing = Number.isFinite(parsedFormId) && parsedFormId > 0;
+      const response = await apiFetch(isEditing ? `/chatbots/${parsedFormId}` : '/chatbots', {
         method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -827,6 +836,10 @@ export function ChatbotManagementScreen({
       setStatusMessage('Selecciona un PDF antes de subirlo.');
       return;
     }
+    if (selectedFile.size > 2500 * 1024) {
+      setStatusMessage(`El archivo supera el límite de 2500 KB (${(selectedFile.size / 1024).toFixed(0)} KB). Selecciona un PDF más pequeño.`);
+      return;
+    }
 
     setIsUploading(true);
     setStatusMessage('Subiendo documento...');
@@ -850,6 +863,7 @@ export function ChatbotManagementScreen({
         await selectChatbot(selected);
       }
       setSelectedFile(null);
+      setPdfSizeError('');
       setStatusMessage('Documento subido y procesado correctamente.');
     } catch (error) {
       console.error('Error uploading document:', error);
@@ -1253,7 +1267,17 @@ export function ChatbotManagementScreen({
                   id="chatbot-pdf-upload"
                   type="file"
                   accept=".pdf"
-                  onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    if (file && file.size > 2500 * 1024) {
+                      setPdfSizeError(`El archivo "${file.name}" pesa ${(file.size / 1024).toFixed(0)} KB y supera el límite de 2500 KB. Selecciona un PDF más pequeño.`);
+                      event.target.value = '';
+                      setSelectedFile(null);
+                      return;
+                    }
+                    setPdfSizeError('');
+                    setSelectedFile(file);
+                  }}
                   className="hidden"
                   hidden
                   aria-hidden="true"
@@ -1278,11 +1302,20 @@ export function ChatbotManagementScreen({
                   <div className="chatbot-admin-upload-band">
                     <div className="chatbot-admin-upload-band__summary">
                       <div>
-                        <div className="app-form-summary-label">Archivo seleccionado</div>
-                        <div className="chatbot-admin-upload-band__filename">{selectedFile ? selectedFile.name : 'Ningún PDF seleccionado'}</div>
+                        <div className="app-form-summary-label">Archivo seleccionado <span className="text-slate-400 font-normal">(máx. 2500 KB)</span></div>
+                        <div className="chatbot-admin-upload-band__filename">
+                          {selectedFile ? `${selectedFile.name} · ${(selectedFile.size / 1024).toFixed(0)} KB` : 'Ningún PDF seleccionado'}
+                        </div>
                       </div>
                       <div className="chatbot-admin-upload-band__status">{selectedFile ? 'Listo para confirmar' : 'Sin selección'}</div>
                     </div>
+
+                    {pdfSizeError && (
+                      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <span className="mt-0.5 shrink-0">⚠️</span>
+                        <span>{pdfSizeError}</span>
+                      </div>
+                    )}
 
                     <div className="chatbot-admin-upload-band__actions">
                       <button onClick={openPdfPicker} className="app-btn app-primary-btn h-14 justify-center text-sm font-semibold">
@@ -1291,7 +1324,7 @@ export function ChatbotManagementScreen({
                       <button onClick={() => void handleUploadDocument()} disabled={!canConfirmPdf} className="app-btn app-btn-success h-14 justify-center text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                         {isUploading ? 'Cargando...' : 'Cargar PDF'}
                       </button>
-                      <button onClick={() => setSelectedFile(null)} disabled={!canCancelPdf} className="app-btn chatbot-admin-upload-band__cancel h-14 justify-center text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                      <button onClick={() => { setSelectedFile(null); setPdfSizeError(''); }} disabled={!canCancelPdf} className="app-btn chatbot-admin-upload-band__cancel h-14 justify-center text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                         Cancelar PDF
                       </button>
                     </div>
@@ -1668,33 +1701,33 @@ export function ChatbotManagementScreen({
                           <InfoBadge text="Controla la creatividad o aleatoriedad de la respuesta." />
                         </label>
                         <select value={form.temperature} onChange={(e) => updateForm('temperature', e.target.value)} className="app-form-select">
-                          <option value="0.1">0.1 – Determinista (Recomendado para Tesis)</option>
+                          <option value="0.1">0.1 – Determinista (Recomendado)</option>
                           <option value="0.4">0.4 – Balanceado</option>
                           <option value="0.7">0.7 – Creativo</option>
-                          <option value="1.0">1.0 – Aleatorio (no recomendado para académico)</option>
+                          <option value="1.0">1.0 – Aleatorio (no recomendado)</option>
                         </select>
                         <p className="mt-1 text-xs text-slate-500">
                           {form.temperature === '0.1' && 'Ideal para ceñirse estrictamente a los documentos sin inventar.'}
                           {form.temperature === '0.4' && 'Da respuestas fluidas pero mantiene precisión técnica.'}
                           {form.temperature === '0.7' && 'Útil para lluvia de ideas o redacción de textos generales.'}
-                          {form.temperature === '1.0' && 'Aumenta el riesgo de alucinaciones. Evítalo en fines académicos.'}
+                          {form.temperature === '1.0' && 'Aumenta el riesgo de alucinaciones. Úsalo solo si sabes lo que haces.'}
                         </p>
                       </div>
 
                       <div className="app-form-field">
                         <label className="app-form-label flex items-center gap-2">
-                          Top-K
-                          <InfoBadge text="Define cuántos fragmentos del PDF considera el sistema antes de elegir la respuesta." />
+                          Fragmentos RAG (Top-K)
+                          <InfoBadge text="Cuántos fragmentos del PDF recupera el sistema para construir el contexto antes de responder." />
                         </label>
                         <select value={form.topK} onChange={(e) => updateForm('topK', e.target.value)} className="app-form-select">
-                          <option value="10">10 – Muy estricto</option>
-                          <option value="40">40 – Estándar (Recomendado)</option>
-                          <option value="100">100 – Divergente</option>
+                          <option value="3">3 – Mínimo (más rápido)</option>
+                          <option value="5">5 – Estándar (Recomendado)</option>
+                          <option value="10">10 – Amplio</option>
                         </select>
                         <p className="mt-1 text-xs text-slate-500">
-                          {form.topK === '10' && 'Respuestas muy predecibles y enfocadas.'}
-                          {form.topK === '40' && 'Buen balance entre precisión y variedad. Valor por defecto en Llama y Gemma.'}
-                          {form.topK === '100' && 'Considera palabras menos comunes; respuestas más variadas.'}
+                          {form.topK === '3' && 'Toma solo los 3 fragmentos más relevantes del PDF. Respuestas más rápidas pero con menos contexto.'}
+                          {form.topK === '5' && 'Buen balance: suficiente contexto del documento sin sobrecargar el modelo.'}
+                          {form.topK === '10' && 'Recupera más contexto del PDF. Útil para documentos técnicos con mucha información relacionada.'}
                         </p>
                       </div>
 
@@ -1711,7 +1744,7 @@ export function ChatbotManagementScreen({
                         </select>
                         <p className="mt-1 text-xs text-slate-500">
                           {form.max_tokens === '256' && 'Ideal para respuestas rápidas o definiciones breves.'}
-                          {form.max_tokens === '512' && 'Perfecto para explicar conceptos académicos sin saturar el servidor.'}
+                          {form.max_tokens === '512' && 'Buen balance entre detalle y velocidad de respuesta.'}
                           {form.max_tokens === '1024' && 'Para resúmenes extensos o explicaciones detalladas de procesos.'}
                           {form.max_tokens === '2048' && 'Útil para generación de código o artículos completos.'}
                         </p>
