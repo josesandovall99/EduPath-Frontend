@@ -21,18 +21,11 @@ export function OrderingExercise({ activity, enunciado = 'Ordena los elementos c
     return [...items].sort(() => Math.random() - 0.5);
   }, [JSON.stringify(items)]);
   const [list, setList] = useState<string[]>(Array.isArray(configurableResponse?.respuesta?.orden) ? configurableResponse.respuesta.orden : itemsAleatorios);
-    useEffect(() => {
-      if (Array.isArray(configurableResponse?.respuesta?.orden)) {
-        setList(configurableResponse.respuesta.orden);
-        return;
-      }
-      setList(itemsAleatorios);
-    }, [configurableResponse, itemsAleatorios]);
 
-    useEffect(() => {
-      if (!configurableMode || !onConfigurableResponseChange) return;
-      onConfigurableResponseChange({ respuesta: { orden: list } });
-    }, [configurableMode, list, onConfigurableResponseChange]);
+  useEffect(() => {
+    if (!configurableMode || !onConfigurableResponseChange) return;
+    onConfigurableResponseChange({ respuesta: { orden: list } });
+  }, [configurableMode, list, onConfigurableResponseChange]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aprobado, setAprobado] = useState(false);

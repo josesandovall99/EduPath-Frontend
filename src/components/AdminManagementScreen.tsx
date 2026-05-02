@@ -10,13 +10,11 @@ interface AdminManagementScreenProps {
 interface AdminFormData {
   nombre: string;
   email: string;
-  codigoAcceso: string;
 }
 
 const emptyForm: AdminFormData = {
   nombre: '',
   email: '',
-  codigoAcceso: '',
 };
 
 export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
@@ -44,11 +42,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
   };
 
   const handleCreateAdmin = async () => {
-    if (
-      !formData.nombre.trim() ||
-      !formData.email.trim() ||
-      !formData.codigoAcceso.trim()
-    ) {
+    if (!formData.nombre.trim() || !formData.email.trim()) {
       setFormError('Completa todos los campos obligatorios.');
       return;
     }
@@ -72,7 +66,6 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
       const payload: Record<string, string> = {
         nombre: formData.nombre.trim(),
         email: formData.email.trim(),
-        codigoAcceso: formData.codigoAcceso.trim(),
       };
 
       const response = await fetch(`${API_BASE_URL}/administrador/`, {
@@ -222,24 +215,11 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
               <section className="app-form-section">
                 <div className="mb-4">
                   <h4 className="app-form-section-title">Acceso</h4>
-                  <p className="app-form-section-description">Definición del código de acceso inicial.</p>
+                  <p className="app-form-section-description">El código de acceso y la contraseña se generan automáticamente.</p>
                 </div>
-                <div className="app-form-grid app-form-grid-2">
-                <div className="app-form-field">
-                  <label className="app-form-label">Código de acceso *</label>
-                  <input
-                    type="text"
-                    value={formData.codigoAcceso}
-                    onChange={(event) => setFormData({ ...formData, codigoAcceso: event.target.value })}
-                    className="app-form-input"
-                    placeholder="ADM001"
-                    required
-                  />
+                <div className="app-form-note">
+                  El sistema asignará un código <strong>ADM###</strong> único al crear la cuenta. Las credenciales se enviarán al correo del administrador.
                 </div>
-                <div className="app-form-note flex items-center">
-                  La contraseña se genera automáticamente y se envía al correo del administrador.
-                </div>
-              </div>
               </section>
             </div>
             </div>
@@ -254,7 +234,7 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
               </button>
               <button
                 onClick={handleCreateAdmin}
-                disabled={submitting || !formData.nombre.trim() || !formData.email.trim() || !formData.codigoAcceso.trim()}
+                disabled={submitting || !formData.nombre.trim() || !formData.email.trim()}
                 className="app-btn app-primary-btn px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (

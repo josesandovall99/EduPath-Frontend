@@ -3,6 +3,7 @@
   import App from "./App.tsx";
   import "./index.css";
   import "quill/dist/quill.snow.css";
+  import "./styles/globals.css";
   import "./styles/admin-consistency.css";
   import { applyAuthHeaders, setupAuthFetch } from "./utils/authHeaders";
 

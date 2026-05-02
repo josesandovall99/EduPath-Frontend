@@ -23,6 +23,7 @@ interface ProgrammingContentViewProps {
   configurableMode?: boolean;
   configurableResponse?: any;
   onConfigurableResponseChange?: (response: any) => void;
+  configurableApproved?: boolean;
   exerciseId?: number;
   exerciseData?: Ejercicio | null;
   executePath?: string;
@@ -584,7 +585,7 @@ function parseExerciseConfig(configuracion: Ejercicio['configuracion'] | string 
   return configuracion ?? {};
 }
 
-export function ProgrammingContentView({ content, onBack, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, exerciseId, exerciseData = null, executePath, submitPath }: ProgrammingContentViewProps) {
+export function ProgrammingContentView({ content, onBack, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, configurableApproved = false, exerciseId, exerciseData = null, executePath, submitPath }: ProgrammingContentViewProps) {
   const subjectColor = '#4A90E2';
   const wrapperClassName = embedded ? 'w-full min-w-0 lg:h-full' : 'overflow-hidden rounded-[2rem] bg-[#F2F2F2]';
   const workspaceClassName = embedded
@@ -730,13 +731,28 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
   }, [configurableMode, configurableResponse?.codigo]);
 
   useEffect(() => {
-    if (!configurableMode || !isConfigurableReady || !configurableChangeRef.current) return;
+    if (!configurableMode || !isConfigurableReady || isMvcMode || !configurableChangeRef.current) return;
     const nextResponse = { codigo: code, respuesta: { texto: code }, lenguaje_id: 62 };
     const nextSerializedResponse = serializeConfigurablePayload(nextResponse);
     if (lastEmittedResponseRef.current === nextSerializedResponse) return;
     lastEmittedResponseRef.current = nextSerializedResponse;
     configurableChangeRef.current(nextResponse);
-  }, [code, configurableMode, isConfigurableReady]);
+  }, [code, configurableMode, isConfigurableReady, isMvcMode]);
+
+  useEffect(() => {
+    if (!configurableMode || !isConfigurableReady || !isMvcMode || !configurableChangeRef.current) return;
+    const nextResponse = {
+      archivos: {
+        main: mvcMainCode,
+        modelo: mvcModeloCode,
+        consolaIO: CONSOLA_IO_SOURCE,
+      },
+    };
+    const nextSerializedResponse = serializeConfigurablePayload(nextResponse);
+    if (lastEmittedResponseRef.current === nextSerializedResponse) return;
+    lastEmittedResponseRef.current = nextSerializedResponse;
+    configurableChangeRef.current(nextResponse);
+  }, [mvcMainCode, mvcModeloCode, configurableMode, isConfigurableReady, isMvcMode]);
 
   const clearResults = () => {
     setFeedback('');
@@ -1100,9 +1116,16 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
                 {isRunning ? 'Ejecutando...' : 'Ejecutar'}
               </button>
               {configurableMode ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-600">
-                  La solución actual se evaluará con el botón principal del miniproyecto.
-                </div>
+                configurableApproved ? (
+                  <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
+                    <CheckCircle2 className="h-3 w-3" />
+                    Correcto
+                  </span>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-600">
+                    La solución actual se evaluará con el botón principal del miniproyecto.
+                  </div>
+                )
               ) : (
                 <button
                   onClick={handleSubmit}

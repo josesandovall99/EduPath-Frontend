@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Circle, ClipboardList, Settings } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Circle, ClipboardList, Settings, XCircle, Trophy, AlertTriangle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 import { MiniproyectoChatbotPanel } from './MiniproyectoChatbotPanel';
 import { ProgrammingContentView } from './ProgrammingContentView';
@@ -60,14 +60,21 @@ interface ConfigurableProgressResponse {
   ejercicios?: ConfigurableProgressItem[];
 }
 
-function hasDraftResponse(response: any) {
+function hasDraftResponse(response: any, exercise?: EmbeddedExercise) {
   if (!response || typeof response !== 'object') return false;
   if (typeof response.codigo === 'string') return response.codigo.trim().length > 0;
+  if (response.archivos?.main && typeof response.archivos.main === 'string') return response.archivos.main.trim().length > 0;
   if (typeof response.respuesta?.opcion === 'string') return response.respuesta.opcion.trim().length > 0;
   if (Array.isArray(response.respuesta?.orden)) return response.respuesta.orden.length > 0;
   if (response.respuesta?.matches && typeof response.respuesta.matches === 'object') return Object.keys(response.respuesta.matches).length > 0;
-  if (response.respuestas && typeof response.respuestas === 'object') return Object.keys(response.respuestas).length > 0;
-  if (response.respuesta?.diagram && typeof response.respuesta.diagram === 'object') return true;
+  if (response.respuestas && typeof response.respuestas === 'object') {
+    const preguntas = exercise?.configuracion?.preguntas;
+    if (Array.isArray(preguntas) && preguntas.length > 0) {
+      return preguntas.every((p: any) => String(response.respuestas[p.id] || '').trim().length > 0);
+    }
+    return Object.keys(response.respuestas).length > 0;
+  }
+  if (response.respuesta?.diagram && typeof response.respuesta.diagram === 'object') return Array.isArray(response.respuesta.diagram.cells) && response.respuesta.diagram.cells.length > 0;
   return false;
 }
 
@@ -96,6 +103,15 @@ function normalizeExerciseType(exercise: EmbeddedExercise | LegacyExerciseRespon
   return 'Preguntas';
 }
 
+interface EvaluationResultModal {
+  aprobado: boolean;
+  calificacion: number;
+  ejerciciosCorrectos: number;
+  totalEjercicios: number;
+  retroalimentacionGeneral: string;
+  ejerciciosIncorrectos?: Array<{ id: string; titulo: string; tipo_ejercicio?: string }>;
+}
+
 export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMiniproyectoViewProps) {
   const [miniproyecto, setMiniproyecto] = useState<MiniproyectoResponse | null>(null);
   const [payload, setPayload] = useState<ConfigurableMiniproyectoPayload | null>(null);
@@ -106,6 +122,7 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
   const [exerciseResponses, setExerciseResponses] = useState<Record<string, any>>({});
   const [progressSummary, setProgressSummary] = useState<ConfigurableProgressResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [evaluationResult, setEvaluationResult] = useState<EvaluationResultModal | null>(null);
 
   const loadConfigurableProgress = async (miniproyectoId: string | number) => {
     try {
@@ -181,12 +198,12 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
   }, [legacyExercises, payload]);
 
   const totalExercises = exercises.length;
-  const draftedResponses = Object.values(exerciseResponses).filter((response) => hasDraftResponse(response)).length;
+  const draftedResponses = exercises.filter((exercise) => hasDraftResponse(exerciseResponses[String(exercise.id)], exercise)).length;
   const answeredExercises = Math.max(Number(progressSummary?.ejerciciosRespondidos || 0), draftedResponses);
   const correctExercises = Number(progressSummary?.ejerciciosCorrectos || 0);
   const incorrectExercises = Math.max(0, answeredExercises - correctExercises);
   const isCompleted = Boolean(progressSummary?.completado);
-  const readyToEvaluate = totalExercises > 0 && exercises.every((exercise) => hasDraftResponse(exerciseResponses[String(exercise.id)]));
+  const readyToEvaluate = totalExercises > 0 && exercises.every((exercise) => hasDraftResponse(exerciseResponses[String(exercise.id)], exercise));
   const showChatbot = Boolean(payload?.chatbot?.enabled) || Boolean(miniproyecto?.chatbots?.some((chatbot) => chatbot.estado !== false));
   const accuracy = totalExercises > 0 ? Math.round((correctExercises / totalExercises) * 100) : 0;
   const completionProgress = totalExercises > 0 ? Math.round((correctExercises / totalExercises) * 100) : 0;
@@ -214,7 +231,7 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
   const handleEvaluateMiniproyecto = async () => {
     const estudianteId = localStorage.getItem('estudianteId') || localStorage.getItem('userId');
     if (!estudianteId) {
-      alert('No se encontró la sesión del estudiante. Inicia sesión nuevamente.');
+      setEvaluationResult({ aprobado: false, calificacion: 0, ejerciciosCorrectos: 0, totalEjercicios: 0, retroalimentacionGeneral: 'No se encontró la sesión del estudiante. Inicia sesión nuevamente.' });
       return;
     }
     setIsEvaluating(true);
@@ -228,9 +245,19 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
       const progressState = await loadConfigurableProgress(content.id);
       setCorrectMap(progressState.map);
       setProgressSummary(progressState.summary);
-      alert(data?.message || (response.ok ? 'El miniproyecto fue evaluado correctamente.' : 'No fue posible evaluar el miniproyecto configurable.'));
+      const ejerciciosIncorrectos = (data?.resumen?.ejercicios || [])
+        .filter((e: any) => !e.esCorrecta && !e.aprobado)
+        .map((e: any) => ({ id: String(e.id), titulo: e.titulo || `Ejercicio ${e.id}`, tipo_ejercicio: e.tipo_ejercicio }));
+      setEvaluationResult({
+        aprobado: Boolean(data?.completado),
+        calificacion: Number(data?.resumen?.calificacion ?? 0),
+        ejerciciosCorrectos: Number(data?.resumen?.ejerciciosCorrectos ?? 0),
+        totalEjercicios: Number(data?.resumen?.totalEjercicios ?? 0),
+        retroalimentacionGeneral: data?.message || (response.ok ? 'El miniproyecto fue evaluado correctamente.' : 'No fue posible evaluar el miniproyecto configurable.'),
+        ejerciciosIncorrectos,
+      });
     } catch {
-      alert('Ocurrió un error técnico al evaluar el miniproyecto configurable.');
+      setEvaluationResult({ aprobado: false, calificacion: 0, ejerciciosCorrectos: 0, totalEjercicios: 0, retroalimentacionGeneral: 'Ocurrió un error técnico al evaluar el miniproyecto configurable.' });
     } finally {
       setIsEvaluating(false);
     }
@@ -244,12 +271,12 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
     const submitPath = `/miniproyectos/${content.id}/ejercicios/${selectedExercise.id}/enviar`;
     const feedbackPath = `/miniproyectos/${content.id}/ejercicios/${selectedExercise.id}/retroalimentacion`;
     const approved = Boolean(correctMap[String(selectedExercise.id)]);
-    const hasDraft = hasDraftResponse(exerciseResponses[String(selectedExercise.id)]);
+    const hasDraft = hasDraftResponse(exerciseResponses[String(selectedExercise.id)], selectedExercise);
     const isLargeExercise = normalizedType === 'Compilador' || normalizedType === 'Diagramas UML' || normalizedType === 'Preguntas';
 
     let exerciseContent: React.ReactNode;
     if (normalizedType === 'Compilador') {
-      exerciseContent = <ProgrammingContentView content={contentProps} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} exerciseData={{ id: Number(selectedExercise.id), contenido_id: 0, puntos: selectedExercise.puntos || 100, resultado_ejercicio: selectedExercise.resultado_ejercicio || '', codigoEstructura: selectedExercise.codigoEstructura || undefined, tipo_ejercicio: selectedExercise.tipo_ejercicio, configuracion: selectedExercise.configuracion, actividad: { titulo: selectedExercise.titulo, descripcion: selectedExercise.descripcion } }} executePath={resolvePath} submitPath={submitPath} />;
+      exerciseContent = <ProgrammingContentView content={contentProps} onBack={() => undefined} embedded configurableMode configurableApproved={approved} configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} exerciseData={{ id: Number(selectedExercise.id), contenido_id: 0, puntos: selectedExercise.puntos || 100, resultado_ejercicio: selectedExercise.resultado_ejercicio || '', codigoEstructura: selectedExercise.codigoEstructura || undefined, tipo_ejercicio: selectedExercise.tipo_ejercicio, configuracion: selectedExercise.configuracion, actividad: { titulo: selectedExercise.titulo, descripcion: selectedExercise.descripcion } }} executePath={resolvePath} submitPath={submitPath} />;
     } else if (normalizedType === 'Opción única') {
       exerciseContent = <MultipleChoiceExercise activity={{ id: String(selectedExercise.id), title: exerciseTitle }} enunciado={selectedExercise.configuracion?.enunciado} opciones={selectedExercise.configuracion?.opciones} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} resolvePath={resolvePath} submitPath={submitPath} />;
     } else if (normalizedType === 'Ordenar') {
@@ -308,6 +335,112 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
 
   return (
     <div className="min-h-screen bg-[#F5F7FB]">
+
+      {/* ── Modal de resultado de evaluación ── */}
+      {evaluationResult && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(2px)' }}
+          onClick={() => setEvaluationResult(null)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+            style={{ maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabecera coloreada */}
+            <div
+              className="flex flex-col items-center gap-3 px-8 py-7"
+              style={{ background: evaluationResult.aprobado ? 'linear-gradient(135deg,#16a34a,#22c55e)' : 'linear-gradient(135deg,#dc2626,#ef4444)' }}
+            >
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
+                {evaluationResult.aprobado
+                  ? <Trophy className="h-8 w-8 text-white" />
+                  : <AlertTriangle className="h-8 w-8 text-white" />}
+              </div>
+              <div className="text-center">
+                <p className="text-xl font-bold text-white">
+                  {evaluationResult.aprobado ? '¡Miniproyecto aprobado!' : 'Miniproyecto no aprobado'}
+                </p>
+                {evaluationResult.totalEjercicios > 0 && (
+                  <p className="mt-1 text-sm text-white/80">
+                    {evaluationResult.ejerciciosCorrectos} de {evaluationResult.totalEjercicios} ejercicios correctos
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Cuerpo */}
+            <div className="px-8 pt-6 pb-2 flex flex-col gap-4">
+
+              {/* Calificación */}
+              {evaluationResult.totalEjercicios > 0 && (
+                <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-5 py-4">
+                  <span className="text-sm font-medium text-slate-500">Calificación</span>
+                  <span className="text-2xl font-bold" style={{ color: evaluationResult.aprobado ? '#16a34a' : '#dc2626' }}>
+                    {evaluationResult.calificacion}%
+                  </span>
+                </div>
+              )}
+
+              {/* Retroalimentación */}
+              <div className="flex gap-3 rounded-xl border px-4 py-3" style={{ borderColor: evaluationResult.aprobado ? '#bbf7d0' : '#fecaca', backgroundColor: evaluationResult.aprobado ? '#f0fdf4' : '#fef2f2' }}>
+                {evaluationResult.aprobado
+                  ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                  : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />}
+                <p className="text-sm leading-5" style={{ color: evaluationResult.aprobado ? '#15803d' : '#b91c1c' }}>
+                  {evaluationResult.retroalimentacionGeneral}
+                </p>
+              </div>
+
+              {/* Ejercicios incorrectos */}
+              {!evaluationResult.aprobado && evaluationResult.ejerciciosIncorrectos && evaluationResult.ejerciciosIncorrectos.length > 0 && (
+                <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-orange-700">
+                    Ejercicios que debes repasar
+                  </p>
+                  <ul className="flex flex-col gap-1.5">
+                    {evaluationResult.ejerciciosIncorrectos.map((ej) => (
+                      <li key={ej.id} className="flex items-center gap-2 text-sm text-orange-800">
+                        <XCircle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+                        <span className="font-medium">{ej.titulo}</span>
+                        {ej.tipo_ejercicio && (
+                          <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] text-orange-600">
+                            {ej.tipo_ejercicio}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Pie */}
+            <div className="px-8 pt-4 pb-6 flex flex-col gap-2">
+              {!evaluationResult.aprobado && (
+                <button
+                  onClick={() => { setEvaluationResult(null); onBack(); }}
+                  className="w-full rounded-xl py-5 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:shadow-md"
+                  style={{ background: 'linear-gradient(135deg,#2563EB,#4A90E2)' }}
+                >
+                  Volver a los temas
+                </button>
+              )}
+              <button
+                onClick={() => setEvaluationResult(null)}
+                className="w-full rounded-xl py-5 text-sm font-semibold transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                style={evaluationResult.aprobado
+                  ? { background: 'linear-gradient(135deg,#16a34a,#22c55e)', color: '#fff' }
+                  : { background: '#f1f5f9', color: '#475569' }}
+              >
+                {evaluationResult.aprobado ? 'Entendido' : 'Seguir intentando'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-slate-200 bg-white shadow-sm">
         <div style={containerStyle} className="flex items-center justify-between gap-4 py-3">
@@ -380,7 +513,10 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
                   {hasRenderableDescription(miniproyectoDescripcion) && (
                     <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                       <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '10px' }}>Descripción</p>
-                      <div className="prose prose-sm max-w-none text-slate-600" dangerouslySetInnerHTML={{ __html: miniproyectoDescripcion }} />
+                      <div
+                        className="quill-render text-slate-600"
+                        dangerouslySetInnerHTML={{ __html: miniproyectoDescripcion }}
+                      />
                     </div>
                   )}
                   {miniproyectoNivel && (
