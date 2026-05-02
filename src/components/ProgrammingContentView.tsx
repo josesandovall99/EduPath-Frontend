@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Lock, Trash2, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, Lightbulb, Loader2, Lock, Trash2, XCircle } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { toast } from 'sonner';
 import { executeExercise, submitExercise } from '../utils/submitExercise';
@@ -420,32 +420,42 @@ function DiagnosticBlock({ error, className = '', studentCode, offset = 0 }: { e
   const accion = buildFriendlyCompilerAction(error, parsed, studentCode, parsed.studentLine);
 
   return (
-    <div className={`rounded-2xl border border-rose-200/80 bg-gradient-to-br from-rose-50/80 via-white to-white p-5 shadow-[0_8px_24px_rgba(190,24,93,0.08)] space-y-3 ${className}`}>
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="inline-flex items-center rounded-full border border-rose-300 bg-rose-100 px-2.5 py-1 font-semibold text-rose-700">Error de compilación</span>
+    <div className={`overflow-hidden rounded-xl border border-rose-200 bg-white shadow-[0_4px_14px_rgba(244,63,94,0.10)] ${className}`}>
+      {/* Header — banda roja con ícono + estado + línea */}
+      <div className="flex items-center justify-between gap-3 border-b border-rose-200/70 bg-gradient-to-r from-rose-50 to-rose-50/40 px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-100">
+            <AlertCircle className="h-4 w-4 text-rose-600" strokeWidth={2.2} />
+          </div>
+          <span className="text-sm font-semibold text-rose-700">Error de compilación</span>
+        </div>
         {parsed.studentLine !== null && (
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-700">Línea {parsed.studentLine}</span>
+          <span className="rounded-md bg-white px-2.5 py-1 font-mono text-[11px] font-semibold text-rose-600 ring-1 ring-rose-200">
+            línea {parsed.studentLine}
+          </span>
         )}
       </div>
-      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5">
-        <span className="font-bold text-rose-700">Detalle:</span>{' '}
-        <span className="font-mono text-slate-800">{parsed.errorType}</span>
+
+      {/* Detalle del error — sin caja anidada, solo etiqueta + texto */}
+      <div className="px-4 py-3 border-b border-rose-100">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 mb-1.5">Detalle</p>
+        <p className="font-mono text-[13px] text-slate-800 break-words leading-relaxed">{parsed.errorType}</p>
       </div>
 
+      {/* Code snippet — IDE style integrado */}
       {snippetLines.length > 0 && (
-        <pre className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 font-mono text-[12px] leading-[1.65] text-slate-100">
+        <pre className="overflow-x-auto bg-slate-950 px-4 py-3 font-mono text-[12px] leading-[1.65] text-slate-100 border-b border-rose-100">
           {snippetLines.map(({ n, text, isError }) => {
             const prefix = `${isError ? '→' : ' '} ${String(n).padStart(2)}: `;
             const studentIndent = text.match(/^(\s*)/)?.[1].length ?? 0;
             return (
               <div key={n}>
-                <span className={`select-none ${isError ? 'text-rose-300' : 'text-slate-500'}`}>{prefix}</span>
+                <span className={`select-none ${isError ? 'text-rose-400' : 'text-slate-500'}`}>{prefix}</span>
                 <span className={isError ? 'font-semibold text-rose-200' : 'text-slate-200'}>{text}</span>
-                {/* ^ inlineado en la misma zona, una línea después de la línea de error */}
                 {isError && caretRelCol >= 0 && (
-                  <div className="select-none text-rose-300">
+                  <div className="select-none text-rose-400">
                     {' '.repeat(prefix.length + studentIndent + caretRelCol)}
-                    <span className="font-bold text-rose-300">^</span>
+                    <span className="font-bold text-rose-400">^</span>
                   </div>
                 )}
               </div>
@@ -454,9 +464,15 @@ function DiagnosticBlock({ error, className = '', studentCode, offset = 0 }: { e
         </pre>
       )}
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-xs leading-6">
-        <span className="font-semibold text-amber-800">Acción sugerida:</span>{' '}
-        <span className="text-amber-900">{accion}</span>
+      {/* Acción sugerida — footer con ícono lightbulb, sin caja amarilla suelta */}
+      <div className="flex items-start gap-2.5 px-4 py-3 bg-amber-50/40">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100">
+          <Lightbulb className="h-3.5 w-3.5 text-amber-600" strokeWidth={2.2} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-700 mb-1">Acción sugerida</p>
+          <p className="text-xs leading-relaxed text-slate-700">{accion}</p>
+        </div>
       </div>
     </div>
   );

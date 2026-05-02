@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Clock, FileText, PlayCircle, Edit, Share2, Users, Lock, User } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Edit, Share2, Users, Lock, User } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
@@ -318,12 +318,19 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           // Determinar si está completo
           const completo = estadoProgreso?.completo ?? (porcentaje >= 100);
           
+          // Estado real basado en el progreso del estudiante
+          const status: Content['status'] = completo
+            ? 'completed'
+            : porcentaje > 0
+              ? 'in-progress'
+              : 'not-started';
+
           return {
             id: temaId,
             title: tema.nombre,
             type: 'document' as const,
             duration: undefined,
-            status: 'not-started' as const,
+            status,
             desbloqueado,
             completo,
             porcentaje
@@ -475,23 +482,9 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h2 className="text-3xl mb-3">{subject.name}</h2>
-              <p className="text-white/90 text-lg mb-4">
+              <p className="text-white/90 text-lg">
                 Aprende los fundamentos y conceptos esenciales a través de videos, documentos y ejercicios prácticos.
               </p>
-              <div className="flex gap-6 text-white/90">
-                <div className="flex items-center gap-2">
-                  <PlayCircle className="w-5 h-5" />
-                  <span>{totalTemas} temas</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  <span>8 horas de contenido</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>{currentProgress}% completado</span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -647,33 +640,6 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           )}
         </div>
 
-        {/* Additional Resources */}
-        <div className="mt-8 bg-white rounded-2xl shadow-md p-6">
-          <h4 className="text-[#3A4A5B] mb-4 text-xl">Recursos Adicionales</h4>
-          <div className="grid grid-cols-3 gap-4">
-            <a 
-              href="#" 
-              className="p-4 border-2 border-gray-200 rounded-xl hover:border-[#4A90E2] hover:bg-blue-50 transition-all group"
-            >
-              <FileText className="w-6 h-6 text-gray-400 group-hover:text-[#4A90E2] mb-2" />
-              <p className="text-[#3A4A5B] text-sm">Bibliografía del curso</p>
-            </a>
-            <a 
-              href="#" 
-              className="p-4 border-2 border-gray-200 rounded-xl hover:border-[#4A90E2] hover:bg-blue-50 transition-all group"
-            >
-              <Share2 className="w-6 h-6 text-gray-400 group-hover:text-[#4A90E2] mb-2" />
-              <p className="text-[#3A4A5B] text-sm">Material complementario</p>
-            </a>
-            <a 
-              href="#" 
-              className="p-4 border-2 border-gray-200 rounded-xl hover:border-[#4A90E2] hover:bg-blue-50 transition-all group"
-            >
-              <FileText className="w-6 h-6 text-gray-400 group-hover:text-[#4A90E2] mb-2" />
-              <p className="text-[#3A4A5B] text-sm">Enlaces de interés</p>
-            </a>
-          </div>
-        </div>
       </main>
     </div>
   );
