@@ -96,7 +96,10 @@ const htmlContentStyles = `
   .html-content table {
     border-collapse: collapse;
     width: 100%;
+    max-width: 100%;
     margin: 1rem 0;
+    display: block;
+    overflow-x: auto;
   }
   
   .html-content th,
@@ -978,7 +981,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
   return (
     <div className="min-h-screen bg-[#F2F2F2] flex">
       {/* Left Sidebar - Course Modules */}
-      <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto shadow-sm">
+      <div className="w-80 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto shadow-sm">
         {/* Sidebar Header — alineado en altura con el header derecho (px-8 py-4 + ícono 48x48) */}
         <div
           className="px-6 py-4 border-b border-gray-200 text-white shadow-sm"
@@ -1017,18 +1020,18 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     : 'hover:bg-gray-50 hover:shadow-md'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs shadow-sm"
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs shadow-sm flex-shrink-0"
                     style={{ backgroundColor: isModuleLocked ? '#9CA3AF' : subjectColor }}
                   >
                     {isModuleLocked ? <Lock className="w-4 h-4" /> : (idx + 1)}
                   </div>
-                  <span className={`text-sm ${isModuleLocked ? 'text-gray-400' : 'text-[#3A4A5B]'}`}>
+                  <span className={`text-base truncate ${isModuleLocked ? 'text-gray-400' : 'text-[#3A4A5B]'}`}>
                     {module.title}
                   </span>
                   {module.completo && (
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
                   )}
                 </div>
                 {!isModuleLocked && (module.expanded ? (
@@ -1093,7 +1096,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                               onContentChange?.(item.id);
                             }
                           }}
-                          className={`w-full text-left p-3 border rounded-lg flex items-center gap-3 text-sm transition-all group ${
+                          className={`w-full text-left p-3 border rounded-lg flex items-center gap-3 text-base transition-all group ${
                             isItemLocked
                               ? 'opacity-60 cursor-not-allowed border-gray-200'
                               : isSelected 
@@ -1130,7 +1133,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                               {item.title}
                               {item.completo && <CheckCircle2 className="w-4 h-4 ml-2 inline text-green-500" />}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                               <ItemIcon className="w-3 h-3" />
                               <span>{item.type.charAt(0).toUpperCase() + item.type.slice(1)}</span>
                             </div>
@@ -1148,7 +1151,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       </div>
 
       {/* Right Content Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-8 py-4">
@@ -1178,7 +1181,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto bg-[#F2F2F2] p-8">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#F2F2F2] p-8">
           <div className="mx-auto w-full max-w-[1500px]">
             {/* Back Button */}
             <button 
@@ -1337,16 +1340,10 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                       )}
 
                       {selectedContentData.descripcion && (
-                        <div className="space-y-4 text-gray-700 mb-6 html-content">
-                          <div
-                            className="leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: selectedContentData.descripcion }}
-                            style={{
-                              fontSize: '1rem',
-                              lineHeight: '1.75'
-                            }}
-                          />
-                        </div>
+                        <div
+                          className="quill-render mb-6"
+                          dangerouslySetInnerHTML={{ __html: selectedContentData.descripcion }}
+                        />
                       )}
                       
                       {selectedContentData.url && (
