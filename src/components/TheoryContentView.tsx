@@ -386,7 +386,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     const intervalId = setInterval(() => {
       console.log('🔄 Actualizando progreso automáticamente...');
       obtenerProgresoArea();
-    }, 30000); // 30 segundos
+    }, 10000); // 10 segundos
 
     return () => clearInterval(intervalId);
   }, [temaId, estudianteId]);
@@ -426,7 +426,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     }
   };
 
-  // Obtener progreso dinámico del estudiante en el área
+  // Obtener progreso dinámico del estudiante en el tema
   const obtenerProgresoArea = async () => {
     if (!estudianteId || !temaId) {
       console.warn('No hay estudiante_id o temaId disponibles');
@@ -435,7 +435,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
 
     setLoadingProgress(true);
     try {
-      const url = `${API_BASE_URL}/progresos/por-area?area_id=${temaId}&estudiante_id=${estudianteId}`;
+      const url = `${API_BASE_URL}/progresos/por-tema?tema_id=${temaId}&estudiante_id=${estudianteId}`;
       console.log(`🔄 Obteniendo progreso desde: ${url}`);
       
       const response = await fetch(url);
@@ -448,9 +448,9 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
       }
       
       const data = await response.json();
-      const porcentaje = data.resumen?.porcentajeTotalArea || 0;
+      const porcentaje = data.resumen?.porcentajeTotalTema || 0;
       setCurrentProgress(Math.round(porcentaje));
-      console.log(`Progreso del área: ${porcentaje}%`);
+      console.log(`Progreso del tema: ${porcentaje}%`);
     } catch (err) {
       console.error('Error al obtener progreso:', err);
       setCurrentProgress(0);
@@ -459,7 +459,38 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
     }
   };
 
-  // Marcar contenido como visualizado
+  // Recalcular gating secuencial de ítems dentro de un subtema
+  const recalcularGatingItems = (items: ModuleItem[]): ModuleItem[] => {
+    return items.map((item, i) => {
+      if (i === 0) return { ...item, desbloqueado: true };
+      const prev = items[i - 1];
+      const prevDone = prev.ejercicioData
+        ? Boolean(prev.completo)
+        : Boolean(prev.visualizado);
+      return { ...item, desbloqueado: prevDone };
+    });
+  };
+
+  // Recalcular qué subtemas están desbloqueados en base al estado real de sus ítems
+  const recalcularGatingSubtemas = (mods: Module[]): Module[] => {
+    return mods.map((module, idx) => {
+      if (idx === 0) return { ...module, desbloqueado: true };
+      const prev = mods[idx - 1];
+      let prevComplete: boolean;
+      if (prev.items.length > 0 && !prev.loadingItems) {
+        // Ítems cargados: todos deben estar completos (contenido visto + ejercicios aprobados)
+        prevComplete = prev.items.every(item =>
+          item.ejercicioData ? Boolean(item.completo) : Boolean(item.visualizado)
+        );
+      } else {
+        // Sin ítems cargados: usar flag completo derivado del backend
+        prevComplete = prev.completo ?? false;
+      }
+      return { ...module, desbloqueado: prevComplete };
+    });
+  };
+
+  // Marcar contenido como visualizado cuando se selecciona
   const marcarContenidoVisualizado = async (contenidoId: string) => {
     if (!estudianteId) {
       console.warn('No hay estudiante_id disponible');
@@ -487,20 +518,43 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
-      // Actualizar el estado del módulo para mostrar que fue visualizado
-      setModules(prevModules =>
-        prevModules.map(m => ({
+      // Actualizar el estado del módulo para mostrar que fue visualizado y recalcular gating
+      setModules(prevModules => {
+        const updated = prevModules.map(m => ({
           ...m,
-          items: m.items.map(item =>
-            item.id === contenidoId ? { ...item, visualizado: true } : item
+          items: recalcularGatingItems(
+            m.items.map(item =>
+              item.id === contenidoId ? { ...item, visualizado: true, completo: true } : item
+            )
           )
-        }))
-      );
+        }));
+        return recalcularGatingSubtemas(updated);
+      });
 
       console.log('Contenido marcado como visualizado');
     } catch (err) {
       console.error('Error al marcar contenido como visualizado:', err);
     }
+  };
+
+  // Manejar la finalización de un ejercicio: actualizar estado local y recalcular gating
+  const handleExerciseComplete = (ejercicioItemId: string) => {
+    setModules(prevModules => {
+      const updated = prevModules.map(m => {
+        const hasItem = m.items.some(i => i.id === ejercicioItemId);
+        if (!hasItem) return m;
+        const updatedItems = recalcularGatingItems(
+          m.items.map(item =>
+            item.id === ejercicioItemId
+              ? { ...item, completo: true, visualizado: true }
+              : item
+          )
+        );
+        return { ...m, items: updatedItems };
+      });
+      return recalcularGatingSubtemas(updated);
+    });
+    obtenerProgresoArea();
   };
 
   // Intentar cargar estado de desbloqueo (OPCIONAL - no rompe si endpoint no existe)
@@ -1205,6 +1259,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                       type: 'activity'
                     }}
                     onBack={onBack}
+                    onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
                     embedded={true}
                     exerciseData={ejercicioAsociado}
                     exerciseId={ejercicioAsociado.id}
@@ -1238,6 +1293,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Selecciona la opción correcta'}
                     opciones={Array.isArray(ejercicioAsociado.configuracion?.opciones) ? ejercicioAsociado.configuracion?.opciones : undefined}
                     onBack={onBack}
+                    onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
                   />
                 )}
 
@@ -1247,6 +1303,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Ordena los elementos correctamente'}
                     items={Array.isArray(ejercicioAsociado.configuracion?.items) ? ejercicioAsociado.configuracion?.items : undefined}
                     onBack={onBack}
+                    onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
                   />
                 )}
 
@@ -1256,6 +1313,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Relaciona conceptos con definiciones'}
                     pares={Array.isArray(ejercicioAsociado.configuracion?.pares) ? ejercicioAsociado.configuracion?.pares : undefined}
                     onBack={onBack}
+                    onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
                   />
                 )}
               </div>

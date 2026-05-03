@@ -7,6 +7,7 @@ interface MultipleChoiceExerciseProps {
   enunciado?: string;
   opciones?: string[];
   onBack: () => void;
+  onComplete?: () => void;
   embedded?: boolean;
   configurableMode?: boolean;
   configurableResponse?: any;
@@ -15,7 +16,7 @@ interface MultipleChoiceExerciseProps {
   submitPath?: string;
 }
 
-export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la opción correcta', opciones = ['Opción 1', 'Opción 2', 'Opción 3', 'Opción 4'], onBack, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, submitPath }: MultipleChoiceExerciseProps) {
+export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la opción correcta', opciones = ['Opción 1', 'Opción 2', 'Opción 3', 'Opción 4'], onBack, onComplete, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, submitPath }: MultipleChoiceExerciseProps) {
   // Aleatorizar opciones manteniendo el texto original
   const opcionesAleatorias = useMemo(() => {
     return [...opciones].sort(() => Math.random() - 0.5);
@@ -50,6 +51,7 @@ export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la op
       toast.warning('Envío en proceso', { description: res.message || 'Otro envío en proceso; intenta de nuevo' });
     } else if (res.status === 409) {
       setAprobado(true);
+      onComplete?.();
       toast.info('Ejercicio aprobado', { description: res.message || 'Ya tienes este ejercicio aprobado.' });
     } else if (res.status === 400) {
       setFeedback(data?.retroalimentacion || '');
@@ -60,6 +62,7 @@ export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la op
       setFeedback(data?.retroalimentacion || '');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
       setAprobado(true);
+      onComplete?.();
       toast.success('Respuesta correcta', { description: data?.retroalimentacion || puntosTxt });
     } else {
       toast.error('Error del servidor', { description: res.message || 'Error desconocido' });

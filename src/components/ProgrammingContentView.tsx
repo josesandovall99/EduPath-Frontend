@@ -19,6 +19,7 @@ interface Content {
 interface ProgrammingContentViewProps {
   content: Content;
   onBack: () => void;
+  onComplete?: () => void;
   embedded?: boolean;
   configurableMode?: boolean;
   configurableResponse?: any;
@@ -585,7 +586,7 @@ function parseExerciseConfig(configuracion: Ejercicio['configuracion'] | string 
   return configuracion ?? {};
 }
 
-export function ProgrammingContentView({ content, onBack, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, configurableApproved = false, exerciseId, exerciseData = null, executePath, submitPath }: ProgrammingContentViewProps) {
+export function ProgrammingContentView({ content, onBack, onComplete, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, configurableApproved = false, exerciseId, exerciseData = null, executePath, submitPath }: ProgrammingContentViewProps) {
   const subjectColor = '#4A90E2';
   const wrapperClassName = embedded ? 'w-full min-w-0 lg:h-full' : 'overflow-hidden rounded-[2rem] bg-[#F2F2F2]';
   const workspaceClassName = embedded
@@ -951,6 +952,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
 
     if (result.status === 409) {
       setAprobado(true);
+      onComplete?.();
       setFeedback(data?.retroalimentacion || result.message || 'Ya tienes este ejercicio aprobado.');
       if (Array.isArray(data?.casosPrueba)) setCasosPruebaResultados(data.casosPrueba);
       toast.info('Ejercicio ya aprobado', { description: result.message || 'Ya tienes este ejercicio aprobado.' });
@@ -973,6 +975,7 @@ export function ProgrammingContentView({ content, onBack, embedded = false, conf
 
     if (result.status === 200) {
       setAprobado(true);
+      onComplete?.();
       setFeedback(data?.retroalimentacion || data?.resumen || 'La solucion aprobo todos los casos.');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
       toast.success(data?.resultado || 'Cumple', { description: data?.resumen || 'La solucion aprobo todos los casos.' });
