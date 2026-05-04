@@ -9,6 +9,10 @@ import { loadQuill, createQuillModules } from '../utils/quill';
 
 interface ExerciseManagementScreenProps {
   onBack: () => void;
+  mode?: 'admin' | 'docente';
+  docenteId?: number;
+  docentePersonaId?: number;
+  docenteAreaId?: number;
 }
 
 interface TipoActividad {
@@ -858,7 +862,13 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
   );
 }
 
-export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenProps) {
+export function ExerciseManagementScreen({
+  onBack,
+  mode = 'admin',
+  docenteId,
+  docentePersonaId,
+  docenteAreaId,
+}: ExerciseManagementScreenProps) {
   const [ejercicios, setEjercicios] = useState<EjercicioItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -866,9 +876,31 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedEjercicio, setSelectedEjercicio] = useState<EjercicioItem | null>(null);
 
-  type ContenidoOption = { id: number; titulo: string };
+  const isDocenteMode = mode === 'docente';
+
+  type AreaOption = { id: number; nombre: string; estado?: boolean };
+  type TemaOption = { id: number; nombre: string; area_id: number; estado?: boolean };
+  type SubtemaOption = { id: number; nombre: string; tema_id: number; estado?: boolean };
+  type ContenidoOption = {
+    id: number;
+    titulo: string;
+    area_id?: number;
+    tema_id?: number;
+    subtema_id?: number;
+    areaNombre?: string;
+    temaNombre?: string;
+    subtemaNombre?: string;
+  };
   const [contenidosOptions, setContenidosOptions] = useState<ContenidoOption[]>([]);
   const [isLoadingContenidos, setIsLoadingContenidos] = useState(false);
+  const [areasOptions, setAreasOptions] = useState<AreaOption[]>([]);
+  const [temasOptions, setTemasOptions] = useState<TemaOption[]>([]);
+  const [subtemasOptions, setSubtemasOptions] = useState<SubtemaOption[]>([]);
+  const [contentFilters, setContentFilters] = useState({
+    areaId: docenteAreaId ? String(docenteAreaId) : '',
+    temaId: '',
+    subtemaId: ''
+  });
   
   const [tiposActividad, setTiposActividad] = useState<TipoActividad[]>([]);
   const [isLoadingTipos, setIsLoadingTipos] = useState(false);
@@ -897,7 +929,10 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     const authToken = localStorage.getItem('authToken');
     return {
       'Content-Type': 'application/json',
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(isDocenteMode && docenteId ? { 'x-docente-id': String(docenteId) } : {}),
+      ...(isDocenteMode && docentePersonaId ? { 'x-persona-id': String(docentePersonaId) } : {}),
+      ...(isDocenteMode && docenteAreaId ? { 'x-area-id': String(docenteAreaId) } : {})
     };
   };
 
@@ -911,6 +946,17 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     loadContenidos();
     loadTiposActividad();
   }, []);
+
+  useEffect(() => {
+    if (!isDocenteMode) {
+      return;
+    }
+
+    setContentFilters((prev) => ({
+      ...prev,
+      areaId: docenteAreaId ? String(docenteAreaId) : ''
+    }));
+  }, [docenteAreaId, isDocenteMode]);
 
   const loadEjercicios = async () => {
     setIsLoadingData(true);
@@ -933,13 +979,89 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const loadContenidos = async () => {
     setIsLoadingContenidos(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/contenidos`, {
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error('No se pudieron cargar los contenidos');
-      const data = await res.json();
-      const mapped: ContenidoOption[] = (data || []).map((c: any) => ({ id: Number(c.id), titulo: c.titulo }));
+      const catalogHeaders = getAuthHeaders();
+      const [contenidosRes, areasRes, temasRes, subtemasRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/contenidos`, {
+          headers: catalogHeaders,
+          credentials: 'include'
+        }),
+        fetch(`${API_BASE_URL}${isDocenteMode ? '/areas/mis-areas' : '/areas'}`, {
+          headers: catalogHeaders,
+          credentials: 'include'
+        }),
+        fetch(`${API_BASE_URL}/temas`, {
+          headers: catalogHeaders,
+          credentials: 'include'
+        }),
+        fetch(`${API_BASE_URL}/subtemas`, {
+          headers: catalogHeaders,
+          credentials: 'include'
+        })
+      ]);
+
+      if (!contenidosRes.ok) throw new Error('No se pudieron cargar los contenidos');
+
+      const [data, areasCatalog, temasCatalog, subtemasCatalog] = await Promise.all([
+        contenidosRes.json(),
+        areasRes.ok ? areasRes.json() : Promise.resolve([]),
+        temasRes.ok ? temasRes.json() : Promise.resolve([]),
+        subtemasRes.ok ? subtemasRes.json() : Promise.resolve([])
+      ]);
+
+      const areasMapped: AreaOption[] = (areasCatalog || [])
+        .filter((area: any) => area?.estado !== false)
+        .map((area: any) => ({
+          id: Number(area.id),
+          nombre: area.nombre || `Área ${area.id}`,
+          estado: area.estado
+        }))
+        .filter((area: AreaOption) => Number.isFinite(area.id));
+      const temasMapped: TemaOption[] = (temasCatalog || [])
+        .filter((tema: any) => tema?.estado !== false)
+        .map((tema: any) => ({
+          id: Number(tema.id),
+          nombre: tema.nombre || `Tema ${tema.id}`,
+          area_id: Number(tema.area_id),
+          estado: tema.estado
+        }))
+        .filter((tema: TemaOption) => Number.isFinite(tema.id) && Number.isFinite(tema.area_id));
+      const subtemasMapped: SubtemaOption[] = (subtemasCatalog || [])
+        .filter((subtema: any) => subtema?.estado !== false)
+        .map((subtema: any) => ({
+          id: Number(subtema.id),
+          nombre: subtema.nombre || `Subtema ${subtema.id}`,
+          tema_id: Number(subtema.tema_id),
+          estado: subtema.estado
+        }))
+        .filter((subtema: SubtemaOption) => Number.isFinite(subtema.id) && Number.isFinite(subtema.tema_id));
+
+      const temasById = new Map(temasMapped.map((tema) => [Number(tema.id), tema]));
+      const subtemasById = new Map(subtemasMapped.map((subtema) => [Number(subtema.id), subtema]));
+      const areasById = new Map(areasMapped.map((area) => [Number(area.id), area]));
+
+      const mapped: ContenidoOption[] = (data || []).map((c: any) => {
+        const temaId = Number(c.tema_id ?? c.tema?.id ?? c.Tema?.id);
+        const subtemaId = Number(c.subtema_id ?? c.subtema?.id ?? c.Subtema?.id);
+        const tema = Number.isFinite(temaId) ? temasById.get(temaId) : undefined;
+        const subtema = Number.isFinite(subtemaId) ? subtemasById.get(subtemaId) : undefined;
+        const areaId = Number(c.area_id ?? c.area?.id ?? c.Area?.id ?? tema?.area_id);
+        const area = Number.isFinite(areaId) ? areasById.get(areaId) : undefined;
+
+        return {
+          id: Number(c.id),
+          titulo: c.titulo || `Contenido ${c.id}`,
+          area_id: Number.isFinite(areaId) ? areaId : undefined,
+          tema_id: Number.isFinite(temaId) ? temaId : undefined,
+          subtema_id: Number.isFinite(subtemaId) ? subtemaId : undefined,
+          areaNombre: area?.nombre || c.area?.nombre || c.Area?.nombre,
+          temaNombre: tema?.nombre || c.tema?.nombre || c.Tema?.nombre,
+          subtemaNombre: subtema?.nombre || c.subtema?.nombre || c.Subtema?.nombre
+        };
+      }).filter((contenido: ContenidoOption) => Number.isFinite(contenido.id));
+
+      setAreasOptions(areasMapped);
+      setTemasOptions(temasMapped);
+      setSubtemasOptions(subtemasMapped);
       setContenidosOptions(mapped);
     } catch (err) {
       console.error(err);
@@ -1048,6 +1170,11 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     setIsEditMode(false);
     setSelectedEjercicio(null);
     setValidationErrors({});
+    setContentFilters({
+      areaId: isDocenteMode && docenteAreaId ? String(docenteAreaId) : '',
+      temaId: '',
+      subtemaId: ''
+    });
     setFormData({
       actividad: {
         titulo: '',
@@ -1136,7 +1263,16 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
       };
     }
 
+    const contenidoActual = contenidosOptions.find((contenido) => Number(contenido.id) === Number(item.contenido_id));
+
     setValidationErrors({});
+    setContentFilters({
+      areaId: isDocenteMode && docenteAreaId
+        ? String(docenteAreaId)
+        : (contenidoActual?.area_id ? String(contenidoActual.area_id) : ''),
+      temaId: contenidoActual?.tema_id ? String(contenidoActual.tema_id) : '',
+      subtemaId: contenidoActual?.subtema_id ? String(contenidoActual.subtema_id) : ''
+    });
     setFormData({
       actividad: {
         titulo: item.actividad?.titulo || '',
@@ -1159,6 +1295,34 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
   const selectedContenido = contenidosOptions.find(
     (contenido) => String(contenido.id) === String(formData.ejercicio.contenido_id)
   );
+  const activeAreaFilter = isDocenteMode && docenteAreaId ? String(docenteAreaId) : contentFilters.areaId;
+  const temaFilterOptions = temasOptions.filter((tema) => (
+    !activeAreaFilter || Number(tema.area_id) === Number(activeAreaFilter)
+  ));
+  const subtemaFilterOptions = subtemasOptions.filter((subtema) => {
+    if (contentFilters.temaId) {
+      return Number(subtema.tema_id) === Number(contentFilters.temaId);
+    }
+
+    if (activeAreaFilter) {
+      return temaFilterOptions.some((tema) => Number(tema.id) === Number(subtema.tema_id));
+    }
+
+    return true;
+  });
+  const contentMatchesFilters = (contenido: ContenidoOption, filters = contentFilters) => {
+    const areaId = isDocenteMode && docenteAreaId ? String(docenteAreaId) : filters.areaId;
+
+    if (areaId && Number(contenido.area_id) !== Number(areaId)) return false;
+    if (filters.temaId && Number(contenido.tema_id) !== Number(filters.temaId)) return false;
+    if (filters.subtemaId && Number(contenido.subtema_id) !== Number(filters.subtemaId)) return false;
+
+    return true;
+  };
+  const filteredContenidosOptions = contenidosOptions.filter((contenido) => contentMatchesFilters(contenido));
+  const contenidoSelectorOptions = selectedContenido && !filteredContenidosOptions.some((contenido) => contenido.id === selectedContenido.id)
+    ? [selectedContenido, ...filteredContenidosOptions]
+    : filteredContenidosOptions;
   const selectedTipoActividad = tiposActividad.find(
     (tipo) => String(tipo.id) === String(formData.actividad.tipo_actividad_id)
   );
@@ -1190,6 +1354,29 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
     : stateFilter === 'active'
       ? 'Solo activos'
       : 'Solo inhabilitados';
+
+  const handleContentFilterChange = (field: 'areaId' | 'temaId' | 'subtemaId', value: string) => {
+    const nextFilters = {
+      ...contentFilters,
+      [field]: value,
+      ...(field === 'areaId' ? { temaId: '', subtemaId: '' } : {}),
+      ...(field === 'temaId' ? { subtemaId: '' } : {})
+    };
+
+    setContentFilters(nextFilters);
+
+    if (!selectedContenido || contentMatchesFilters(selectedContenido, nextFilters)) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      ejercicio: {
+        ...prev.ejercicio,
+        contenido_id: ''
+      }
+    }));
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -1434,7 +1621,7 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
             </div>
             <div className="app-user-chip">
               <div className="app-user-chip__meta">
-                <p>Panel de administrador</p>
+                <p>{isDocenteMode ? 'Panel docente' : 'Panel de administrador'}</p>
                 <p>{currentStateLabel}</p>
               </div>
               <div className="app-user-avatar">
@@ -1775,6 +1962,59 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                         <p className="text-xs text-gray-500">{exerciseTypeDescription}</p>
                       </div>
 
+                      {!isDocenteMode && (
+                        <div className="app-form-field">
+                          <label className="app-form-label">Filtrar por área</label>
+                          <select
+                            value={contentFilters.areaId}
+                            onChange={(event) => handleContentFilterChange('areaId', event.target.value)}
+                            className="app-form-select"
+                            disabled={isLoadingContenidos}
+                          >
+                            <option value="">Todas las áreas</option>
+                            {areasOptions.map((area) => (
+                              <option key={area.id} value={String(area.id)}>
+                                {area.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Filtrar por tema</label>
+                        <select
+                          value={contentFilters.temaId}
+                          onChange={(event) => handleContentFilterChange('temaId', event.target.value)}
+                          className="app-form-select"
+                          disabled={isLoadingContenidos || (isDocenteMode && !activeAreaFilter)}
+                        >
+                          <option value="">Todos los temas</option>
+                          {temaFilterOptions.map((tema) => (
+                            <option key={tema.id} value={String(tema.id)}>
+                              {tema.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="app-form-field">
+                        <label className="app-form-label">Filtrar por subtema</label>
+                        <select
+                          value={contentFilters.subtemaId}
+                          onChange={(event) => handleContentFilterChange('subtemaId', event.target.value)}
+                          className="app-form-select"
+                          disabled={isLoadingContenidos || subtemaFilterOptions.length === 0}
+                        >
+                          <option value="">Todos los subtemas</option>
+                          {subtemaFilterOptions.map((subtema) => (
+                            <option key={subtema.id} value={String(subtema.id)}>
+                              {subtema.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div className="app-form-field">
                         <label className="app-form-label">Contenido *</label>
                         <select
@@ -1788,12 +2028,18 @@ export function ExerciseManagementScreen({ onBack }: ExerciseManagementScreenPro
                           <option value="" disabled>
                             {isLoadingContenidos ? 'Cargando contenidos...' : 'Seleccione un contenido'}
                           </option>
-                          {contenidosOptions.map((contenido) => (
+                          {contenidoSelectorOptions.map((contenido) => (
                             <option key={contenido.id} value={String(contenido.id)}>
-                              {contenido.titulo} (ID {contenido.id})
+                              {contenido.titulo}
+                              {contenido.temaNombre ? ` · ${contenido.temaNombre}` : ''}
+                              {contenido.subtemaNombre ? ` / ${contenido.subtemaNombre}` : ''}
+                              {` (ID ${contenido.id})`}
                             </option>
                           ))}
                         </select>
+                        {!isLoadingContenidos && filteredContenidosOptions.length === 0 && (
+                          <p className="text-xs text-amber-600">No hay contenidos para los filtros seleccionados.</p>
+                        )}
                         {validationErrors['ejercicio.contenido_id'] && (
                           <p className="text-xs text-red-500 flex items-center gap-1">
                             <AlertCircle className="w-3 h-3" />
