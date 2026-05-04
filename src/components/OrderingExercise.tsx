@@ -7,6 +7,7 @@ interface OrderingExerciseProps {
   enunciado?: string;
   items?: string[];
   onBack: () => void;
+  onComplete?: () => void;
   embedded?: boolean;
   configurableMode?: boolean;
   configurableResponse?: any;
@@ -15,24 +16,17 @@ interface OrderingExerciseProps {
   submitPath?: string;
 }
 
-export function OrderingExercise({ activity, enunciado = 'Ordena los elementos correctamente', items = ['Paso 1', 'Paso 2', 'Paso 3'], onBack, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, resolvePath, submitPath }: OrderingExerciseProps) {
+export function OrderingExercise({ activity, enunciado = 'Ordena los elementos correctamente', items = ['Paso 1', 'Paso 2', 'Paso 3'], onBack, onComplete, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, resolvePath, submitPath }: OrderingExerciseProps) {
   // Aleatorizar items inicialmente
   const itemsAleatorios = useMemo(() => {
     return [...items].sort(() => Math.random() - 0.5);
   }, [JSON.stringify(items)]);
   const [list, setList] = useState<string[]>(Array.isArray(configurableResponse?.respuesta?.orden) ? configurableResponse.respuesta.orden : itemsAleatorios);
-    useEffect(() => {
-      if (Array.isArray(configurableResponse?.respuesta?.orden)) {
-        setList(configurableResponse.respuesta.orden);
-        return;
-      }
-      setList(itemsAleatorios);
-    }, [configurableResponse, itemsAleatorios]);
 
-    useEffect(() => {
-      if (!configurableMode || !onConfigurableResponseChange) return;
-      onConfigurableResponseChange({ respuesta: { orden: list } });
-    }, [configurableMode, list, onConfigurableResponseChange]);
+  useEffect(() => {
+    if (!configurableMode || !onConfigurableResponseChange) return;
+    onConfigurableResponseChange({ respuesta: { orden: list } });
+  }, [configurableMode, list, onConfigurableResponseChange]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aprobado, setAprobado] = useState(false);
@@ -93,6 +87,7 @@ export function OrderingExercise({ activity, enunciado = 'Ordena los elementos c
       alert(`${res.message || 'Otro envío en proceso; intenta de nuevo'}`);
     } else if (res.status === 409) {
       setAprobado(true);
+      onComplete?.();
       alert(`${res.message || 'Ejercicio ya aprobado'}`);
     } else if (res.status === 400) {
       const data: any = res.data || {};
@@ -105,6 +100,7 @@ export function OrderingExercise({ activity, enunciado = 'Ordena los elementos c
       setFeedback(data?.retroalimentacion || '');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
       setAprobado(true);
+      onComplete?.();
       alert(`Correcta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
     } else {
       alert(`Error del servidor: ${res.message || 'Error desconocido'}`);

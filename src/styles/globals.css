@@ -285,11 +285,16 @@ html {
   border-radius: 3px;
 }
 
-/* Imágenes — centrar las que Quill alinea con text-align:center en el <p> padre */
+/* Imágenes — mismos valores que el editor Quill del admin (.app-miniproyecto-rich-editor .ql-editor img) */
 .quill-render img {
-  max-width: 100%;
+  display: block;
+  width: auto !important;
+  max-width: min(100%, 40rem);
+  max-height: min(18rem, 38vh);
   height: auto;
-  display: inline-block; /* Quill las deja inline dentro de un <p> centrado */
+  border-radius: 0.85rem;
+  margin: 0.85rem auto;
+  object-fit: contain;
 }
 
 /* Links */

@@ -770,7 +770,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
       } else {
         const link = document.createElement('a');
         link.href = url;
-        link.download = `reporte_${type}.pdf`;
+        const nombreES: Record<string, string> = { student: 'estudiante', date: 'fecha', activity: 'actividad', failures: 'fallos' };
+        link.download = `reporte_${nombreES[type] ?? type}.pdf`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -2127,31 +2128,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                     </div>
                   );
                 })}
-              </div>
-            </div>
-
-            {/* Estadísticas de tiempo */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-[#F5A97F]" />
-                Tiempo Promedio de Resolución
-              </h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-[#4A90E2]/5 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-2">Ejercicios de Programación</div>
-                  <div className="text-3xl text-[#4A90E2] mb-1">25 min</div>
-                  <div className="text-xs text-gray-500">Tiempo promedio por ejercicio</div>
-                </div>
-                <div className="bg-[#7ED6A7]/5 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-2">Actividades Teóricas</div>
-                  <div className="text-3xl text-[#7ED6A7] mb-1">15 min</div>
-                  <div className="text-xs text-gray-500">Tiempo promedio por actividad</div>
-                </div>
-                <div className="bg-[#F5A97F]/5 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-2">Miniproyectos</div>
-                  <div className="text-3xl text-[#F5A97F] mb-1">3.5 hrs</div>
-                  <div className="text-xs text-gray-500">Tiempo promedio por proyecto</div>
-                </div>
               </div>
             </div>
           </div>

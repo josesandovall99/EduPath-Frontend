@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, X, ArrowLeft, Users, Download } from 'lucide-react';
-// Asegúrate de que la ruta de la imagen sea correcta en tu proyecto
+import * as XLSX from 'xlsx';
 import { API_BASE_URL } from '../utils/constants';
 
 interface StudentUploadScreenProps {
@@ -27,39 +27,16 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
     }
   };
 
-  // Función para descargar una plantilla CSV real con los encabezados que pide tu backend
   const handleDownloadTemplate = () => {
-    // Encabezados exactos que espera tu controlador backend
-    const headers = [
-      "Nombres", 
-      "Apellidos", 
-      "Email_institucional", 
-      "CodigoEstudiantil", 
-      "Programa", 
-      "Semestre"
+    const headers = ["Nombres", "Apellidos", "Email_institucional", "CodigoEstudiantil", "Programa", "Semestre"];
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    ws['!autofilter'] = { ref: `A1:F1` };
+    ws['!cols'] = [
+      { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 18 }, { wch: 30 }, { wch: 12 }
     ];
-    
-    // Ejemplo de datos
-    const rowExample = [
-      "Juan", 
-      "Perez", 
-      "juan.perez@ejemplo.com", 
-      "1150001", 
-      "Ingeniería de Sistemas", 
-      "1"
-    ];
-
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + headers.join(",") + "\n" 
-        + rowExample.join(",");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "plantilla_estudiantes.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Estudiantes");
+    XLSX.writeFile(wb, "plantilla_estudiantes.xlsx");
   };
 
   const handleUpload = async () => {
@@ -174,7 +151,7 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
             className="app-btn app-btn-success px-6 py-3"
           >
             <Download className="w-5 h-5" />
-            <span>Descargar Plantilla (.csv)</span>
+            <span>Descargar Plantilla (.xlsx)</span>
           </button>
         </div>
 

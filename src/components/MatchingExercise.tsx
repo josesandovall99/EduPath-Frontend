@@ -9,6 +9,7 @@ interface MatchingExerciseProps {
   enunciado?: string;
   pares?: Pair[];
   onBack: () => void;
+  onComplete?: () => void;
   embedded?: boolean;
   configurableMode?: boolean;
   configurableResponse?: any;
@@ -17,7 +18,7 @@ interface MatchingExerciseProps {
   submitPath?: string;
 }
 
-export function MatchingExercise({ activity, enunciado = 'Relaciona cada concepto con su definición', pares = [{ concepto: 'Concepto A', definicion: 'Definición A' }, { concepto: 'Concepto B', definicion: 'Definición B' }], onBack, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, resolvePath, submitPath }: MatchingExerciseProps) {
+export function MatchingExercise({ activity, enunciado = 'Relaciona cada concepto con su definición', pares = [{ concepto: 'Concepto A', definicion: 'Definición A' }, { concepto: 'Concepto B', definicion: 'Definición B' }], onBack, onComplete, embedded = false, configurableMode = false, configurableResponse, onConfigurableResponseChange, resolvePath, submitPath }: MatchingExerciseProps) {
   const [left] = useState<Pair[]>(pares);
   // Aleatorizar definiciones pero mantener orden de conceptos
   const rightAleatorio = useMemo(() => {
@@ -89,6 +90,7 @@ export function MatchingExercise({ activity, enunciado = 'Relaciona cada concept
       alert(`${res.message || 'Otro envío en proceso; intenta de nuevo'}`);
     } else if (res.status === 409) {
       setAprobado(true);
+      onComplete?.();
       alert(`${res.message || 'Ejercicio ya aprobado'}`);
     } else if (res.status === 400) {
       const data: any = res.data || {};
@@ -101,6 +103,7 @@ export function MatchingExercise({ activity, enunciado = 'Relaciona cada concept
       setFeedback(data?.retroalimentacion || '');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
       setAprobado(true);
+      onComplete?.();
       alert(`Correcta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
     } else {
       alert(`Error del servidor: ${res.message || 'Error desconocido'}`);

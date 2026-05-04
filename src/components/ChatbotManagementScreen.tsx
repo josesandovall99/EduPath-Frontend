@@ -12,6 +12,8 @@ import {
   Save,
   Search,
   Send,
+  ToggleLeft,
+  ToggleRight,
   Trash2,
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
@@ -294,6 +296,28 @@ function enforceDocenteFormMode(formState: ChatbotFormState, docenteAreaId?: num
     ...formState,
     tipo: nextType,
     area_id: formState.area_id || String(Number(docenteAreaId) || Number(fallbackAreaId) || ''),
+  };
+}
+
+function buildChatbotPayload(chatbot: ChatbotItem, overrides: { estado?: boolean } = {}) {
+  const tipo = chatbot.tipo;
+  return {
+    nombre_chatbot: chatbot.nombre,
+    descripcion: chatbot.descripcion || '',
+    tipo,
+    prompt_base: chatbot.prompt_base || '',
+    estado: overrides.estado !== undefined ? overrides.estado : chatbot.estado !== false,
+    configuracion: {
+      area_id: isRoleScopedGeneralType(tipo) ? null : (chatbot.area_id ?? null),
+      miniproyecto_id: tipo === 'MINIPROYECTO' ? (chatbot.miniproyecto_id ?? null) : null,
+    },
+    parametros_rendimiento: {
+      model: chatbot.model_name || 'qwen2.5:0.5b',
+      topK: chatbot.top_k || 5,
+      max_context_chars: chatbot.max_context_chars || 4000,
+      max_tokens: chatbot.max_tokens || 512,
+      temperature: chatbot.temperature ?? 0.1,
+    },
   };
 }
 
@@ -827,6 +851,36 @@ export function ChatbotManagementScreen({
     }
   }
 
+  async function handleToggleEstado(chatbot: ChatbotItem, event: React.MouseEvent) {
+    event.stopPropagation();
+    const newEstado = chatbot.estado === false ? true : false;
+    setStatusMessage(newEstado ? 'Habilitando chatbot...' : 'Deshabilitando chatbot...');
+
+    try {
+      const payload = buildChatbotPayload(chatbot, { estado: newEstado });
+      const response = await apiFetch(`/chatbots/${chatbot.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }, chatbot.area_id ?? null);
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.mensaje || data?.error || 'No se pudo actualizar el estado.');
+      }
+
+      const refreshed = await loadChatbots();
+      if (selectedChatbotId === chatbot.id) {
+        const updated = refreshed.find((item) => item.id === chatbot.id);
+        if (updated) await selectChatbot(updated);
+      }
+      setStatusMessage(newEstado ? 'Chatbot habilitado correctamente.' : 'Chatbot deshabilitado correctamente.');
+    } catch (error) {
+      console.error('Error toggling chatbot estado:', error);
+      setStatusMessage(error instanceof Error ? error.message : 'Error al actualizar el estado del chatbot.');
+    }
+  }
+
   async function handleUploadDocument() {
     if (!selectedChatbotId) {
       setStatusMessage('Guarda el chatbot antes de subir documentos.');
@@ -1194,10 +1248,12 @@ export function ChatbotManagementScreen({
                     const documentCount = chatbot.documentos?.length ?? 0;
 
                     return (
-                      <button
+                      <div
                         key={chatbot.id}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => void selectChatbot(chatbot)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void selectChatbot(chatbot); }}
                         className={`chatbot-admin-library-card ${isSelected ? 'chatbot-admin-library-card--selected' : ''} ${!chatbotIsActive ? 'chatbot-admin-library-card--inactive' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -1236,8 +1292,23 @@ export function ChatbotManagementScreen({
                             <span className="chatbot-admin-library-card__meta-label">Documentos</span>
                             <span className="chatbot-admin-library-card__meta-value">{documentCount}</span>
                           </div>
+                          <button
+                            type="button"
+                            onClick={(e) => void handleToggleEstado(chatbot, e)}
+                            title={chatbotIsActive ? 'Deshabilitar chatbot' : 'Habilitar chatbot'}
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                              chatbotIsActive
+                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            }`}
+                          >
+                            {chatbotIsActive
+                              ? <><ToggleRight className="w-4 h-4" /><span>Deshabilitar</span></>
+                              : <><ToggleLeft className="w-4 h-4" /><span>Habilitar</span></>
+                            }
+                          </button>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1411,9 +1482,24 @@ export function ChatbotManagementScreen({
                     <p className="chatbot-admin-section-description">Contexto y estado.</p>
                   </div>
                   {!isFormVisible && selectedChatbotId ? (
-                    <button onClick={handleEditSelected} className="app-btn app-btn-secondary px-4 py-3">
-                      Editar chatbot seleccionado
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button onClick={handleEditSelected} className="app-btn app-btn-secondary px-4 py-3">
+                        Editar chatbot
+                      </button>
+                      <button
+                        onClick={(e) => { if (selectedChatbot) void handleToggleEstado(selectedChatbot, e); }}
+                        className={`app-btn inline-flex items-center gap-2 px-4 py-3 font-medium transition-colors ${
+                          selectedChatbotIsActive
+                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                            : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                        }`}
+                      >
+                        {selectedChatbotIsActive
+                          ? <><ToggleRight className="w-4 h-4" /><span>Deshabilitar</span></>
+                          : <><ToggleLeft className="w-4 h-4" /><span>Habilitar</span></>
+                        }
+                      </button>
+                    </div>
                   ) : null}
                 </div>
 

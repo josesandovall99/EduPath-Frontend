@@ -32,7 +32,6 @@ interface Docente {
 interface DocenteFormData {
   nombre: string;
   email: string;
-  codigoAcceso: string;
   especialidad: string;
   areaId: string;
 }
@@ -40,7 +39,6 @@ interface DocenteFormData {
 const emptyForm: DocenteFormData = {
   nombre: '',
   email: '',
-  codigoAcceso: '',
   especialidad: '',
   areaId: ''
 };
@@ -150,7 +148,6 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
     setFormData({
       nombre: docente.persona?.nombre || '',
       email: docente.persona?.email || '',
-      codigoAcceso: docente.persona?.codigoAcceso || docente.codigoAcceso || '',
       especialidad: docente.especialidad || '',
       areaId: String(docente.area?.id ?? docente.areaId ?? '')
     });
@@ -204,18 +201,13 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
   };
 
   const isFormValid = useMemo(() => {
-    const baseValid =
+    return !!(
       formData.nombre.trim() &&
       formData.email.trim() &&
-      formData.codigoAcceso.trim() &&
       formData.especialidad.trim() &&
-      formData.areaId.trim();
-
-    if (!baseValid) {
-      return false;
-    }
-    return true;
-  }, [editingDocente, formData]);
+      formData.areaId.trim()
+    );
+  }, [formData]);
 
   const filteredDocentes = useMemo(() => {
     const normalizedQuery = searchTerm.trim().toLowerCase();
@@ -308,7 +300,6 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
       const payload: Record<string, unknown> = {
         nombre: formData.nombre.trim(),
         email: formData.email.trim(),
-        codigoAcceso: formData.codigoAcceso.trim(),
         especialidad: formData.especialidad.trim(),
         areaId: Number(formData.areaId)
       };
@@ -704,21 +695,10 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                 <section className="app-form-section">
                   <div className="mb-4 space-y-1.5">
                     <h4 className="app-form-section-title">Perfil académico</h4>
-                    <p className="app-form-section-description">Define código, especialidad y área.</p>
+                    <p className="app-form-section-description">Define especialidad y área. El código DOC### se asigna automáticamente.</p>
                   </div>
 
                   <div className="app-form-grid app-form-grid-2">
-                    <div className="app-form-field">
-                      <label className="app-form-label">Código de acceso *</label>
-                      <input
-                        type="text"
-                        value={formData.codigoAcceso}
-                        onChange={(event) => updateField('codigoAcceso', event.target.value)}
-                        className={inputClassName}
-                        placeholder="DOC123"
-                        required
-                      />
-                    </div>
                     <div className="app-form-field">
                       <label className="app-form-label">Especialidad *</label>
                       <input
@@ -762,7 +742,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
                       <div className="app-form-summary-card">
                         <div className="app-form-summary-label">Código</div>
-                        <div className="app-form-summary-value">{formData.codigoAcceso.trim() || 'Pendiente'}</div>
+                        <div className="app-form-summary-value">{editingDocente ? (editingDocente.persona?.codigoAcceso || editingDocente.codigoAcceso || '—') : 'DOC### (automático)'}</div>
                       </div>
                       <div className="app-form-summary-card">
                         <div className="app-form-summary-label">Especialidad</div>
@@ -780,7 +760,7 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                   <h4 className="app-form-section-title">Verificación</h4>
                   <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
                     <p>Validación del correo antes del guardado.</p>
-                    <p>Confirma el código de acceso y la especialidad.</p>
+                    <p>El código DOC### se asigna automáticamente al crear el docente.</p>
                     <p>Asigna el área correcta para mantener consistencia operativa.</p>
                   </div>
                 </section>

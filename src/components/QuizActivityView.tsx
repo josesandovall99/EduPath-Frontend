@@ -10,6 +10,7 @@ interface QuizActivityViewProps {
     title: string;
   };
   onBack: () => void;
+  onComplete?: () => void;
 }
 
 // Colores por materia
@@ -19,7 +20,7 @@ const subjectColors: Record<string, string> = {
   'Fundamentos de Programación': '#4A90E2'
 };
 
-export function QuizActivityView({ subjectName, activity, onBack }: QuizActivityViewProps) {
+export function QuizActivityView({ subjectName, activity, onBack, onComplete }: QuizActivityViewProps) {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [expandedModule, setExpandedModule] = useState(true);
@@ -64,6 +65,7 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
 
     if (result.status === 409) {
       setAprobado(true);
+      onComplete?.();
       alert(`${result.message || 'Ejercicio ya aprobado'}`);
       setIsSubmitting(false);
       return;
@@ -82,6 +84,7 @@ export function QuizActivityView({ subjectName, activity, onBack }: QuizActivity
     if (result.status === 200) {
       const data: any = result.data || {};
       setAprobado(true);
+      onComplete?.();
       setFeedback(data?.retroalimentacion || '¡Correcto!');
       if (typeof data?.puntosObtenidos === 'number') setPuntos(data.puntosObtenidos);
       alert(`Correcta${typeof data?.puntosObtenidos === 'number' ? `\n\nPuntos obtenidos: ${data.puntosObtenidos}` : ''}${data?.retroalimentacion ? `\n\nRetroalimentación:\n${data.retroalimentacion}` : ''}`);
