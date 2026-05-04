@@ -81,8 +81,7 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              // SOLUCIÓN AL ERROR DE IMAGEN image_567ce2.png:
-              // Agrupamos React y dependencias esenciales para que siempre estén disponibles.
+              
               if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) {
                 return 'vendor-core';
               }
