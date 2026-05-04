@@ -247,7 +247,10 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
   if (!isOpen) {
     return (
       <button
+        type="button"
         onClick={() => setIsOpen(true)}
+        aria-label="Abrir asistente del chatbot"
+        title="Abrir asistente"
         style={{
           position: "fixed", bottom: "20px", right: "20px",
           width: "60px", height: "60px", borderRadius: "50%",
@@ -256,7 +259,7 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
           display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >
-        <MessageCircle size={28} color="white" />
+        <MessageCircle size={28} color="white" aria-hidden="true" />
       </button>
     );
   }
@@ -293,8 +296,24 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
           </p>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
-          <button onClick={() => setIsMinimized(!isMinimized)} style={{ background: "none", border: "none", color: "white", cursor: "pointer" }}><Minimize2 size={18} /></button>
-          <button onClick={() => setIsOpen(false)} style={{ background: "none", border: "none", color: "white", cursor: "pointer" }}><X size={18} /></button>
+          <button
+            type="button"
+            onClick={() => setIsMinimized(!isMinimized)}
+            aria-label={isMinimized ? 'Expandir chatbot' : 'Minimizar chatbot'}
+            title={isMinimized ? 'Expandir' : 'Minimizar'}
+            style={{ background: "none", border: "none", color: "white", cursor: "pointer" }}
+          >
+            <Minimize2 size={18} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsOpen(false)}
+            aria-label="Cerrar chatbot"
+            title="Cerrar"
+            style={{ background: "none", border: "none", color: "white", cursor: "pointer" }}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
         </div>
       </div>
 
@@ -330,8 +349,15 @@ export function ChatbotButton({ chatbotType = 'GENERAL', areaId = null, miniproy
               placeholder={resolvedChatbot?.id ? 'Pregunta algo...' : 'No hay chatbot disponible para este contexto'}
               style={{ flex: 1, border: "1px solid #ddd", borderRadius: "20px", padding: "8px 15px", outline: "none", backgroundColor: isResolving || !resolvedChatbot?.id ? '#f3f4f6' : 'white' }}
             />
-            <button onClick={handleSend} disabled={isLoading || isResolving || !resolvedChatbot?.id} style={{ background: "#7ED6A7", border: "none", borderRadius: "50%", width: "35px", height: "35px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white", opacity: isLoading || isResolving || !resolvedChatbot?.id ? 0.5 : 1 }}>
-              <Send size={18} />
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={isLoading || isResolving || !resolvedChatbot?.id}
+              aria-label="Enviar mensaje al chatbot"
+              title="Enviar"
+              style={{ background: "#7ED6A7", border: "none", borderRadius: "50%", width: "35px", height: "35px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white", opacity: isLoading || isResolving || !resolvedChatbot?.id ? 0.5 : 1 }}
+            >
+              <Send size={18} aria-hidden="true" />
             </button>
           </div>
         </>

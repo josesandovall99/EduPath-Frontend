@@ -1,0 +1,23 @@
+# Headers de despliegue — compatibles con Render Static Sites,
+# Netlify y Cloudflare Pages. Vite emite assets con hash en el nombre
+# (ej: `index-abc123.js`), por lo que se pueden cachear de manera
+# inmutable durante un año sin riesgo de servir archivos obsoletos:
+# si cambia el contenido cambia el hash → cambia la URL → el cliente
+# vuelve a descargar. El HTML, en cambio, NUNCA debe cachearse para
+# que cada despliegue se resuelva al refrescar.
+
+# ── Assets versionados (JS, CSS, imágenes, fuentes) ─────────────────
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff
+
+# ── HTML siempre fresco ─────────────────────────────────────────────
+/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# ── Fallback (raíz) ─────────────────────────────────────────────────
+/
+  Cache-Control: no-cache, no-store, must-revalidate
