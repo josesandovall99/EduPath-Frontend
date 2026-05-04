@@ -84,44 +84,51 @@
       sourcemap: false,
       reportCompressedSize: false,
       assetsInlineLimit: 4096,
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vendor-react':       ['react', 'react-dom'],
-            'vendor-radix':       [
-              '@radix-ui/react-dialog',
-              '@radix-ui/react-dropdown-menu',
-              '@radix-ui/react-popover',
-              '@radix-ui/react-tabs',
-              '@radix-ui/react-select',
-              '@radix-ui/react-tooltip',
-              '@radix-ui/react-accordion',
-              '@radix-ui/react-checkbox',
-              '@radix-ui/react-radio-group',
-              '@radix-ui/react-switch',
-              '@radix-ui/react-toggle',
-              '@radix-ui/react-toggle-group',
-              '@radix-ui/react-slider',
-              '@radix-ui/react-separator',
-              '@radix-ui/react-scroll-area',
-              '@radix-ui/react-progress',
-              '@radix-ui/react-navigation-menu',
-              '@radix-ui/react-menubar',
-              '@radix-ui/react-label',
-              '@radix-ui/react-hover-card',
-              '@radix-ui/react-context-menu',
-              '@radix-ui/react-collapsible',
-              '@radix-ui/react-avatar',
-              '@radix-ui/react-aspect-ratio',
-              '@radix-ui/react-alert-dialog',
-              '@radix-ui/react-slot',
-            ],
-            'vendor-charts':      ['recharts'],
-            'vendor-editor':      ['quill'],
-            'vendor-monaco':      ['@monaco-editor/react'],
-            'vendor-icons':       ['lucide-react'],
-            'vendor-form':        ['react-hook-form'],
-            'vendor-toast':       ['sonner'],
+          // ── Estrategia de chunking por función ──
+          // Función en lugar de objeto para detectar también pantallas pesadas
+          // que se importan estáticamente desde varios sitios y aún así
+          // separarlas en chunks propios.
+          manualChunks(id) {
+            // Vendors externos
+            if (id.includes('node_modules')) {
+              if (id.includes('react-dom') || id.includes('/react/'))           return 'vendor-react';
+              if (id.includes('@radix-ui'))                                     return 'vendor-radix';
+              if (id.includes('recharts'))                                      return 'vendor-charts';
+              if (id.includes('quill'))                                         return 'vendor-editor';
+              if (id.includes('@monaco-editor'))                                return 'vendor-monaco';
+              if (id.includes('lucide-react'))                                  return 'vendor-icons';
+              if (id.includes('react-hook-form'))                               return 'vendor-form';
+              if (id.includes('sonner'))                                        return 'vendor-toast';
+              if (id.includes('xlsx'))                                          return 'vendor-xlsx';
+              if (id.includes('jointjs') || id.includes('mermaid'))             return 'vendor-diagrams';
+              if (id.includes('react-markdown') || id.includes('remark-'))      return 'vendor-markdown';
+              return 'vendor-misc';
+            }
+            // Pantallas pesadas del proyecto separadas en su propio chunk
+            // aunque sean importadas tanto estáticamente como vía lazy().
+            if (id.includes('/components/')) {
+              if (id.includes('ContentManagementScreen'))         return 'screen-content';
+              if (id.includes('SequenceManagementScreen'))        return 'screen-sequence';
+              if (id.includes('SubtemaSequenceManagementScreen')) return 'screen-subtema-seq';
+              if (id.includes('SubThemeManagementScreen'))        return 'screen-subtheme';
+              if (id.includes('TemasManagementScreen'))           return 'screen-temas';
+              if (id.includes('AreasManagementScreen'))           return 'screen-areas';
+              if (id.includes('ExerciseManagementScreen'))        return 'screen-exercise';
+              if (id.includes('MiniproyectoManagementScreen'))    return 'screen-miniproyecto';
+              if (id.includes('ChatbotManagementScreen'))         return 'screen-chatbot';
+              if (id.includes('DocenteManagementScreen'))         return 'screen-docentes';
+              if (id.includes('AdminManagementScreen'))           return 'screen-admins';
+              if (id.includes('ProgrammingContentView'))          return 'screen-programming';
+              if (id.includes('UMLDiagramView') || id.includes('ClassDiagramEditor')) return 'screen-uml';
+              if (id.includes('TheoryContentView'))               return 'screen-theory';
+              if (id.includes('ConfigurableMiniproyecto') || id.includes('CreateConfigurableMiniproyecto')) return 'screen-configurable';
+              if (id.includes('StudentUploadScreen'))             return 'screen-upload';
+              if (id.includes('ReportsScreen'))                   return 'screen-reports';
+              if (id.includes('StudentTrackingScreen'))           return 'screen-tracking';
+            }
           },
         },
       },

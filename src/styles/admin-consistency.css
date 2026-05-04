@@ -195,7 +195,8 @@
 
 .app-section-description {
   margin-top: 0.3rem;
-  color: #64748b;
+  /* slate-600: contraste 7.4:1 sobre blanco — cumple AA y AAA. */
+  color: #475569;
   font-size: 0.9rem;
 }
 
@@ -290,7 +291,7 @@
 
 .app-metric-label {
   margin-top: 0.25rem;
-  color: #64748b;
+  color: #475569;
   font-size: 0.84rem;
 }
 
@@ -373,7 +374,7 @@
 
 .app-list-card__description,
 .app-list-card__meta {
-  color: #64748b;
+  color: #475569;
   font-size: 0.88rem;
   line-height: 1.55;
 }

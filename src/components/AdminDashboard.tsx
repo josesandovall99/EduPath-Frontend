@@ -752,7 +752,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
               </div>
               <div>
                 <h1 className="text-[#3A4A5B]">Panel de Administrador</h1>
-                <p className="text-gray-500 text-sm">Acceso a los módulos del rol administrador.</p>
+                <p className="text-slate-600 text-sm">Acceso a los módulos del rol administrador.</p>
               </div>
             </div>
 
