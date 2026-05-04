@@ -77,49 +77,6 @@ export default defineConfig(({ mode }) => {
       reportCompressedSize: false,
       assetsInlineLimit: 4096,
       chunkSizeWarningLimit: 1000,
-      rollupOptions: {
-        output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              
-              if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) {
-                return 'vendor-core';
-              }
-              if (id.includes('@radix-ui')) return 'vendor-radix';
-              if (id.includes('recharts')) return 'vendor-charts';
-              if (id.includes('quill')) return 'vendor-editor';
-              if (id.includes('@monaco-editor')) return 'vendor-monaco';
-              if (id.includes('lucide-react')) return 'vendor-icons';
-              if (id.includes('react-hook-form')) return 'vendor-form';
-              if (id.includes('sonner')) return 'vendor-toast';
-              if (id.includes('xlsx')) return 'vendor-xlsx';
-              if (id.includes('jointjs') || id.includes('mermaid')) return 'vendor-diagrams';
-              if (id.includes('react-markdown') || id.includes('remark-')) return 'vendor-markdown';
-              return 'vendor-misc';
-            }
-            if (id.includes('/components/')) {
-              if (id.includes('ContentManagementScreen')) return 'screen-content';
-              if (id.includes('SequenceManagementScreen')) return 'screen-sequence';
-              if (id.includes('SubtemaSequenceManagementScreen')) return 'screen-subtema-seq';
-              if (id.includes('SubThemeManagementScreen')) return 'screen-subtheme';
-              if (id.includes('TemasManagementScreen')) return 'screen-temas';
-              if (id.includes('AreasManagementScreen')) return 'screen-areas';
-              if (id.includes('ExerciseManagementScreen')) return 'screen-exercise';
-              if (id.includes('MiniproyectoManagementScreen')) return 'screen-miniproyecto';
-              if (id.includes('ChatbotManagementScreen')) return 'screen-chatbot';
-              if (id.includes('DocenteManagementScreen')) return 'screen-docentes';
-              if (id.includes('AdminManagementScreen')) return 'screen-admins';
-              if (id.includes('ProgrammingContentView')) return 'screen-programming';
-              if (id.includes('UMLDiagramView') || id.includes('ClassDiagramEditor')) return 'screen-uml';
-              if (id.includes('TheoryContentView')) return 'screen-theory';
-              if (id.includes('ConfigurableMiniproyecto') || id.includes('CreateConfigurableMiniproyecto')) return 'screen-configurable';
-              if (id.includes('StudentUploadScreen')) return 'screen-upload';
-              if (id.includes('ReportsScreen')) return 'screen-reports';
-              if (id.includes('StudentTrackingScreen')) return 'screen-tracking';
-            }
-          },
-        },
-      },
     },
     server: {
       port: 3000,
