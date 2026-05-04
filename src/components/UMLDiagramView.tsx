@@ -11,6 +11,7 @@ interface UMLDiagramViewProps {
     title: string;
   };
   onBack: () => void;
+  onComplete?: () => void;
   configurableMode?: boolean;
   configurableResponse?: any;
   onConfigurableResponseChange?: (response: any) => void;
@@ -60,7 +61,7 @@ interface MultiplicityDialog {
   targetMultiplicity: string;
 }
 
-export function UMLDiagramView({ activity, onBack, configurableMode = false, configurableResponse, onConfigurableResponseChange, resolvePath, submitPath, feedbackPath }: UMLDiagramViewProps) {
+export function UMLDiagramView({ activity, onBack, onComplete, configurableMode = false, configurableResponse, onConfigurableResponseChange, resolvePath, submitPath, feedbackPath }: UMLDiagramViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<joint.dia.Graph | null>(null);
   const paperRef = useRef<joint.dia.Paper | null>(null);
@@ -438,6 +439,7 @@ export function UMLDiagramView({ activity, onBack, configurableMode = false, con
       // 409: Ejercicio ya aprobado (bloquear envíos)
       if (response.status === 409) {
         setEjercicioAprobado(true);
+        onComplete?.();
         alert(`${data?.message || data?.error || 'Ejercicio ya aprobado'}`);
         setIsValidating(false);
         return;
@@ -480,6 +482,7 @@ export function UMLDiagramView({ activity, onBack, configurableMode = false, con
         setValidationWarnings([]);
         setShowErrorModal(false);
         setEjercicioAprobado(true);
+        onComplete?.();
 
         let msg = `Correcta`;
         if (typeof ejercicioData.puntosObtenidos === 'number') msg += `\n\nPuntos obtenidos: ${ejercicioData.puntosObtenidos}`;
