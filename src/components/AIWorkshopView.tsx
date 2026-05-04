@@ -356,29 +356,6 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
           <p className="text-gray-700 text-sm mb-4">
             {workshopConfig.description}
           </p>
-          
-          {/* Progress */}
-          <div 
-            className="border-2 p-4 rounded-xl"
-            style={{ 
-              backgroundColor: `${subjectColor}10`,
-              borderColor: `${subjectColor}40`
-            }}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-700">Progreso</span>
-              <span className="text-sm" style={{ color: subjectColor }}>{currentTask}/{totalTasks} tareas</span>
-            </div>
-            <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div 
-                className="h-full rounded-full transition-all duration-500"
-                style={{ 
-                  width: `${(currentTask / totalTasks) * 100}%`,
-                  backgroundColor: subjectColor
-                }}
-              ></div>
-            </div>
-          </div>
         </div>
 
         {/* Tasks Checklist */}
@@ -1012,18 +989,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
               Tarea actual: <span style={{ color: subjectColor }}>{currentTask} de {totalTasks}</span>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setPendingEstado('ENVIADO');
-                  setShowConfirmModal(true);
-                }}
-                disabled={isSaving || !workshop.isMiniproyecto}
-                className="border-2 border-gray-300 px-5 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-700 text-sm transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Save className="w-4 h-4" />
-                Guardar progreso
-              </button>
-              <button 
+<button 
                 onClick={() => {
                   setPendingEstado('COMPLETADO');
                   setShowConfirmModal(true);
