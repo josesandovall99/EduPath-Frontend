@@ -1,31 +1,27 @@
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react-swc';
+import path from 'path';
 
-  import { defineConfig, loadEnv } from 'vite';
-  import react from '@vitejs/plugin-react-swc';
-  import path from 'path';
+export default defineConfig(({ mode }) => {
+  const isProductionLike = mode === 'production';
+  const env = loadEnv(mode, process.cwd(), '');
+  const devProxyTarget = (env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:4000').trim().replace(/\/$/, '');
+  const backendUrl = (env.VITE_API_BASE_URL || devProxyTarget).trim().replace(/\/$/, '');
 
-  export default defineConfig(({ mode }) => {
-    const isProductionLike = mode === 'production';
-    const env = loadEnv(mode, process.cwd(), '');
-    const devProxyTarget = (env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:4000').trim().replace(/\/$/, '');
-    const backendUrl = (env.VITE_API_BASE_URL || devProxyTarget).trim().replace(/\/$/, '');
+  const devCsp = `default-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws: wss: ${backendUrl} http://localhost:3000; font-src 'self' data:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; child-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';`;
+  const strictCsp = `default-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com; connect-src 'self' ${backendUrl}; font-src 'self' data:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; child-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';`;
 
-    // Keep dev server compatible with HMR; enforce stricter policy in preview/build scans.
-    const devCsp = `default-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ws: wss: ${backendUrl} http://localhost:3000; font-src 'self' data:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; child-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';`;
-    const strictCsp = `default-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com; connect-src 'self' ${backendUrl}; font-src 'self' data:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; child-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';`;
+  const devHeaders: Record<string, string> = {
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+  };
 
-    const devHeaders: Record<string, string> = {
-      'X-Frame-Options': 'DENY',
-      'X-Content-Type-Options': 'nosniff',
-      'Referrer-Policy': 'strict-origin-when-cross-origin',
-    };
+  if (isProductionLike) {
+    devHeaders['Content-Security-Policy'] = strictCsp;
+  }
 
-    // During local development, skip CSP to avoid blocking embedded resources while iterating.
-    // CSP remains enforced in preview/build mode for security scans.
-    if (isProductionLike) {
-      devHeaders['Content-Security-Policy'] = strictCsp;
-    }
-
-    return {
+  return {
     plugins: [react()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
@@ -76,10 +72,6 @@
     build: {
       target: 'esnext',
       outDir: 'build',
-      // ── Code splitting agresivo ──
-      // Separa vendors pesados en chunks dedicados para que el bundle inicial
-      // baje de ~1.9MB a ~400KB y el navegador pueda cachear cada vendor por
-      // separado entre despliegues.
       cssCodeSplit: true,
       sourcemap: false,
       reportCompressedSize: false,
@@ -87,47 +79,44 @@
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          // ── Estrategia de chunking por función ──
-          // Función en lugar de objeto para detectar también pantallas pesadas
-          // que se importan estáticamente desde varios sitios y aún así
-          // separarlas en chunks propios.
           manualChunks(id) {
-            // Vendors externos
             if (id.includes('node_modules')) {
-              if (id.includes('react-dom') || id.includes('/react/'))           return 'vendor-react';
-              if (id.includes('@radix-ui'))                                     return 'vendor-radix';
-              if (id.includes('recharts'))                                      return 'vendor-charts';
-              if (id.includes('quill'))                                         return 'vendor-editor';
-              if (id.includes('@monaco-editor'))                                return 'vendor-monaco';
-              if (id.includes('lucide-react'))                                  return 'vendor-icons';
-              if (id.includes('react-hook-form'))                               return 'vendor-form';
-              if (id.includes('sonner'))                                        return 'vendor-toast';
-              if (id.includes('xlsx'))                                          return 'vendor-xlsx';
-              if (id.includes('jointjs') || id.includes('mermaid'))             return 'vendor-diagrams';
-              if (id.includes('react-markdown') || id.includes('remark-'))      return 'vendor-markdown';
+              // SOLUCIÓN AL ERROR DE IMAGEN image_567ce2.png:
+              // Agrupamos React y dependencias esenciales para que siempre estén disponibles.
+              if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) {
+                return 'vendor-core';
+              }
+              if (id.includes('@radix-ui')) return 'vendor-radix';
+              if (id.includes('recharts')) return 'vendor-charts';
+              if (id.includes('quill')) return 'vendor-editor';
+              if (id.includes('@monaco-editor')) return 'vendor-monaco';
+              if (id.includes('lucide-react')) return 'vendor-icons';
+              if (id.includes('react-hook-form')) return 'vendor-form';
+              if (id.includes('sonner')) return 'vendor-toast';
+              if (id.includes('xlsx')) return 'vendor-xlsx';
+              if (id.includes('jointjs') || id.includes('mermaid')) return 'vendor-diagrams';
+              if (id.includes('react-markdown') || id.includes('remark-')) return 'vendor-markdown';
               return 'vendor-misc';
             }
-            // Pantallas pesadas del proyecto separadas en su propio chunk
-            // aunque sean importadas tanto estáticamente como vía lazy().
             if (id.includes('/components/')) {
-              if (id.includes('ContentManagementScreen'))         return 'screen-content';
-              if (id.includes('SequenceManagementScreen'))        return 'screen-sequence';
+              if (id.includes('ContentManagementScreen')) return 'screen-content';
+              if (id.includes('SequenceManagementScreen')) return 'screen-sequence';
               if (id.includes('SubtemaSequenceManagementScreen')) return 'screen-subtema-seq';
-              if (id.includes('SubThemeManagementScreen'))        return 'screen-subtheme';
-              if (id.includes('TemasManagementScreen'))           return 'screen-temas';
-              if (id.includes('AreasManagementScreen'))           return 'screen-areas';
-              if (id.includes('ExerciseManagementScreen'))        return 'screen-exercise';
-              if (id.includes('MiniproyectoManagementScreen'))    return 'screen-miniproyecto';
-              if (id.includes('ChatbotManagementScreen'))         return 'screen-chatbot';
-              if (id.includes('DocenteManagementScreen'))         return 'screen-docentes';
-              if (id.includes('AdminManagementScreen'))           return 'screen-admins';
-              if (id.includes('ProgrammingContentView'))          return 'screen-programming';
+              if (id.includes('SubThemeManagementScreen')) return 'screen-subtheme';
+              if (id.includes('TemasManagementScreen')) return 'screen-temas';
+              if (id.includes('AreasManagementScreen')) return 'screen-areas';
+              if (id.includes('ExerciseManagementScreen')) return 'screen-exercise';
+              if (id.includes('MiniproyectoManagementScreen')) return 'screen-miniproyecto';
+              if (id.includes('ChatbotManagementScreen')) return 'screen-chatbot';
+              if (id.includes('DocenteManagementScreen')) return 'screen-docentes';
+              if (id.includes('AdminManagementScreen')) return 'screen-admins';
+              if (id.includes('ProgrammingContentView')) return 'screen-programming';
               if (id.includes('UMLDiagramView') || id.includes('ClassDiagramEditor')) return 'screen-uml';
-              if (id.includes('TheoryContentView'))               return 'screen-theory';
+              if (id.includes('TheoryContentView')) return 'screen-theory';
               if (id.includes('ConfigurableMiniproyecto') || id.includes('CreateConfigurableMiniproyecto')) return 'screen-configurable';
-              if (id.includes('StudentUploadScreen'))             return 'screen-upload';
-              if (id.includes('ReportsScreen'))                   return 'screen-reports';
-              if (id.includes('StudentTrackingScreen'))           return 'screen-tracking';
+              if (id.includes('StudentUploadScreen')) return 'screen-upload';
+              if (id.includes('ReportsScreen')) return 'screen-reports';
+              if (id.includes('StudentTrackingScreen')) return 'screen-tracking';
             }
           },
         },
@@ -154,4 +143,4 @@
       },
     },
   };
-  });
+});
