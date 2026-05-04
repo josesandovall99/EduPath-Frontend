@@ -4,5 +4,6 @@
 
 // Backend local para desarrollo.
 // Para volver al servidor, cambia este valor a: http://192.168.3.21:4000
-export const API_BASE_URL = 'http://localhost:4000';
+//Para probar en local, cambia este valor a: http://localhost:4000
+export const API_BASE_URL = 'http://192.168.3.21:4000';
 export const API_PROXY_TARGET = API_BASE_URL;
