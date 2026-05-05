@@ -22,7 +22,7 @@ interface ContentManagementScreenProps {
 interface ContentItem {
   id: string;
   title: string;
-  type: 'video' | 'document' | 'activity';
+  type: 'video' | 'document' | 'activity' | 'explicacion';
   linkedTo: 'theme' | 'subtheme';
   linkedName: string;
   subject: string;
@@ -38,7 +38,7 @@ interface ContentItem {
 
 interface CreateContentFormData {
   titulo: string;
-  tipo: 'video' | 'document' | 'activity';
+  tipo: 'video' | 'document' | 'activity' | 'explicacion';
   descripcion: string;
   url: string;
   tema_id: string;
@@ -84,8 +84,12 @@ const normalizeContentType = (value: unknown): ContentItem['type'] => {
     return 'document';
   }
 
-  if (normalized === 'activity' || normalized === 'actividad' || normalized === 'explicacion' || normalized === 'explicación') {
+  if (normalized === 'activity' || normalized === 'actividad') {
     return 'activity';
+  }
+
+  if (normalized === 'explicacion' || normalized === 'explicación') {
+    return 'explicacion';
   }
 
   return 'activity';
@@ -136,6 +140,13 @@ export function ContentManagementScreen({
   const [selectedAreaId, setSelectedAreaId] = useState<string>(isFlowScoped ? scopeAreaId : '');
   const preserveAreaSelectionRef = useRef(false);
   const preserveTemaSelectionRef = useRef(false);
+
+  // Filtros de catálogo (solo aplican en modo catálogo)
+  const [filterAreaId, setFilterAreaId] = useState<string>('');
+  const [filterTemaId, setFilterTemaId] = useState<string>('');
+  const [filterSubtemaId, setFilterSubtemaId] = useState<string>('');
+  const [filterTemas, setFilterTemas] = useState<Tema[]>([]);
+  const [filterSubtemas, setFilterSubtemas] = useState<Subtema[]>([]);
   const isContentActive = (content: ContentItem) => content.estado !== false;
 
   const buildContenidosRequestUrl = () => {
@@ -211,6 +222,39 @@ export function ContentManagementScreen({
   useEffect(() => {
     loadContenidos();
   }, [scopeAreaId, scopeTemaId, scopeSubtemaId, isFlowScoped]);
+
+  // Cascada de filtros de catálogo
+  useEffect(() => {
+    setFilterTemaId('');
+    setFilterSubtemaId('');
+    setFilterSubtemas([]);
+    if (!isFlowScoped && filterAreaId) {
+      fetch(`${API_BASE_URL}/temas/por-area/${filterAreaId}`, {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
+      })
+        .then((r) => r.ok ? r.json() : [])
+        .then((data) => setFilterTemas(Array.isArray(data) ? data : []))
+        .catch(() => setFilterTemas([]));
+    } else {
+      setFilterTemas([]);
+    }
+  }, [filterAreaId]);
+
+  useEffect(() => {
+    setFilterSubtemaId('');
+    if (!isFlowScoped && filterTemaId) {
+      fetch(`${API_BASE_URL}/subtemas/por-tema/${filterTemaId}`, {
+        headers: buildAuthHeaders({ Accept: 'application/json' }),
+        credentials: 'include'
+      })
+        .then((r) => r.ok ? r.json() : [])
+        .then((data) => setFilterSubtemas(Array.isArray(data) ? data : []))
+        .catch(() => setFilterSubtemas([]));
+    } else {
+      setFilterSubtemas([]);
+    }
+  }, [filterTemaId]);
 
   // Cargar temas cuando cambia el área seleccionada
   useEffect(() => {
@@ -602,8 +646,11 @@ export function ContentManagementScreen({
       .join(' ')
       .toLowerCase()
       .includes(searchTerm.trim().toLowerCase());
+    const matchesFilterArea = !filterAreaId || String(content.area_id || '') === filterAreaId;
+    const matchesFilterTema = !filterTemaId || String(content.tema_id || '') === filterTemaId;
+    const matchesFilterSubtema = !filterSubtemaId || String(content.subtema_id || '') === filterSubtemaId;
 
-    return matchesType && matchesState && matchesSearch;
+    return matchesType && matchesState && matchesSearch && matchesFilterArea && matchesFilterTema && matchesFilterSubtema;
   });
 
   const selectedArea = areas.find((area) => String(area.id) === selectedAreaId);
@@ -646,6 +693,7 @@ export function ContentManagementScreen({
       case 'video': return PlayCircle;
       case 'document': return FileText;
       case 'activity': return Edit;
+      case 'explicacion': return Edit;
       default: return FileText;
     }
   };
@@ -655,6 +703,7 @@ export function ContentManagementScreen({
       case 'video': return '#4A90E2';
       case 'document': return '#7ED6A7';
       case 'activity': return '#F5A97F';
+      case 'explicacion': return '#F5A97F';
       default: return '#64748B';
     }
   };
@@ -719,7 +768,7 @@ export function ContentManagementScreen({
             </div>
           </div>
 
-          <div className="app-hero-layout app-hero-layout--wide-main">
+          <div className="app-hero-layout">
             <div className="app-toolbar-card">
               <div className="app-content-toolbar__header">
                 <div>
@@ -742,6 +791,57 @@ export function ContentManagementScreen({
                   className="app-form-input"
                 />
               </div>
+
+              {!isFlowScoped && (
+                <div className="app-content-filter-grid mt-4">
+                  <div className="app-content-filter-block">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Área</p>
+                    <p className="mt-1 text-sm text-slate-600">Filtra por área académica.</p>
+                    <select
+                      value={filterAreaId}
+                      onChange={(e) => setFilterAreaId(e.target.value)}
+                      className="app-form-select mt-3"
+                    >
+                      <option value="">Todas las áreas</option>
+                      {areas.map((area) => (
+                        <option key={area.id} value={area.id}>{area.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="app-content-filter-block">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Tema</p>
+                    <p className="mt-1 text-sm text-slate-600">Filtra por tema.</p>
+                    <select
+                      value={filterTemaId}
+                      onChange={(e) => setFilterTemaId(e.target.value)}
+                      className="app-form-select mt-3"
+                      disabled={!filterAreaId || filterTemas.length === 0}
+                    >
+                      <option value="">Todos los temas</option>
+                      {filterTemas.map((tema) => (
+                        <option key={tema.id} value={tema.id}>{tema.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="app-content-filter-block">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Subtema</p>
+                    <p className="mt-1 text-sm text-slate-600">Filtra por subtema.</p>
+                    <select
+                      value={filterSubtemaId}
+                      onChange={(e) => setFilterSubtemaId(e.target.value)}
+                      className="app-form-select mt-3"
+                      disabled={!filterTemaId || filterSubtemas.length === 0}
+                    >
+                      <option value="">Todos los subtemas</option>
+                      {filterSubtemas.map((subtema) => (
+                        <option key={subtema.id} value={subtema.id}>{subtema.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               <div className="app-content-filter-grid">
                 <div className="app-content-filter-block">
@@ -802,21 +902,6 @@ export function ContentManagementScreen({
               </div>
             </div>
 
-            <div className="app-sidebar-stack">
-              <div className="app-soft-card app-soft-card--blue">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {isFlowScoped ? 'Contexto del flujo' : 'Catálogo'}
-                </p>
-                <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">
-                  {isFlowScoped ? 'Ruta activa' : 'Gestión del catálogo'}
-                </h3>
-                <p className="mt-1 text-sm text-slate-600">
-                  {isFlowScoped
-                    ? `Mostrando únicamente los contenidos vinculados al ${flowScopeLabel}.`
-                    : 'Usa tipo, estado y búsqueda desde el mismo bloque para revisar el listado sin saltos visuales.'}
-                </p>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -886,7 +971,7 @@ export function ContentManagementScreen({
                       </td>
                       <td>
                         <span className="px-3 py-1 rounded-full text-sm" style={{ backgroundColor: `${color}15`, color }}>
-                          {content.type === 'video' ? 'Videos' : content.type === 'document' ? 'Documento' : 'Explicación'}
+                          {content.type === 'video' ? 'Video' : content.type === 'document' ? 'Documento' : 'Explicación'}
                         </span>
                       </td>
                       <td>{content.subject}</td>
@@ -1018,7 +1103,7 @@ export function ContentManagementScreen({
                         >
                           <option value="video">Videos</option>
                           <option value="document">Documento</option>
-                          <option value="activity">Explicación</option>
+                          <option value="explicacion">Explicación</option>
                         </select>
                       </div>
 
@@ -1069,6 +1154,7 @@ export function ContentManagementScreen({
                           onChange={(e) => setSelectedAreaId(e.target.value)}
                           className="app-form-select"
                           required
+                          disabled={isFlowScoped}
                         >
                           <option value="">Seleccione un área</option>
                           {areas.map((area) => (
@@ -1087,7 +1173,7 @@ export function ContentManagementScreen({
                           onChange={handleInputChange}
                           className="app-form-select"
                           required
-                          disabled={!selectedAreaId || temas.length === 0}
+                          disabled={isFlowScoped || !selectedAreaId || temas.length === 0}
                         >
                           <option value="">Seleccione un tema</option>
                           {temas.map((tema) => (
@@ -1109,7 +1195,7 @@ export function ContentManagementScreen({
                           onChange={handleInputChange}
                           className="app-form-select"
                           required
-                          disabled={!formData.tema_id || subtemas.length === 0}
+                          disabled={isFlowScoped || !formData.tema_id || subtemas.length === 0}
                         >
                           <option value="">Seleccione un subtema</option>
                           {subtemas.map((subtema) => (

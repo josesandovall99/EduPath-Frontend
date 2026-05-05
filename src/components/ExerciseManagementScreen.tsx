@@ -10,6 +10,7 @@ import { loadQuill, createQuillModules } from '../utils/quill';
 
 interface ExerciseManagementScreenProps {
   onBack: () => void;
+  onHome?: () => void;
   mode?: 'admin' | 'docente';
   docenteId?: number;
   docentePersonaId?: number;
@@ -1095,6 +1096,7 @@ function PreguntasConfig({ formData, setFormData }: { formData: ExerciseFormData
 
 export function ExerciseManagementScreen({
   onBack,
+  onHome,
   mode = 'admin',
   docenteId,
   docentePersonaId,
@@ -1906,9 +1908,11 @@ export function ExerciseManagementScreen({
         <div className="app-main py-4">
           <div className="app-page-header">
             <div className="app-brand-block">
-              <div className="app-brand-icon">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
+              <button type="button" onClick={onHome} title="Ir al panel principal">
+                <div className="app-brand-icon">
+                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                </div>
+              </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de ejercicios</h1>
                 <p className="text-sm text-slate-500">Catálogo, estado y edición dentro del mismo entorno administrativo.</p>

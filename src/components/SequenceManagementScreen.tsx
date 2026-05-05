@@ -27,7 +27,7 @@ interface Subtema {
 interface ContentItem {
   id: number;
   titulo: string;
-  tipo: 'video' | 'document' | 'activity';
+  tipo: 'video' | 'document' | 'activity' | 'explicacion';
   descripcion?: string;
   area_id?: number;
   tema_id?: number;
@@ -1276,7 +1276,18 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       case 'video': return '#4A90E2';
       case 'document': return '#7ED6A7';
       case 'activity': return '#F5A97F';
+      case 'explicacion': return '#F5A97F';
       default: return '#999';
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'video': return 'Video';
+      case 'document': return 'Documento';
+      case 'explicacion': return 'Explicación';
+      case 'activity': return 'Actividad';
+      default: return type;
     }
   };
 
@@ -1606,7 +1617,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                                 className="app-sequence-node__type"
                                 style={{ backgroundColor: getTypeColor(contenido?.tipo || '') }}
                               >
-                                {contenido?.tipo === 'video' ? 'Video' : contenido?.tipo === 'document' ? 'Documento' : contenido?.tipo === 'activity' ? 'Actividad' : 'Contenido'}
+                                {contenido?.tipo === 'video' ? 'Video' : contenido?.tipo === 'document' ? 'Documento' : contenido?.tipo === 'explicacion' ? 'Explicación' : contenido?.tipo === 'activity' ? 'Actividad' : 'Contenido'}
                               </span>
                               <span className="app-sequence-node__title">{contenido?.titulo || 'N/A'}</span>
                             </div>
@@ -1866,7 +1877,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   <option value="">Seleccionar contenido de origen</option>
                   {getAvailableOriginModalContents().map(c => (
                     <option key={c.id} value={c.id}>
-                      {c.titulo} ({c.tipo})
+                      {c.titulo} ({getTypeLabel(c.tipo)})
                     </option>
                   ))}
                 </select>
@@ -1894,7 +1905,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                   <option value="">Seleccionar contenido de destino</option>
                   {getAvailableDestinationModalContents().map(c => (
                     <option key={c.id} value={c.id}>
-                      {c.titulo} ({c.tipo})
+                      {c.titulo} ({getTypeLabel(c.tipo)})
                     </option>
                   ))}
                 </select>

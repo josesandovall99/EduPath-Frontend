@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../utils/constants';
 
 interface AdminManagementScreenProps {
   onBack: () => void;
+  onHome?: () => void;
 }
 
 interface AdminFormData {
@@ -17,7 +18,7 @@ const emptyForm: AdminFormData = {
   email: '',
 };
 
-export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
+export function AdminManagementScreen({ onBack, onHome }: AdminManagementScreenProps) {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState<AdminFormData>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
@@ -100,9 +101,11 @@ export function AdminManagementScreen({ onBack }: AdminManagementScreenProps) {
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="app-page-header">
             <div className="app-brand-block">
-              <div className="app-brand-icon">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
+              <button type="button" onClick={onHome} title="Ir al panel principal">
+                <div className="app-brand-icon">
+                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                </div>
+              </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de administradores</h1>
                 <p className="text-gray-500 text-sm">Panel de Administrador - EduPath</p>

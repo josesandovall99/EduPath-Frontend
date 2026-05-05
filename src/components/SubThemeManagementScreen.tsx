@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Code, Database, BarChart3, Eye, EyeOff, ChevronUp, ChevronDown, ToggleLeft, ToggleRight, Plus, Edit2, Search, X } from 'lucide-react';
 import axios from 'axios';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { AdminFlowGuide } from './ui/AdminFlowGuide';
 import { API_BASE_URL } from '../utils/constants';
+import { createQuillModules, loadQuill } from '../utils/quill';
 
 interface SubThemeManagementScreenProps {
   onBack: () => void;
@@ -76,6 +77,53 @@ export function SubThemeManagementScreen({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const isDocenteMode = mode === 'docente';
   const isSubtemaActive = (subtema: Subtema) => subtema.estado !== false;
+
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const quillRef = useRef<any>(null);
+
+  // Initialize Quill when modal opens
+  useEffect(() => {
+    let cancelled = false;
+
+    const destroyEditor = () => {
+      if (editorRef.current) editorRef.current.innerHTML = '';
+      quillRef.current = null;
+    };
+
+    if (!showModal) {
+      destroyEditor();
+      return undefined;
+    }
+
+    const initialHtml = editingSubtema ? (editingSubtema.descripcion || '') : '';
+
+    const initializeQuill = async () => {
+      if (!editorRef.current) return;
+      const Quill = await loadQuill();
+      if (cancelled || !editorRef.current) return;
+      if (quillRef.current) {
+        quillRef.current.root.innerHTML = initialHtml;
+        return;
+      }
+      editorRef.current.innerHTML = '';
+      quillRef.current = new Quill(editorRef.current, {
+        theme: 'snow',
+        placeholder: 'Descripción del subtema',
+        modules: createQuillModules()
+      });
+      quillRef.current.root.innerHTML = initialHtml;
+      setFormData((prev) => ({ ...prev, descripcion: initialHtml }));
+      quillRef.current.on('text-change', () => {
+        setFormData((prev) => ({ ...prev, descripcion: quillRef.current.root.innerHTML }));
+      });
+    };
+
+    initializeQuill();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showModal, editingSubtema]);
 
   // Cargar áreas del backend
   useEffect(() => {
@@ -669,7 +717,7 @@ export function SubThemeManagementScreen({
               <div className="app-page-hero__content">
                 <div className="app-page-hero__copy">
                   <div className="app-page-hero__eyebrow">Subtemas</div>
-                  <h2 className="app-page-hero__title">{currentTemaObj?.nombre || 'Tema seleccionado'}</h2>
+                  <h2 className="app-page-hero__title">Gestión de subtemas</h2>
                   <p className="app-page-hero__description">Gestiona los subtemas del tema seleccionado.</p>
                 </div>
               </div>
@@ -816,7 +864,7 @@ export function SubThemeManagementScreen({
                     </div>
                     <div className="min-w-0">
                       <h4 className="app-list-card__title app-subtema-catalog-card__title">{subtema.nombre}</h4>
-                      <p className="app-list-card__description app-subtema-catalog-card__description">{subtema.descripcion || 'Sin descripción registrada.'}</p>
+                      <p className="app-list-card__description app-subtema-catalog-card__description quill-render" dangerouslySetInnerHTML={{ __html: subtema.descripcion || 'Sin descripción registrada.' }} />
                     </div>
                   </div>
                 ))}
@@ -860,13 +908,13 @@ export function SubThemeManagementScreen({
 
                   <div className="app-form-field">
                     <label className="app-form-label">Descripción</label>
-                    <textarea
-                      value={formData.descripcion}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, descripcion: event.target.value }))}
-                      rows={4}
-                      className="app-form-textarea"
-                      placeholder="Descripción del subtema"
-                    />
+                    <div className="quill-editor-container app-rich-text-editor">
+                      <div
+                        ref={editorRef}
+                        className="w-full"
+                        data-placeholder="Descripción del subtema"
+                      />
+                    </div>
                   </div>
 
                   <div className="app-form-field">

@@ -21,6 +21,7 @@ import {
 
 interface MiniproyectoManagementScreenProps {
   onBack: () => void;
+  onHome?: () => void;
   mode?: 'admin' | 'docente';
   docenteId?: number;
   docentePersonaId?: number;
@@ -135,6 +136,7 @@ function normalizeCompilerCases(rawCases: unknown, fallbackOutput = ''): Compile
 
 export function MiniproyectoManagementScreen({
   onBack,
+  onHome,
   mode = 'admin',
   docenteId,
   docentePersonaId,
@@ -1066,9 +1068,11 @@ export function MiniproyectoManagementScreen({
         <div className="app-main py-4">
           <div className="app-page-header">
             <div className="app-brand-block">
-              <div className="app-brand-icon">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
+              <button type="button" onClick={onHome} title="Ir al panel principal">
+                <div className="app-brand-icon">
+                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                </div>
+              </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Miniproyectos</h1>
                 <p className="text-gray-500 text-sm">Listado, edición y seguimiento dentro del mismo lenguaje visual del panel.</p>

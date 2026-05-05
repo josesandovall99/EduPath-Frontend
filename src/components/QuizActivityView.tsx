@@ -5,6 +5,7 @@ import { submitExercise } from '../utils/submitExercise';
 
 interface QuizActivityViewProps {
   subjectName: string;
+  onHome?: () => void;
   activity: {
     id: string;
     title: string;
@@ -20,7 +21,7 @@ const subjectColors: Record<string, string> = {
   'Fundamentos de Programación': '#4A90E2'
 };
 
-export function QuizActivityView({ subjectName, activity, onBack, onComplete }: QuizActivityViewProps) {
+export function QuizActivityView({ subjectName, activity, onBack, onHome, onComplete }: QuizActivityViewProps) {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [expandedModule, setExpandedModule] = useState(true);
@@ -167,9 +168,9 @@ export function QuizActivityView({ subjectName, activity, onBack, onComplete }: 
           <div className="px-8 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+                <button type="button" onClick={onHome} title="Ir al panel principal" className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
                   <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-                </div>
+                </button>
                 <div>
                   <h1 className="text-[#3A4A5B]">{subjectName}</h1>
                   <p className="text-gray-500 text-sm">{activity.title}</p>
@@ -192,14 +193,6 @@ export function QuizActivityView({ subjectName, activity, onBack, onComplete }: 
         {/* Main Quiz Content */}
         <div className="flex-1 overflow-y-auto bg-[#F2F2F2] p-8">
           <div className="max-w-3xl mx-auto">
-            {/* Back Button */}
-            <button 
-              onClick={onBack}
-              className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-              <span>Volver</span>
-            </button>
-
             {/* Question Card */}
             <div className="rounded-2xl border border-gray-200 bg-white p-8 mb-6 shadow-md">
               <div className="mb-6">
@@ -295,12 +288,17 @@ export function QuizActivityView({ subjectName, activity, onBack, onComplete }: 
 
             {/* Navigation Buttons */}
             <div className="flex gap-4 mt-6">
-              <button className="flex-1 flex items-center justify-center gap-2 border-2 border-gray-300 py-3 rounded-xl bg-white hover:bg-gray-50 transition-colors">
+              <button
+                onClick={onBack}
+                className="flex-1 flex items-center justify-center gap-2 border-2 border-gray-300 py-3 rounded-xl bg-white hover:bg-gray-50 transition-colors"
+              >
                 <SkipBack className="w-4 h-4 text-gray-600" />
                 <span className="text-gray-700">Anterior</span>
               </button>
-              <button 
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white shadow-md hover:shadow-lg transition-all"
+              <button
+                onClick={() => aprobado && onComplete?.()}
+                disabled={!aprobado}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ backgroundColor: subjectColor }}
               >
                 <span>Siguiente</span>

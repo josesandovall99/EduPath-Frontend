@@ -631,7 +631,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'miniproyectos') {
     return (
       <Suspense fallback={<ScreenLoader />}>
-        <MiniproyectoManagementScreen onBack={goBack} />
+        <MiniproyectoManagementScreen onBack={goBack} onHome={goHome} />
       </Suspense>
     );
   }
@@ -639,7 +639,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'ejercicios') {
     return (
       <Suspense fallback={<ScreenLoader />}>
-        <ExerciseManagementScreen onBack={goBack} />
+        <ExerciseManagementScreen onBack={goBack} onHome={goHome} />
       </Suspense>
     );
   }
@@ -655,7 +655,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'docentes') {
     return (
       <Suspense fallback={<ScreenLoader />}>
-        <DocenteManagementScreen onBack={goBack} />
+        <DocenteManagementScreen onBack={goBack} onHome={goHome} />
       </Suspense>
     );
   }
@@ -663,7 +663,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'administradores') {
     return (
       <Suspense fallback={<ScreenLoader />}>
-        <AdminManagementScreen onBack={goBack} />
+        <AdminManagementScreen onBack={goBack} onHome={goHome} />
       </Suspense>
     );
   }

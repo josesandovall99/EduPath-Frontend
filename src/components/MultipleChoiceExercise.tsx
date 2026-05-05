@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { submitExercise } from '../utils/submitExercise';
 
@@ -71,10 +72,16 @@ export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la op
   };
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-md">
-      <div className="mb-4 flex items-center justify-between">
+    <div>
+      {!embedded && (
+        <button onClick={onBack} className="app-back-button mb-6">
+          <ArrowLeft className="w-4 h-4" />
+          <span>Volver</span>
+        </button>
+      )}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-md">
+      <div className="mb-4">
         <h3 className="text-[#3A4A5B] font-semibold">{activity.title}</h3>
-        {!embedded ? <button onClick={onBack} className="text-sm text-gray-600 hover:text-[#3A4A5B]">Volver</button> : null}
       </div>
       {/* El enunciado puede llegar en HTML enriquecido (Quill) — se renderiza
           procesado para preservar formato (negritas, listas, colores). */}
@@ -116,6 +123,7 @@ export function MultipleChoiceExercise({ activity, enunciado = 'Selecciona la op
           {puntos !== null && <div className="mt-1 text-blue-600">Puntos: {puntos}</div>}
         </div>
       )}
+    </div>
     </div>
   );
 }

@@ -1013,7 +1013,7 @@ export function ProgrammingContentView({ content, onBack, onComplete, embedded =
 
       <div className={workspaceClassName}>
         {!embedded && (
-          <button onClick={onBack} className="mb-1 flex items-center gap-2 text-gray-600 transition-colors hover:text-[#3A4A5B]">
+          <button onClick={onBack} className="app-back-button mb-6">
             <ArrowLeft className="h-4 w-4" />
             <span>Volver</span>
           </button>

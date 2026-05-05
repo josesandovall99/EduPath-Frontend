@@ -167,6 +167,7 @@ interface Ejercicio {
 
 interface TheoryContentViewProps {
   subjectName: string;
+  onHome?: () => void;
   content: {
     id: string;
     title: string;
@@ -279,7 +280,7 @@ const isDirectVideoUrl = (rawUrl?: string): boolean => {
 // Función para ordenar subtemas basado en secuencias
 const orderSubtemasBySequence = (subtemas: any[], sequences: any[]): any[] => {
   if (!Array.isArray(sequences) || sequences.length === 0) {
-    return subtemas;
+    return [];
   }
 
   // Crear un mapa de secuencias
@@ -337,19 +338,12 @@ const orderSubtemasBySequence = (subtemas: any[], sequences: any[]): any[] => {
   // Procesar cadenas iniciales
   initialSubtemas.forEach(id => addToChain(id));
 
-  // Agregar subtemas no visitados al final
-  subtemas.forEach(s => {
-    if (!visited.has(s.id)) {
-      ordered.push(s);
-    }
-  });
-
   return ordered;
 };
 
 
 
-export function TheoryContentView({ subjectName, content, temaId, onBack, onContentChange, estudianteId }: TheoryContentViewProps) {
+export function TheoryContentView({ subjectName, content, temaId, onBack, onHome, onContentChange, estudianteId }: TheoryContentViewProps) {
 
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(false);
@@ -742,7 +736,8 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
             console.log('Subtemas ordenados por secuencia:', subtemas);
           }
         } catch (err) {
-          console.warn('Error cargando secuencias, usando orden original:', err);
+          console.warn('Error cargando secuencias, ocultando subtemas no secuenciados:', err);
+          subtemas = [];
         }
 
         // Transform subtemas to modules format - incluir estado de desbloqueo
@@ -1230,9 +1225,9 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
           <div className="px-8 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
+                <button type="button" onClick={onHome} title="Ir al panel principal" className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
                   <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-                </div>
+                </button>
                 <div>
                   <h1 className="text-[#3A4A5B]">{subjectName}</h1>
                   <p className="text-gray-500 text-sm">{content.title}</p>
@@ -1256,11 +1251,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#F2F2F2] p-8">
           <div className="mx-auto w-full max-w-[1500px]">
-            {/* Back Button */}
-            <button 
-              onClick={onBack}
-              className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
-            >
+            <button onClick={onBack} className="app-back-button mb-6">
               <ArrowLeft className="w-4 h-4" />
               <span>Volver</span>
             </button>
@@ -1315,6 +1306,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     opciones={Array.isArray(ejercicioAsociado.configuracion?.opciones) ? ejercicioAsociado.configuracion?.opciones : undefined}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
+                    embedded={true}
                   />
                 )}
 
@@ -1325,6 +1317,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     items={Array.isArray(ejercicioAsociado.configuracion?.items) ? ejercicioAsociado.configuracion?.items : undefined}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
+                    embedded={true}
                   />
                 )}
 
@@ -1335,6 +1328,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onCont
                     pares={Array.isArray(ejercicioAsociado.configuracion?.pares) ? ejercicioAsociado.configuracion?.pares : undefined}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
+                    embedded={true}
                   />
                 )}
               </div>

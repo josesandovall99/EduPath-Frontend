@@ -804,6 +804,7 @@ export default function App() {
             content={selectedContent}
             temaId={selectedTemaId || undefined}
             onBack={handleBackToSubject}
+            onHome={handleBackToDashboard}
             estudianteId={userSession.id}
           />
           <ChatbotButton areaId={selectedContent.areaId ?? Number(selectedSubject.id)} contextLabel={selectedContent.title} />
@@ -816,6 +817,7 @@ export default function App() {
             subjectName={selectedSubject.name}
             activity={selectedContent}
             onBack={handleBackToSubject}
+            onHome={handleBackToDashboard}
           />
           <ChatbotButton areaId={selectedContent.areaId ?? Number(selectedSubject.id)} contextLabel={selectedContent.title} />
         </>

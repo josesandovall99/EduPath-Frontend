@@ -815,7 +815,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                                 ></div>
                                 <div>
                                   <span className="text-[#3A4A5B] font-medium">{subtema.nombre}</span>
-                                  <p className="text-gray-500 text-xs mt-0.5">{subtema.descripcion}</p>
+                                  <p className="text-gray-500 text-xs mt-0.5 quill-render" dangerouslySetInnerHTML={{ __html: subtema.descripcion || '' }} />
                                 </div>
                               </div>
                             </div>

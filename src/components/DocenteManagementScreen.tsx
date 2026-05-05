@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../utils/constants';
 
 interface DocenteManagementScreenProps {
   onBack: () => void;
+  onHome?: () => void;
 }
 
 interface Area {
@@ -65,7 +66,7 @@ const stateFilterButtonClass = (tone: 'all' | 'active' | 'inactive', selected: b
   return 'app-filter-chip';
 };
 
-export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps) {
+export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScreenProps) {
   const [docentes, setDocentes] = useState<Docente[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [loading, setLoading] = useState(true);
@@ -352,9 +353,11 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
         <div className="app-main py-4">
           <div className="app-page-header">
             <div className="app-brand-block">
-              <div className="app-brand-icon">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-              </div>
+              <button type="button" onClick={onHome} title="Ir al panel principal">
+                <div className="app-brand-icon">
+                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                </div>
+              </button>
               <div>
                 <h1 className="text-[#3A4A5B]">Gestión de Docentes</h1>
                 <p className="text-gray-500 text-sm">Equipo docente, áreas y estado operativo bajo el mismo lenguaje del panel.</p>
@@ -571,7 +574,6 @@ export function DocenteManagementScreen({ onBack }: DocenteManagementScreenProps
                           </div>
                           <div>
                             <div className={docenteIsActive ? 'text-[#3A4A5B]' : 'text-slate-500'}>{docente.persona?.nombre || 'Sin nombre'}</div>
-                            <div className="text-xs text-gray-400">ID #{docente.id}</div>
                           </div>
                         </div>
                       </td>
