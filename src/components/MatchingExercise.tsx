@@ -117,7 +117,10 @@ export function MatchingExercise({ activity, enunciado = 'Relaciona cada concept
         <h3 className="text-[#3A4A5B] font-semibold">{activity.title}</h3>
         {!embedded ? <button onClick={onBack} className="text-sm text-gray-600 hover:text-[#3A4A5B]">Volver</button> : null}
       </div>
-      <p className="text-gray-700 mb-4">{enunciado}</p>
+      <div
+        className="html-content text-gray-700 mb-4"
+        dangerouslySetInnerHTML={{ __html: enunciado }}
+      />
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
           {left.map((p, idx) => (

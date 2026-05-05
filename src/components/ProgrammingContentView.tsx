@@ -1034,7 +1034,22 @@ export function ProgrammingContentView({ content, onBack, onComplete, embedded =
               </div>
             </div>
           </div>
-          <p className="mt-4 border-t border-slate-100 pt-4 text-[14px] leading-6 text-gray-600">{ejercicio?.actividad?.descripcion || 'Sin descripcion disponible.'}</p>
+          {/*
+            La descripción se almacena como HTML enriquecido (Quill).
+            Se renderiza con `dangerouslySetInnerHTML` para preservar formato
+            (negritas, colores, listas). El contenido proviene del docente
+            autenticado y pasa por el sanitizador del backend, por lo que es
+            seguro inyectarlo aquí. La clase `html-content` aporta estilos
+            tipográficos consistentes definidos en `index.html`.
+          */}
+          {ejercicio?.actividad?.descripcion ? (
+            <div
+              className="html-content mt-4 border-t border-slate-100 pt-4 text-[14px] leading-6 text-gray-600"
+              dangerouslySetInnerHTML={{ __html: ejercicio.actividad.descripcion }}
+            />
+          ) : (
+            <p className="mt-4 border-t border-slate-100 pt-4 text-[14px] leading-6 text-gray-600">Sin descripción disponible.</p>
+          )}
         </section>
 
         <section className="grid grid-cols-1 gap-5">

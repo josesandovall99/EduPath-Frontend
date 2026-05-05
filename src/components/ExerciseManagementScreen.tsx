@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Plus, Edit, Eye, EyeOff, Search, Loader, Trash2, AlertCircle, Lock, Info } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ArrowLeft, Plus, Edit, Eye, EyeOff, Search, Loader, Trash2, AlertCircle, Lock } from 'lucide-react';
 import { JavaEditor } from './JavaEditor';
 import { CONSOLA_IO_SOURCE } from '../utils/consolaIOSource';
 import { toast } from 'sonner';
@@ -153,7 +154,6 @@ const SYNTAX_GROUPS = [
       { key: 'if',      label: 'if / else' },
       { key: 'else if', label: 'else if' },
       { key: 'switch',  label: 'switch / case' },
-      { key: 'ternary', label: 'Ternario (? :)' },
     ],
   },
   {
@@ -185,12 +185,171 @@ const SYNTAX_GROUPS = [
   },
 ] as const;
 
-const GROUP_BADGE: Record<string, string> = {
-  violet: 'bg-violet-100 text-violet-700 border-violet-200',
-  sky:    'bg-sky-100 text-sky-700 border-sky-200',
-  rose:   'bg-rose-100 text-rose-700 border-rose-200',
-  amber:  'bg-amber-100 text-amber-700 border-amber-200',
+/**
+ * Paleta literal por grupo. Se usa con `style={{ backgroundColor }}` para evitar
+ * que Tailwind purgue las clases dinámicas y los chips queden invisibles.
+ */
+const SYNTAX_GROUP_HEX: Record<string, { active: string; dot: string }> = {
+  violet: { active: '#8b5cf6', dot: '#a78bfa' },
+  sky:    { active: '#0ea5e9', dot: '#38bdf8' },
+  rose:   { active: '#f43f5e', dot: '#fb7185' },
+  amber:  { active: '#f59e0b', dot: '#fbbf24' },
 };
+
+/**
+ * Tooltip controlado por click. El texto solo aparece tras pulsar el ícono `i`,
+ * y se cierra automáticamente al hacer click fuera. No depende de librerías
+ * externas ni de named-groups de Tailwind.
+ */
+/**
+ * Tooltip controlado por click.
+ *
+ * El popover se renderiza vía `createPortal` directamente sobre `document.body`.
+ * Esto lo libera de cualquier ancestro con `overflow: hidden / auto` (modal,
+ * tarjetas, scroll containers) que de otro modo lo recortaría. Su posición se
+ * recalcula a partir del rectángulo del ícono y se acota a los márgenes del
+ * viewport para que nunca quede fuera de pantalla.
+ *
+ * Cierre: click fuera del wrapper o tecla `Escape`.
+ */
+/**
+ * Tooltip controlado por click.
+ *
+ * Se renderiza vía `createPortal` directamente sobre `document.body`, lo que
+ * lo libera de cualquier ancestro con `overflow: hidden / auto` (modal,
+ * tarjetas, scroll containers) que de otro modo lo recortaría. La posición
+ * (`fixed`) se calcula SÍNCRONAMENTE al hacer click, antes de cambiar
+ * `open` a true, para garantizar que el primer render del popover ya esté
+ * en su posición final. Se mantiene un listener de scroll/resize que
+ * recalcula coords mientras está abierto. Se cierra con click fuera o
+ * tecla `Escape`.
+ */
+function InfoTooltip({ text, className = '' }: { text: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 256 });
+  const wrapperRef = useRef<HTMLSpanElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Calcula la posición del popover relativa al viewport (`fixed`).
+   * El popover se centra horizontalmente bajo el ícono y se recorta a los
+   * márgenes del viewport (16 px a cada lado) para nunca salirse.
+   */
+  const computeCoords = () => {
+    if (!wrapperRef.current) return null;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const desiredWidth = 260;
+    const width = Math.min(desiredWidth, window.innerWidth - 32);
+    let left = rect.left + rect.width / 2 - width / 2;
+    if (left + width > window.innerWidth - 16) left = window.innerWidth - width - 16;
+    if (left < 16) left = 16;
+    const top = rect.bottom + 8;
+    return { top, left, width };
+  };
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleDocClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const insideWrapper = wrapperRef.current?.contains(target);
+      const insidePopover = popoverRef.current?.contains(target);
+      if (!insideWrapper && !insidePopover) setOpen(false);
+    };
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    const handleScrollOrResize = () => {
+      const next = computeCoords();
+      if (next) setCoords(next);
+    };
+
+    document.addEventListener('mousedown', handleDocClick);
+    document.addEventListener('keydown', handleEsc);
+    window.addEventListener('resize', handleScrollOrResize);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    return () => {
+      document.removeEventListener('mousedown', handleDocClick);
+      document.removeEventListener('keydown', handleEsc);
+      window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+    };
+  }, [open]);
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!open) {
+      const next = computeCoords();
+      if (next) setCoords(next);
+    }
+    setOpen((prev) => !prev);
+  };
+
+  return (
+    <span ref={wrapperRef} className={`relative inline-flex items-center align-middle ${className}`}>
+      <button
+        type="button"
+        aria-label="Mostrar información"
+        aria-expanded={open}
+        onClick={handleToggle}
+        // Dimensiones y padding garantizados por inline-style: el reset CSS
+        // global (`*{padding:0}`) y el purgado de utilities arbitrarias en
+        // Tailwind v4 hacían colapsar el botón a tamaño cero.
+        style={{
+          width: 18,
+          height: 18,
+          minWidth: 18,
+          minHeight: 18,
+          padding: 0,
+          fontSize: 10,
+          lineHeight: 1,
+          fontWeight: 700,
+          borderRadius: 9999,
+          borderWidth: 1,
+          borderStyle: 'solid',
+          backgroundColor: open ? '#4A90E2' : '#ffffff',
+          borderColor: open ? '#4A90E2' : '#cbd5e1',
+          color: open ? '#ffffff' : '#64748b',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        i
+      </button>
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popoverRef}
+          role="tooltip"
+          // Estilos críticos por inline-style: el popover queda DENTRO del
+          // body fuera del modal, así que nunca se recorta por overflow:auto.
+          // Z-index alto y sombra directa para máxima visibilidad.
+          style={{
+            position: 'fixed',
+            top: coords.top,
+            left: coords.left,
+            width: coords.width,
+            zIndex: 9999,
+            backgroundColor: '#1e293b',
+            color: '#ffffff',
+            padding: '10px 14px',
+            borderRadius: 10,
+            fontSize: 12,
+            lineHeight: 1.5,
+            fontWeight: 400,
+            boxShadow: '0 10px 25px rgba(15,23,42,0.35), 0 0 0 1px rgba(15,23,42,0.5)',
+            pointerEvents: 'auto',
+          }}
+        >
+          {text}
+        </div>,
+        document.body,
+      )}
+    </span>
+  );
+}
 
 // Componente para configuración de Compilador
 function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormData; setFormData: React.Dispatch<React.SetStateAction<ExerciseFormData>> }) {
@@ -228,7 +387,7 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
   };
 
   return (
-    <div className="space-y-6 p-5 lg:p-6 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
+    <div className="w-full space-y-6 p-3 sm:p-4 lg:p-5 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div>
@@ -293,102 +452,174 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
         </p>
       </div>
 
-      {/* Restricciones de sintaxis */}
+      {/* ── Restricciones de sintaxis: chips planos por grupo ─────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <label className="block text-xs font-semibold text-[#3A4A5B]">Estructuras obligatorias</label>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              El alumno debe usar estas estructuras en su código real — los comentarios (<code className="font-mono">// for</code>) no cuentan.
-            </p>
+        <div className="flex items-center justify-between mb-4 h-6">
+          <div className="flex items-center" style={{ gap: 10 }}>
+            <label className="text-xs font-semibold text-[#3A4A5B] leading-none">Estructuras obligatorias</label>
+            <InfoTooltip text="El alumno debe usar estas estructuras en su código real. Los comentarios (// for) no cuentan." />
           </div>
           {sintaxis.length > 0 && (
             <button
               type="button"
               onClick={() => updateCfg({ sintaxis: [] })}
-              className="text-[11px] text-slate-400 hover:text-rose-500 transition-colors"
+              className="text-[11px] font-semibold text-slate-500 hover:text-rose-500 transition-colors"
             >
-              Limpiar todo
+              Limpiar todo ({sintaxis.length})
             </button>
           )}
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {SYNTAX_GROUPS.map((group) => (
-            <div key={group.group} className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm space-y-2">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{group.group}</div>
-              {group.items.map((item) => {
-                const checked = sintaxis.includes(item.key);
-                return (
-                  <label key={item.key} className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleSyntax(item.key)}
-                      className="h-3.5 w-3.5 rounded text-[#4A90E2] border-slate-300 cursor-pointer"
-                    />
-                    <span className={`text-[11px] font-mono transition-colors ${checked ? 'text-[#3A4A5B] font-semibold' : 'text-slate-500 group-hover:text-slate-700'}`}>
-                      {item.label}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          ))}
+        <div className="rounded-xl bg-white border border-slate-200 shadow-sm divide-y divide-slate-100">
+          {SYNTAX_GROUPS.map((group) => {
+            const palette = SYNTAX_GROUP_HEX[group.color];
+            return (
+              <div
+                key={group.group}
+                // Grid de 2 columnas: label de grupo (fixed) + chips (resto).
+                // Garantiza alineación vertical de los títulos y separación.
+                className="grid items-center gap-x-5 gap-y-2"
+                style={{
+                  gridTemplateColumns: '140px 1fr',
+                  padding: '14px 18px',
+                }}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span style={{ width: 10, height: 10, borderRadius: 9999, backgroundColor: palette.dot, flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#475569' }}>
+                    {group.group}
+                  </span>
+                </div>
+                <div className="flex flex-wrap" style={{ gap: 8 }}>
+                  {group.items.map((item) => {
+                    const checked = sintaxis.includes(item.key);
+                    // Estilos garantizados por inline-style: padding y borde
+                    // inmunes al reset global y al purgado de Tailwind v4.
+                    const chipStyle: React.CSSProperties = {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 14px',
+                      borderRadius: 9999,
+                      borderWidth: 1,
+                      borderStyle: 'solid',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                      cursor: 'pointer',
+                      transition: 'transform .15s ease, box-shadow .15s ease',
+                      lineHeight: 1.2,
+                      ...(checked
+                        ? {
+                            backgroundColor: palette.active,
+                            borderColor: palette.active,
+                            color: '#ffffff',
+                            boxShadow: `0 2px 6px ${palette.active}55`,
+                          }
+                        : {
+                            backgroundColor: '#f8fafc',
+                            borderColor: '#e2e8f0',
+                            color: '#475569',
+                          }),
+                    };
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => toggleSyntax(item.key)}
+                        style={chipStyle}
+                      >
+                        {checked && <span aria-hidden="true">✓</span>}
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
-
-        {sintaxis.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {sintaxis.map((s) => {
-              const group = SYNTAX_GROUPS.find((g) => g.items.some((i) => i.key === s));
-              const badgeClass = group ? GROUP_BADGE[group.color] : 'bg-slate-100 text-slate-700 border-slate-200';
-              return (
-                <span key={s} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-mono font-semibold ${badgeClass}`}>
-                  {s}
-                  <button type="button" onClick={() => toggleSyntax(s)} className="ml-0.5 opacity-60 hover:opacity-100">×</button>
-                </span>
-              );
-            })}
-          </div>
-        )}
       </div>
 
-      {/* Casos de prueba */}
-      <div>
-        <label className="block text-xs font-semibold text-[#3A4A5B] mb-1">Casos de prueba obligatorios *</label>
-        <p className="text-[11px] text-slate-400 mb-3">
-          Inputs separados por coma (ej: <code className="font-mono text-[11px]">Juan,4.0,3.0</code>). El programa se ejecuta una vez por caso con esos valores como stdin.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ── Casos de prueba: ocupan ancho completo, grid responsive ─────── */}
+      <div className="w-full">
+        <div className="flex items-center justify-between mb-4 h-6">
+          <div className="flex items-center" style={{ gap: 10 }}>
+            <label className="text-xs font-semibold text-[#3A4A5B] leading-none">Casos de prueba obligatorios *</label>
+            <InfoTooltip text="Cada caso ejecuta el programa una vez. En 'Inputs' escribe los valores separados por coma (ej: Juan,4.0,3.0). En 'Output esperado' incluye una línea por cada println del programa." />
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-none">3 casos · obligatorios</span>
+        </div>
+        <div className="grid w-full grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4">
           {[0, 1, 2].map((index) => {
             const caso = casosPrueba[index] || emptyCompilerCase();
             return (
-              <div key={index} className="space-y-3 bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                <div className="flex items-center justify-between">
+              <div key={index} className="flex w-full h-full flex-col rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+                {/* Header — altura generosa, separador inferior y bandeja sutil. */}
+                <div
+                  className="flex items-center justify-between border-b border-slate-200 bg-slate-50"
+                  style={{ padding: '12px 18px' }}
+                >
                   <span className="text-xs font-bold uppercase tracking-wider text-[#3A4A5B]">Caso {index + 1}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-mono text-slate-500">stdin</span>
+                  <span className="text-[10px] font-mono text-slate-400">#{index + 1} / 3</span>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Inputs (stdin)</label>
-                  <input
-                    type="text"
-                    value={caso.inputs || ''}
-                    onChange={(e) => updateCase(index, 'inputs', e.target.value)}
-                    placeholder="Juan,4.0,3.0"
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] text-sm font-mono bg-slate-50"
-                  />
-                  <p className="mt-1 text-[10px] text-slate-400 font-mono">valores separados por coma</p>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Output esperado *</label>
-                  <textarea
-                    rows={4}
-                    value={caso.output || ''}
-                    onChange={(e) => updateCase(index, 'output', e.target.value)}
-                    placeholder={"Nombre del estudiante: Juan\nNota 1: 4.0\n--- RESULTADOS ---\nEstado: APROBADO"}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A90E2] text-sm font-mono resize-none bg-slate-50"
-                  />
-                  <p className="mt-1 text-[10px] text-slate-400 font-mono">una línea por cada println del programa</p>
+
+                <div className="flex flex-1 flex-col" style={{ gap: 20, padding: 20 }}>
+                  {/* Inputs */}
+                  <div className="w-full">
+                    <div
+                      className="flex items-center justify-between"
+                      style={{ marginBottom: 10, gap: 12 }}
+                    >
+                      <label
+                        className="font-semibold text-slate-700"
+                        style={{ fontSize: 12, lineHeight: 1.2 }}
+                      >
+                        Inputs
+                      </label>
+                      <InfoTooltip
+                        className="ml-2"
+                        text="Valores separados por coma. Ej: Juan,4.0,3.0"
+                      />
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={caso.inputs || ''}
+                      onChange={(e) => updateCase(index, 'inputs', e.target.value)}
+                      placeholder="Juan,4.0,3.0"
+                      className="block w-full border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono bg-slate-50 resize-y"
+                      style={{ padding: '10px 14px', fontSize: 13, lineHeight: 1.6 }}
+                      spellCheck={false}
+                    />
+                  </div>
+
+                  {/* Output */}
+                  <div className="w-full flex-1 flex flex-col">
+                    <div
+                      className="flex items-center justify-between"
+                      style={{ marginBottom: 10, gap: 12 }}
+                    >
+                      <label
+                        className="font-semibold text-slate-700"
+                        style={{ fontSize: 12, lineHeight: 1.2 }}
+                      >
+                        Output esperado *
+                      </label>
+                      <InfoTooltip
+                        className="ml-2"
+                        text="Una línea por cada println del programa. Respeta mayúsculas, espacios y orden."
+                      />
+                    </div>
+                    <textarea
+                      rows={8}
+                      value={caso.output || ''}
+                      onChange={(e) => updateCase(index, 'output', e.target.value)}
+                      placeholder={"Nombre del estudiante: Juan\nNota 1: 4.0\nNota 2: 3.0\n--- RESULTADOS ---\nEstado: APROBADO"}
+                      className="block w-full flex-1 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent font-mono bg-slate-50 resize-y"
+                      style={{ padding: '10px 14px', fontSize: 13, lineHeight: 1.6 }}
+                      spellCheck={false}
+                    />
+                  </div>
                 </div>
               </div>
             );
@@ -876,6 +1107,14 @@ export function ExerciseManagementScreen({
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedEjercicio, setSelectedEjercicio] = useState<EjercicioItem | null>(null);
 
+  // ── Refs para el editor enriquecido (Quill) de la descripción ──
+  // Wrapper estable de React. Quill genera la toolbar como SIBLING del editor,
+  // por lo que limpiar el wrapper es la única forma fiable de eliminar todos
+  // los nodos creados por una instancia previa antes de montar otra.
+  const descWrapperRef = useRef<HTMLDivElement | null>(null);
+  // Instancia activa de Quill; se reusa para sincronizar contenido externo.
+  const descQuillRef   = useRef<any>(null);
+
   const isDocenteMode = mode === 'docente';
 
   type AreaOption = { id: number; nombre: string; estado?: boolean };
@@ -957,6 +1196,62 @@ export function ExerciseManagementScreen({
       areaId: docenteAreaId ? String(docenteAreaId) : ''
     }));
   }, [docenteAreaId, isDocenteMode]);
+
+  /**
+   * Inicializa Quill al abrir el modal y lo desmonta al cerrarlo.
+   *
+   * Quill crea su `.ql-toolbar` como hermano del nodo destino (no como hijo).
+   * Si se reinstanciara sin limpiar, cada montaje agregaría una toolbar nueva.
+   * Para evitarlo se trabaja sobre un **wrapper estable** y se vacía su DOM en
+   * cada ciclo: se elimina cualquier toolbar/editor previo, se inserta un div
+   * fresco y sobre él se monta la nueva instancia.
+   *
+   * El paquete se carga de forma diferida (`loadQuill`) para mantenerlo fuera
+   * del bundle inicial.
+   */
+  useEffect(() => {
+    if (!showModal) return;
+    let cancelled = false;
+
+    (async () => {
+      const wrapper = descWrapperRef.current;
+      if (!wrapper) return;
+
+      // Limpieza total: borra cualquier toolbar/editor de un montaje anterior.
+      wrapper.innerHTML = '';
+      const editorEl = document.createElement('div');
+      wrapper.appendChild(editorEl);
+
+      const Quill = await loadQuill();
+      if (cancelled || !descWrapperRef.current) return;
+
+      const quill = new Quill(editorEl, {
+        theme: 'snow',
+        modules: createQuillModules(),
+        placeholder: 'Ingrese la descripción del ejercicio',
+      });
+
+      // Hidratación con el contenido actual (creación o edición).
+      quill.root.innerHTML = formData.actividad.descripcion || '';
+
+      quill.on('text-change', () => {
+        setFormData((prev) => ({
+          ...prev,
+          actividad: { ...prev.actividad, descripcion: quill.root.innerHTML },
+        }));
+      });
+
+      descQuillRef.current = quill;
+    })();
+
+    return () => {
+      cancelled = true;
+      descQuillRef.current = null;
+      // Al cerrar el modal se limpia el wrapper para no acumular DOM huérfano.
+      if (descWrapperRef.current) descWrapperRef.current.innerHTML = '';
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showModal, selectedEjercicio?.id]);
 
   const loadEjercicios = async () => {
     setIsLoadingData(true);
@@ -1888,17 +2183,6 @@ export function ExerciseManagementScreen({
                           <option value="dificil">Difícil</option>
                         </select>
                       </div>
-                      <div className="app-form-field md:col-span-2">
-                        <label className="app-form-label">Descripción *</label>
-                        <textarea
-                          name="actividad.descripcion"
-                          value={formData.actividad.descripcion}
-                          onChange={handleChange}
-                          placeholder="Ingrese la descripción"
-                          className="app-form-textarea"
-                          required
-                        />
-                      </div>
                     </div>
                   </section>
 
@@ -2063,38 +2347,6 @@ export function ExerciseManagementScreen({
                     </div>
                   </section>
 
-                  <section className="app-form-section">
-                    <div className="mb-4 space-y-1.5">
-                      <h4 className="app-form-section-title">Configuración específica</h4>
-                      <p className="app-form-section-description">Completa los parámetros que solo aplican al tipo de ejercicio seleccionado actualmente.</p>
-                    </div>
-
-                    <div className="space-y-4">
-                      {formData.ejercicio.tipo_ejercicio === 'Compilador' && (
-                        <CompiladorConfig formData={formData} setFormData={setFormData} />
-                      )}
-
-                      {formData.ejercicio.tipo_ejercicio === 'Diagramas UML' && (
-                        <UMLConfig formData={formData} setFormData={setFormData} />
-                      )}
-
-                      {formData.ejercicio.tipo_ejercicio === 'Preguntas' && (
-                        <PreguntasConfig formData={formData} setFormData={setFormData} />
-                      )}
-
-                      {formData.ejercicio.tipo_ejercicio === 'Opción única' && (
-                        <MultipleChoiceConfig formData={formData} setFormData={setFormData} />
-                      )}
-
-                      {formData.ejercicio.tipo_ejercicio === 'Ordenar' && (
-                        <OrderingConfig formData={formData} setFormData={setFormData} />
-                      )}
-
-                      {formData.ejercicio.tipo_ejercicio === 'Relacionar' && (
-                        <MatchingConfig formData={formData} setFormData={setFormData} />
-                      )}
-                    </div>
-                  </section>
                 </form>
 
                 <aside className="app-form-aside app-form-stack md:self-start">
@@ -2104,7 +2356,6 @@ export function ExerciseManagementScreen({
                       <div className="app-form-summary-card">
                         <div className="app-form-summary-label">Actividad</div>
                         <div className="app-form-summary-value">{formData.actividad.titulo.trim() || 'Sin título definido'}</div>
-                        <div className="app-form-summary-help">{formData.actividad.descripcion.trim() || 'Descripción pendiente'}</div>
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
                         <div className="app-form-summary-card">
@@ -2135,6 +2386,54 @@ export function ExerciseManagementScreen({
                     </div>
                   </section>
                 </aside>
+              </div>
+
+              {/*
+                Bloque de secciones que ocupan TODO el ancho del modal.
+                Quedan fuera del grid `with-aside` para que el editor de la
+                descripción y la configuración específica (Compilador, UML, …)
+                aprovechen el espacio horizontal completo. Los inputs son
+                controlados por React state, así que no necesitan estar dentro
+                del `<form>` para participar del submit.
+              */}
+              <div className="px-4 sm:px-6 lg:px-8 pb-2 space-y-5">
+                <section className="app-form-section">
+                  <div className="mb-4 space-y-1.5">
+                    <h4 className="app-form-section-title">Descripción de la actividad *</h4>
+                    <p className="app-form-section-description">Edita el enunciado, instrucciones y contexto del ejercicio. El estudiante verá esta descripción al abrir la actividad.</p>
+                  </div>
+                  <div className="quill-editor-container app-rich-text-editor w-full">
+                    <div ref={descWrapperRef} className="w-full" />
+                  </div>
+                </section>
+
+                <section className="app-form-section">
+                  <div className="mb-4 space-y-1.5">
+                    <h4 className="app-form-section-title">Configuración específica</h4>
+                    <p className="app-form-section-description">Completa los parámetros que solo aplican al tipo de ejercicio seleccionado actualmente.</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {formData.ejercicio.tipo_ejercicio === 'Compilador' && (
+                      <CompiladorConfig formData={formData} setFormData={setFormData} />
+                    )}
+                    {formData.ejercicio.tipo_ejercicio === 'Diagramas UML' && (
+                      <UMLConfig formData={formData} setFormData={setFormData} />
+                    )}
+                    {formData.ejercicio.tipo_ejercicio === 'Preguntas' && (
+                      <PreguntasConfig formData={formData} setFormData={setFormData} />
+                    )}
+                    {formData.ejercicio.tipo_ejercicio === 'Opción única' && (
+                      <MultipleChoiceConfig formData={formData} setFormData={setFormData} />
+                    )}
+                    {formData.ejercicio.tipo_ejercicio === 'Ordenar' && (
+                      <OrderingConfig formData={formData} setFormData={setFormData} />
+                    )}
+                    {formData.ejercicio.tipo_ejercicio === 'Relacionar' && (
+                      <MatchingConfig formData={formData} setFormData={setFormData} />
+                    )}
+                  </div>
+                </section>
               </div>
             </div>
 

@@ -114,7 +114,10 @@ export function OrderingExercise({ activity, enunciado = 'Ordena los elementos c
         <h3 className="text-[#3A4A5B] font-semibold">{activity.title}</h3>
         {!embedded ? <button onClick={onBack} className="text-sm text-gray-600 hover:text-[#3A4A5B]">Volver</button> : null}
       </div>
-      <p className="text-gray-700 mb-4">{enunciado}</p>
+      <div
+        className="html-content text-gray-700 mb-4"
+        dangerouslySetInnerHTML={{ __html: enunciado }}
+      />
       <div className="space-y-2">
         {list.map((it, idx) => (
           <div key={idx} className="flex items-center gap-2" draggable onDragStart={() => onDragStart(idx)} onDragOver={onDragOver} onDrop={() => onDrop(idx)}>
