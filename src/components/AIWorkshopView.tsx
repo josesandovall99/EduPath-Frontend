@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Lightbulb, FileText, Check, Save } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
+import { buildAuthHeaders } from '../utils/authHeaders';
 import { MiniproyectoChatbotPanel } from './MiniproyectoChatbotPanel';
 
 
@@ -88,7 +89,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
   ]);
   const [managementJustification, setManagementJustification] = useState('');
   const [expectedCounts, setExpectedCounts] = useState<{ stakeholders: number; functional: number; nonFunctional: number } | null>(null);
-  const [expectedManagementCounts, setExpectedManagementCounts] = useState<{ scope: number; schedule: number; costs: number } | null>(null);
+  const [expectedManagementCounts, setExpectedManagementCounts] = useState<{ scope: number; schedule: number; costs: number; supuestos: number } | null>(null);
   const [evaluation, setEvaluation] = useState<{
     puntaje: number;
     criterios?: Array<{ criterio: string; cumplido: boolean; puntaje?: number; peso?: number; detalle?: string }>;
@@ -222,8 +223,9 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
           const scope = Array.isArray(parsed?.alcance) ? parsed.alcance.length : 0;
           const schedule = Array.isArray(parsed?.cronograma) ? parsed.cronograma.length : 0;
           const costs = Array.isArray(parsed?.costos) ? parsed.costos.length : 0;
-          if (scope || schedule || costs) {
-            setExpectedManagementCounts({ scope, schedule, costs });
+          const supuestos = Array.isArray(parsed?.supuestos) ? parsed.supuestos.length : 0;
+          if (scope || schedule || costs || supuestos) {
+            setExpectedManagementCounts({ scope, schedule, costs, supuestos });
           }
 
           const defaultScope = Array.isArray(parsed?.alcance)
@@ -304,7 +306,8 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
     try {
       const response = await fetch(`${API_BASE_URL}/respuestasEstudianteMiniproyecto`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include',
         body: JSON.stringify({
           respuesta,
           miniproyecto_id: miniId,
@@ -794,10 +797,12 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                     </div>
                   </div>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                    <label className="text-xs text-gray-500">Supuestos y justificación</label>
-                    <p className="text-[11px] text-gray-400 mt-1">
-                      Explica brevemente cómo definiste las fechas y costos con apoyo del chat: duración estimada, tamaño del equipo, tarifas, licencias o restricciones.
-                    </p>
+                    <label className="text-xs text-gray-500">Supuestos del proyecto</label>
+                    {expectedManagementCounts?.supuestos ? (
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        Pista: se esperan {expectedManagementCounts.supuestos} supuestos.
+                      </p>
+                    ) : null}
                     <textarea
                       value={managementJustification}
                       onChange={(event) => setManagementJustification(event.target.value)}

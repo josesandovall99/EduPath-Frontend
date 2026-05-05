@@ -1793,12 +1793,12 @@ export function MiniproyectoManagementScreen({
                         </div>
 
                         <div>
-                          <label className="text-sm text-gray-600">Supuestos cuantificables</label>
+                          <label className="text-sm text-gray-600">Supuestos del proyecto</label>
                           <div className="mt-2 flex gap-2">
                             <input
                               value={assumptionInput}
                               onChange={(event) => setAssumptionInput(event.target.value)}
-                              placeholder="Agregar supuesto verificable"
+                              placeholder="Agregar supuesto del proyecto"
                               className="app-form-input"
                             />
                             <button

@@ -796,6 +796,25 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                                       <option value="abierta">Abierta</option>
                                     </select>
                                   </div>
+
+                                  {question.tipo === 'abierta' && (
+                                    <div className="mt-2">
+                                      <label className="app-form-label text-xs">Respuesta esperada</label>
+                                      <input
+                                        value={question.respuesta_correcta || ''}
+                                        onChange={(event) => {
+                                          const nextQuestions = questions.map((currentQuestion, currentIndex) =>
+                                            currentIndex === questionIndex
+                                              ? { ...currentQuestion, respuesta_correcta: event.target.value }
+                                              : currentQuestion
+                                          );
+                                          handleUpdateConfig(index, { preguntas: nextQuestions });
+                                        }}
+                                        placeholder="Escribe la respuesta correcta esperada"
+                                        className="app-form-input"
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>

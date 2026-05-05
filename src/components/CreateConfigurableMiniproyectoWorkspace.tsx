@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Plus } from 'lucide-react';
 import { ConfigurableEmbeddedExerciseEditor } from './ConfigurableEmbeddedExerciseEditor';
 import { EmbeddedExercise } from './configurableEmbeddedExercises';
 import { InlineChatbotCreator } from './InlineChatbotCreator';
+import { createQuillModules, loadQuill } from '../utils/quill';
 
 export interface CreateConfigurableFormData {
   titulo: string;
@@ -52,7 +53,42 @@ export function CreateConfigurableMiniproyectoWorkspace({
   apiFetch,
 }: CreateConfigurableMiniproyectoWorkspaceProps) {
   const [showChatbotCreator, setShowChatbotCreator] = useState(false);
-  
+
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const quillRef = useRef<any>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const initializeQuill = async () => {
+      if (!editorRef.current) return;
+      // Evitar doble inicialización (React Strict Mode)
+      if (editorRef.current.querySelector('.ql-container')) return;
+      const Quill = await loadQuill();
+      if (cancelled || !editorRef.current) return;
+      if (editorRef.current.querySelector('.ql-container')) return;
+      editorRef.current.innerHTML = '';
+      quillRef.current = new Quill(editorRef.current, {
+        theme: 'snow',
+        placeholder: 'Explica el contexto del reto y qué debe resolver el estudiante',
+        modules: createQuillModules()
+      });
+      quillRef.current.root.innerHTML = formData.descripcion || '';
+      quillRef.current.on('text-change', () => {
+        const html = quillRef.current.root.innerHTML;
+        onUpdate((prev) => ({ ...prev, descripcion: html }));
+      });
+    };
+
+    initializeQuill();
+
+    return () => {
+      cancelled = true;
+      if (editorRef.current) editorRef.current.innerHTML = '';
+      quillRef.current = null;
+    };
+  }, []);
+
   const exerciseCount = formData.exercises.length;
   const selectedAreaName = availableAreas.find((area) => String(area.id) === formData.areaId)?.nombre || 'Sin área seleccionada';
   const selectedChatbotName = eligibleChatbots.find((chatbot) => String(chatbot.id) === formData.chatbotId)?.nombre || 'Sin chatbot asignado';
@@ -71,17 +107,20 @@ export function CreateConfigurableMiniproyectoWorkspace({
   return (
     <div className="app-modal-overlay app-modal-overlay--top z-50">
       <div className="app-modal-card" style={{ width: 'min(100%, 82rem)', height: 'min(900px, calc(100vh - 2rem))' }}>
-        <div className="app-modal-header">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="app-modal-kicker">Gestión docente</div>
-              <h3 className="app-modal-title">Crear miniproyecto configurable</h3>
-              <p className="app-modal-description">Completa la base del miniproyecto, define si usará chatbot y construye los ejercicios desde un flujo contenido.</p>
-            </div>
-            <button type="button" onClick={onClose} className="app-modal-close">
-              <X className="w-5 h-5" />
-            </button>
+        <div className="app-modal-header flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="app-modal-kicker">Gestión docente</div>
+            <h3 className="app-modal-title">Crear miniproyecto configurable</h3>
+            <p className="app-modal-description">Completa la base del miniproyecto, define si usará chatbot y construye los ejercicios desde un flujo contenido.</p>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="app-modal-close flex-shrink-0 self-start"
+            title="Cerrar"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <form onSubmit={onSubmit} className="contents">
@@ -138,12 +177,13 @@ export function CreateConfigurableMiniproyectoWorkspace({
 
                   <div className="app-form-field">
                     <label className="app-form-label">Descripción</label>
-                    <textarea
-                      value={formData.descripcion}
-                      onChange={(event) => onUpdate((prev) => ({ ...prev, descripcion: event.target.value }))}
-                      rows={4}
-                      className="app-form-textarea"
-                    />
+                    <div className="quill-editor-container app-rich-text-editor">
+                      <div
+                        ref={editorRef}
+                        className="w-full"
+                        data-placeholder="Explica el contexto del reto y qué debe resolver el estudiante"
+                      />
+                    </div>
                   </div>
                 </section>
 
@@ -222,7 +262,7 @@ export function CreateConfigurableMiniproyectoWorkspace({
                     <div className="app-form-summary-card">
                       <div className="app-form-summary-label">Miniproyecto</div>
                       <div className="app-form-summary-value">{formData.titulo.trim() || 'Sin título definido'}</div>
-                      <div className="app-form-summary-help">{formData.descripcion.trim() ? 'Descripción cargada' : 'Descripción pendiente'}</div>
+                      <div className="app-form-summary-help">{formData.descripcion.replace(/<[^>]*>/g, '').trim() ? 'Descripción cargada' : 'Descripción pendiente'}</div>
                     </div>
                     <div className="app-form-summary-card">
                       <div className="app-form-summary-label">Área</div>
