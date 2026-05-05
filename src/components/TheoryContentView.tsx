@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Play, FileText, CheckCircle2, BookOpen, ChevronDown, ChevronRight, Loader, Lock } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ProgrammingContentView } from './ProgrammingContentView';
@@ -167,6 +167,7 @@ interface Ejercicio {
 
 interface TheoryContentViewProps {
   subjectName: string;
+  areaId?: string | number;
   onHome?: () => void;
   content: {
     id: string;
@@ -343,7 +344,7 @@ const orderSubtemasBySequence = (subtemas: any[], sequences: any[]): any[] => {
 
 
 
-export function TheoryContentView({ subjectName, content, temaId, onBack, onHome, onContentChange, estudianteId }: TheoryContentViewProps) {
+export function TheoryContentView({ subjectName, areaId, content, temaId, onBack, onHome, onContentChange, estudianteId }: TheoryContentViewProps) {
 
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(false);
@@ -371,11 +372,11 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onHome
   // Cargar progreso dinámico del estudiante
   useEffect(() => {
     obtenerProgresoArea();
-  }, [temaId, estudianteId]);
+  }, [areaId, temaId, estudianteId]);
 
   // Polling automático: actualizar progreso cada 30 segundos
   useEffect(() => {
-    if (!estudianteId || !temaId) return;
+    if (!estudianteId || (!areaId && !temaId)) return;
 
     const intervalId = setInterval(() => {
       console.log('🔄 Actualizando progreso automáticamente...');
@@ -383,12 +384,12 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onHome
     }, 10000); // 10 segundos
 
     return () => clearInterval(intervalId);
-  }, [temaId, estudianteId]);
+  }, [areaId, temaId, estudianteId]);
 
   // Actualizar progreso cuando la pestaña vuelve a ser visible
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && estudianteId && temaId) {
+      if (!document.hidden && estudianteId && (areaId || temaId)) {
         console.log('🔄 Pestaña visible de nuevo, actualizando progreso...');
         obtenerProgresoArea();
       }
@@ -396,7 +397,7 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onHome
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [temaId, estudianteId]);
+  }, [areaId, temaId, estudianteId]);
 
   // Obtener estado de visualización del contenido
   const obtenerEstadoVisualizacion = async (contenidoId: string) => {
@@ -420,16 +421,18 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onHome
     }
   };
 
-  // Obtener progreso dinámico del estudiante en el tema
+  // Obtener el mismo progreso de área que se muestra en la pantalla anterior.
   const obtenerProgresoArea = async () => {
-    if (!estudianteId || !temaId) {
-      console.warn('No hay estudiante_id o temaId disponibles');
+    if (!estudianteId || (!areaId && !temaId)) {
+      console.warn('No hay estudiante_id, areaId o temaId disponibles');
       return;
     }
 
     setLoadingProgress(true);
     try {
-      const url = `${API_BASE_URL}/progresos/por-tema?tema_id=${temaId}&estudiante_id=${estudianteId}`;
+      const url = areaId
+        ? `${API_BASE_URL}/progresos/por-area?area_id=${areaId}&estudiante_id=${estudianteId}`
+        : `${API_BASE_URL}/progresos/por-tema?tema_id=${temaId}&estudiante_id=${estudianteId}`;
       console.log(`🔄 Obteniendo progreso desde: ${url}`);
       
       const response = await fetch(url);
@@ -442,9 +445,11 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onHome
       }
       
       const data = await response.json();
-      const porcentaje = data.resumen?.porcentajeTotalTema || 0;
+      const porcentaje = areaId
+        ? data.resumen?.porcentajeTotalArea || 0
+        : data.resumen?.porcentajeTotalTema || 0;
       setCurrentProgress(Math.round(porcentaje));
-      console.log(`Progreso del tema: ${porcentaje}%`);
+      console.log(`Progreso mostrado: ${porcentaje}%`);
     } catch (err) {
       console.error('Error al obtener progreso:', err);
       setCurrentProgress(0);
@@ -1237,8 +1242,10 @@ export function TheoryContentView({ subjectName, content, temaId, onBack, onHome
               {/* Progress */}
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-gray-600 text-sm">Progreso del módulo:</span>
-                  <span className="text-xl" style={{ color: subjectColor }}>{currentProgress}%</span>
+                  <span className="text-gray-600 text-sm">Progreso:</span>
+                  <span className="text-xl" style={{ color: subjectColor }}>
+                    {loadingProgress ? '...' : `${currentProgress}%`}
+                  </span>
                 </div>
                 <div className="w-32 h-3 bg-gray-200 rounded-full overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${currentProgress}%`, backgroundColor: subjectColor }}></div>

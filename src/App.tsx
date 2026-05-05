@@ -801,6 +801,7 @@ export default function App() {
         <>
           <TheoryContentView
             subjectName={selectedSubject.name}
+            areaId={selectedSubject.id}
             content={selectedContent}
             temaId={selectedTemaId || undefined}
             onBack={handleBackToSubject}
