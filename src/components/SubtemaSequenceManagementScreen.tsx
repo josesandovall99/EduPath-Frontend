@@ -1235,14 +1235,16 @@ export function SubtemaSequenceManagementScreen({
                       </div>
 
                       <div className="app-action-row">
-                        <button
-                          onClick={() => handleToggleEstado(sequence.id, sequence.estado)}
-                          disabled={isLoading}
-                          className={`app-btn app-btn-icon app-btn-sm ${sequence.estado ? 'app-btn-secondary' : 'app-btn-success'}`}
-                          title={sequence.estado ? 'Desactivar' : 'Activar'}
-                        >
-                          {sequence.estado ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                        </button>
+                        {!isDocenteMode && (
+                          <button
+                            onClick={() => handleToggleEstado(sequence.id, sequence.estado)}
+                            disabled={isLoading}
+                            className={`app-btn app-btn-icon app-btn-sm ${sequence.estado ? 'app-btn-secondary' : 'app-btn-success'}`}
+                            title={sequence.estado ? 'Desactivar' : 'Activar'}
+                          >
+                            {sequence.estado ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                          </button>
+                        )}
 
                         <button
                           onClick={() => handleEditSequence(sequence)}

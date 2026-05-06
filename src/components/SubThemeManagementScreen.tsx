@@ -4,6 +4,7 @@ import axios from 'axios';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { AdminFlowGuide } from './ui/AdminFlowGuide';
 import { API_BASE_URL } from '../utils/constants';
+import { buildAuthHeaders } from '../utils/authHeaders';
 import { createQuillModules, loadQuill } from '../utils/quill';
 
 interface SubThemeManagementScreenProps {
@@ -77,6 +78,16 @@ export function SubThemeManagementScreen({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const isDocenteMode = mode === 'docente';
   const isSubtemaActive = (subtema: Subtema) => subtema.estado !== false;
+  const buildRequestConfig = (headers: Record<string, string> = {}, timeout?: number) => {
+    const areaId = initialAreaId || selectedArea;
+    return {
+      ...(timeout ? { timeout } : {}),
+      headers: buildAuthHeaders({
+        ...headers,
+        ...(isDocenteMode && areaId ? { 'x-area-id': String(areaId) } : {})
+      })
+    };
+  };
 
   const editorRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
@@ -132,12 +143,7 @@ export function SubThemeManagementScreen({
         setLoading(true);
         setError(null);
         
-        const response = await axios.get(`${API_BASE_URL}/areas`, {
-          timeout: 5000,
-          headers: {
-            'Accept': 'application/json',
-          }
-        });
+        const response = await axios.get(`${API_BASE_URL}/areas`, buildRequestConfig({ Accept: 'application/json' }, 5000));
         
         const data = response.data;
         
@@ -190,12 +196,7 @@ export function SubThemeManagementScreen({
         setSelectedTema(''); // Resetear tema seleccionado
         setSubtemas([]); // Limpiar subtemas
         
-        const response = await axios.get(`${API_BASE_URL}/temas`, {
-          timeout: 5000,
-          headers: {
-            'Accept': 'application/json',
-          }
-        });
+        const response = await axios.get(`${API_BASE_URL}/temas`, buildRequestConfig({ Accept: 'application/json' }, 5000));
         
         const data = response.data;
         
@@ -254,12 +255,7 @@ export function SubThemeManagementScreen({
         setSubtemasLoading(true);
         setSubtemasError(null);
         
-        const response = await axios.get(`${API_BASE_URL}/subtemas`, {
-          timeout: 5000,
-          headers: {
-            'Accept': 'application/json',
-          }
-        });
+        const response = await axios.get(`${API_BASE_URL}/subtemas`, buildRequestConfig({ Accept: 'application/json' }, 5000));
         
         const data = response.data;
         
@@ -304,10 +300,7 @@ export function SubThemeManagementScreen({
           return;
         }
 
-        const temasResponse = await axios.get(`${API_BASE_URL}/temas`, {
-          timeout: 5000,
-          headers: { Accept: 'application/json' }
-        });
+        const temasResponse = await axios.get(`${API_BASE_URL}/temas`, buildRequestConfig({ Accept: 'application/json' }, 5000));
 
         const temasData = Array.isArray(temasResponse.data)
           ? temasResponse.data.filter((tema) => tema.area_id === selectedArea)
@@ -328,10 +321,7 @@ export function SubThemeManagementScreen({
           return;
         }
 
-        const subtemasResponse = await axios.get(`${API_BASE_URL}/subtemas`, {
-          timeout: 5000,
-          headers: { Accept: 'application/json' }
-        });
+        const subtemasResponse = await axios.get(`${API_BASE_URL}/subtemas`, buildRequestConfig({ Accept: 'application/json' }, 5000));
 
         if (Array.isArray(subtemasResponse.data)) {
           setSubtemas(subtemasResponse.data.filter((subtema) => subtema.tema_id === temaObjetivo));
@@ -391,7 +381,7 @@ export function SubThemeManagementScreen({
       
       if (editingSubtema) {
         // Actualizar subtema existente
-        await axios.put(`${API_BASE_URL}/subtemas/${editingSubtema.id}`, formData);
+        await axios.put(`${API_BASE_URL}/subtemas/${editingSubtema.id}`, formData, buildRequestConfig());
         setSuccessMessage('Subtema actualizado correctamente.');
         
         // Actualizar en el estado local
@@ -400,7 +390,7 @@ export function SubThemeManagementScreen({
         );
       } else {
         // Crear nuevo subtema
-        const response = await axios.post(`${API_BASE_URL}/subtemas`, formData);
+        const response = await axios.post(`${API_BASE_URL}/subtemas`, formData, buildRequestConfig());
         setSuccessMessage('Subtema registrado correctamente.');
         
         // Agregar al estado local
@@ -434,7 +424,7 @@ export function SubThemeManagementScreen({
     if (!confirmDelete) return;
     
     try {
-      const response = await axios.put(`${API_BASE_URL}/subtemas/${subtema.id}/toggle-estado`);
+      const response = await axios.put(`${API_BASE_URL}/subtemas/${subtema.id}/toggle-estado`, undefined, buildRequestConfig());
       const updatedEstado = response.data?.estado ?? !currentlyActive;
       setSuccessMessage(`Subtema ${updatedEstado ? 'habilitado' : 'inhabilitado'} correctamente.`);
       

@@ -115,6 +115,16 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const initialAreaIdValue = initialAreaId !== undefined && initialAreaId !== null ? String(initialAreaId) : '';
   const isDocenteMode = mode === 'docente';
+  const buildAreaScopedConfig = (headers: Record<string, string> = {}, timeout?: number) => {
+    const areaId = selectedSubject || initialAreaIdValue || formData.area_id;
+    return {
+      ...(timeout ? { timeout } : {}),
+      headers: {
+        ...headers,
+        ...(isDocenteMode && areaId ? { 'x-area-id': String(areaId) } : {})
+      }
+    };
+  };
 
   // Cargar áreas del backend
   useEffect(() => {
@@ -123,12 +133,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
         setLoading(true);
         setError(null);
         
-        const response = await api.get('/areas', {
-          timeout: 5000,
-          headers: {
-            'Accept': 'application/json',
-          }
-        });
+      const response = await api.get('/areas', buildAreaScopedConfig({ Accept: 'application/json' }, 5000));
         
         const data = response.data;
         
@@ -206,12 +211,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
         
         // Admin necesita ver TODOS los temas (habilitados y deshabilitados)
         // Por eso usamos /temas en lugar de /temas/por-area que filtra por estado
-        const response = await api.get('/temas', {
-          timeout: 5000,
-          headers: {
-            'Accept': 'application/json',
-          }
-        });
+        const response = await api.get('/temas', buildAreaScopedConfig({ Accept: 'application/json' }, 5000));
         
         const data = response.data;
         
@@ -339,7 +339,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
       
       if (editingTema) {
         // Actualizar tema existente
-        await api.put(`/temas/${editingTema.id}`, formData);
+      await api.put(`/temas/${editingTema.id}`, formData, buildAreaScopedConfig());
         setSuccessMessage('Tema actualizado exitosamente');
         
         // Actualizar en el estado local
@@ -348,7 +348,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
         );
       } else {
         // Crear nuevo tema
-        const response = await api.post('/temas', formData);
+        const response = await api.post('/temas', formData, buildAreaScopedConfig());
         setSuccessMessage('Tema creado exitosamente');
         
         // Agregar al inicio del estado local (porque orden=0)
@@ -380,7 +380,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
     if (!confirmDelete) return;
     
     try {
-      await api.delete(`/temas/${tema.id}`);
+      await api.delete(`/temas/${tema.id}`, buildAreaScopedConfig());
       setSuccessMessage('Tema eliminado exitosamente');
       
       // Eliminar del estado local
@@ -402,15 +402,11 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   const toggleTema = async (tema: Tema) => {
     try {
       const updatedEstado = !tema.estado;
-      await api.put(`/temas/${tema.id}/toggle-estado`);
+      await api.put(`/temas/${tema.id}/toggle-estado`, undefined, buildAreaScopedConfig());
       setSuccessMessage(`Tema ${updatedEstado ? 'habilitado' : 'inhabilitado'} correctamente`);
       
       // Recargar todos los temas para que coincidan con el orden de la BD
-      const response = await api.get('/temas', {
-        headers: {
-          'Accept': 'application/json',
-        }
-      });
+      const response = await api.get('/temas', buildAreaScopedConfig({ Accept: 'application/json' }));
       
       const data = response.data;
       if (Array.isArray(data)) {
