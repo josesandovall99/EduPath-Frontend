@@ -530,7 +530,7 @@ export function MiniproyectoManagementScreen({
     const lines = rows
       .filter((row) => row.deliverable || row.quantity || row.unitPrice)
       .map((row, index) =>
-        `Entregable ${index + 1}: ${row.deliverable || '-'} | Unidad de medida: ${row.unitMeasure || '-'} | Cantidad: ${row.quantity || '-'} | Precio unitario: ${row.unitPrice || '-'} | Subtotal: ${formatCurrency(calculateRowTotal(row))}`
+        `Entregable ${index + 1}: ${row.deliverable || '-'} | Cantidad: ${row.quantity || '-'} | Precio unitario: ${row.unitPrice || '-'} | Subtotal: ${formatCurrency(calculateRowTotal(row))}`
       );
     return [
       ...lines,
@@ -667,7 +667,7 @@ export function MiniproyectoManagementScreen({
             return null;
           }
 
-          if (/total\s+general|total\s*:|total proyecto/i.test(text)) return null;
+          if (/^total/i.test(text.trim())) return null;
 
           const conceptMatch = text.match(/(?:Entregable|Costo|Concepto)\s*\d*:?\s*([^|]+)\|/i);
           const unitMeasureMatch = text.match(/Unidad\s+de\s+medida\s*:?\s*([^|]+)/i);
@@ -911,8 +911,8 @@ export function MiniproyectoManagementScreen({
       const deliverables = scopeList.map((item) => item.trim()).filter(Boolean);
       if (deliverables.length === 0) return [];
 
-      return deliverables.map((deliverable) => {
-        const existing = prev.find((row) => normalizeAreaName(row.deliverable) === normalizeAreaName(deliverable));
+      return deliverables.map((deliverable, index) => {
+        const existing = prev[index] ?? prev.find((row) => normalizeAreaName(row.deliverable) === normalizeAreaName(deliverable));
         return existing ? { ...existing, deliverable } : createDefaultCostRow(deliverable);
       });
     });
@@ -1690,10 +1690,9 @@ export function MiniproyectoManagementScreen({
                           <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
                             <div
                               className="bg-gray-50 text-[11px] text-gray-500"
-                              style={{ display: 'grid', gridTemplateColumns: '2.2fr 1.2fr 0.9fr 1.2fr 1fr' }}
+                              style={{ display: 'grid', gridTemplateColumns: '2.5fr 0.9fr 1.2fr 1fr' }}
                             >
                               <div className="px-3 py-2">Entregable</div>
-                              <div className="px-3 py-2">Unidad de medida</div>
                               <div className="px-3 py-2">Cantidad</div>
                               <div className="px-3 py-2">Precio unitario</div>
                               <div className="px-3 py-2 text-right">Subtotal</div>
@@ -1703,26 +1702,13 @@ export function MiniproyectoManagementScreen({
                                 <div
                                   key={index}
                                   className="px-3 py-2"
-                                  style={{ display: 'grid', gridTemplateColumns: '2.2fr 1.2fr 0.9fr 1.2fr 1fr', gap: '8px', alignItems: 'center' }}
+                                  style={{ display: 'grid', gridTemplateColumns: '2.5fr 0.9fr 1.2fr 1fr', gap: '8px', alignItems: 'center' }}
                                 >
                                   <input
                                     value={row.deliverable}
                                     readOnly
                                     className="rounded-lg border border-gray-100 bg-gray-50 px-2 py-2 text-xs text-gray-600"
                                   />
-                                  <select
-                                    value={row.unitMeasure}
-                                    onChange={(event) => {
-                                      const updated = [...costRows];
-                                      updated[index] = { ...updated[index], unitMeasure: event.target.value };
-                                      setCostRows(updated);
-                                    }}
-                                    className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                                  >
-                                    {UNIT_MEASURE_OPTIONS.map((option) => (
-                                      <option key={option} value={option}>{option}</option>
-                                    ))}
-                                  </select>
                                   <input
                                     type="number"
                                     inputMode="numeric"
