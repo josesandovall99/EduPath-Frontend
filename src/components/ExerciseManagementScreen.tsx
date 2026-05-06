@@ -84,6 +84,7 @@ type MetodoDerivado = {
 };
 
 const emptyCompilerCase = () => ({ inputs: '', output: '' });
+const EXERCISE_POINT_OPTIONS = [10, 20, 30, 40, 50];
 
 const createDefaultCompilerConfig = () => ({
   tipo: 'programacion',
@@ -100,6 +101,16 @@ const createDefaultUmlConfig = () => ({
     requireMultiplicities: false,
   }
 });
+
+const normalizeCatalogText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+const isExerciseActivityType = (tipo: TipoActividad) =>
+  normalizeCatalogText(tipo.nombre) === 'ejercicio';
 
 function parseMethodTemplate(template: string): MetodoDerivado | null {
   const match = template.match(/(?:public|private|protected)?\s*(?:static\s+)?([A-Za-z_][A-Za-z0-9_<>\[\],\s?]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/);
@@ -1199,6 +1210,32 @@ export function ExerciseManagementScreen({
     }));
   }, [docenteAreaId, isDocenteMode]);
 
+  const exerciseActivityType = useMemo(
+    () => tiposActividad.find(isExerciseActivityType),
+    [tiposActividad]
+  );
+  const exerciseActivityTypeId = exerciseActivityType?.id ?? '';
+
+  useEffect(() => {
+    if (!exerciseActivityTypeId) {
+      return;
+    }
+
+    setFormData((prev) => {
+      if (prev.actividad.tipo_actividad_id === exerciseActivityTypeId) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        actividad: {
+          ...prev.actividad,
+          tipo_actividad_id: exerciseActivityTypeId
+        }
+      };
+    });
+  }, [exerciseActivityTypeId]);
+
   /**
    * Inicializa Quill al abrir el modal y lo desmonta al cerrarlo.
    *
@@ -1477,7 +1514,7 @@ export function ExerciseManagementScreen({
         titulo: '',
         descripcion: '',
         nivel_dificultad: 'medio',
-        tipo_actividad_id: ''
+        tipo_actividad_id: exerciseActivityTypeId
       },
       ejercicio: {
         contenido_id: '',
@@ -1575,7 +1612,7 @@ export function ExerciseManagementScreen({
         titulo: item.actividad?.titulo || '',
         descripcion: item.actividad?.descripcion || '',
         nivel_dificultad: (item.actividad?.nivel_dificultad as any) || 'medio',
-        tipo_actividad_id: item.actividad?.tipo_actividad_id || ''
+        tipo_actividad_id: exerciseActivityTypeId
       },
       ejercicio: {
         contenido_id: item.contenido_id || '',
@@ -2205,14 +2242,16 @@ export function ExerciseManagementScreen({
                           onChange={handleChange}
                           className={`app-form-select ${validationErrors['actividad.tipo_actividad_id'] ? 'border-red-500' : ''}`}
                           required
-                          disabled={isLoadingTipos}
+                          disabled
                         >
-                          <option value="">-- Seleccione un tipo de actividad --</option>
-                          {tiposActividad.map((tipo) => (
-                            <option key={tipo.id} value={tipo.id}>
-                              {tipo.nombre}
+                          <option value="">
+                            {isLoadingTipos ? 'Cargando tipo de actividad...' : 'Tipo de actividad Ejercicio no disponible'}
+                          </option>
+                          {exerciseActivityType && (
+                            <option value={exerciseActivityType.id}>
+                              {exerciseActivityType.nombre}
                             </option>
-                          ))}
+                          )}
                         </select>
                         {validationErrors['actividad.tipo_actividad_id'] && (
                           <p className="text-xs text-red-500 flex items-center gap-1">
@@ -2242,7 +2281,11 @@ export function ExerciseManagementScreen({
                         >
                           <option value="Compilador">Compilador</option>
                           <option value="Diagramas UML">Diagramas UML</option>
-                          <option value="Preguntas">Preguntas</option>
+                          {formData.ejercicio.tipo_ejercicio === 'Preguntas' && (
+                            <option value="Preguntas" disabled hidden>
+                              Preguntas
+                            </option>
+                          )}
                           <option value="Opción única">Opción única</option>
                           <option value="Ordenar">Ordenar</option>
                           <option value="Relacionar">Relacionar</option>
@@ -2338,15 +2381,20 @@ export function ExerciseManagementScreen({
 
                       <div className="app-form-field">
                         <label className="app-form-label">Puntos *</label>
-                        <input
-                          type="number"
+                        <select
                           name="ejercicio.puntos"
                           value={formData.ejercicio.puntos}
                           onChange={handleChange}
-                          min={0}
-                          className="app-form-input"
+                          className="app-form-select"
                           required
-                        />
+                        >
+                          <option value="">Seleccione el puntaje</option>
+                          {EXERCISE_POINT_OPTIONS.map((points) => (
+                            <option key={points} value={points}>
+                              {points}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   </section>
