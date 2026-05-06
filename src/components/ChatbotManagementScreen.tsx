@@ -186,7 +186,7 @@ function mapChatbotToForm(chatbot: ChatbotItem): ChatbotFormState {
     topK: snapToNearest(Number(chatbot.top_k || 5), TOPK_OPTIONS),
     max_context_chars: snapToNearest(Number(chatbot.max_context_chars || 4000), MAX_CONTEXT_CHARS_OPTIONS),
     max_tokens: snapToNearest(Number(chatbot.max_tokens || 512), MAX_TOKENS_OPTIONS),
-    temperature: snapToNearest(Number(chatbot.temperature ?? 0.1), TEMPERATURE_OPTIONS),
+    temperature: '0.1',
     estado: chatbot.estado !== false,
   };
 }
@@ -316,7 +316,7 @@ function buildChatbotPayload(chatbot: ChatbotItem, overrides: { estado?: boolean
       topK: chatbot.top_k || 5,
       max_context_chars: chatbot.max_context_chars || 4000,
       max_tokens: chatbot.max_tokens || 512,
-      temperature: chatbot.temperature ?? 0.1,
+      temperature: 0.1,
     },
   };
 }
@@ -775,7 +775,7 @@ export function ChatbotManagementScreen({
         topK: Number(form.topK) || 1,
         max_context_chars: Number(form.max_context_chars) || 600,
         max_tokens: Number(form.max_tokens) || 256,
-        temperature: Number(form.temperature) || 0.2,
+        temperature: 0.1,
       },
     };
 
@@ -1786,17 +1786,11 @@ export function ChatbotManagementScreen({
                           Temperatura
                           <InfoBadge text="Controla la creatividad o aleatoriedad de la respuesta." />
                         </label>
-                        <select value={form.temperature} onChange={(e) => updateForm('temperature', e.target.value)} className="app-form-select">
+                        <select value="0.1" disabled className="app-form-select disabled:bg-gray-100 disabled:text-gray-500">
                           <option value="0.1">0.1 – Determinista (Recomendado)</option>
-                          <option value="0.4">0.4 – Balanceado</option>
-                          <option value="0.7">0.7 – Creativo</option>
-                          <option value="1.0">1.0 – Aleatorio (no recomendado)</option>
                         </select>
                         <p className="mt-1 text-xs text-slate-500">
-                          {form.temperature === '0.1' && 'Ideal para ceñirse estrictamente a los documentos sin inventar.'}
-                          {form.temperature === '0.4' && 'Da respuestas fluidas pero mantiene precisión técnica.'}
-                          {form.temperature === '0.7' && 'Útil para lluvia de ideas o redacción de textos generales.'}
-                          {form.temperature === '1.0' && 'Aumenta el riesgo de alucinaciones. Úsalo solo si sabes lo que haces.'}
+                          Ideal para ceñirse estrictamente a los documentos sin inventar.
                         </p>
                       </div>
 
