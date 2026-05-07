@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Square, GitMerge, Share2, Boxes, Diamond, RotateCcw, Redo2, Trash2, BookOpen, Save, Send, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import * as joint from 'jointjs';
 import 'jointjs/dist/joint.css';
@@ -9,6 +9,7 @@ interface UMLDiagramViewProps {
   activity: {
     id: string;
     title: string;
+    description?: string;
   };
   onBack: () => void;
   onComplete?: () => void;
@@ -963,6 +964,14 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
           )}
         </div>
       </div>
+
+      {/* Descripcion del ejercicio */}
+      {activity.description && (
+        <div
+          className="bg-[#F0FBF5] border-b border-[#7ED6A7]/30 px-6 py-4 quill-render"
+          dangerouslySetInnerHTML={{ __html: activity.description }}
+        />
+      )}
 
       {/* Layout Horizontal: Sidebar + Canvas */}
       <div className="flex" style={{ height: '650px' }}>

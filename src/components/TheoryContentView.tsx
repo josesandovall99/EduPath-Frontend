@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿﻿import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Play, FileText, CheckCircle2, BookOpen, ChevronDown, ChevronRight, Loader, Lock } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ProgrammingContentView } from './ProgrammingContentView';
@@ -1283,7 +1283,8 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
                   <UMLDiagramView
                     activity={{
                       id: ejercicioAsociado.id.toString(),
-                      title: ejercicioAsociado.actividad?.titulo || 'Ejercicio'
+                      title: ejercicioAsociado.actividad?.titulo || 'Ejercicio',
+                      description: ejercicioAsociado.actividad?.descripcion
                     }}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
@@ -1295,7 +1296,8 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
                     subjectName={subjectName}
                     activity={{
                       id: ejercicioAsociado.id.toString(),
-                      title: ejercicioAsociado.actividad?.titulo || 'Ejercicio'
+                      title: ejercicioAsociado.actividad?.titulo || 'Ejercicio',
+                      description: ejercicioAsociado.actividad?.descripcion
                     }}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
