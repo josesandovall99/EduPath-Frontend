@@ -19,7 +19,7 @@ npm run dev
 ### Test 1: ¿Backend responde?
 ```bash
 # En cualquier terminal
-curl http://localhost:3000/api/areas
+curl http://localhost:3000/api/asignaturas
 # Esperado: [{"id":1,"nombre":"..."}]
 ```
 
@@ -39,7 +39,7 @@ F12 → Console → busca "🔄 Fetching"
 
 | Problema | Solución |
 |----------|----------|
-| "Cannot GET /api/areas" | Backend no tiene endpoint, revisar routes |
+| "Cannot GET /api/asignaturas" | Backend no tiene endpoint, revisar routes |
 | "Failed to fetch" | Backend no está corriendo en puerto 3000 |
 | "Unexpected token '<'" | Backend retorna HTML (error 500) |
 | "CORS error" | Proxy no activo, recarga frontend |
@@ -160,6 +160,6 @@ const API_BASE_URL = 'http://localhost:3000/api';
 Proporciona:
 1. Logs exactos de Console (F12)
 2. Response de Network (F12 → Network)
-3. Resultado de `curl http://localhost:3000/api/areas`
+3. Resultado de `curl http://localhost:3000/api/asignaturas`
 4. Qué puerto ves en "Local:" cuando inicia Vite
 

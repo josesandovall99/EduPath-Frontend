@@ -24,7 +24,7 @@ import { StudentUploadScreen } from './components/StudentUploadScreen';
 import { SequenceManagementScreen } from './components/SequenceManagementScreen';
 import { SubtemaSequenceManagementScreen } from './components/SubtemaSequenceManagementScreen';
 import { DocenteDashboard } from './components/DocenteDashboard';
-import { DocenteAreaManagementScreen } from './components/DocenteAreaManagementScreen';
+import { DocenteAsignaturaManagementScreen } from './components/DocenteAsignaturaManagementScreen';
 import { applyAuthHeaders, setupAuthFetch } from './utils/authHeaders';
 
 type Screen = 
@@ -51,7 +51,7 @@ type Screen =
   | 'admin-subtema-sequences'
   | 'ai-workshop'
   | 'docente-dashboard'
-  | 'docente-area-management';
+  | 'docente-asignatura-management';
 
 
 
@@ -69,8 +69,8 @@ interface DocenteSession {
   nombre: string;
   email: string;
   especialidad: string;
-  areaId?: number;
-  areaNombre?: string;
+  asignaturaId?: number;
+  asignaturaNombre?: string;
 }
 
 interface AdminSession {
@@ -93,8 +93,8 @@ interface Content {
   status?: 'completed' | 'in-progress' | 'not-started';
   isMiniproyecto?: boolean;
   actividadId?: number;
-  areaId?: number;
-  areaNombre?: string;
+  asignaturaId?: number;
+  asignaturaNombre?: string;
   tipoPilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null;
   miniproyectoMode?: 'legacy' | 'configurable';
 }
@@ -262,7 +262,7 @@ export default function App() {
           ) {
             return hasStudentSession && Boolean(nav.selectedContent);
           }
-          if (screen === 'docente-dashboard' || screen === 'docente-area-management') return hasDocenteSession;
+          if (screen === 'docente-dashboard' || screen === 'docente-asignatura-management') return hasDocenteSession;
           if (
             screen === 'admin-dashboard' ||
             screen === 'admin-themes' ||
@@ -389,8 +389,8 @@ export default function App() {
       nombre: docente.nombre,
       email: docente.email,
       especialidad: docente.especialidad,
-      areaId: docente.area?.id,
-      areaNombre: docente.area?.nombre
+      asignaturaId: docente.Asignatura?.id,
+      asignaturaNombre: docente.Asignatura?.nombre
     };
 
     localStorage.setItem('personaId', docente.personaId.toString());
@@ -566,7 +566,7 @@ export default function App() {
         return;
       }
 
-      const normalizedAreaName = normalizeLabel(content.areaNombre || selectedSubject?.name);
+      const normalizedAreaName = normalizeLabel(content.asignaturaNombre || selectedSubject?.name);
       const isProgrammingMiniproyecto = content.tipoPilar === 'PROGRAMACION' || normalizedAreaName.includes('programacion');
 
       setCurrentScreen(isProgrammingMiniproyecto ? 'programming-miniproyecto' : 'ai-workshop');
@@ -576,7 +576,7 @@ export default function App() {
     // Determine which view to show based on subject and content type
     if (selectedSubject?.name === 'Fundamentos de Programación') {
       // Pasa por TheoryContentView para que el estudiante pueda navegar
-      // Subtema → Contenido → Ejercicio (ProgrammingContentView embebido)
+      // Subtema ÔåÆ Contenido ÔåÆ Ejercicio (ProgrammingContentView embebido)
       setCurrentScreen('theory-content');
     } else if (selectedSubject?.name === 'Análisis de Sistemas') {
       // Analysis Systems subject
@@ -666,12 +666,12 @@ export default function App() {
         <DocenteDashboard
           docente={docenteSession}
           onLogout={handleLogout}
-          onManageArea={() => setCurrentScreen('docente-area-management')}
+          onManageAsignatura={() => setCurrentScreen('docente-asignatura-management')}
         />
       )}
 
-      {currentScreen === 'docente-area-management' && docenteSession && (
-        <DocenteAreaManagementScreen
+      {currentScreen === 'docente-asignatura-management' && docenteSession && (
+        <DocenteAsignaturaManagementScreen
           onBack={() => setCurrentScreen('docente-dashboard')}
         />
       )}
@@ -761,7 +761,7 @@ export default function App() {
             onContentSelect={handleContentSelect}
             estudianteId={userSession.id}
           />
-          <ChatbotButton areaId={Number(selectedSubject.id)} contextLabel={selectedSubject.name} />
+          <ChatbotButton asignaturaId={Number(selectedSubject.id)} contextLabel={selectedSubject.name} />
         </>
       )}
 
@@ -771,7 +771,7 @@ export default function App() {
             content={selectedContent}
             onBack={handleBackToSubject}
           />
-          <ChatbotButton areaId={selectedContent.areaId ?? Number(selectedSubject?.id)} contextLabel={selectedContent.title} />
+          <ChatbotButton asignaturaId={selectedContent.asignaturaId ?? Number(selectedSubject?.id)} contextLabel={selectedContent.title} />
         </>
       )}
 
@@ -783,7 +783,7 @@ export default function App() {
           />
           <ChatbotButton
             chatbotType="MINIPROYECTO"
-            areaId={selectedContent.areaId ?? Number(selectedSubject?.id)}
+            asignaturaId={selectedContent.asignaturaId ?? Number(selectedSubject?.id)}
             miniproyectoId={selectedContent.id}
             contextLabel={selectedContent.title}
           />
@@ -801,14 +801,14 @@ export default function App() {
         <>
           <TheoryContentView
             subjectName={selectedSubject.name}
-            areaId={selectedSubject.id}
+            asignaturaId={selectedSubject.id}
             content={selectedContent}
             temaId={selectedTemaId || undefined}
             onBack={handleBackToSubject}
             onHome={handleBackToDashboard}
             estudianteId={userSession.id}
           />
-          <ChatbotButton areaId={selectedContent.areaId ?? Number(selectedSubject.id)} contextLabel={selectedContent.title} />
+          <ChatbotButton asignaturaId={selectedContent.asignaturaId ?? Number(selectedSubject.id)} contextLabel={selectedContent.title} />
         </>
       )}
 
@@ -820,7 +820,7 @@ export default function App() {
             onBack={handleBackToSubject}
             onHome={handleBackToDashboard}
           />
-          <ChatbotButton areaId={selectedContent.areaId ?? Number(selectedSubject.id)} contextLabel={selectedContent.title} />
+          <ChatbotButton asignaturaId={selectedContent.asignaturaId ?? Number(selectedSubject.id)} contextLabel={selectedContent.title} />
         </>
       )}
 
@@ -830,7 +830,7 @@ export default function App() {
             activity={selectedContent}
             onBack={handleBackToSubject}
           />
-          <ChatbotButton areaId={selectedContent.areaId ?? Number(selectedSubject?.id)} contextLabel={selectedContent.title} />
+          <ChatbotButton asignaturaId={selectedContent.asignaturaId ?? Number(selectedSubject?.id)} contextLabel={selectedContent.title} />
         </>
       )}
 

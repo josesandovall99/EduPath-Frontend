@@ -12,7 +12,7 @@ type ChatbotType = 'GENERAL' | 'MINIPROYECTO';
 
 interface MiniproyectoChatbotPanelProps {
   chatbotType?: ChatbotType;
-  areaId?: number | null;
+  asignaturaId?: number | null;
   miniproyectoId?: number | string | null;
   title?: string;
   subtitle?: string;
@@ -71,7 +71,7 @@ function buildWelcomeMessage(chatbotType: ChatbotType, chatbotName?: string | nu
 
 export function MiniproyectoChatbotPanel({
   chatbotType = 'MINIPROYECTO',
-  areaId = null,
+  asignaturaId = null,
   miniproyectoId = null,
   title = 'Cliente del Proyecto',
   subtitle = 'Chatbot gestionado por el administrador',
@@ -102,10 +102,10 @@ export function MiniproyectoChatbotPanel({
         searchParams.set('tipo', chatbotType);
         searchParams.set('allow_fallback', 'false');
 
-        const parsedAreaId = toOptionalPositiveId(areaId);
-        const shouldSendAreaId = chatbotType === 'GENERAL' || chatbotType === 'MINIPROYECTO';
-        if (shouldSendAreaId && parsedAreaId !== undefined) {
-          searchParams.set('area_id', String(parsedAreaId));
+        const parsedasignaturaId = toOptionalPositiveId(asignaturaId);
+        const shouldSendasignaturaId = chatbotType === 'GENERAL' || chatbotType === 'MINIPROYECTO';
+        if (shouldSendasignaturaId && parsedasignaturaId !== undefined) {
+          searchParams.set('asignatura_id', String(parsedasignaturaId));
         }
 
         const parsedMiniproyectoId = toOptionalPositiveId(miniproyectoId);
@@ -142,7 +142,7 @@ export function MiniproyectoChatbotPanel({
     return () => {
       cancelled = true;
     };
-  }, [chatbotType, areaId, miniproyectoId, contextLabel]);
+  }, [chatbotType, asignaturaId, miniproyectoId, contextLabel]);
 
   async function handleSend() {
     if (!inputValue.trim() || isLoading || !resolvedChatbot?.id) return;
@@ -157,8 +157,8 @@ export function MiniproyectoChatbotPanel({
       let receivedFirstChunk = false;
       const timeoutId = window.setTimeout(() => controller.abort(), CHATBOT_TIMEOUT_MS);
 
-      const payloadAreaId = (chatbotType === 'GENERAL' || chatbotType === 'MINIPROYECTO')
-        ? toOptionalPositiveId(areaId)
+      const payloadasignaturaId = (chatbotType === 'GENERAL' || chatbotType === 'MINIPROYECTO')
+        ? toOptionalPositiveId(asignaturaId)
         : undefined;
       const response = await fetch(`${API_BASE_URL}/chatbots/${resolvedChatbot.id}/chat/stream`, {
         method: 'POST',
@@ -168,7 +168,7 @@ export function MiniproyectoChatbotPanel({
           question: userMessage,
           topK: 3,
           tipo: chatbotType,
-          area_id: payloadAreaId,
+          asignatura_id: payloadasignaturaId,
           miniproyecto_id: chatbotType === 'MINIPROYECTO'
             ? toOptionalPositiveId(miniproyectoId)
             : undefined,

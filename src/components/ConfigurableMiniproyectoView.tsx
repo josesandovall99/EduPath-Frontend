@@ -14,8 +14,8 @@ interface ConfigurableMiniproyectoViewProps {
   content: {
     id: string;
     title: string;
-    areaId?: number;
-    areaNombre?: string;
+    asignaturaId?: number;
+    asignaturaNombre?: string;
   };
   onBack: () => void;
 }
@@ -30,7 +30,7 @@ interface MiniproyectoResponse {
   id: number;
   entregable?: string;
   respuesta_miniproyecto?: string;
-  Area?: { id?: number; nombre?: string };
+  Asignatura?: { id?: number; nombre?: string };
   Actividad?: { titulo?: string; descripcion?: string; nivel_dificultad?: string };
   chatbots?: ChatbotInfo[];
 }
@@ -538,7 +538,7 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
             {/* ── Chatbot ── */}
             {showChatbot && (
               <section style={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
-                <MiniproyectoChatbotPanel chatbotType="MINIPROYECTO" areaId={miniproyecto?.Area?.id || content.areaId || null} miniproyectoId={miniproyecto?.id || content.id} title="Petitbot" subtitle="Chatbot configurado para este miniproyecto" contextLabel={miniproyecto?.Actividad?.titulo || content.title} />
+                <MiniproyectoChatbotPanel chatbotType="MINIPROYECTO" asignaturaId={miniproyecto?.Asignatura?.id || content.asignaturaId || null} miniproyectoId={miniproyecto?.id || content.id} title="Petitbot" subtitle="Chatbot configurado para este miniproyecto" contextLabel={miniproyecto?.Actividad?.titulo || content.title} />
               </section>
             )}
 

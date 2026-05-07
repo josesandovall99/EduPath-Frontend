@@ -35,22 +35,22 @@ api.interceptors.request.use((config) => {
 
 interface ThemeManagementScreenProps {
   onBack: () => void;
-  initialAreaId?: string | number;
+  initialAsignaturaId?: string | number;
   initialEditTema?: {
     id: string | number;
     nombre: string;
     descripcion?: string;
     estado?: boolean;
-    area_id: string | number;
+    asignatura_id: string | number;
   };
   embedded?: boolean;
   backLabel?: string;
   mode?: 'admin' | 'docente';
-  lockAreaSelection?: boolean;
+  lockAsignaturaselection?: boolean;
 }
 
-interface Area {
-  id: string;
+interface Asignatura {
+  id: string | number;
   nombre: string;
   descripcion: string;
 }
@@ -60,7 +60,7 @@ interface Tema {
   nombre: string;
   descripcion: string;
   estado: boolean;
-  area_id: string;
+  asignatura_id: string | number;
 }
 
 interface Subtema {
@@ -90,8 +90,8 @@ const subjectColors: Record<string, { primary: string; light: string; icon: any 
   'alcance': { primary: '#F5A97F', light: '#FFF3E0', icon: BarChart3 }
 };
 
-export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, embedded = false, backLabel, mode = 'admin', lockAreaSelection = false }: ThemeManagementScreenProps) {
-  const [areas, setAreas] = useState<Area[]>([]);
+export function ThemeManagementScreen({ onBack, initialAsignaturaId, initialEditTema, embedded = false, backLabel, mode = 'admin', lockAsignaturaselection = false }: ThemeManagementScreenProps) {
+  const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
   const [subtemas, setSubtemas] = useState<Record<string, Subtema[]>>({});
   const [loading, setLoading] = useState(true);
@@ -109,58 +109,58 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
     nombre: '',
     descripcion: '',
     estado: true,
-    area_id: ''
+    asignatura_id: ''
   });
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const initialAreaIdValue = initialAreaId !== undefined && initialAreaId !== null ? String(initialAreaId) : '';
+  const initialAsignaturaIdValue = initialAsignaturaId !== undefined && initialAsignaturaId !== null ? String(initialAsignaturaId) : '';
   const isDocenteMode = mode === 'docente';
-  const buildAreaScopedConfig = (headers: Record<string, string> = {}, timeout?: number) => {
-    const areaId = selectedSubject || initialAreaIdValue || formData.area_id;
+  const buildasignaturascopedConfig = (headers: Record<string, string> = {}, timeout?: number) => {
+    const asignaturaId = selectedSubject || initialAsignaturaIdValue || formData.asignatura_id;
     return {
       ...(timeout ? { timeout } : {}),
       headers: {
         ...headers,
-        ...(isDocenteMode && areaId ? { 'x-area-id': String(areaId) } : {})
+        ...(isDocenteMode && asignaturaId ? { 'x-asignatura-id': String(asignaturaId) } : {})
       }
     };
   };
 
-  // Cargar áreas del backend
+  // Cargar asignaturas del backend
   useEffect(() => {
-    const fetchAreas = async () => {
+    const fetchasignaturas = async () => {
       try {
         setLoading(true);
         setError(null);
         
-      const response = await api.get('/areas', buildAreaScopedConfig({ Accept: 'application/json' }, 5000));
+      const response = await api.get('/asignaturas', buildasignaturascopedConfig({ Accept: 'application/json' }, 5000));
         
         const data = response.data;
         
         if (!Array.isArray(data)) {
-          throw new Error('La respuesta no es un array de áreas');
+          throw new Error('La respuesta no es un array de asignaturas');
         }
         
-        setAreas(data);
+        setAsignaturas(data);
         
-        // Establecer área inicial (si llega desde el overlay) o la primera disponible
-        const preferredAreaId = initialEditTema
-          ? String(initialEditTema.area_id)
-          : initialAreaIdValue;
-        const matchedArea = data.find(area => area.id === preferredAreaId);
-        if (matchedArea) {
-          setSelectedSubject(matchedArea.id);
+        // Establecer asignatura inicial (si llega desde el overlay) o la primera disponible
+        const preferredAsignaturaId = initialEditTema
+          ? String(initialEditTema.asignatura_id)
+          : initialAsignaturaIdValue;
+        const matchedAsignatura = data.find((a) => String(a.id) === String(preferredAsignaturaId));
+        if (matchedAsignatura) {
+          setSelectedSubject(String(matchedAsignatura.id));
         } else if (data.length > 0) {
-          setSelectedSubject(data[0].id);
+          setSelectedSubject(String(data[0].id));
         }
       } catch (err) {
-        let errorMessage = 'Error desconocido al cargar las áreas';
+        let errorMessage = 'Error desconocido al cargar las asignaturas';
         
         if (axios.isAxiosError(err)) {
           if (err.code === 'ECONNREFUSED') {
             errorMessage = 'No se pudo conectar al servidor. ¿Está corriendo?';
           } else if (err.response?.status === 404) {
-            errorMessage = 'El endpoint /areas no existe en el servidor.';
+            errorMessage = 'El endpoint /asignaturas no existe en el servidor.';
           } else if (err.response?.status) {
             errorMessage = `Error ${err.response.status}: ${err.response.statusText}`;
           } else if (err.message) {
@@ -171,13 +171,13 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
         }
         
         setError(errorMessage);
-        console.error('Error fetching areas:', err);
+        console.error('Error fetching asignaturas:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAreas();
+    fetchasignaturas();
   }, []);
 
   useEffect(() => {
@@ -187,20 +187,20 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
       nombre: initialEditTema.nombre,
       descripcion: initialEditTema.descripcion || '',
       estado: initialEditTema.estado ?? true,
-      area_id: String(initialEditTema.area_id)
+      asignatura_id: String(initialEditTema.asignatura_id)
     };
-    setSelectedSubject(String(initialEditTema.area_id));
+    setSelectedSubject(String(initialEditTema.asignatura_id));
     setEditingTema(normalizedTema);
     setFormData({
       nombre: normalizedTema.nombre,
       descripcion: normalizedTema.descripcion,
       estado: normalizedTema.estado,
-      area_id: normalizedTema.area_id
+      asignatura_id: normalizedTema.asignatura_id
     });
     setShowModal(true);
   }, [initialEditTema]);
 
-  // Cargar temas cuando cambia el área seleccionada
+  // Cargar temas cuando cambia el asignatura seleccionada
   useEffect(() => {
     if (!selectedSubject) return;
 
@@ -210,8 +210,8 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
         setTemasError(null);
         
         // Admin necesita ver TODOS los temas (habilitados y deshabilitados)
-        // Por eso usamos /temas en lugar de /temas/por-area que filtra por estado
-        const response = await api.get('/temas', buildAreaScopedConfig({ Accept: 'application/json' }, 5000));
+        // Por eso usamos /temas en lugar de /temas/por-asignatura que filtra por estado
+        const response = await api.get('/temas', buildasignaturascopedConfig({ Accept: 'application/json' }, 5000));
         
         const data = response.data;
         
@@ -219,11 +219,11 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
           throw new Error('La respuesta no es un array de temas');
         }
         
-        // Filtrar por área seleccionada
-        const temasPorArea = data.filter(tema => tema.area_id === selectedSubject);
+        // Filtrar por asignatura seleccionada
+        const temasPorAsignatura = data.filter((tema) => String(tema.asignatura_id) === String(selectedSubject));
         
         // Ordenar temas por la columna 'orden'
-        const temasOrdenados = temasPorArea.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+        const temasOrdenados = temasPorAsignatura.sort((a, b) => (a.orden || 0) - (b.orden || 0));
         setTemas(temasOrdenados);
       } catch (err) {
         let errorMessage = 'Error desconocido al cargar los temas';
@@ -232,7 +232,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
           if (err.code === 'ECONNREFUSED') {
             errorMessage = 'No se pudo conectar al servidor.';
           } else if (err.response?.status === 404) {
-            errorMessage = 'No hay temas para esta área.';
+            errorMessage = 'No hay temas para esta asignatura.';
           } else if (err.response?.status) {
             errorMessage = `Error ${err.response.status}: ${err.response.statusText}`;
           } else if (err.message) {
@@ -298,7 +298,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
       nombre: '',
       descripcion: '',
       estado: true,
-      area_id: selectedSubject
+      asignatura_id: selectedSubject
     });
     setShowModal(true);
   };
@@ -310,7 +310,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
       nombre: tema.nombre,
       descripcion: tema.descripcion,
       estado: tema.estado,
-      area_id: tema.area_id
+      asignatura_id: tema.asignatura_id
     });
     setShowModal(true);
   };
@@ -323,7 +323,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
       nombre: '',
       descripcion: '',
       estado: true,
-      area_id: selectedSubject
+      asignatura_id: selectedSubject
     });
   };
 
@@ -334,21 +334,35 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
       return;
     }
 
+    const rawAsignaturaId = selectedSubject || initialAsignaturaIdValue || formData.asignatura_id;
+    const asignaturaIdNum = Number(rawAsignaturaId);
+    if (!Number.isFinite(asignaturaIdNum)) {
+      alert('Selecciona una asignatura válida antes de guardar.');
+      return;
+    }
+
+    const payload = {
+      nombre: formData.nombre.trim(),
+      descripcion: formData.descripcion ?? '',
+      estado: formData.estado !== false,
+      asignatura_id: asignaturaIdNum,
+    };
+
     try {
       setSubmitting(true);
       
       if (editingTema) {
         // Actualizar tema existente
-      await api.put(`/temas/${editingTema.id}`, formData, buildAreaScopedConfig());
+      await api.put(`/temas/${editingTema.id}`, payload, buildasignaturascopedConfig());
         setSuccessMessage('Tema actualizado exitosamente');
         
         // Actualizar en el estado local
         setTemas(prev =>
-          prev.map(t => t.id === editingTema.id ? { ...t, ...formData } : t)
+          prev.map(t => t.id === editingTema.id ? { ...t, ...payload } : t)
         );
       } else {
         // Crear nuevo tema
-        const response = await api.post('/temas', formData, buildAreaScopedConfig());
+        const response = await api.post('/temas', payload, buildasignaturascopedConfig());
         setSuccessMessage('Tema creado exitosamente');
         
         // Agregar al inicio del estado local (porque orden=0)
@@ -362,7 +376,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
     } catch (err) {
       console.error('Error saving tema:', err);
       if (axios.isAxiosError(err) && err.response) {
-        alert(`Error: ${err.response.data.message || 'No se pudo guardar el tema'}`);
+        alert(`Error: ${err.response.data.message || err.response.data.detail || 'No se pudo guardar el tema'}`);
       } else {
         alert('Error al guardar el tema');
       }
@@ -380,7 +394,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
     if (!confirmDelete) return;
     
     try {
-      await api.delete(`/temas/${tema.id}`, buildAreaScopedConfig());
+      await api.delete(`/temas/${tema.id}`, buildasignaturascopedConfig());
       setSuccessMessage('Tema eliminado exitosamente');
       
       // Eliminar del estado local
@@ -402,16 +416,16 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
   const toggleTema = async (tema: Tema) => {
     try {
       const updatedEstado = !tema.estado;
-      await api.put(`/temas/${tema.id}/toggle-estado`, undefined, buildAreaScopedConfig());
+      await api.put(`/temas/${tema.id}/toggle-estado`, undefined, buildasignaturascopedConfig());
       setSuccessMessage(`Tema ${updatedEstado ? 'habilitado' : 'inhabilitado'} correctamente`);
       
       // Recargar todos los temas para que coincidan con el orden de la BD
-      const response = await api.get('/temas', buildAreaScopedConfig({ Accept: 'application/json' }));
+      const response = await api.get('/temas', buildasignaturascopedConfig({ Accept: 'application/json' }));
       
       const data = response.data;
       if (Array.isArray(data)) {
-        const temasPorArea = data.filter(t => t.area_id === selectedSubject);
-        const temasOrdenados = temasPorArea.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+        const temasPorAsignatura = data.filter((t) => String(t.asignatura_id) === String(selectedSubject));
+        const temasOrdenados = temasPorAsignatura.sort((a, b) => (a.orden || 0) - (b.orden || 0));
         setTemas(temasOrdenados);
       }
     } catch (err) {
@@ -485,17 +499,17 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
     await saveOrden(newTemas);
   };
 
-  // Obtener el tema/color según el índice del área seleccionada
+  // Obtener el tema/color según el índice del asignatura seleccionada
   const getColorByIndex = (index: number): string => {
     const colorKeys = Object.keys(subjectColors);
     return colorKeys[index % colorKeys.length];
   };
 
-  const areaIndex = areas.findIndex(a => a.id === selectedSubject);
-  const currentColorKey = areaIndex >= 0 ? getColorByIndex(areaIndex) : Object.keys(subjectColors)[0];
+  const AsignaturaIndex = asignaturas.findIndex((a) => String(a.id) === String(selectedSubject));
+  const currentColorKey = AsignaturaIndex >= 0 ? getColorByIndex(AsignaturaIndex) : Object.keys(subjectColors)[0];
   const currentColor = subjectColors[currentColorKey];
-  const currentSubject = areas.find(s => s.id === selectedSubject);
-  const hasFixedAreaContext = Boolean(initialAreaIdValue || initialEditTema?.area_id || lockAreaSelection);
+  const currentSubject = asignaturas.find((s) => String(s.id) === String(selectedSubject));
+  const hasFixedAsignaturaContext = Boolean(initialAsignaturaIdValue || initialEditTema?.asignatura_id || lockAsignaturaselection);
   const activeTemasCount = temas.filter((tema) => tema.estado !== false).length;
   const inactiveTemasCount = temas.filter((tema) => tema.estado === false).length;
 
@@ -505,7 +519,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
       <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando áreas...</p>
+          <p className="text-gray-600">Cargando asignaturas...</p>
         </div>
       </div>
     );
@@ -516,7 +530,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
     return (
       <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-600 font-semibold mb-2">Error al cargar las áreas</p>
+          <p className="text-red-600 font-semibold mb-2">Error al cargar las asignaturas</p>
           <p className="text-red-500 text-sm">{error}</p>
         </div>
       </div>
@@ -540,7 +554,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                 </button>
                 <div>
                   <h1 className="text-[#3A4A5B]">Gestión de temas</h1>
-                  <p className="text-gray-500 text-sm">{currentSubject ? `Área activa: ${currentSubject.nombre}` : (isDocenteMode ? 'Panel docente - EduPath' : 'Panel de administrador - EduPath')}</p>
+                  <p className="text-gray-500 text-sm">{currentSubject ? `Asignatura activa: ${currentSubject.nombre}` : (isDocenteMode ? 'Panel docente - EduPath' : 'Panel de administrador - EduPath')}</p>
                 </div>
               </div>
             </div>
@@ -565,7 +579,7 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
               <div className="app-page-hero__eyebrow">Estructura temática</div>
               <h2 className="app-page-hero__title">Gestión de temas</h2>
               <p className="app-page-hero__description">
-                Ordena, edita y revisa los temas del área activa sin salir del flujo actual.
+                Ordena, edita y revisa los temas del asignatura activa sin salir del flujo actual.
               </p>
             </div>
           </div>
@@ -574,8 +588,8 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
             <div className="app-toolbar-card">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Área y filtros</p>
-                  <p className="mt-1 text-sm text-slate-600">{hasFixedAreaContext ? 'El área se mantiene fija por el flujo de navegación actual.' : 'Selecciona el área activa antes de crear, ordenar o editar temas.'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Asignatura y filtros</p>
+                  <p className="mt-1 text-sm text-slate-600">{hasFixedAsignaturaContext ? 'El asignatura se mantiene fija por el flujo de navegación actual.' : 'Selecciona el asignatura activa antes de crear, ordenar o editar temas.'}</p>
                 </div>
                 <button
                   onClick={handleCreateTema}
@@ -589,10 +603,10 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="app-form-field">
-                  <label className="app-form-label">Área</label>
-                  {hasFixedAreaContext ? (
+                  <label className="app-form-label">Asignatura</label>
+                  {hasFixedAsignaturaContext ? (
                     <div className="app-form-static">
-                      <p className="text-gray-700 font-medium">{currentSubject?.nombre || 'Área no encontrada'}</p>
+                      <p className="text-gray-700 font-medium">{currentSubject?.nombre || 'Asignatura no encontrada'}</p>
                       <p className="text-xs text-gray-500 mt-1">{currentSubject?.descripcion || 'Contexto fijado por la pantalla anterior.'}</p>
                     </div>
                   ) : (
@@ -601,9 +615,9 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
                       onChange={(e) => setSelectedSubject(e.target.value)}
                       className="app-form-input"
                     >
-                      <option value="">Seleccionar área</option>
-                      {areas.map((area) => (
-                        <option key={area.id} value={area.id}>{area.nombre}</option>
+                      <option value="">Seleccionar asignatura</option>
+                      {asignaturas.map((Asignatura) => (
+                        <option key={Asignatura.id} value={Asignatura.id}>{Asignatura.nombre}</option>
                       ))}
                     </select>
                   )}
@@ -678,12 +692,12 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
           </div>
         ) : !selectedSubject ? (
           <div className="app-empty-panel py-12">
-            <p className="text-base text-slate-600">Selecciona un área para continuar.</p>
+            <p className="text-base text-slate-600">Selecciona un asignatura para continuar.</p>
           </div>
         ) : temas.length === 0 ? (
           <div className="app-empty-panel py-12">
-            <p className="text-base text-slate-600">No hay temas disponibles para esta área.</p>
-            <p className="mt-2 text-sm text-slate-500">Crea un tema para comenzar la estructura del área.</p>
+            <p className="text-base text-slate-600">No hay temas disponibles para esta asignatura.</p>
+            <p className="mt-2 text-sm text-slate-500">Crea un tema para comenzar la estructura del asignatura.</p>
           </div>
         ) : filteredTemas.length === 0 ? (
           <div className="app-empty-panel py-12">
@@ -910,14 +924,14 @@ export function ThemeManagementScreen({ onBack, initialAreaId, initialEditTema, 
 
                   <div className="app-form-field">
                     <label className="app-form-label">
-                      Área Asociada
+                      Asignatura Asociada
                     </label>
                     <div className="app-form-static">
                       <p className="text-gray-700 font-medium">
-                        {areas.find(a => a.id === formData.area_id)?.nombre || 'Área no encontrada'}
+                        {asignaturas.find(a => a.id === formData.asignatura_id)?.nombre || 'Asignatura no encontrada'}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {areas.find(a => a.id === formData.area_id)?.descripcion}
+                        {asignaturas.find(a => a.id === formData.asignatura_id)?.descripcion}
                       </p>
                     </div>
                   </div>

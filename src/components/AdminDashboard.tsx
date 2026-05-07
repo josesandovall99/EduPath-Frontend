@@ -2,13 +2,13 @@
  * Pantalla raíz del rol Administrador.
  *
  * Actúa como router interno entre el dashboard de inicio y los once módulos
- * de gestión (áreas, temas, subtemas, secuencias, contenidos, ejercicios,
+ * de gestión (asignaturas, temas, subtemas, secuencias, contenidos, ejercicios,
  * miniproyectos, chatbot, docentes, administradores, carga masiva).
  *
  * Responsabilidades:
  *  • Mantener el estado de navegación (pantalla actual + historial) y
  *    persistirlo en `localStorage` para sobrevivir refrescos.
- *  • Mantener el contexto académico seleccionado (área → tema → subtema)
+ *  • Mantener el contexto académico seleccionado (asignatura → tema → subtema)
  *    que se propaga a las pantallas hijas.
  *  • Calcular y exponer las métricas del panel (entidades activas) cuando
  *    la pantalla activa es el dashboard.
@@ -49,7 +49,7 @@ const lazyNamed = <T extends object>(loader: () => Promise<T>, key: keyof T) =>
 const ContentManagementScreen        = lazyNamed(() => import('./ContentManagementScreen'),        'ContentManagementScreen');
 const SequenceManagementScreen       = lazyNamed(() => import('./SequenceManagementScreen'),       'SequenceManagementScreen');
 const SubtemaSequenceManagementScreen= lazyNamed(() => import('./SubtemaSequenceManagementScreen'),'SubtemaSequenceManagementScreen');
-const AreasManagementScreen          = lazyNamed(() => import('./AreasManagementScreen'),          'AreasManagementScreen');
+const AsignaturasManagementScreen          = lazyNamed(() => import('./AsignaturasManagementScreen'),          'AsignaturasManagementScreen');
 const TemasManagementScreen          = lazyNamed(() => import('./TemasManagementScreen'),          'TemasManagementScreen');
 const SubThemeManagementScreen       = lazyNamed(() => import('./SubThemeManagementScreen'),       'SubThemeManagementScreen');
 const MiniproyectoManagementScreen   = lazyNamed(() => import('./MiniproyectoManagementScreen'),   'MiniproyectoManagementScreen');
@@ -68,7 +68,7 @@ interface AdminDashboardProps {
 /** Identificador interno de cada pantalla manejada por el router del dashboard. */
 type AdminScreen =
   | 'dashboard'
-  | 'areas'
+  | 'asignaturas'
   | 'temas'
   | 'subtema-sequences'
   | 'contents'
@@ -82,7 +82,7 @@ type AdminScreen =
 
 /** Conteo de entidades activas que se muestra en las tarjetas de métricas. */
 type DashboardStats = {
-  activeAreas: number;
+  activeasignaturas: number;
   activeTemas: number;
   activeEstudiantes: number;
   activeContenidos: number;
@@ -111,7 +111,7 @@ const ADMIN_DASHBOARD_STATE_KEY = 'adminDashboardState';
 
 /** Estado inicial de las métricas: todas en cero hasta que el fetch responda. */
 const EMPTY_STATS: DashboardStats = {
-  activeAreas: 0,
+  activeasignaturas: 0,
   activeTemas: 0,
   activeEstudiantes: 0,
   activeContenidos: 0,
@@ -143,10 +143,10 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   /** Pila de pantallas previas; se usa al pulsar "volver". */
   const [navigationHistory, setNavigationHistory] = useState<AdminScreen[]>([]);
 
-  // Contexto académico: área → tema → subtema. Cada nivel se propaga como
+  // Contexto académico: asignatura → tema → subtema. Cada nivel se propaga como
   // prop a la pantalla hija para que opere ya filtrada.
-  const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
-  const [selectedAreaName, setSelectedAreaName] = useState<string>('');
+  const [selectedAsignaturaId, setSelectedasignaturaId] = useState<number | null>(null);
+  const [selectedAsignaturaName, setSelectedasignaturaName] = useState<string>('');
   const [selectedTemaId, setSelectedTemaId] = useState<number | null>(null);
   const [selectedTemaName, setSelectedTemaName] = useState<string>('');
   const [selectedSubtemaId, setSelectedSubtemaId] = useState<number | null>(null);
@@ -169,8 +169,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       const parsed = JSON.parse(rawState) as Partial<{
         currentScreen: AdminScreen;
         navigationHistory: AdminScreen[];
-        selectedAreaId: number | null;
-        selectedAreaName: string;
+        selectedAsignaturaId: number | null;
+        selectedAsignaturaName: string;
         selectedTemaId: number | null;
         selectedTemaName: string;
         selectedSubtemaId: number | null;
@@ -179,8 +179,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
 
       if (parsed.currentScreen) setCurrentScreen(parsed.currentScreen);
       if (Array.isArray(parsed.navigationHistory)) setNavigationHistory(parsed.navigationHistory);
-      if (parsed.selectedAreaId !== undefined) setSelectedAreaId(parsed.selectedAreaId);
-      if (parsed.selectedAreaName !== undefined) setSelectedAreaName(parsed.selectedAreaName);
+      if (parsed.selectedAsignaturaId !== undefined) setSelectedasignaturaId(parsed.selectedAsignaturaId);
+      if (parsed.selectedAsignaturaName !== undefined) setSelectedasignaturaName(parsed.selectedAsignaturaName);
       if (parsed.selectedTemaId !== undefined) setSelectedTemaId(parsed.selectedTemaId);
       if (parsed.selectedTemaName !== undefined) setSelectedTemaName(parsed.selectedTemaName);
       if (parsed.selectedSubtemaId !== undefined) setSelectedSubtemaId(parsed.selectedSubtemaId);
@@ -201,8 +201,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       JSON.stringify({
         currentScreen,
         navigationHistory,
-        selectedAreaId,
-        selectedAreaName,
+        selectedAsignaturaId,
+        selectedAsignaturaName,
         selectedTemaId,
         selectedTemaName,
         selectedSubtemaId,
@@ -212,8 +212,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   }, [
     currentScreen,
     navigationHistory,
-    selectedAreaId,
-    selectedAreaName,
+    selectedAsignaturaId,
+    selectedAsignaturaName,
     selectedTemaId,
     selectedTemaName,
     selectedSubtemaId,
@@ -222,7 +222,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
 
   /**
    * Carga las métricas del panel mediante cuatro consultas en paralelo:
-   * `/areas`, `/temas`, `/estudiante` y `/contenidos`. Solo se dispara
+   * `/asignaturas`, `/temas`, `/estudiante` y `/contenidos`. Solo se dispara
    * cuando la pantalla activa es el dashboard (no al entrar a un submódulo)
    * y soporta cancelación via `isCancelled` para evitar `setState` después
    * de desmontar.
@@ -266,8 +266,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           throw lastError || new Error('No se pudo obtener la respuesta del servidor');
         };
 
-        const [areas, temas, estudiantes, contenidos] = await Promise.all([
-          fetchJsonWithFallback(['/areas']),
+        const [asignaturas, temas, estudiantes, contenidos] = await Promise.all([
+          fetchJsonWithFallback(['/asignaturas']),
           fetchJsonWithFallback(['/temas']),
           fetchJsonWithFallback(['/estudiante', '/estudiantes']),
           fetchJsonWithFallback(['/contenidos']),
@@ -278,7 +278,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         // El backend devuelve listas planas; se filtran las entidades
         // activas y se cuenta la cardinalidad resultante.
         setStatsData({
-          activeAreas: Array.isArray(areas) ? areas.filter((area) => isActiveFlag(area?.estado)).length : 0,
+          activeasignaturas: Array.isArray(asignaturas) ? asignaturas.filter((Asignatura) => isActiveFlag(Asignatura?.estado)).length : 0,
           activeTemas: Array.isArray(temas) ? temas.filter((tema) => isActiveFlag(tema?.estado)).length : 0,
           activeEstudiantes: Array.isArray(estudiantes)
             ? estudiantes.filter((estudiante) => isActiveFlag(estudiante?.persona?.estado)).length
@@ -337,13 +337,13 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   }, []);
 
   /**
-   * Selecciona un área desde la pantalla de áreas y limpia los niveles
+   * Selecciona un asignatura desde la pantalla de asignaturas y limpia los niveles
    * inferiores (tema/subtema) para que la siguiente pantalla los redefina.
    */
-  const handleAreaSelect = useCallback(
-    (areaId: number, areaName: string) => {
-      setSelectedAreaId(areaId);
-      setSelectedAreaName(areaName);
+  const handleasignaturaselect = useCallback(
+    (asignaturaId: number, asignaturaName: string) => {
+      setSelectedasignaturaId(asignaturaId);
+      setSelectedasignaturaName(asignaturaName);
       setSelectedTemaId(null);
       setSelectedTemaName('');
       setSelectedSubtemaId(null);
@@ -387,7 +387,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   /** Configuración de las tarjetas de métricas mostradas en la cabecera. */
   const stats = useMemo(
     () => [
-      { label: 'Áreas activas',        value: statsData.activeAreas,        icon: BookOpen,    color: '#4A90E2' },
+      { label: 'Asignaturas activas',        value: statsData.activeasignaturas,        icon: BookOpen,    color: '#4A90E2' },
       { label: 'Temas activos',        value: statsData.activeTemas,        icon: FileEdit,    color: '#7ED6A7' },
       { label: 'Estudiantes activos',  value: statsData.activeEstudiantes,  icon: Users,       color: '#F5A97F' },
       { label: 'Contenidos activos',   value: statsData.activeContenidos,   icon: TrendingUp,  color: '#14B8A6' },
@@ -403,12 +403,12 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
    */
   const actions = useMemo<DashboardAction[]>(
     () => [
-      { id: 'areas',          title: 'Gestión de Áreas',           description: 'Registro y organización de áreas académicas.',                       icon: BookOpen,      color: '#4A90E2', gradient: 'from-[#4A90E2] to-[#5B9FED]', group: 'workflow', badge: 'Paso 1',       tone: 'blue',  onClick: () => navigateTo('areas') },
+      { id: 'asignaturas',          title: 'Gestión de Asignaturas',           description: 'Registro y organización de asignaturas académicas.',                       icon: BookOpen,      color: '#4A90E2', gradient: 'from-[#4A90E2] to-[#5B9FED]', group: 'workflow', badge: 'Paso 1',       tone: 'blue',  onClick: () => navigateTo('asignaturas') },
       { id: 'contents',       title: 'Catálogo de Contenidos',     description: 'Administración del catálogo de contenidos, recursos y actividades.', icon: TrendingUp,    color: '#0F766E', gradient: 'from-[#0F766E] to-[#14B8A6]', group: 'workflow', badge: 'Paso final',   tone: 'green', onClick: () => navigateTo('content-management') },
       { id: 'ejercicios',     title: 'Gestión de Ejercicios',      description: 'Creación y edición de ejercicios asociados a contenidos.',           icon: ClipboardList, color: '#0EA5E9', gradient: 'from-[#0EA5E9] to-[#38BDF8]', group: 'workflow', badge: 'Complemento',  tone: 'blue',  onClick: () => navigateTo('ejercicios') },
       { id: 'miniproyectos',  title: 'Gestión de Miniproyectos',   description: 'Administración de miniproyectos y actividades relacionadas.',         icon: ClipboardList, color: '#0EA5E9', gradient: 'from-[#0EA5E9] to-[#38BDF8]', group: 'workflow', badge: 'Complemento',  tone: 'green', onClick: () => navigateTo('miniproyectos') },
       { id: 'reports',        title: 'Generación de Informes',     description: 'Consulta y exportación de informes de progreso y estado.',           icon: BarChart3,     color: '#F5A97F', gradient: 'from-[#F5A97F] to-[#F7B98F]', group: 'support',  badge: 'Seguimiento',  tone: 'amber', navigateSection: 'reports' },
-      { id: 'docentes',       title: 'Gestión de Docentes',        description: 'Administración de docentes, especialidades y áreas asignadas.',      icon: Users,         color: '#14B8A6', gradient: 'from-[#14B8A6] to-[#2DD4BF]', group: 'support',  badge: 'Operación',    tone: 'green', onClick: () => navigateTo('docentes') },
+      { id: 'docentes',       title: 'Gestión de Docentes',        description: 'Administración de docentes, especialidades y asignaturas asignadas.',      icon: Users,         color: '#14B8A6', gradient: 'from-[#14B8A6] to-[#2DD4BF]', group: 'support',  badge: 'Operación',    tone: 'green', onClick: () => navigateTo('docentes') },
       { id: 'administradores',title: 'Gestión de Administradores', description: 'Administración de cuentas y credenciales del rol administrador.',    icon: Shield,        color: '#2563EB', gradient: 'from-[#2563EB] to-[#3B82F6]', group: 'support',  badge: 'Control',      tone: 'blue',  onClick: () => navigateTo('administradores') },
       { id: 'upload',         title: 'Carga Masiva de Estudiantes',description: 'Importación masiva de estudiantes desde archivo Excel.',            icon: Upload,        color: '#F472B6', gradient: 'from-[#F472B6] to-[#FB87C6]', group: 'support',  badge: 'Operación',    tone: 'amber', navigateSection: 'upload' },
       { id: 'chatbot',        title: 'Gestión del Chatbot',        description: 'Administración de documentos y actualización de la base de conocimiento.', icon: Bot,       color: '#6366F1', gradient: 'from-[#6366F1] to-[#818CF8]', group: 'support',  badge: 'Soporte',      tone: 'slate', onClick: () => navigateTo('chatbot') },
@@ -417,7 +417,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   );
 
   /** Indicadores de qué nivel del contexto académico está poblado. */
-  const hasAreaContext = Boolean(selectedAreaId);
+  const hasAsignaturaContext = Boolean(selectedAsignaturaId);
   const hasTemaContext = Boolean(selectedTemaId);
   const hasSubtemaContext = Boolean(selectedSubtemaId);
 
@@ -426,9 +426,9 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
     ? 'Secuencias y contenidos'
     : hasTemaContext
       ? 'Subtemas'
-      : hasAreaContext
+      : hasAsignaturaContext
         ? 'Temas'
-        : 'Áreas';
+        : 'Asignaturas';
 
   /** Tarjetas pertenecientes a la ruta principal de gestión académica. */
   const academicActions = useMemo(() => actions.filter((a) => a.group === 'workflow'), [actions]);
@@ -440,12 +440,12 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
 
   /**
    * `true` cuando el catálogo de contenidos se abrió DESDE el flujo de
-   * gestión académica (área/tema/subtema seleccionado) en lugar del acceso
+   * gestión académica (asignatura/tema/subtema seleccionado) en lugar del acceso
    * directo desde el dashboard. Determina si la pantalla de contenidos debe
    * filtrarse por contexto (`flow`) o mostrar el catálogo completo (`catalog`).
    */
   const isContentManagementFlowScoped =
-    lastNavigationScreen === 'contents' && (hasAreaContext || hasTemaContext || hasSubtemaContext);
+    lastNavigationScreen === 'contents' && (hasAsignaturaContext || hasTemaContext || hasSubtemaContext);
 
   /**
    * Despacha la activación de una tarjeta. Si tiene `onClick` lo ejecuta
@@ -512,18 +512,18 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   //
   // Cada `if` evalúa la pantalla activa y delega en la pantalla hija
   // correspondiente. Cuando una pantalla requiere un contexto que aún no
-  // está poblado (p.ej. abrir 'temas' sin un área seleccionada), se
+  // está poblado (p.ej. abrir 'temas' sin un asignatura seleccionada), se
   // redirige automáticamente al paso anterior para que el usuario lo
   // complete. Esto evita estados inválidos en submódulos.
   // ─────────────────────────────────────────────────────────────────────
 
   if (currentScreen === 'subthemes') {
-    // Subtemas requiere área Y tema. Si falta alguno, se baja al paso
+    // Subtemas requiere asignatura Y tema. Si falta alguno, se baja al paso
     // correspondiente sin perder la pantalla destino del historial.
-    if (!selectedAreaId) {
+    if (!selectedAsignaturaId) {
       return (
         <Suspense fallback={<ScreenLoader />}>
-          <AreasManagementScreen onBack={goBack} onHome={goHome} onSelectArea={handleAreaSelect} />
+          <AsignaturasManagementScreen onBack={goBack} onHome={goHome} onSelectAsignatura={handleasignaturaselect} />
         </Suspense>
       );
     }
@@ -531,8 +531,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       return (
         <Suspense fallback={<ScreenLoader />}>
           <TemasManagementScreen
-            areaId={selectedAreaId}
-            areaName={selectedAreaName}
+            asignaturaId={selectedAsignaturaId}
+            asignaturaName={selectedAsignaturaName}
             onBack={goBack}
             onHome={goHome}
             onSelectTema={(temaId, temaName) => handleTemaSelect(temaId, temaName, 'subthemes')}
@@ -545,13 +545,13 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         <SubThemeManagementScreen
           onBack={goBack}
           onHome={goHome}
-          initialAreaId={selectedAreaId}
+          initialAsignaturaId={selectedAsignaturaId}
           initialTemaId={selectedTemaId}
-          onManageSequences={(nextAreaId, nextAreaName, nextTemaId, nextTemaName) => {
+          onManageSequences={(nextasignaturaId, nextasignaturaName, nextTemaId, nextTemaName) => {
             // Salta a la gestión de secuencias dentro del mismo tema
             // refrescando el contexto recibido por el callback.
-            setSelectedAreaId(nextAreaId);
-            setSelectedAreaName(nextAreaName);
+            setSelectedasignaturaId(nextasignaturaId);
+            setSelectedasignaturaName(nextasignaturaName);
             setSelectedTemaId(nextTemaId);
             setSelectedTemaName(nextTemaName);
             setSelectedSubtemaId(null);
@@ -563,27 +563,27 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
     );
   }
 
-  if (currentScreen === 'areas') {
+  if (currentScreen === 'asignaturas') {
     return (
       <Suspense fallback={<ScreenLoader />}>
-        <AreasManagementScreen onBack={goBack} onHome={goHome} onSelectArea={handleAreaSelect} />
+        <AsignaturasManagementScreen onBack={goBack} onHome={goHome} onSelectAsignatura={handleasignaturaselect} />
       </Suspense>
     );
   }
 
   if (currentScreen === 'temas') {
-    if (!selectedAreaId) {
+    if (!selectedAsignaturaId) {
       return (
         <Suspense fallback={<ScreenLoader />}>
-          <AreasManagementScreen onBack={goBack} onHome={goHome} onSelectArea={handleAreaSelect} />
+          <AsignaturasManagementScreen onBack={goBack} onHome={goHome} onSelectAsignatura={handleasignaturaselect} />
         </Suspense>
       );
     }
     return (
       <Suspense fallback={<ScreenLoader />}>
         <TemasManagementScreen
-          areaId={selectedAreaId}
-          areaName={selectedAreaName}
+          asignaturaId={selectedAsignaturaId}
+          asignaturaName={selectedAsignaturaName}
           onBack={goBack}
           onHome={goHome}
           onSelectTema={(temaId, temaName) => handleTemaSelect(temaId, temaName, 'subthemes')}
@@ -593,10 +593,10 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   }
 
   if (currentScreen === 'subtema-sequences') {
-    if (!selectedAreaId) {
+    if (!selectedAsignaturaId) {
       return (
         <Suspense fallback={<ScreenLoader />}>
-          <AreasManagementScreen onBack={goBack} onHome={goHome} onSelectArea={handleAreaSelect} />
+          <AsignaturasManagementScreen onBack={goBack} onHome={goHome} onSelectAsignatura={handleasignaturaselect} />
         </Suspense>
       );
     }
@@ -604,8 +604,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       return (
         <Suspense fallback={<ScreenLoader />}>
           <TemasManagementScreen
-            areaId={selectedAreaId}
-            areaName={selectedAreaName}
+            asignaturaId={selectedAsignaturaId}
+            asignaturaName={selectedAsignaturaName}
             onBack={goBack}
             onHome={goHome}
             onSelectTema={(temaId, temaName) => handleTemaSelect(temaId, temaName, 'subthemes')}
@@ -619,8 +619,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           onBack={goBack}
           onHome={goHome}
           onSelectSubtema={handleSubtemaSelect}
-          areaId={selectedAreaId || undefined}
-          areaName={selectedAreaName}
+          asignaturaId={selectedAsignaturaId || undefined}
+          asignaturaName={selectedAsignaturaName}
           temaId={selectedTemaId || undefined}
           temaName={selectedTemaName}
         />
@@ -686,8 +686,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             onGoToContentManagement={() => navigateTo('content-management')}
             subtemaId={selectedSubtemaId}
             temaId={selectedTemaId}
-            areaId={selectedAreaId || undefined}
-            areaName={selectedAreaName}
+            asignaturaId={selectedAsignaturaId || undefined}
+            asignaturaName={selectedAsignaturaName}
             temaName={selectedTemaName}
             subtemaNombre={selectedSubtemaNombre}
           />
@@ -699,9 +699,9 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         <ContentManagementScreen
           onBack={goBack}
           onHome={goHome}
-          scopeMode={hasAreaContext || hasTemaContext || hasSubtemaContext ? 'flow' : 'catalog'}
-          initialAreaId={selectedAreaId || undefined}
-          initialAreaName={selectedAreaName || undefined}
+          scopeMode={hasAsignaturaContext || hasTemaContext || hasSubtemaContext ? 'flow' : 'catalog'}
+          initialAsignaturaId={selectedAsignaturaId || undefined}
+          initialAsignaturaName={selectedAsignaturaName || undefined}
           initialTemaId={selectedTemaId || undefined}
           initialTemaName={selectedTemaName || undefined}
           initialSubtemaId={selectedSubtemaId || undefined}
@@ -721,8 +721,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           onBack={goBack}
           onHome={goHome}
           scopeMode={isContentManagementFlowScoped ? 'flow' : 'catalog'}
-          initialAreaId={isContentManagementFlowScoped ? selectedAreaId || undefined : undefined}
-          initialAreaName={isContentManagementFlowScoped ? selectedAreaName || undefined : undefined}
+          initialAsignaturaId={isContentManagementFlowScoped ? selectedAsignaturaId || undefined : undefined}
+          initialAsignaturaName={isContentManagementFlowScoped ? selectedAsignaturaName || undefined : undefined}
           initialTemaId={isContentManagementFlowScoped ? selectedTemaId || undefined : undefined}
           initialTemaName={isContentManagementFlowScoped ? selectedTemaName || undefined : undefined}
           initialSubtemaId={isContentManagementFlowScoped ? selectedSubtemaId || undefined : undefined}
@@ -787,18 +787,18 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         </div>
 
         {/*
-          Guía de flujo: muestra el orden recomendado (Áreas → Temas →
+          Guía de flujo: muestra el orden recomendado (Asignaturas → Temas →
           Subtemas → Secuencias) y el progreso del usuario derivado del
           contexto académico que tenga seleccionado.
         */}
         <AdminFlowGuide
           eyebrow="Flujo de gestión"
           title="Orden de gestión académica"
-          description="Referencia del orden de acceso para áreas, temas, subtemas y secuencias."
+          description="Referencia del orden de acceso para asignaturas, temas, subtemas y secuencias."
           breadcrumbs={[{ label: 'Panel admin' }, { label: currentFlowLabel, current: true }]}
           steps={[
-            { label: 'Áreas',                    helper: 'Definición de la estructura base.',           status: hasAreaContext ? 'complete' : 'current' },
-            { label: 'Temas',                    helper: 'Organización temática por área.',             status: hasTemaContext ? 'complete' : hasAreaContext ? 'current' : 'upcoming' },
+            { label: 'Asignaturas',                    helper: 'Definición de la estructura base.',           status: hasAsignaturaContext ? 'complete' : 'current' },
+            { label: 'Temas',                    helper: 'Organización temática por asignatura.',             status: hasTemaContext ? 'complete' : hasAsignaturaContext ? 'current' : 'upcoming' },
             { label: 'Subtemas',                 helper: 'Detalle de la estructura académica.',         status: hasSubtemaContext ? 'complete' : hasTemaContext ? 'current' : 'upcoming' },
             { label: 'Secuencias y contenidos',  helper: 'Orden y gestión del contenido final.',        status: hasSubtemaContext ? 'current' : 'upcoming' },
           ]}
@@ -827,7 +827,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           <div className="app-section-head">
             <div>
               <h3 className="app-section-title">Gestión académica</h3>
-              <p className="app-section-description">Módulos para áreas, contenidos, ejercicios y miniproyectos.</p>
+              <p className="app-section-description">Módulos para asignaturas, contenidos, ejercicios y miniproyectos.</p>
             </div>
           </div>
           <div className="app-card-grid">{academicActions.map(renderActionCard)}</div>

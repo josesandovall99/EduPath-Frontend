@@ -24,8 +24,8 @@ interface Content {
   status: 'completed' | 'in-progress' | 'not-started';
   isMiniproyecto?: boolean;
   actividadId?: number;
-  areaId?: number;
-  areaNombre?: string;
+  asignaturaId?: number;
+  asignaturaNombre?: string;
   tipoPilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null;
   miniproyectoAprobado?: boolean;
   miniproyectoMode?: 'legacy' | 'configurable';
@@ -38,7 +38,7 @@ interface Content {
 interface Tema {
   id: number;
   nombre: string;
-  area_id: number;
+  asignatura_id: number;
 }
 
 interface Subtema {
@@ -61,7 +61,7 @@ interface MiniproyectoApiItem {
   entregable?: string;
   respuesta_miniproyecto?: string;
   seleccionadoParaEstudiantes?: boolean;
-  Area?: { id: number; nombre: string; tipo_pilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null };
+  Asignatura?: { id: number; nombre: string; tipo_pilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null };
   Actividad?: { id: number; titulo?: string; descripcion?: string; nivel_dificultad?: string };
 }
 
@@ -149,7 +149,6 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentProgress, setCurrentProgress] = useState(0);
-  const [loadingProgress, setLoadingProgress] = useState(false);
   const [temasConEstadoProgreso, setTemasConEstadoProgreso] = useState<Map<string, any>>(new Map()); // Estado de desbloqueo opcional
   const [miniproyectoNotice, setMiniproyectoNotice] = useState<string | null>(null);
   const noticeTimeoutRef = useRef<number | null>(null);
@@ -164,16 +163,15 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     };
   }, []);
 
-  // Obtener progreso dinámico del estudiante en el área
-  const obtenerProgresoArea = async () => {
+  // Obtener progreso dinámico del estudiante en el asignatura
+  const obtenerProgresoAsignatura = async () => {
     if (!estudianteId || !subject.id) {
       console.warn('No hay estudiante_id o subject.id disponibles');
       return;
     }
 
-    setLoadingProgress(true);
     try {
-      const url = `${API_BASE_URL}/progresos/por-area?area_id=${subject.id}&estudiante_id=${estudianteId}`;
+      const url = `${API_BASE_URL}/progresos/por-asignatura?asignatura_id=${subject.id}&estudiante_id=${estudianteId}`;
       console.log(`Obteniendo progreso desde: ${url}`);
       
       const response = await fetch(url);
@@ -186,14 +184,12 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
       }
       
       const data = await response.json();
-      const porcentaje = data.resumen?.porcentajeTotalArea || 0;
+      const porcentaje = data.resumen?.porcentajeTotalAsignatura || 0;
       setCurrentProgress(Math.round(porcentaje));
-      console.log(`Progreso del área: ${porcentaje}%`);
+      console.log(`Progreso del asignatura: ${porcentaje}%`);
     } catch (err) {
       console.error('Error al obtener progreso:', err);
       setCurrentProgress(0);
-    } finally {
-      setLoadingProgress(false);
     }
   };
 
@@ -230,7 +226,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     
     try {
       const response = await fetch(
-        `${API_BASE_URL}/progresos/estado-temas-area?estudiante_id=${estudianteId}&area_id=${subject.id}`
+        `${API_BASE_URL}/progresos/estado-temas-asignatura?estudiante_id=${estudianteId}&asignatura_id=${subject.id}`
       );
       
       if (response.ok) {
@@ -258,7 +254,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
 
   // Cargar progreso dinámico del estudiante
   useEffect(() => {
-    obtenerProgresoArea();
+    obtenerProgresoAsignatura();
     intentarCargarEstadoDesbloqueo();
   }, [subject.id, estudianteId]);
 
@@ -268,10 +264,10 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         setLoading(true);
         setError(null);
 
-        console.log('🔄 Fetching temas for area:', subject.id);
+        console.log('🔄 Fetching temas for Asignatura:', subject.id);
 
-        // Obtener todos los temas del área
-        const temasResponse = await fetch(`${API_BASE_URL}/temas/por-area/${subject.id}`);
+        // Obtener todos los temas del asignatura
+        const temasResponse = await fetch(`${API_BASE_URL}/temas/por-asignatura/${subject.id}`);
 
         // Validación: verificar si response es exitosa
         if (!temasResponse.ok) {
@@ -280,7 +276,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
 
         const contentType = temasResponse.headers.get('content-type');
         if (!contentType?.includes('application/json')) {
-          throw new Error(`Invalid response type from /temas/por-area. Expected JSON, got: ${contentType}`);
+          throw new Error(`Invalid response type from /temas/por-asignatura. Expected JSON, got: ${contentType}`);
         }
 
         const temas: Tema[] = await temasResponse.json();
@@ -337,10 +333,10 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           };
         });
 
-        // Obtener miniproyectos del área y agregarlos al final como tema fijo
+        // Obtener miniproyectos del asignatura y agregarlos al final como tema fijo
         let miniproyectosContent: Content[] = [];
         try {
-          const minisResponse = await fetch(`${API_BASE_URL}/miniproyectos?area_id=${subject.id}`);
+          const minisResponse = await fetch(`${API_BASE_URL}/miniproyectos?asignatura_id=${subject.id}`);
           if (minisResponse.ok) {
             const minis: MiniproyectoApiItem[] = await minisResponse.json();
             const minisArray = Array.isArray(minis) ? minis : [];
@@ -389,16 +385,16 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 status: aprobado ? 'completed' : ('not-started' as const),
                 isMiniproyecto: true,
                 actividadId: Number(mini.actividad_id),
-                areaId: mini.Area?.id,
-                areaNombre: mini.Area?.nombre,
-                tipoPilar: mini.Area?.tipo_pilar || null,
+                asignaturaId: mini.Asignatura?.id,
+                asignaturaNombre: mini.Asignatura?.nombre,
+                tipoPilar: mini.Asignatura?.tipo_pilar || null,
                 miniproyectoAprobado: aprobado,
                 miniproyectoMode: configurablePayload ? 'configurable' : 'legacy',
                 completo: aprobado
               };
             });
           } else {
-            console.warn('No se pudieron cargar miniproyectos del área');
+            console.warn('No se pudieron cargar miniproyectos del asignatura');
           }
         } catch (minisError) {
           console.warn('Error al cargar miniproyectos:', minisError);
@@ -494,7 +490,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[#3A4A5B]">Progreso</h3>
             <span className="text-2xl" style={{ color: colors.primary }}>
-              {loadingProgress ? '...' : `${currentProgress}%`}
+              {`${currentProgress}%`}
             </span>
           </div>
           <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">

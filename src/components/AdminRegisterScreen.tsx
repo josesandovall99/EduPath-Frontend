@@ -10,7 +10,7 @@ export function AdminRegisterScreen({ onBack, onRegister }: AdminRegisterScreenP
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#4A90E2] via-[#5B9FED] to-[#7ED6A7] py-12">
       <div className="w-full max-w-3xl mx-auto px-8">
-        {/* Logo/Title Area */}
+        {/* Logo/Title Asignatura */}
         <div className="mb-8 text-center">
           <div className="w-20 h-20 mx-auto mb-4 bg-white rounded-2xl shadow-lg flex items-center justify-center p-3">
             <img src='https://tse1.mm.bing.net/th/id/OIP.RfniSZo5EqSsXFGeP-zRuQHaE7?cb=ucfimg2&ucfimg=1&rs=1&pid=ImgDetMain&o=7&rm=3' alt="EduPath" className="w-full h-full object-contain" />

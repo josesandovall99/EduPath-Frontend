@@ -8,7 +8,7 @@ interface Subject {
   name: string;
 }
 
-interface Area {
+interface Asignatura {
   id: number;
   nombre: string;
   descripcion?: string;
@@ -21,11 +21,11 @@ interface DashboardScreenProps {
   estudianteId?: number;
 }
 
-type RestrictedAreaCategory = 'fundamentos' | 'analisis' | 'atc';
+type RestrictedAsignaturaCategory = 'fundamentos' | 'analisis' | 'atc';
 
 const colorPalette = ['#4A90E2', '#7ED6A7', '#F5A97F', '#FFB84D', '#A78BFA', '#EC4899'];
 
-const normalizeAreaName = (value?: string | null) =>
+const normalizeasignaturaName = (value?: string | null) =>
   (value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -33,8 +33,8 @@ const normalizeAreaName = (value?: string | null) =>
     .trim()
     .replace(/\s+/g, ' ');
 
-const getRestrictedAreaCategory = (areaName?: string | null): RestrictedAreaCategory | null => {
-  const normalizedName = normalizeAreaName(areaName);
+const getRestrictedAsignaturaCategory = (asignaturaName?: string | null): RestrictedAsignaturaCategory | null => {
+  const normalizedName = normalizeasignaturaName(asignaturaName);
 
   if (normalizedName.includes('fundamentos') && normalizedName.includes('program')) {
     return 'fundamentos';
@@ -58,25 +58,24 @@ const getRestrictedAreaCategory = (areaName?: string | null): RestrictedAreaCate
   return null;
 };
 
-// Si el fetch de áreas falla, mostramos lista vacía + alerta — no se inventan datos.
+// Si el fetch de asignaturas falla, mostramos lista vacía + alerta — no se inventan datos.
 
 export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudianteId }: DashboardScreenProps) {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Mapa areaId → datos reales del progreso del backend
-  type AreaProgress = {
+  // Mapa asignaturaId → datos reales del progreso del backend
+  type AsignaturaProgress = {
     porcentaje: number;
     temasTotal: number;
     temasCompletados: number;
     temasPendientes: number;
     siguienteTema: string;
   };
-  const [progresosPorArea, setProgresosPorArea] = useState<Map<number, AreaProgress>>(new Map());
-  const [loadingProgresos, setLoadingProgresos] = useState(false);
+  const [progresosPorAsignatura, setProgresosPorAsignatura] = useState<Map<number, AsignaturaProgress>>(new Map());
 
-  // Función para obtener áreas permitidas según el semestre
-  const obtenerAreasPermitidas = (semestre: number): RestrictedAreaCategory[] => {
+  // Función para obtener asignaturas permitidas según el semestre
+  const obtenerasignaturasPermitidas = (semestre: number): RestrictedAsignaturaCategory[] => {
     if (semestre >= 1 && semestre <= 4) {
       return ['fundamentos'];
     } else if (semestre >= 5 && semestre <= 6) {
@@ -87,40 +86,40 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
     return []; // Si el semestre está fuera de rango
   };
 
-  // Obtener progreso real de un área (porcentaje + info de temas)
-  const obtenerProgresoArea = async (areaId: number): Promise<AreaProgress> => {
-    const empty: AreaProgress = {
+  // Obtener progreso real de un asignatura (porcentaje + info de temas)
+  const obtenerProgresoAsignatura = async (asignaturaId: number): Promise<AsignaturaProgress> => {
+    const empty: AsignaturaProgress = {
       porcentaje: 0, temasTotal: 0, temasCompletados: 0, temasPendientes: 0,
       siguienteTema: 'Sin temas registrados'
     };
     if (!estudianteId) return empty;
     try {
-      const url = `${API_BASE_URL}/progresos/por-area?area_id=${areaId}&estudiante_id=${estudianteId}`;
+      const url = `${API_BASE_URL}/progresos/por-asignatura?asignatura_id=${asignaturaId}&estudiante_id=${estudianteId}`;
       const response = await fetch(url);
       if (!response.ok) return empty;
       const data = await response.json();
       return {
-        porcentaje: Math.round(data.resumen?.porcentajeTotalArea || 0),
+        porcentaje: Math.round(data.resumen?.porcentajeTotalAsignatura || 0),
         temasTotal: Number(data.temas?.total ?? 0),
         temasCompletados: Number(data.temas?.completados ?? 0),
         temasPendientes: Number(data.temas?.pendientes ?? 0),
         siguienteTema: data.temas?.siguiente || 'Sin temas registrados',
       };
     } catch (err) {
-      console.error(`Error al obtener progreso del área ${areaId}:`, err);
+      console.error(`Error al obtener progreso del asignatura ${asignaturaId}:`, err);
       return empty;
     }
   };
 
   useEffect(() => {
-    const fetchAreas = async () => {
+    const fetchasignaturas = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        console.log('Fetching areas from:', `${API_BASE_URL}/areas`);
+        console.log('Fetching asignaturas from:', `${API_BASE_URL}/asignaturas`);
 
-        const response = await fetch(`${API_BASE_URL}/areas`);
+        const response = await fetch(`${API_BASE_URL}/asignaturas`);
 
         // Validación crítica: verificar si la respuesta es exitosa
         if (!response.ok) {
@@ -132,34 +131,34 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           throw new Error(`Invalid content type. Expected JSON, got: ${contentType}`);
         }
 
-        const areas = await response.json();
-        console.log('Areas loaded successfully:', areas);
+        const asignaturas = await response.json();
+        console.log('asignaturas loaded successfully:', asignaturas);
 
         // Filtro de seguridad: obtener semestre del estudiante
         // NOTA: Esto debería venir del backend en producción
         const semestre = parseInt(localStorage.getItem('semestreEstudiante') || '1');
-        const areasPermitidas = obtenerAreasPermitidas(semestre);
+        const asignaturasPermitidas = obtenerasignaturasPermitidas(semestre);
         
-        // Filtrar áreas según el semestre
-        const areasFiltradas = areas.filter((area: Area) => {
-          const restrictedCategory = getRestrictedAreaCategory(area.nombre);
+        // Filtrar asignaturas según el semestre
+        const asignaturasFiltradas = asignaturas.filter((Asignatura: Asignatura) => {
+          const restrictedCategory = getRestrictedAsignaturaCategory(Asignatura.nombre);
 
-          // Las áreas históricas siguen limitadas por semestre.
-          // Cualquier área nueva queda visible para todos los estudiantes.
+          // Las asignaturas históricas siguen limitadas por semestre.
+          // Cualquier asignatura nueva queda visible para todos los estudiantes.
           if (!restrictedCategory) {
             return true;
           }
 
-          return areasPermitidas.includes(restrictedCategory);
+          return asignaturasPermitidas.includes(restrictedCategory);
         });
 
-        console.log(`Semestre ${semestre} - Áreas permitidas:`, areasPermitidas);
-        console.log('Áreas filtradas:', areasFiltradas);
+        console.log(`Semestre ${semestre} - Asignaturas permitidas:`, asignaturasPermitidas);
+        console.log('Asignaturas filtradas:', asignaturasFiltradas);
 
-        // Transformar áreas a formato de subjects (los temas/progreso se cargan después desde el backend)
-        const transformedSubjects = areasFiltradas.map((area: Area, index: number) => ({
-          id: area.id.toString(),
-          name: area.nombre,
+        // Transformar asignaturas a formato de subjects (los temas/progreso se cargan después desde el backend)
+        const transformedSubjects = asignaturasFiltradas.map((Asignatura: Asignatura, index: number) => ({
+          id: Asignatura.id.toString(),
+          name: Asignatura.nombre,
           icon: Code,
           color: colorPalette[index % colorPalette.length],
         }));
@@ -167,8 +166,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         setSubjects(transformedSubjects);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-        console.error('Error fetching areas:', errorMessage);
-        setError(`No se pudieron cargar las áreas: ${errorMessage}`);
+        console.error('Error fetching asignaturas:', errorMessage);
+        setError(`No se pudieron cargar las asignaturas: ${errorMessage}`);
         
         // No se inventan datos: lista vacía + alerta para que el estudiante sepa que algo falló
         setSubjects([]);
@@ -177,23 +176,21 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
       }
     };
 
-    fetchAreas();
+    fetchasignaturas();
   }, []);
 
-  // Cargar progreso real (en paralelo) cuando las áreas se carguen
+  // Cargar progreso real (en paralelo) cuando las asignaturas se carguen
   useEffect(() => {
     if (subjects.length > 0 && estudianteId) {
-      setLoadingProgresos(true);
       const cargarProgresos = async () => {
         const entries = await Promise.all(
           subjects.map(async (s) => {
-            const areaId = parseInt(s.id);
-            const progreso = await obtenerProgresoArea(areaId);
-            return [areaId, progreso] as const;
+            const asignaturaId = parseInt(s.id);
+            const progreso = await obtenerProgresoAsignatura(asignaturaId);
+            return [asignaturaId, progreso] as const;
           })
         );
-        setProgresosPorArea(new Map(entries));
-        setLoadingProgresos(false);
+        setProgresosPorAsignatura(new Map(entries));
       };
       cargarProgresos();
     }
@@ -238,7 +235,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
             <div className="app-page-hero__copy">
               <div className="app-page-hero__eyebrow">Panel académico</div>
               <h2 className="app-page-hero__title">{userName || 'Estudiante'}</h2>
-              <p className="app-page-hero__description">Resumen de áreas académicas y avance registrado.</p>
+              <p className="app-page-hero__description">Resumen de asignaturas académicas y avance registrado.</p>
             </div>
             <BookOpen className="app-page-hero__icon w-20 h-20" />
           </div>
@@ -246,8 +243,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
 
         <div className="app-section-head">
           <div>
-            <h3 className="app-section-title">Áreas académicas</h3>
-            <p className="app-section-description">Consulta del progreso por área académica.</p>
+            <h3 className="app-section-title">Asignaturas académicas</h3>
+            <p className="app-section-description">Consulta del progreso por asignatura académica.</p>
           </div>
         </div>
 
@@ -267,13 +264,13 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           
           {!loading && subjects.length === 0 ? (
             <div className="app-empty-panel lg:col-span-3">
-              <p>No hay áreas disponibles</p>
+              <p>No hay asignaturas disponibles</p>
             </div>
           ) : (
           subjects.map((subject) => {
             const Icon = subject.icon;
-            const areaId = parseInt(subject.id);
-            const data = progresosPorArea.get(areaId);
+            const asignaturaId = parseInt(subject.id);
+            const data = progresosPorAsignatura.get(asignaturaId);
             const porcentaje = data?.porcentaje ?? 0;
             const temasTotal = data?.temasTotal ?? 0;
             const temasPendientes = data?.temasPendientes ?? 0;
@@ -306,7 +303,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
                   <div className="flex items-center justify-between mb-2 app-list-card__meta">
                     <span>Progreso</span>
                     <span className="text-sm" style={{ color: subject.color }}>
-                      {loadingProgresos && !data ? '...' : `${porcentaje}%`}
+                      {`${porcentaje}%`}
                     </span>
                   </div>
                   <div className="app-progress-track">
@@ -322,14 +319,14 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
 
                 <div className="flex items-center justify-end text-sm text-gray-600">
                   <span className="app-badge app-badge--slate">
-                    {loadingProgresos && !data ? '...' : `${temasPendientes} de ${temasTotal} pendientes`}
+                    {`${temasPendientes} de ${temasTotal} pendientes`}
                   </span>
                 </div>
 
                 <div className="app-list-card__footer">
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Siguiente tema</p>
-                    <p className="text-sm text-[#3A4A5B]">{loadingProgresos && !data ? 'Cargando…' : siguienteTema}</p>
+                    <p className="text-sm text-[#3A4A5B]">{siguienteTema}</p>
                   </div>
                   <TrendingUp className="w-5 h-5 text-slate-300 group-hover:text-[#4A90E2] transition-colors" />
                 </div>

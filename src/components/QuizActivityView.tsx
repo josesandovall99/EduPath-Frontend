@@ -161,7 +161,7 @@ export function QuizActivityView({ subjectName, activity, onBack, onHome, onComp
         </div>
       </div>
 
-      {/* Right Content Area */}
+      {/* Right Content Asignatura */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
