@@ -421,6 +421,43 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   const hasTemaContext = Boolean(selectedTemaId);
   const hasSubtemaContext = Boolean(selectedSubtemaId);
 
+  /**
+   * Devuelve un handler para `onNavigateToBreadcrumb` según el contexto actual.
+   * Cada nivel (index) corresponde a una posición en el breadcrumb:
+   *   0 = "Panel admin"  → dashboard
+   *   1 = asignatura     → listado de temas de esa asignatura
+   *   2 = tema           → listado de subtemas de ese tema
+   *   3 = subtema        → secuencias de ese subtema
+   * Se usa en TODOS los componentes de gestión para unificar la navegación.
+   */
+  const handleBreadcrumbNavigation = useCallback((index: number) => {
+    switch (index) {
+      case 0:
+        goHome();
+        break;
+      case 1:
+        setSelectedTemaId(null);
+        setSelectedTemaName('');
+        setSelectedSubtemaId(null);
+        setSelectedSubtemaNombre('');
+        setNavigationHistory([]);
+        setCurrentScreen('temas');
+        break;
+      case 2:
+        setSelectedSubtemaId(null);
+        setSelectedSubtemaNombre('');
+        setNavigationHistory([]);
+        setCurrentScreen('subthemes');
+        break;
+      case 3:
+        setNavigationHistory([]);
+        setCurrentScreen('subtema-sequences');
+        break;
+      default:
+        goHome();
+    }
+  }, [goHome]);
+
   /** Etiqueta del breadcrumb actual derivada del nivel más profundo activo. */
   const currentFlowLabel = hasSubtemaContext
     ? 'Secuencias y contenidos'
@@ -536,6 +573,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             onBack={goBack}
             onHome={goHome}
             onSelectTema={(temaId, temaName) => handleTemaSelect(temaId, temaName, 'subthemes')}
+          onNavigateToBreadcrumb={handleBreadcrumbNavigation}
           />
         </Suspense>
       );
@@ -547,6 +585,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           onHome={goHome}
           initialAsignaturaId={selectedAsignaturaId}
           initialTemaId={selectedTemaId}
+          onNavigateToBreadcrumb={handleBreadcrumbNavigation}
           onManageSequences={(nextasignaturaId, nextasignaturaName, nextTemaId, nextTemaName) => {
             // Salta a la gestión de secuencias dentro del mismo tema
             // refrescando el contexto recibido por el callback.
@@ -587,6 +626,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           onBack={goBack}
           onHome={goHome}
           onSelectTema={(temaId, temaName) => handleTemaSelect(temaId, temaName, 'subthemes')}
+          onNavigateToBreadcrumb={handleBreadcrumbNavigation}
         />
       </Suspense>
     );
@@ -609,6 +649,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             onBack={goBack}
             onHome={goHome}
             onSelectTema={(temaId, temaName) => handleTemaSelect(temaId, temaName, 'subthemes')}
+          onNavigateToBreadcrumb={handleBreadcrumbNavigation}
           />
         </Suspense>
       );
@@ -619,6 +660,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           onBack={goBack}
           onHome={goHome}
           onSelectSubtema={handleSubtemaSelect}
+          onNavigateToBreadcrumb={handleBreadcrumbNavigation}
           asignaturaId={selectedAsignaturaId || undefined}
           asignaturaName={selectedAsignaturaName}
           temaId={selectedTemaId || undefined}
@@ -684,6 +726,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             }}
             onHome={goHome}
             onGoToContentManagement={() => navigateTo('content-management')}
+            onNavigateToBreadcrumb={handleBreadcrumbNavigation}
             subtemaId={selectedSubtemaId}
             temaId={selectedTemaId}
             asignaturaId={selectedAsignaturaId || undefined}
@@ -706,6 +749,28 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           initialTemaName={selectedTemaName || undefined}
           initialSubtemaId={selectedSubtemaId || undefined}
           initialSubtemaName={selectedSubtemaNombre || undefined}
+          onBreadcrumbPanel={goHome}
+          onBreadcrumbAsignatura={() => {
+            // Regresa al listado de temas de la asignatura actual
+            setSelectedTemaId(null);
+            setSelectedTemaName('');
+            setSelectedSubtemaId(null);
+            setSelectedSubtemaNombre('');
+            setNavigationHistory([]);
+            setCurrentScreen('temas');
+          }}
+          onBreadcrumbTema={() => {
+            // Regresa al listado de subtemas del tema actual
+            setSelectedSubtemaId(null);
+            setSelectedSubtemaNombre('');
+            setNavigationHistory([]);
+            setCurrentScreen('subthemes');
+          }}
+          onBreadcrumbSubtema={() => {
+            // Regresa a la gestión de secuencias del subtema actual
+            setNavigationHistory([]);
+            setCurrentScreen('contents');
+          }}
         />
       </Suspense>
     );
@@ -727,6 +792,25 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           initialTemaName={isContentManagementFlowScoped ? selectedTemaName || undefined : undefined}
           initialSubtemaId={isContentManagementFlowScoped ? selectedSubtemaId || undefined : undefined}
           initialSubtemaName={isContentManagementFlowScoped ? selectedSubtemaNombre || undefined : undefined}
+          onBreadcrumbPanel={goHome}
+          onBreadcrumbAsignatura={isContentManagementFlowScoped ? () => {
+            setSelectedTemaId(null);
+            setSelectedTemaName('');
+            setSelectedSubtemaId(null);
+            setSelectedSubtemaNombre('');
+            setNavigationHistory([]);
+            setCurrentScreen('temas');
+          } : undefined}
+          onBreadcrumbTema={isContentManagementFlowScoped ? () => {
+            setSelectedSubtemaId(null);
+            setSelectedSubtemaNombre('');
+            setNavigationHistory([]);
+            setCurrentScreen('subthemes');
+          } : undefined}
+          onBreadcrumbSubtema={isContentManagementFlowScoped ? () => {
+            setNavigationHistory([]);
+            setCurrentScreen('contents');
+          } : undefined}
         />
       </Suspense>
     );

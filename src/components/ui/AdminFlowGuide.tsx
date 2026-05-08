@@ -6,6 +6,8 @@ type AdminFlowStatus = 'complete' | 'current' | 'upcoming';
 interface AdminFlowBreadcrumb {
   label: string;
   current?: boolean;
+  /** Si se provee, el item se renderiza como botón y navega al nivel indicado. */
+  onClick?: () => void;
 }
 
 interface AdminFlowStep {
@@ -52,18 +54,27 @@ export function AdminFlowGuide({
   return (
     <section className="app-flow-guide">
       {breadcrumbs.length > 0 && (
-        <div className="app-flow-guide__breadcrumbs">
+        <nav aria-label="Ruta de navegación" className="app-flow-guide__breadcrumbs">
           {breadcrumbs.map((breadcrumb, index) => (
             <div key={`${breadcrumb.label}-${index}`} className="app-flow-guide__breadcrumb-wrap">
-              <span
-                className={`app-flow-guide__breadcrumb ${breadcrumb.current ? 'app-flow-guide__breadcrumb--current' : ''}`}
-              >
-                {breadcrumb.label}
-              </span>
+              {breadcrumb.onClick ? (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); breadcrumb.onClick!(); }}
+                  className="app-flow-guide__breadcrumb app-flow-guide__breadcrumb--link"
+                  title={`Ir a ${breadcrumb.label}`}
+                >
+                  {breadcrumb.label}
+                </button>
+              ) : (
+                <span className={`app-flow-guide__breadcrumb ${breadcrumb.current ? 'app-flow-guide__breadcrumb--current' : ''}`}>
+                  {breadcrumb.label}
+                </span>
+              )}
               {index < breadcrumbs.length - 1 && <ArrowRight className="app-flow-guide__separator" />}
             </div>
           ))}
-        </div>
+        </nav>
       )}
 
       <div className="app-flow-guide__top">
