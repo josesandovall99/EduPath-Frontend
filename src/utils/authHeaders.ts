@@ -61,7 +61,9 @@ export const setupAuthFetch = () => {
     const isBackendRequest =
       requestUrl.startsWith(API_BASE_URL) ||
       requestUrl.startsWith(API_PROXY_TARGET) ||
+      requestUrl.startsWith('http://localhost:4000') ||
       requestUrl.startsWith('http://127.0.0.1:4000') ||
+      requestUrl.startsWith('http://192.168.3.21:4000') ||
       requestUrl.startsWith('/api');
     const requestMethod = (init.method || 'GET').toUpperCase();
 

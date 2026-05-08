@@ -1,13 +1,12 @@
 const stripTrailingSlash = (url: string) => url.trim().replace(/\/$/, '');
 
 /**
- * Cambiar backend con una sola línea:
- * - Pon aquí la URL (ej. `http://localhost:4000` o la URL de Render).
- * - Déjalo en cadena vacía `''` para usar solo `.env`: `VITE_API_BASE_URL`
- *   (`npm run dev` → `.env.development`; `npm run build` → `.env.production`).
+ * Backend API (servidor en red local; ajusta si cambia la IP o el puerto).
  *
- * Si ves siempre el servidor de Render aunque edites esto: casi seguro estás en
- * `npm run preview` / `npm start` (build de producción). Para backend local usa `npm run dev`.
+ * - Con valor no vacío, esta URL tiene prioridad sobre `VITE_API_BASE_URL` en `.env`.
+ * - Pon `''` para usar solo variables de entorno (útil antes de desplegar).
+ *
+ * Proxy de Vite (`/api` → backend): `vite.config.ts` y `VITE_DEV_PROXY_TARGET` en `.env.development`.
  */
 export const MANUAL_API_BASE_URL = 'http://192.168.3.21:4000';
 
