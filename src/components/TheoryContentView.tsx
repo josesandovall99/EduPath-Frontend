@@ -582,17 +582,12 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       const responseSubtemas = await fetch(urlSubtemas);
       if (responseSubtemas.ok) {
         const dataSubtemas = await responseSubtemas.json();
-<<<<<<< HEAD
-        mapSubtemas = new Map<string, any>(dataSubtemas.map((item: any) => [String(item.subtema_id), item]));
-=======
-        console.log('Estado de subtemas cargado:', dataSubtemas);
         const rawSub = Array.isArray(dataSubtemas) ? dataSubtemas : dataSubtemas?.subtemas;
         mapSubtemas = new Map<string, any>(
           Array.isArray(rawSub)
             ? rawSub.map((item: any) => [String(item.id ?? item.subtema_id), item])
             : []
         );
->>>>>>> e4fe09fe17a2704a5691e220648f83ccceb225f6
         setSubtemasConEstadoProgreso(mapSubtemas);
       } else {
       }
@@ -603,17 +598,12 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       const responseContenidos = await fetch(urlContenidos);
       if (responseContenidos.ok) {
         const dataContenidos = await responseContenidos.json();
-<<<<<<< HEAD
-        mapContenidos = new Map<string, any>(dataContenidos.map((item: any) => [String(item.contenido_id), item]));
-=======
-        console.log('Estado de contenidos cargado:', dataContenidos);
         const rawCont = Array.isArray(dataContenidos) ? dataContenidos : dataContenidos?.contenidos;
         mapContenidos = new Map<string, any>(
           Array.isArray(rawCont)
             ? rawCont.map((item: any) => [String(item.id ?? item.contenido_id), item])
             : []
         );
->>>>>>> e4fe09fe17a2704a5691e220648f83ccceb225f6
         setContenidosConEstadoProgreso(mapContenidos);
       } else {
       }
