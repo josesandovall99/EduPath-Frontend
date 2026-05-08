@@ -383,7 +383,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
     const intervalId = setInterval(() => {
       console.log('🔄 Actualizando progreso automáticamente...');
       obtenerProgresoAsignatura();
-    }, 10000);
+    }, 120000); // 2 minutos
 
     return () => clearInterval(intervalId);
   }, [asignaturaId, temaId, estudianteId]);
@@ -1109,7 +1109,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                   >
                     {isModuleLocked ? <Lock className="w-4 h-4" /> : (idx + 1)}
                   </div>
-                  <span className={`text-base truncate ${isModuleLocked ? 'text-gray-400' : 'text-[#3A4A5B]'}`}>
+                  <span className={`text-sm leading-snug break-words min-w-0 ${isModuleLocked ? 'text-gray-400' : 'text-[#3A4A5B]'}`}>
                     {module.title}
                   </span>
                   {module.completo && (
@@ -1180,10 +1180,12 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                           }}
                           className={`w-full text-left p-3 border rounded-lg flex items-center gap-3 text-base transition-all group ${
                             isItemLocked
-                              ? 'opacity-60 cursor-not-allowed border-gray-200'
-                              : isSelected 
-                                ? 'border-blue-400 bg-blue-50' 
-                                : 'border-gray-200 hover:bg-gray-50'
+                              ? 'opacity-60 cursor-not-allowed border-gray-200 bg-white'
+                              : isSelected
+                                ? 'border-blue-400 bg-blue-50'
+                                : item.ejercicioData
+                                  ? 'border-gray-200 bg-white hover:bg-gray-50'         // ejercicio → blanco
+                                  : 'border-blue-100 bg-blue-50/50 hover:bg-blue-50'   // contenido → azul muy tenue
                           }`}
                         >
                           {isItemLocked ? (
@@ -1205,11 +1207,11 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                             );
                           })()}
                           <div className="flex-1 min-w-0">
-                            <div className={`transition-colors truncate ${
-                              isItemLocked 
-                                ? 'text-gray-400' 
-                                : isSelected 
-                                  ? 'text-blue-600 font-semibold' 
+                            <div className={`transition-colors break-words leading-snug ${
+                              isItemLocked
+                                ? 'text-gray-400'
+                                : isSelected
+                                  ? 'text-blue-600 font-semibold'
                                   : 'text-[#3A4A5B] group-hover:text-[#4A90E2]'
                             }`}>
                               {item.title}

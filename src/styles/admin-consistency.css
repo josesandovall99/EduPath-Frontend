@@ -2779,6 +2779,16 @@
   color: #1d4ed8;
 }
 
+.app-flow-guide__breadcrumb--link {
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.app-flow-guide__breadcrumb--link:hover {
+  background: rgba(239, 246, 255, 0.98);
+  border-color: rgba(147, 197, 253, 0.95);
+  color: #2563eb;
+}
+
 .app-flow-guide__separator {
   width: 0.9rem;
   height: 0.9rem;

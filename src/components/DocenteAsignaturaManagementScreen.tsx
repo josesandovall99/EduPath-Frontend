@@ -53,6 +53,36 @@ export function DocenteAsignaturaManagementScreen({ onBack }: DocenteAsignaturaM
     onBack();
   };
 
+  /**
+   * Navega directamente al nivel indicado desde cualquier breadcrumb.
+   * Misma semántica que AdminDashboard.handleBreadcrumbNavigation:
+   *   0 = Panel docente  → vuelve al dashboard del docente
+   *   1 = asignatura     → lista de temas
+   *   2 = tema           → lista de subtemas
+   *   3 = subtema        → secuencias de ese subtema
+   */
+  const handleBreadcrumbNavigation = (index: number) => {
+    switch (index) {
+      case 0:
+        handleBack();
+        break;
+      case 1:
+        setSelectedTema(null);
+        setSelectedSubtema(null);
+        setCurrentScreen('temas');
+        break;
+      case 2:
+        setSelectedSubtema(null);
+        setCurrentScreen('subtemas');
+        break;
+      case 3:
+        setCurrentScreen('subtema-secuencias');
+        break;
+      default:
+        handleBack();
+    }
+  };
+
   if (currentScreen === 'asignaturas') {
     return (
       <AsignaturasManagementScreen
@@ -82,6 +112,7 @@ export function DocenteAsignaturaManagementScreen({ onBack }: DocenteAsignaturaM
           setSelectedSubtema(null);
           setCurrentScreen('subtemas');
         }}
+        onNavigateToBreadcrumb={handleBreadcrumbNavigation}
         mode="docente"
       />
     );
@@ -100,6 +131,7 @@ export function DocenteAsignaturaManagementScreen({ onBack }: DocenteAsignaturaM
           setSelectedSubtema(null);
           setCurrentScreen('subtema-secuencias');
         }}
+        onNavigateToBreadcrumb={handleBreadcrumbNavigation}
         mode="docente"
       />
     );
@@ -118,6 +150,7 @@ export function DocenteAsignaturaManagementScreen({ onBack }: DocenteAsignaturaM
           setSelectedSubtema({ id: subtemaId, name: subtemaNombre });
           setCurrentScreen('contenido-secuencias');
         }}
+        onNavigateToBreadcrumb={handleBreadcrumbNavigation}
         mode="docente"
       />
     );
@@ -129,6 +162,7 @@ export function DocenteAsignaturaManagementScreen({ onBack }: DocenteAsignaturaM
         onBack={() => setCurrentScreen('subtema-secuencias')}
         onHome={handleBack}
         onGoToContentManagement={() => setCurrentScreen('contenidos')}
+        onNavigateToBreadcrumb={handleBreadcrumbNavigation}
         asignaturaId={selectedAsignatura.id}
         asignaturaName={selectedAsignatura.name}
         temaId={selectedTema.id}
@@ -153,6 +187,10 @@ export function DocenteAsignaturaManagementScreen({ onBack }: DocenteAsignaturaM
         initialSubtemaId={selectedSubtema.id}
         initialSubtemaName={selectedSubtema.name}
         mode="docente"
+        onBreadcrumbPanel={handleBack}
+        onBreadcrumbAsignatura={() => handleBreadcrumbNavigation(1)}
+        onBreadcrumbTema={() => handleBreadcrumbNavigation(2)}
+        onBreadcrumbSubtema={() => handleBreadcrumbNavigation(3)}
       />
     );
   }
