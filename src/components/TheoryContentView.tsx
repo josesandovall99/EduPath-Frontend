@@ -1167,10 +1167,12 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
                           }}
                           className={`w-full text-left p-3 border rounded-lg flex items-center gap-3 text-base transition-all group ${
                             isItemLocked
-                              ? 'opacity-60 cursor-not-allowed border-gray-200'
-                              : isSelected 
-                                ? 'border-blue-400 bg-blue-50' 
-                                : 'border-gray-200 hover:bg-gray-50'
+                              ? 'opacity-60 cursor-not-allowed border-gray-200 bg-white'
+                              : isSelected
+                                ? 'border-blue-400 bg-blue-50'
+                                : item.ejercicioData
+                                  ? 'border-gray-200 bg-white hover:bg-gray-50'         // ejercicio → blanco
+                                  : 'border-blue-100 bg-blue-50/50 hover:bg-blue-50'   // contenido → azul muy tenue
                           }`}
                         >
                           {isItemLocked ? (

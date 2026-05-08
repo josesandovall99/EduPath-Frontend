@@ -168,6 +168,8 @@ export default function App() {
     localStorage.removeItem(APP_NAV_STATE_KEY);
     localStorage.removeItem(APP_ROLE_KEY);
     localStorage.removeItem('adminDashboardState');
+    localStorage.removeItem('docenteAsignaturaFlowState');
+    localStorage.removeItem('docenteDashboardScreen');
   };
 
   useEffect(() => {
