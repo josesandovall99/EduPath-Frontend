@@ -1,4 +1,4 @@
-﻿﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Play, FileText, CheckCircle2, BookOpen, ChevronDown, ChevronRight, Loader, Lock } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ProgrammingContentView } from './ProgrammingContentView';
@@ -168,6 +168,8 @@ interface Ejercicio {
 interface TheoryContentViewProps {
   subjectName: string;
   asignaturaId?: string | number;
+  /** Si true: bloqueo tema→subtema→contenido según la asignatura (configurado por docente/admin) */
+  progresionSecuencial?: boolean;
   onHome?: () => void;
   content: {
     id: string;
@@ -344,7 +346,7 @@ const orderSubtemasBySequence = (subtemas: any[], sequences: any[]): any[] => {
 
 
 
-export function TheoryContentView({ subjectName, asignaturaId, content, temaId, onBack, onHome, onContentChange, estudianteId }: TheoryContentViewProps) {
+export function TheoryContentView({ subjectName, asignaturaId, progresionSecuencial = false, content, temaId, onBack, onHome, onContentChange, estudianteId }: TheoryContentViewProps) {
 
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(false);
@@ -357,6 +359,7 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
   const [subtemasConEstadoProgreso, setSubtemasConEstadoProgreso] = useState<Map<string, any>>(new Map());
   const [contenidosConEstadoProgreso, setContenidosConEstadoProgreso] = useState<Map<string, any>>(new Map());
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
+  const secuencialActivado = Boolean(progresionSecuencial);
 
   // Inyectar estilos en el documento
   useEffect(() => {
@@ -454,8 +457,10 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
     }
   };
 
-  // Recalcular gating secuencial de ítems dentro de un subtema
   const recalcularGatingItems = (items: ModuleItem[]): ModuleItem[] => {
+    if (!secuencialActivado) {
+      return items.map((item) => ({ ...item, desbloqueado: true }));
+    }
     return items.map((item, i) => {
       if (i === 0) return { ...item, desbloqueado: true };
       const prev = items[i - 1];
@@ -474,17 +479,17 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
     items.length > 0 && items.every(esItemCompleto)
   );
 
-  // Recalcular qué subtemas están desbloqueados en base al estado real de sus ítems
   const recalcularGatingSubtemas = (mods: Module[]): Module[] => {
+    if (!secuencialActivado) {
+      return mods.map((module) => ({ ...module, desbloqueado: true }));
+    }
     return mods.map((module, idx) => {
       if (idx === 0) return { ...module, desbloqueado: true };
       const prev = mods[idx - 1];
       let prevComplete: boolean;
       if (prev.items.length > 0 && !prev.loadingItems) {
-        // Ítems cargados: todos deben estar completos (contenido visto + ejercicios aprobados)
         prevComplete = esModuloCompletoPorItems(prev.items);
       } else {
-        // Sin ítems cargados: usar flag completo derivado del backend
         prevComplete = prev.completo ?? false;
       }
       return { ...module, desbloqueado: prevComplete };
@@ -584,7 +589,12 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
       if (responseSubtemas.ok) {
         const dataSubtemas = await responseSubtemas.json();
         console.log('Estado de subtemas cargado:', dataSubtemas);
-        mapSubtemas = new Map<string, any>(dataSubtemas.map((item: any) => [String(item.subtema_id), item]));
+        const rawSub = Array.isArray(dataSubtemas) ? dataSubtemas : dataSubtemas?.subtemas;
+        mapSubtemas = new Map<string, any>(
+          Array.isArray(rawSub)
+            ? rawSub.map((item: any) => [String(item.id ?? item.subtema_id), item])
+            : []
+        );
         setSubtemasConEstadoProgreso(mapSubtemas);
       } else {
         console.log('Endpoint de subtemas no disponible (404) - usando comportamiento actual');
@@ -598,7 +608,12 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
       if (responseContenidos.ok) {
         const dataContenidos = await responseContenidos.json();
         console.log('Estado de contenidos cargado:', dataContenidos);
-        mapContenidos = new Map<string, any>(dataContenidos.map((item: any) => [String(item.contenido_id), item]));
+        const rawCont = Array.isArray(dataContenidos) ? dataContenidos : dataContenidos?.contenidos;
+        mapContenidos = new Map<string, any>(
+          Array.isArray(rawCont)
+            ? rawCont.map((item: any) => [String(item.id ?? item.contenido_id), item])
+            : []
+        );
         setContenidosConEstadoProgreso(mapContenidos);
       } else {
         console.log('Endpoint de contenidos no disponible (404) - usando comportamiento actual');
@@ -748,19 +763,17 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
               const progresoSubtema = progresoSubtemas.get(String(subtema.id));
               const porcentaje = progresoSubtema?.porcentaje ?? 0;
               
-              // Determinar si está desbloqueado
               let desbloqueado: boolean;
-              if (estadoProgreso?.desbloqueado !== undefined) {
+              if (!secuencialActivado) {
+                desbloqueado = true;
+              } else if (estadoProgreso?.desbloqueado !== undefined) {
                 desbloqueado = estadoProgreso.desbloqueado;
+              } else if (idx === 0) {
+                desbloqueado = true;
               } else {
-                // Calcular localmente: primer subtema siempre desbloqueado
-                if (idx === 0) {
-                  desbloqueado = true;
-                } else {
-                  const subtemaAnterior = subtemas[idx - 1];
-                  const progresoAnterior = progresoSubtemas.get(String(subtemaAnterior.id));
-                  desbloqueado = (progresoAnterior?.porcentaje ?? 0) >= 100;
-                }
+                const subtemaAnterior = subtemas[idx - 1];
+                const progresoAnterior = progresoSubtemas.get(String(subtemaAnterior.id));
+                desbloqueado = (progresoAnterior?.porcentaje ?? 0) >= 100;
               }
               
               const completo = estadoProgreso?.completo ?? (porcentaje >= 100);
@@ -797,7 +810,7 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
     };
 
     fetchSubtemas();
-  }, [temaId]);
+  }, [temaId, estudianteId, progresionSecuencial]);
 
   // Fetch contenidos for a specific subtema
   // ...existing code...

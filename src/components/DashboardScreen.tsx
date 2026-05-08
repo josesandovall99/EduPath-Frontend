@@ -6,12 +6,16 @@ import { API_BASE_URL } from '../utils/constants';
 interface Subject {
   id: string;
   name: string;
+  icon: typeof Code;
+  color: string;
+  progresion_secuencial?: boolean;
 }
 
 interface Asignatura {
   id: number;
   nombre: string;
   descripcion?: string;
+  progresion_secuencial?: boolean;
 }
 
 interface DashboardScreenProps {
@@ -159,6 +163,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         const transformedSubjects = asignaturasFiltradas.map((Asignatura: Asignatura, index: number) => ({
           id: Asignatura.id.toString(),
           name: Asignatura.nombre,
+          progresion_secuencial: Boolean(Asignatura.progresion_secuencial),
           icon: Code,
           color: colorPalette[index % colorPalette.length],
         }));
@@ -278,7 +283,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
             return (
               <button
                 key={subject.id}
-                onClick={() => onSubjectSelect({ id: subject.id, name: subject.name })}
+                onClick={() => onSubjectSelect({ id: subject.id, name: subject.name, progresion_secuencial: subject.progresion_secuencial })}
                 className="app-list-card group"
               >
                 <div className="app-list-card__head">
