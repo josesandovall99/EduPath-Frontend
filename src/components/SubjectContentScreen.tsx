@@ -7,6 +7,7 @@ import { parseConfigurableMiniproyecto } from './configurableEmbeddedExercises';
 interface Subject {
   id: string;
   name: string;
+  progresion_secuencial?: boolean;
 }
 
 interface SubjectContentScreenProps {
@@ -281,27 +282,26 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         // Calcular progreso de cada tema
         const progresoTemas = await calcularProgresoTemas(temasOrdenados);
 
-        // Transformar temas a formato Content con lógica de desbloqueo
+        const progresionSecuencial = Boolean(subject.progresion_secuencial);
+
+        // Transformar temas (bloqueo por orden solo si la asignatura tiene progresión secuencial)
         const transformedContent = temasOrdenados.map((tema, index) => {
           const temaId = tema.id.toString();
           const estadoProgreso = temasConEstadoProgreso.get(temaId);
           const progresoTema = progresoTemas.get(temaId);
           const porcentaje = progresoTema?.porcentaje ?? 0;
-          
-          // Determinar si está desbloqueado
+
           let desbloqueado: boolean;
-          if (estadoProgreso?.desbloqueado !== undefined) {
-            // Si el backend provee datos, usarlos
+          if (!progresionSecuencial) {
+            desbloqueado = true;
+          } else if (estadoProgreso?.desbloqueado !== undefined) {
             desbloqueado = estadoProgreso.desbloqueado;
+          } else if (index === 0) {
+            desbloqueado = true;
           } else {
-            // Calcular localmente: primer tema siempre desbloqueado, los demás solo si el anterior está completo al 100%
-            if (index === 0) {
-              desbloqueado = true;
-            } else {
-              const temaAnterior = temasOrdenados[index - 1];
-              const progresoAnterior = progresoTemas.get(temaAnterior.id.toString());
-              desbloqueado = (progresoAnterior?.porcentaje ?? 0) >= 100;
-            }
+            const temaAnterior = temasOrdenados[index - 1];
+            const progresoAnterior = progresoTemas.get(temaAnterior.id.toString());
+            desbloqueado = (progresoAnterior?.porcentaje ?? 0) >= 100;
           }
           
           // Determinar si está completo
@@ -421,7 +421,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     };
 
     fetchContent();
-  }, [subject.id, estudianteId]);
+  }, [subject.id, subject.progresion_secuencial, estudianteId]);
   
   return (
     <div className="min-h-screen bg-[#F2F2F2]">

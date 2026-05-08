@@ -84,6 +84,7 @@ interface AdminSession {
 interface Subject {
   id: string;
   name: string;
+  progresion_secuencial?: boolean;
 }
 
 interface Content {
@@ -807,6 +808,7 @@ export default function App() {
           <TheoryContentView
             subjectName={selectedSubject.name}
             asignaturaId={selectedSubject.id}
+            progresionSecuencial={Boolean(selectedSubject.progresion_secuencial)}
             content={selectedContent}
             temaId={selectedTemaId || undefined}
             onBack={handleBackToSubject}
