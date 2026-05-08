@@ -1076,7 +1076,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
           const filtered = contents.filter(c => temaIds.includes(Number(c.tema_id)));
 
-          console.log('DEBUG: Filtrando modalContents por asignatura -> temaIds:', temaIds, 'result:', filtered.map(fc => ({ id: fc.id, titulo: fc.titulo })));
 
           setModalContents(filtered);
 
@@ -1128,7 +1127,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
         const filtered = contents.filter(c => Number(c.tema_id) === Number(value) && (!modalSelectedAsignatura || modalTemas.some(t => Number(t.id) === Number(c.tema_id))));
 
-        console.log('DEBUG: Filtrando modalContents por tema -> temaId:', value, 'result:', filtered.map(fc => ({ id: fc.id, titulo: fc.titulo })));
 
         setModalContents(filtered);
 
@@ -1194,7 +1192,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
           const url = `/contenidos/subtema/${value}`;
 
-          console.log('Cargando contenidos para modal desde:', url);
 
           const res = await apiFetch(url);
 
@@ -1210,7 +1207,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
           const data = await res.json();
 
-          console.log('DEBUG: Respuesta /contenidos/subtema/:', res.status, res.statusText, 'items:', Array.isArray(data) ? data.length : 'not-array', data.slice ? data.map((d: any) => ({ id: d.id, titulo: d.titulo, subtema_id: d.subtema_id })) : data);
 
           setModalContents(mapContentsWithAsignatura(data, temas));
 
@@ -1360,11 +1356,9 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
           const url = `/temas/por-asignatura/${value}`;
 
-          console.log('Cargando temas desde:', url);
 
           const res = await apiFetch(url);
 
-          console.log('Respuesta de temas:', res.status, res.statusText);
 
           if (!res.ok) {
 
@@ -1378,7 +1372,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
           const data = await res.json();
 
-          console.log('Temas cargados:', data);
 
           setTemas(data);
 
@@ -1412,11 +1405,9 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
           const url = `/subtemas/por-tema/${value}`;
 
-          console.log('Cargando subtemas desde:', url);
 
           const res = await apiFetch(url);
 
-          console.log('Respuesta de subtemas:', res.status, res.statusText);
 
           if (!res.ok) {
 
@@ -1430,7 +1421,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
           const data = await res.json();
 
-          console.log('Subtemas cargados:', data);
 
           setSubtemas(data);
 
@@ -1756,7 +1746,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
         const errorMessage = data.error || data.message || 'Error al actualizar la secuencia';
 
-        console.log('Validaciones realizadas:', data.validacionesRealizadas);
 
         throw new Error(errorMessage);
 
@@ -1782,7 +1771,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
       setSuccess('Secuencia actualizada correctamente.');
 
-      console.log('Validaciones completadas:', data.validacionesRealizadas);
 
       resetForm();
 

@@ -378,7 +378,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
     if (!estudianteId || (!asignaturaId && !temaId)) return;
 
     const intervalId = setInterval(() => {
-      console.log('🔄 Actualizando progreso automáticamente...');
       obtenerProgresoAsignatura();
     }, 120000); // 2 minutos
 
@@ -389,7 +388,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && estudianteId && (asignaturaId || temaId)) {
-        console.log('🔄 Pestaña visible de nuevo, actualizando progreso...');
         obtenerProgresoAsignatura();
       }
     };
@@ -431,7 +429,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
       const url = asignaturaId
         ? `${API_BASE_URL}/progresos/por-asignatura?asignatura_id=${asignaturaId}&estudiante_id=${estudianteId}`
         : `${API_BASE_URL}/progresos/por-tema?tema_id=${temaId}&estudiante_id=${estudianteId}`;
-      console.log(`🔄 Obteniendo progreso desde: ${url}`);
       
       const response = await fetch(url);
       
@@ -447,7 +444,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
         ? data.resumen?.porcentajeTotalAsignatura || 0
         : data.resumen?.porcentajeTotalTema || 0;
       setCurrentProgress(Math.round(porcentaje));
-      console.log(`Progreso mostrado: ${porcentaje}%`);
     } catch (err) {
       console.error('Error al obtener progreso:', err);
       setCurrentProgress(0);
@@ -537,7 +533,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
         );
       });
 
-      console.log('Contenido marcado como visualizado');
     } catch (err) {
       console.error('Error al marcar contenido como visualizado:', err);
     }
@@ -578,35 +573,28 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
 
       // Intentar cargar estado de subtemas
       const urlSubtemas = `${API_BASE_URL}/progresos/estado-subtemas-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
-      console.log('[OPCIONAL] Intentando cargar estado de subtemas desde:', urlSubtemas);
       
       const responseSubtemas = await fetch(urlSubtemas);
       if (responseSubtemas.ok) {
         const dataSubtemas = await responseSubtemas.json();
-        console.log('Estado de subtemas cargado:', dataSubtemas);
         mapSubtemas = new Map<string, any>(dataSubtemas.map((item: any) => [String(item.subtema_id), item]));
         setSubtemasConEstadoProgreso(mapSubtemas);
       } else {
-        console.log('Endpoint de subtemas no disponible (404) - usando comportamiento actual');
       }
 
       // Intentar cargar estado de contenidos
       const urlContenidos = `${API_BASE_URL}/progresos/estado-contenidos-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
-      console.log('[OPCIONAL] Intentando cargar estado de contenidos desde:', urlContenidos);
       
       const responseContenidos = await fetch(urlContenidos);
       if (responseContenidos.ok) {
         const dataContenidos = await responseContenidos.json();
-        console.log('Estado de contenidos cargado:', dataContenidos);
         mapContenidos = new Map<string, any>(dataContenidos.map((item: any) => [String(item.contenido_id), item]));
         setContenidosConEstadoProgreso(mapContenidos);
       } else {
-        console.log('Endpoint de contenidos no disponible (404) - usando comportamiento actual');
       }
 
       return { subtemas: mapSubtemas, contenidos: mapContenidos };
     } catch (err) {
-      console.log('Endpoints de desbloqueo no disponibles - manteniendo lógica actual:', err);
       return estadoVacio;
     }
   };
@@ -644,7 +632,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
     setEjercicioAsociado(null);
     
     try {
-      console.log(`🔄 Buscando ejercicio para contenido_id: ${contenidoId}`);
       const response = await fetch(`${API_BASE_URL}/ejercicios`);
       
       if (!response.ok) {
@@ -653,18 +640,14 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
 
       const ejercicios: Ejercicio[] = await response.json();
       
-      console.log('Ejercicios recibidos del backend:', ejercicios);
-      console.log('Buscando ejercicio con contenido_id:', parseInt(contenidoId));
       
       // Buscar el ejercicio que coincida con el contenido_id
       const ejercicio = ejercicios.find(ej => {
-        console.log(`   Comparando: ej.contenido_id=${ej.contenido_id} (tipo: ${typeof ej.contenido_id}) vs contenidoId=${parseInt(contenidoId)} (tipo: ${typeof parseInt(contenidoId)})`);
         // Comparar ambos como números para evitar problemas de tipo string vs number
         return Number(ej.contenido_id) === parseInt(contenidoId);
       });
       
       if (ejercicio) {
-        console.log('Ejercicio encontrado:', ejercicio);
         
         // Detectar el subtipo real desde la configuración para ejercicios de tipo "Preguntas"
         let ejercicioConTipoReal = { ...ejercicio };
@@ -680,8 +663,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
         
         setEjercicioAsociado(ejercicioConTipoReal);
       } else {
-        console.log('No hay ejercicio asociado a este contenido');
-        console.log('Ejercicios disponibles:', ejercicios.map(ej => ({ id: ej.id, contenido_id: ej.contenido_id })));
         setEjercicioAsociado(null);
       }
     } catch (err) {
@@ -695,7 +676,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
   // Fetch subtemas when temaId changes
   useEffect(() => {
     if (!temaId) {
-      console.log('No temaId provided, using fallback data');
       setModules(FALLBACK_MODULES);
       return;
     }
@@ -704,7 +684,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
       setLoading(true);
       setError(null);
       try {
-        console.log(`Fetching subtemas for temaId: ${temaId}`);
         const response = await fetch(`${API_BASE_URL}/subtemas/por-tema/${temaId}`);
         
         if (!response.ok) {
@@ -717,7 +696,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
         }
 
         let subtemas = await response.json();
-        console.log('Subtemas fetched (sin ordenar):', subtemas);
 
         // Intentar cargar estado de desbloqueo (OPCIONAL)
         const estadoProgresoMaps = await intentarCargarEstadoDesbloqueo();
@@ -730,11 +708,9 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
           const seqResponse = await fetch(`${API_BASE_URL}/secuencias-subtema`);
           if (seqResponse.ok) {
             const sequences = await seqResponse.json();
-            console.log('Secuencias de subtemas cargadas:', sequences);
             
             // Ordenar subtemas basado en las secuencias
             subtemas = orderSubtemasBySequence(subtemas, sequences);
-            console.log('Subtemas ordenados por secuencia:', subtemas);
           }
         } catch (err) {
           console.warn('Error cargando secuencias, ocultando subtemas no secuenciados:', err);
@@ -781,7 +757,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
         
         // Fetch contents for first subtema automatically
         if (transformedModules.length > 0) {
-          console.log('Loading contenidos for first subtema:', transformedModules[0].id);
           loadContenidosForSubtema(transformedModules[0].id, transformedModules, estadoProgresoMaps.contenidos);
         }
 
@@ -809,7 +784,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
     estadoContenidosActual: Map<string, any> = contenidosConEstadoProgreso
   ) => {
     try {
-      console.log(`Fetching contenidos for subtemaId: ${subtemaId}`);
       // Usar el nuevo endpoint que ordena por secuencia del backend
       const response = await fetch(`${API_BASE_URL}/secuencias-contenido/subtema/${subtemaId}/ordenados`);
       
@@ -824,7 +798,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
       }
 
       const contenidos: Contenido[] = await response.json();
-      console.log('Contenidos fetched ordenados por secuencia:', contenidos);
 
       // Obtener todas las secuencias para identificar qué contenidos están en alguna secuencia
       let sequencias: any[] = [];
@@ -876,31 +849,24 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
 
       // Cargar ejercicios asociados y agregarlos como ítems separados
       try {
-        console.log('Cargando ejercicios asociados para agregar al menú...');
         const ejerciciosResponse = await fetch(`${API_BASE_URL}/ejercicios`);
         
         if (ejerciciosResponse.ok) {
           const todosEjercicios: Ejercicio[] = await ejerciciosResponse.json();
-          console.log('Todos los ejercicios del backend:', todosEjercicios);
           
           // IDs de contenidos de este subtema
           const contenidoIdsDeEsteSubtema = contenidosSecuenciados.map(c => String(c.id));
-          console.log('IDs de contenidos en este subtema:', contenidoIdsDeEsteSubtema);
           
           // Mostrar contenido_id de cada ejercicio para debug
-          console.log('Ejercicios y sus contenido_id:');
           todosEjercicios.forEach(ej => {
-            console.log(`   - Ejercicio ${ej.id}: contenido_id=${ej.contenido_id} (tipo: ${typeof ej.contenido_id})`);
           });
           
           // Filtrar ejercicios que pertenecen a contenidos de este subtema
           const ejerciciosDeEsteSubtema = todosEjercicios.filter(ej => {
             const match = contenidoIdsDeEsteSubtema.includes(String(ej.contenido_id));
-            console.log(`   Comparando ejercicio ${ej.id} con contenido_id=${ej.contenido_id} -> ${match ? 'coincide' : 'no coincide'}`);
             return match;
           });
           
-          console.log(`Encontrados ${ejerciciosDeEsteSubtema.length} ejercicios para este subtema`, ejerciciosDeEsteSubtema);
           
           // Cargar estado de aprobación real de cada ejercicio en paralelo
           const aprobadosMap = new Map<number, boolean>();
@@ -1139,7 +1105,6 @@ export function TheoryContentView({ subjectName, asignaturaId, content, temaId, 
                             
                             // Si es un ejercicio, manejarlo de forma especial
                             if (item.ejercicioData) {
-                              console.log('Seleccionando ejercicio:', item.ejercicioData);
                               setSelectedContentId(item.id);
                               setSelectedContentData(null); // No hay contenido asociado
                               

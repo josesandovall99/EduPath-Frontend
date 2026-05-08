@@ -117,7 +117,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         setLoading(true);
         setError(null);
 
-        console.log('Fetching asignaturas from:', `${API_BASE_URL}/asignaturas`);
 
         const response = await fetch(`${API_BASE_URL}/asignaturas`);
 
@@ -132,7 +131,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         }
 
         const asignaturas = await response.json();
-        console.log('asignaturas loaded successfully:', asignaturas);
 
         // Filtro de seguridad: obtener semestre del estudiante
         // NOTA: Esto debería venir del backend en producción
@@ -152,8 +150,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           return asignaturasPermitidas.includes(restrictedCategory);
         });
 
-        console.log(`Semestre ${semestre} - Asignaturas permitidas:`, asignaturasPermitidas);
-        console.log('Asignaturas filtradas:', asignaturasFiltradas);
 
         // Transformar asignaturas a formato de subjects (los temas/progreso se cargan después desde el backend)
         const transformedSubjects = asignaturasFiltradas.map((Asignatura: Asignatura, index: number) => ({

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
+import { cachedFetch } from '../utils/fetchCache';
 import { AdminFlowGuide } from './ui/AdminFlowGuide';
 import { ChatbotButton } from './ChatbotButton';
 
@@ -47,6 +48,7 @@ const lazyNamed = <T extends object>(loader: () => Promise<T>, key: keyof T) =>
   });
 
 const ContentManagementScreen        = lazyNamed(() => import('./ContentManagementScreen'),        'ContentManagementScreen');
+const AsignaturaDashboardScreen      = lazyNamed(() => import('./AsignaturaDashboardScreen'),      'AsignaturaDashboardScreen');
 const SequenceManagementScreen       = lazyNamed(() => import('./SequenceManagementScreen'),       'SequenceManagementScreen');
 const SubtemaSequenceManagementScreen= lazyNamed(() => import('./SubtemaSequenceManagementScreen'),'SubtemaSequenceManagementScreen');
 const AsignaturasManagementScreen          = lazyNamed(() => import('./AsignaturasManagementScreen'),          'AsignaturasManagementScreen');
@@ -69,6 +71,7 @@ interface AdminDashboardProps {
 type AdminScreen =
   | 'dashboard'
   | 'asignaturas'
+  | 'asignatura-dashboard'
   | 'temas'
   | 'subtema-sequences'
   | 'contents'
@@ -80,12 +83,14 @@ type AdminScreen =
   | 'docentes'
   | 'administradores';
 
-/** Conteo de entidades activas que se muestra en las tarjetas de métricas. */
+/**
+ * Solo métricas macro del panel principal.
+ * El detalle por asignatura (temas, contenidos) es accesible
+ * mediante drill-down una vez seleccionada el área académica.
+ */
 type DashboardStats = {
   activeasignaturas: number;
-  activeTemas: number;
   activeEstudiantes: number;
-  activeContenidos: number;
 };
 
 /** Definición de una tarjeta de acción del panel principal. */
@@ -112,9 +117,7 @@ const ADMIN_DASHBOARD_STATE_KEY = 'adminDashboardState';
 /** Estado inicial de las métricas: todas en cero hasta que el fetch responda. */
 const EMPTY_STATS: DashboardStats = {
   activeasignaturas: 0,
-  activeTemas: 0,
   activeEstudiantes: 0,
-  activeContenidos: 0,
 };
 
 /**
@@ -266,26 +269,29 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           throw lastError || new Error('No se pudo obtener la respuesta del servidor');
         };
 
-        const [asignaturas, temas, estudiantes, contenidos] = await Promise.all([
-          fetchJsonWithFallback(['/asignaturas']),
-          fetchJsonWithFallback(['/temas']),
-          fetchJsonWithFallback(['/estudiante', '/estudiantes']),
-          fetchJsonWithFallback(['/contenidos']),
-        ]);
+        // Endpoint dedicado con COUNT() directos — < 50 ms vs ~800 ms con findAll.
+        // Se cachea 60 s para que la navegación dentro del dashboard no vuelva
+        // a disparar peticiones en cada render.
+        let data: any = null;
+        try {
+          data = await cachedFetch(`${API_BASE_URL}/asignaturas/admin/stats`, { headers, credentials: 'include' }, 60_000);
+        } catch {
+          // Fallback: si el endpoint nuevo aún no está disponible, usa los existentes
+          const [asignaturas, estudiantes] = await Promise.all([
+            fetchJsonWithFallback(['/asignaturas']),
+            fetchJsonWithFallback(['/estudiante', '/estudiantes']),
+          ]);
+          data = {
+            asignaturas: { activas: Array.isArray(asignaturas) ? asignaturas.filter((a: any) => isActiveFlag(a?.estado)).length : 0 },
+            estudiantes: { activos: Array.isArray(estudiantes) ? estudiantes.filter((e: any) => isActiveFlag(e?.persona?.estado)).length : 0 },
+          };
+        }
 
         if (isCancelled) return;
 
-        // El backend devuelve listas planas; se filtran las entidades
-        // activas y se cuenta la cardinalidad resultante.
         setStatsData({
-          activeasignaturas: Array.isArray(asignaturas) ? asignaturas.filter((Asignatura) => isActiveFlag(Asignatura?.estado)).length : 0,
-          activeTemas: Array.isArray(temas) ? temas.filter((tema) => isActiveFlag(tema?.estado)).length : 0,
-          activeEstudiantes: Array.isArray(estudiantes)
-            ? estudiantes.filter((estudiante) => isActiveFlag(estudiante?.persona?.estado)).length
-            : 0,
-          activeContenidos: Array.isArray(contenidos)
-            ? contenidos.filter((contenido) => isActiveFlag(contenido?.estado)).length
-            : 0,
+          activeasignaturas: data?.asignaturas?.activas ?? 0,
+          activeEstudiantes: data?.estudiantes?.activos ?? 0,
         });
       } catch {
         if (!isCancelled) setStatsData(EMPTY_STATS);
@@ -348,7 +354,9 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       setSelectedTemaName('');
       setSelectedSubtemaId(null);
       setSelectedSubtemaNombre('');
-      navigateTo('temas');
+      // Primero muestra el dashboard específico de la asignatura.
+      // Desde allí el admin navega a temas, contenidos, etc.
+      navigateTo('asignatura-dashboard');
     },
     [navigateTo],
   );
@@ -384,13 +392,15 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
     [navigateTo],
   );
 
-  /** Configuración de las tarjetas de métricas mostradas en la cabecera. */
+  /**
+   * Solo se exponen indicadores macro en el panel principal.
+   * El detalle de temas, contenidos y subtemas es visible únicamente
+   * dentro del flujo de una asignatura específica (drill-down).
+   */
   const stats = useMemo(
     () => [
-      { label: 'Asignaturas activas',        value: statsData.activeasignaturas,        icon: BookOpen,    color: '#4A90E2' },
-      { label: 'Temas activos',        value: statsData.activeTemas,        icon: FileEdit,    color: '#7ED6A7' },
-      { label: 'Estudiantes activos',  value: statsData.activeEstudiantes,  icon: Users,       color: '#F5A97F' },
-      { label: 'Contenidos activos',   value: statsData.activeContenidos,   icon: TrendingUp,  color: '#14B8A6' },
+      { label: 'Asignaturas activas', value: statsData.activeasignaturas, icon: BookOpen, color: 'var(--color-primary)' },
+      { label: 'Estudiantes activos', value: statsData.activeEstudiantes,  icon: Users,   color: 'var(--color-accent-orange)' },
     ],
     [statsData],
   );
@@ -553,6 +563,27 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   // redirige automáticamente al paso anterior para que el usuario lo
   // complete. Esto evita estados inválidos en submódulos.
   // ─────────────────────────────────────────────────────────────────────
+
+  // ── Dashboard específico de asignatura ──────────────────────────────────
+  // Se muestra tras seleccionar una asignatura del listado. Presenta métricas
+  // propias (temas, contenidos, estudiantes, miniproyectos) y accesos directos
+  // a los módulos de esa asignatura, sin mezclar datos globales.
+  if (currentScreen === 'asignatura-dashboard' && selectedAsignaturaId) {
+    return (
+      <Suspense fallback={<ScreenLoader />}>
+        <AsignaturaDashboardScreen
+          asignaturaId={selectedAsignaturaId}
+          asignaturaName={selectedAsignaturaName}
+          onBack={goBack}
+          onHome={goHome}
+          onGoToTemas={() => navigateTo('temas')}
+          onGoToContenidos={() => navigateTo('content-management')}
+          onGoToMiniproyectos={() => navigateTo('miniproyectos')}
+          onGoToEjercicios={() => navigateTo('ejercicios')}
+        />
+      </Suspense>
+    );
+  }
 
   if (currentScreen === 'subthemes') {
     // Subtemas requiere asignatura Y tema. Si falta alguno, se baja al paso
@@ -868,43 +899,6 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             <h2 className="app-section-title">Módulos del administrador</h2>
             <p className="app-section-description">Panel principal con acceso a los módulos del rol administrador.</p>
           </div>
-        </div>
-
-        {/*
-          Guía de flujo: muestra el orden recomendado (Asignaturas → Temas →
-          Subtemas → Secuencias) y el progreso del usuario derivado del
-          contexto académico que tenga seleccionado.
-        */}
-        <AdminFlowGuide
-          eyebrow="Flujo de gestión"
-          title="Orden de gestión académica"
-          description="Referencia del orden de acceso para asignaturas, temas, subtemas y secuencias."
-          breadcrumbs={[{ label: 'Panel admin' }, { label: currentFlowLabel, current: true }]}
-          steps={[
-            { label: 'Asignaturas',                    helper: 'Definición de la estructura base.',           status: hasAsignaturaContext ? 'complete' : 'current' },
-            { label: 'Temas',                    helper: 'Organización temática por asignatura.',             status: hasTemaContext ? 'complete' : hasAsignaturaContext ? 'current' : 'upcoming' },
-            { label: 'Subtemas',                 helper: 'Detalle de la estructura académica.',         status: hasSubtemaContext ? 'complete' : hasTemaContext ? 'current' : 'upcoming' },
-            { label: 'Secuencias y contenidos',  helper: 'Orden y gestión del contenido final.',        status: hasSubtemaContext ? 'current' : 'upcoming' },
-          ]}
-        />
-
-        <div className="app-metric-grid mb-8">
-          {stats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <div key={index} className="app-metric-card">
-                <div className="app-metric-icon" style={{ backgroundColor: `${stat.color}16`, color: stat.color }}>
-                  <Icon className="w-6 h-6" style={{ color: stat.color }} aria-hidden="true" />
-                </div>
-                <div>
-                  <div className="app-metric-value" style={{ color: stat.color }}>
-                    {isLoadingStats ? '...' : stat.value}
-                  </div>
-                  <p className="app-metric-label">{stat.label}</p>
-                </div>
-              </div>
-            );
-          })}
         </div>
 
         <section className="mb-8">

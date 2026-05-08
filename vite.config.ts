@@ -93,6 +93,16 @@ export default defineConfig(({ mode }) => {
       },
     },
     preview: {
+      port: 4173,
+      // Mismo proxy que dev: el browser habla con Vite (mismo origen),
+      // Vite reenvía al backend. CORS no aplica nunca.
+      proxy: {
+        '/api': {
+          target: devProxyTarget,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+        },
+      },
       headers: {
         'Content-Security-Policy': strictCsp,
         'X-Frame-Options': 'DENY',

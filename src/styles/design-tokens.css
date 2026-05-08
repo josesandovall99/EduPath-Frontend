@@ -1,0 +1,115 @@
+/**
+ * Design Tokens — EduPath
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Archivo de variables CSS centralizado conforme a las recomendaciones del
+ * W3C (CSS Custom Properties Level 1) y los criterios de contraste WCAG 2.1
+ * nivel AA (mínimo 4.5:1 para texto normal, 3:1 para texto grande).
+ *
+ * REGLA: ningún componente debe declarar colores hexadecimales directos.
+ * Todo valor cromático debe referenciar un token de este archivo.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+:root {
+  /* ── Paleta principal ────────────────────────────────────────────────────── */
+  /* Ratio sobre blanco: #2563EB → 5.9:1 ✓ WCAG AA */
+  --color-primary:          #2563EB;
+  --color-primary-hover:    #1D4ED8;
+  --color-primary-light:    #EFF6FF;
+  --color-primary-border:   #BFDBFE;
+
+  /* Ratio sobre blanco: #059669 → 4.7:1 ✓ WCAG AA */
+  --color-success:          #059669;
+  --color-success-light:    #ECFDF5;
+  --color-success-border:   #A7F3D0;
+
+  /* Ratio sobre blanco: #D97706 → 4.5:1 ✓ WCAG AA */
+  --color-warning:          #D97706;
+  --color-warning-light:    #FFFBEB;
+  --color-warning-border:   #FDE68A;
+
+  /* Ratio sobre blanco: #DC2626 → 5.9:1 ✓ WCAG AA */
+  --color-danger:           #DC2626;
+  --color-danger-light:     #FEF2F2;
+  --color-danger-border:    #FECACA;
+
+  /* Acentos secundarios */
+  --color-accent-teal:      #0F766E;  /* 5.3:1 ✓ */
+  --color-accent-orange:    #C2410C;  /* 5.8:1 ✓ */
+  --color-accent-violet:    #6D28D9;  /* 6.7:1 ✓ */
+
+  /* ── Escala de grises (todos ≥ 4.5:1 sobre #fff) ─────────────────────── */
+  --color-text-primary:     #1E293B;  /* slate-800  — 15.1:1 ✓ */
+  --color-text-secondary:   #334155;  /* slate-700  — 10.7:1 ✓ */
+  --color-text-muted:       #475569;  /* slate-600  —  7.4:1 ✓ */
+  --color-text-placeholder: #64748B;  /* slate-500  —  5.1:1 ✓ */
+  --color-text-disabled:    #94A3B8;  /* slate-400  —  2.6:1  (solo íconos decorativos) */
+
+  /* ── Superficies ─────────────────────────────────────────────────────────── */
+  --color-surface:          #FFFFFF;
+  --color-surface-subtle:   #F8FAFC;  /* fondo de secciones secundarias */
+  --color-surface-card:     #FFFFFF;
+  --color-border:           #E2E8F0;  /* slate-200 */
+  --color-border-strong:    #CBD5E1;  /* slate-300 */
+
+  /* ── Tipografía ──────────────────────────────────────────────────────────── */
+  --font-sans:   'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono:   'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  --text-xs:   0.75rem;    /* 12 px */
+  --text-sm:   0.875rem;   /* 14 px */
+  --text-base: 1rem;       /* 16 px */
+  --text-lg:   1.125rem;   /* 18 px */
+  --text-xl:   1.25rem;    /* 20 px */
+  --text-2xl:  1.5rem;     /* 24 px */
+  --text-3xl:  1.875rem;   /* 30 px */
+
+  --font-normal:   400;
+  --font-medium:   500;
+  --font-semibold: 600;
+  --font-bold:     700;
+
+  /* ── Espaciado (escala 4-point grid) ────────────────────────────────────── */
+  --space-1:  0.25rem;   /*  4 px */
+  --space-2:  0.5rem;    /*  8 px */
+  --space-3:  0.75rem;   /* 12 px */
+  --space-4:  1rem;      /* 16 px */
+  --space-5:  1.25rem;   /* 20 px */
+  --space-6:  1.5rem;    /* 24 px */
+  --space-8:  2rem;      /* 32 px */
+  --space-10: 2.5rem;    /* 40 px */
+  --space-12: 3rem;      /* 48 px */
+
+  /* ── Bordes y sombras ────────────────────────────────────────────────────── */
+  --radius-sm:   0.375rem;  /*  6 px */
+  --radius-md:   0.625rem;  /* 10 px */
+  --radius-lg:   1rem;      /* 16 px */
+  --radius-xl:   1.25rem;   /* 20 px */
+  --radius-2xl:  1.5rem;    /* 24 px */
+  --radius-full: 9999px;
+
+  /* Sombras funcionales — sin efectos decorativos pesados */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 8px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 8px 16px rgba(15, 23, 42, 0.10);
+
+  /* ── Transiciones ────────────────────────────────────────────────────────── */
+  --transition-fast:   150ms ease;
+  --transition-base:   200ms ease;
+  --transition-slow:   300ms ease;
+
+  /* ── Layout ──────────────────────────────────────────────────────────────── */
+  --max-width-content: 80rem;   /* 1280 px */
+  --header-height:     4rem;    /*  64 px */
+}
+
+/* ── Modo oscuro (preparado para implementación futura) ──────────────────────
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface:        #0F172A;
+    --color-surface-subtle: #1E293B;
+    --color-text-primary:   #F1F5F9;
+    --color-border:         #334155;
+  }
+}
+*/

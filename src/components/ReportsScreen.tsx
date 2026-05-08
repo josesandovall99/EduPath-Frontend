@@ -958,7 +958,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         setAsignaturasCatalog(normalizedAsignaturas);
 
-        console.log('[Reports] asignaturas recibidas:', asignaturas.length, asignaturas);
 
 
 
@@ -990,7 +989,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         }
 
-        console.log('[Reports] estudiantes recibidos:', students.length, students);
 
 
 
@@ -1024,7 +1022,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               AsignaturaResumen = res.data;
 
-              console.log('[Reports] progreso por asignatura', { estudianteId: st.id, asignaturaId: Asignatura.id, data: AsignaturaResumen });
 
             } catch (e) {
 
@@ -1046,7 +1043,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               const temas = Array.isArray(temasRes.data) ? temasRes.data : [];
 
-              console.log('[Reports] temas por asignatura', { asignaturaId: Asignatura.id, total: temas.length, temas });
 
 
 
@@ -1064,7 +1060,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                   temaProgress = temaProgRes.data?.resumen?.porcentajeTotalTema ?? temaProgRes.data?.progreso?.contenidos?.porcentaje ?? 0;
 
-                  console.log('[Reports] progreso por tema', { estudianteId: st.id, temaId: tema.id, data: temaProgRes.data });
 
                 } catch (e) {
 
@@ -1086,7 +1081,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                   const subs = Array.isArray(subRes.data) ? subRes.data : [];
 
-                  console.log('[Reports] subtemas por tema', { temaId: tema.id, total: subs.length, subtemas: subs });
 
                   subtopics = await Promise.all(subs.map(async (sub: any) => {
 
@@ -1098,7 +1092,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                       subProgress = subProgRes.data?.resumen?.porcentajeTotalSubtema ?? subProgRes.data?.progreso?.contenidos?.porcentaje ?? 0;
 
-                      console.log('[Reports] progreso por subtema', { estudianteId: st.id, subtemaId: sub.id, data: subProgRes.data });
 
                     } catch (e) {
 

@@ -26,6 +26,7 @@ import { SubtemaSequenceManagementScreen } from './components/SubtemaSequenceMan
 import { DocenteDashboard } from './components/DocenteDashboard';
 import { DocenteAsignaturaManagementScreen } from './components/DocenteAsignaturaManagementScreen';
 import { applyAuthHeaders, setupAuthFetch } from './utils/authHeaders';
+import { clearAllCache } from './utils/fetchCache';
 
 type Screen = 
   | 'login' 
@@ -170,6 +171,8 @@ export default function App() {
     localStorage.removeItem('adminDashboardState');
     localStorage.removeItem('docenteAsignaturaFlowState');
     localStorage.removeItem('docenteDashboardScreen');
+    // Vacía la caché de fetch para que el próximo login obtenga datos frescos.
+    clearAllCache();
   };
 
   useEffect(() => {

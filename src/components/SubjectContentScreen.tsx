@@ -172,7 +172,6 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
 
     try {
       const url = `${API_BASE_URL}/progresos/por-asignatura?asignatura_id=${subject.id}&estudiante_id=${estudianteId}`;
-      console.log(`Obteniendo progreso desde: ${url}`);
       
       const response = await fetch(url);
       
@@ -186,7 +185,6 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
       const data = await response.json();
       const porcentaje = data.resumen?.porcentajeTotalAsignatura || 0;
       setCurrentProgress(Math.round(porcentaje));
-      console.log(`Progreso del asignatura: ${porcentaje}%`);
     } catch (err) {
       console.error('Error al obtener progreso:', err);
       setCurrentProgress(0);
@@ -242,13 +240,10 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
             });
           });
           setTemasConEstadoProgreso(estadoMap);
-          console.log('Estado de desbloqueo cargado:', estadoMap);
         }
       } else {
-        console.log('Endpoint de desbloqueo no disponible, usando comportamiento estándar');
       }
     } catch (err) {
-      console.log('Sistema de desbloqueo no disponible, usando comportamiento estándar');
     }
   };
 
@@ -264,7 +259,6 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         setLoading(true);
         setError(null);
 
-        console.log('🔄 Fetching temas for Asignatura:', subject.id);
 
         // Obtener todos los temas del asignatura
         const temasResponse = await fetch(`${API_BASE_URL}/temas/por-asignatura/${subject.id}`);
@@ -280,7 +274,6 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         }
 
         const temas: Tema[] = await temasResponse.json();
-        console.log('Temas loaded:', temas);
 
         // Ordenar temas por la columna 'orden' antes de transformar
         const temasOrdenados = temas.sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0));
