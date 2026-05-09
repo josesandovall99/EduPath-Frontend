@@ -2,6 +2,7 @@ import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Edit, Share2, Users, Loc
 import { useState, useEffect, useRef } from 'react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { API_BASE_URL } from '../utils/constants';
+import { cachedFetch } from '../utils/fetchCache';
 import { parseConfigurableMiniproyecto } from './configurableEmbeddedExercises';
 
 interface Subject {
@@ -146,11 +147,10 @@ const getStatusBadge = (status: Content['status']) => {
 
 export function SubjectContentScreen({ subject, onBack, onContentSelect, estudianteId }: SubjectContentScreenProps) {
   const [contentList, setContentList] = useState<Content[]>([]);
-  const [temasMap, setTemasMap] = useState<Map<string, string>>(new Map()); // Map content.id to temaId
+  const [temasMap, setTemasMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentProgress, setCurrentProgress] = useState(0);
-  const [temasConEstadoProgreso, setTemasConEstadoProgreso] = useState<Map<string, any>>(new Map()); // Estado de desbloqueo opcional
   const [miniproyectoNotice, setMiniproyectoNotice] = useState<string | null>(null);
   const noticeTimeoutRef = useRef<number | null>(null);
   const colors = getSubjectColor(subject.id);
@@ -158,222 +158,122 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
 
   useEffect(() => {
     return () => {
-      if (noticeTimeoutRef.current) {
-        window.clearTimeout(noticeTimeoutRef.current);
-      }
+      if (noticeTimeoutRef.current) window.clearTimeout(noticeTimeoutRef.current);
     };
   }, []);
 
-  // Obtener progreso dinámico del estudiante en el asignatura
-  const obtenerProgresoAsignatura = async () => {
-    if (!estudianteId || !subject.id) {
-      console.warn('No hay estudiante_id o subject.id disponibles');
-      return;
-    }
-
-    try {
-      const url = `${API_BASE_URL}/progresos/por-asignatura?asignatura_id=${subject.id}&estudiante_id=${estudianteId}`;
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Error ${response.status}:`, errorText);
-        setCurrentProgress(0);
-        return;
-      }
-      
-      const data = await response.json();
-      const porcentaje = data.resumen?.porcentajeTotalAsignatura || 0;
-      setCurrentProgress(Math.round(porcentaje));
-    } catch (err) {
-      console.error('Error al obtener progreso:', err);
-      setCurrentProgress(0);
-    }
-  };
-
-  // Calcular progreso de cada tema individualmente
-  const calcularProgresoTemas = async (temas: Tema[]) => {
-    if (!estudianteId) return new Map<string, { porcentaje: number }>();
-    
-    const progresoMap = new Map<string, { porcentaje: number }>();
-    
-    for (const tema of temas) {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/progresos/por-tema?tema_id=${tema.id}&estudiante_id=${estudianteId}`
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          const porcentaje = data.resumen?.porcentajeTotalTema || 0;
-          progresoMap.set(tema.id.toString(), { porcentaje });
-        } else {
-          progresoMap.set(tema.id.toString(), { porcentaje: 0 });
-        }
-      } catch (err) {
-        progresoMap.set(tema.id.toString(), { porcentaje: 0 });
-      }
-    }
-    
-    return progresoMap;
-  };
-
-  // Intentar cargar estado de desbloqueo de temas (opcional, no afecta funcionalidad si falla)
-  const intentarCargarEstadoDesbloqueo = async () => {
-    if (!estudianteId || !subject.id) return;
-    
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/progresos/estado-temas-asignatura?estudiante_id=${estudianteId}&asignatura_id=${subject.id}`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        const estadoMap = new Map<string, any>();
-        
-        if (data.temas && Array.isArray(data.temas)) {
-          data.temas.forEach((tema: any) => {
-            estadoMap.set(tema.id.toString(), {
-              desbloqueado: tema.desbloqueado,
-              completo: tema.completo,
-              porcentaje: tema.porcentaje || 0
-            });
-          });
-          setTemasConEstadoProgreso(estadoMap);
-        }
-      } else {
-      }
-    } catch (err) {
-    }
-  };
-
-  // Cargar progreso dinámico del estudiante
+  // Una sola carga en paralelo: N+3 peticiones secuenciales → 4 simultáneas
   useEffect(() => {
-    obtenerProgresoAsignatura();
-    intentarCargarEstadoDesbloqueo();
-  }, [subject.id, estudianteId]);
-
-  useEffect(() => {
+    let cancelled = false;
     const fetchContent = async () => {
       try {
         setLoading(true);
         setError(null);
 
+        const token = localStorage.getItem('authToken');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        // Obtener todos los temas del asignatura
-        const temasResponse = await fetch(`${API_BASE_URL}/temas/por-asignatura/${subject.id}`);
+        // Estructura con caché (60s) — progreso sin caché (siempre fresco)
+        const [temasData, minisData, estadoRes, progresoRes] = await Promise.all([
+          cachedFetch(`${API_BASE_URL}/temas/por-asignatura/${subject.id}`, { headers }) as Promise<Tema[]>,
+          cachedFetch(`${API_BASE_URL}/miniproyectos?asignatura_id=${subject.id}`, { headers }) as Promise<any[]>,
+          estudianteId
+            ? fetch(`${API_BASE_URL}/progresos/estado-temas-asignatura?estudiante_id=${estudianteId}&asignatura_id=${subject.id}`, { headers })
+            : Promise.resolve(null),
+          estudianteId
+            ? fetch(`${API_BASE_URL}/progresos/por-asignatura?asignatura_id=${subject.id}&estudiante_id=${estudianteId}`, { headers })
+            : Promise.resolve(null),
+        ]);
 
-        // Validación: verificar si response es exitosa
-        if (!temasResponse.ok) {
-          throw new Error(`Failed to fetch temas: HTTP ${temasResponse.status}`);
-        }
-
-        const contentType = temasResponse.headers.get('content-type');
-        if (!contentType?.includes('application/json')) {
-          throw new Error(`Invalid response type from /temas/por-asignatura. Expected JSON, got: ${contentType}`);
-        }
-
-        const temas: Tema[] = await temasResponse.json();
-
-        // Ordenar temas por la columna 'orden' antes de transformar
+        const temas: Tema[] = Array.isArray(temasData) ? temasData : [];
         const temasOrdenados = temas.sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0));
 
-        // Calcular progreso de cada tema
-        const progresoTemas = await calcularProgresoTemas(temasOrdenados);
+        // Progreso global de la asignatura
+        if (progresoRes?.ok) {
+          const progresoData = await progresoRes.json();
+          if (!cancelled) setCurrentProgress(Math.round(progresoData?.resumen?.porcentajeTotalAsignatura || 0));
+        }
+
+        // Estado de desbloqueo + porcentaje por tema — reemplaza el loop N+1
+        const estadoMap = new Map<string, { desbloqueado: boolean; completo: boolean; porcentaje: number }>();
+        if (estadoRes?.ok) {
+          const estadoData = await estadoRes.json();
+          if (Array.isArray(estadoData.temas)) {
+            estadoData.temas.forEach((t: any) => {
+              estadoMap.set(t.id.toString(), {
+                desbloqueado: t.desbloqueado,
+                completo: t.completo,
+                porcentaje: t.porcentaje || 0,
+              });
+            });
+          }
+        }
 
         const progresionSecuencial = Boolean(subject.progresion_secuencial);
 
-        // Transformar temas (bloqueo por orden solo si la asignatura tiene progresión secuencial)
         const transformedContent = temasOrdenados.map((tema, index) => {
           const temaId = tema.id.toString();
-          const estadoProgreso = temasConEstadoProgreso.get(temaId);
-          const progresoTema = progresoTemas.get(temaId);
-          const porcentaje = progresoTema?.porcentaje ?? 0;
+          const estado = estadoMap.get(temaId);
+          const porcentaje = estado?.porcentaje ?? 0;
 
           let desbloqueado: boolean;
           if (!progresionSecuencial) {
             desbloqueado = true;
-          } else if (estadoProgreso?.desbloqueado !== undefined) {
-            desbloqueado = estadoProgreso.desbloqueado;
+          } else if (estado?.desbloqueado !== undefined) {
+            desbloqueado = estado.desbloqueado;
           } else if (index === 0) {
             desbloqueado = true;
           } else {
-            const temaAnterior = temasOrdenados[index - 1];
-            const progresoAnterior = progresoTemas.get(temaAnterior.id.toString());
-            desbloqueado = (progresoAnterior?.porcentaje ?? 0) >= 100;
+            const anterior = estadoMap.get(temasOrdenados[index - 1].id.toString());
+            desbloqueado = (anterior?.porcentaje ?? 0) >= 100;
           }
-          
-          // Determinar si está completo
-          const completo = estadoProgreso?.completo ?? (porcentaje >= 100);
-          
-          // Estado real basado en el progreso del estudiante
-          const status: Content['status'] = completo
-            ? 'completed'
-            : porcentaje > 0
-              ? 'in-progress'
-              : 'not-started';
 
-          return {
-            id: temaId,
-            title: tema.nombre,
-            type: 'document' as const,
-            duration: undefined,
-            status,
-            desbloqueado,
-            completo,
-            porcentaje
-          };
+          const completo = estado?.completo ?? (porcentaje >= 100);
+          const status: Content['status'] = completo ? 'completed' : porcentaje > 0 ? 'in-progress' : 'not-started';
+
+          return { id: temaId, title: tema.nombre, type: 'document' as const, duration: undefined, status, desbloqueado, completo, porcentaje };
         });
 
-        // Obtener miniproyectos del asignatura y agregarlos al final como tema fijo
+        // Miniproyectos publicados con verificación de aprobación en paralelo
         let miniproyectosContent: Content[] = [];
         try {
-          const minisResponse = await fetch(`${API_BASE_URL}/miniproyectos?asignatura_id=${subject.id}`);
-          if (minisResponse.ok) {
-            const minis: MiniproyectoApiItem[] = await minisResponse.json();
-            const minisArray = Array.isArray(minis) ? minis : [];
-            const publishedMinis = minisArray.filter((mini) => mini.seleccionadoParaEstudiantes);
-            const studentVisibleMinis = publishedMinis;
+          if (minisData) {
+            const minis: MiniproyectoApiItem[] = Array.isArray(minisData) ? minisData : [];
+            const visibles = minis.filter((m) => m.seleccionadoParaEstudiantes);
             let aprobadosMap = new Map<number, boolean>();
 
-            if (estudianteId && studentVisibleMinis.length > 0) {
+            if (estudianteId && visibles.length > 0) {
               const aprobados = await Promise.all(
-                studentVisibleMinis.map(async (mini) => {
+                visibles.map(async (mini) => {
                   try {
-                    const configurablePayload = parseConfigurableMiniproyecto(mini.respuesta_miniproyecto);
-                    if (configurablePayload && configurablePayload.exercises.length > 0) {
-                      const progressResponse = await fetch(`${API_BASE_URL}/miniproyectos/${mini.id}/configurable-progress`);
-                      if (!progressResponse.ok) return [mini.id, false] as const;
-                      const progressData = await progressResponse.json();
-                      return [mini.id, Boolean(progressData?.completado)] as const;
+                    const cfg = parseConfigurableMiniproyecto(mini.respuesta_miniproyecto);
+                    if (cfg && cfg.exercises.length > 0) {
+                      const r = await fetch(`${API_BASE_URL}/miniproyectos/${mini.id}/configurable-progress`, { headers });
+                      if (!r.ok) return [mini.id, false] as const;
+                      const d = await r.json();
+                      return [mini.id, Boolean(d?.completado)] as const;
                     }
-
-                    const response = await fetch(
-                      `${API_BASE_URL}/evaluaciones/by?miniproyecto_id=${mini.id}`
-                    );
-                    if (!response.ok) return [mini.id, false] as const;
-                    const data = await response.json();
-                    const evaluaciones = Array.isArray(data) ? data : [];
-                    const aprobado = evaluaciones.some((item) => String(item?.estado || '').toUpperCase() === 'APROBADO');
+                    const r = await fetch(`${API_BASE_URL}/evaluaciones/by?miniproyecto_id=${mini.id}`, { headers });
+                    if (!r.ok) return [mini.id, false] as const;
+                    const d = await r.json();
+                    const aprobado = (Array.isArray(d) ? d : []).some((e) => String(e?.estado || '').toUpperCase() === 'APROBADO');
                     return [mini.id, aprobado] as const;
-                  } catch (checkError) {
-                    console.warn('Error al verificar aprobación del miniproyecto:', checkError);
+                  } catch {
                     return [mini.id, false] as const;
                   }
                 })
               );
-
               aprobadosMap = new Map(aprobados);
             }
 
-            miniproyectosContent = studentVisibleMinis.map((mini) => {
-              const configurablePayload = parseConfigurableMiniproyecto(mini.respuesta_miniproyecto);
+            miniproyectosContent = visibles.map((mini) => {
+              const cfg = parseConfigurableMiniproyecto(mini.respuesta_miniproyecto);
               const aprobado = aprobadosMap.get(mini.id) || false;
               return {
                 id: mini.id.toString(),
                 title: mini.Actividad?.titulo || 'Miniproyecto',
-                type: configurablePayload ? 'activity' : [11, 13].includes(Number(mini.actividad_id)) ? 'workshop' : 'activity',
+                type: (cfg ? 'activity' : [11, 13].includes(Number(mini.actividad_id)) ? 'workshop' : 'activity') as Content['type'],
                 duration: undefined,
                 status: aprobado ? 'completed' : ('not-started' as const),
                 isMiniproyecto: true,
@@ -382,45 +282,40 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                 asignaturaNombre: mini.Asignatura?.nombre,
                 tipoPilar: mini.Asignatura?.tipo_pilar || null,
                 miniproyectoAprobado: aprobado,
-                miniproyectoMode: configurablePayload ? 'configurable' : 'legacy',
-                completo: aprobado
+                miniproyectoMode: cfg ? 'configurable' : 'legacy',
+                completo: aprobado,
               };
             });
-          } else {
-            console.warn('No se pudieron cargar miniproyectos del asignatura');
           }
         } catch (minisError) {
           console.warn('Error al cargar miniproyectos:', minisError);
         }
 
-        // Create map of content.id -> temaId
         const newTemasMap = new Map<string, string>();
-        temas.forEach((tema) => {
-          newTemasMap.set(tema.id.toString(), tema.id.toString());
-        });
-        setTemasMap(newTemasMap);
+        temas.forEach((t) => newTemasMap.set(t.id.toString(), t.id.toString()));
 
-        const fullContent = [...transformedContent, ...miniproyectosContent];
-
-        if (fullContent.length === 0) {
-          console.warn('No temas found, using fallback data');
-          setContentList(FALLBACK_CONTENT);
-          setError('No se encontraron temas en la BD. Se muestran datos de prueba.');
-        } else {
-          setContentList(fullContent);
+        if (!cancelled) {
+          setTemasMap(newTemasMap);
+          const fullContent = [...transformedContent, ...miniproyectosContent];
+          if (fullContent.length === 0) {
+            setContentList(FALLBACK_CONTENT);
+            setError('No se encontraron temas en la BD. Se muestran datos de prueba.');
+          } else {
+            setContentList(fullContent);
+          }
         }
-
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-        console.error('Error al obtener temas:', errorMessage);
-        setError(`Error: ${errorMessage}. Se muestran datos de prueba.`);
-        setContentList(FALLBACK_CONTENT);
+      } catch (err) {
+        if (!cancelled) {
+          setError(`Error: ${err instanceof Error ? err.message : 'desconocido'}. Se muestran datos de prueba.`);
+          setContentList(FALLBACK_CONTENT);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchContent();
+    return () => { cancelled = true; };
   }, [subject.id, subject.progresion_secuencial, estudianteId]);
   
   return (
@@ -441,8 +336,8 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
             
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-[#3A4A5B]">Juan Estudiante</p>
-                <p className="text-gray-500 text-sm">Ingeniería de Sistemas</p>
+                <p className="text-[#3A4A5B]">{localStorage.getItem('nombreEstudiante') || 'Estudiante'}</p>
+                <p className="text-gray-500 text-sm">EduPath</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-[#4A90E2] to-[#5B9FED] rounded-full flex items-center justify-center text-white shadow-md">
                 <User className="h-5 w-5" />

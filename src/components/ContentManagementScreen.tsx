@@ -233,12 +233,14 @@ export function ContentManagementScreen({
   }, [scopeasignaturaId, scopeTemaId, scopeSubtemaId, isFlowScoped]);
 
   // Cascada de filtros de catálogo
+  // Carga temas: en modo catálogo usa filterasignaturaId; en modo flow usa el área activa
   useEffect(() => {
     setFilterTemaId('');
     setFilterSubtemaId('');
     setFilterSubtemas([]);
-    if (!isFlowScoped && filterasignaturaId) {
-      fetch(`${API_BASE_URL}/temas/por-asignatura/${filterasignaturaId}`, {
+    const asigId = isFlowScoped ? scopeasignaturaId : filterasignaturaId;
+    if (asigId) {
+      fetch(`${API_BASE_URL}/temas/por-asignatura/${asigId}`, {
         headers: buildAuthHeaders({ Accept: 'application/json' }),
         credentials: 'include'
       })
@@ -248,11 +250,11 @@ export function ContentManagementScreen({
     } else {
       setFilterTemas([]);
     }
-  }, [filterasignaturaId]);
+  }, [filterasignaturaId, isFlowScoped, scopeasignaturaId]);
 
   useEffect(() => {
     setFilterSubtemaId('');
-    if (!isFlowScoped && filterTemaId) {
+    if (filterTemaId) {
       fetch(`${API_BASE_URL}/subtemas/por-tema/${filterTemaId}`, {
         headers: buildAuthHeaders({ Accept: 'application/json' }),
         credentials: 'include'
@@ -815,6 +817,7 @@ export function ContentManagementScreen({
                 />
               </div>
 
+              {/* Asignatura — solo en modo catálogo */}
               {!isFlowScoped && (
                 <div className="app-content-filter-grid mt-4">
                   <div className="app-content-filter-block">
@@ -831,40 +834,43 @@ export function ContentManagementScreen({
                       ))}
                     </select>
                   </div>
-
-                  <div className="app-content-filter-block">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Tema</p>
-                    <p className="mt-1 text-sm text-slate-600">Filtra por tema.</p>
-                    <select
-                      value={filterTemaId}
-                      onChange={(e) => setFilterTemaId(e.target.value)}
-                      className="app-form-select mt-3"
-                      disabled={!filterasignaturaId || filterTemas.length === 0}
-                    >
-                      <option value="">Todos los temas</option>
-                      {filterTemas.map((tema) => (
-                        <option key={tema.id} value={tema.id}>{tema.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="app-content-filter-block">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Subtema</p>
-                    <p className="mt-1 text-sm text-slate-600">Filtra por subtema.</p>
-                    <select
-                      value={filterSubtemaId}
-                      onChange={(e) => setFilterSubtemaId(e.target.value)}
-                      className="app-form-select mt-3"
-                      disabled={!filterTemaId || filterSubtemas.length === 0}
-                    >
-                      <option value="">Todos los subtemas</option>
-                      {filterSubtemas.map((subtema) => (
-                        <option key={subtema.id} value={subtema.id}>{subtema.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
                 </div>
               )}
+
+              {/* Tema y Subtema — siempre visibles, horizontales */}
+              <div className="flex gap-4 mt-4">
+                <div className="flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Tema</p>
+                  <p className="mt-1 text-sm text-slate-600">Filtra por tema.</p>
+                  <select
+                    value={filterTemaId}
+                    onChange={(e) => setFilterTemaId(e.target.value)}
+                    className="app-form-select mt-3"
+                    disabled={filterTemas.length === 0}
+                  >
+                    <option value="">Todos los temas</option>
+                    {filterTemas.map((tema) => (
+                      <option key={tema.id} value={tema.id}>{tema.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Subtema</p>
+                  <p className="mt-1 text-sm text-slate-600">Filtra por subtema.</p>
+                  <select
+                    value={filterSubtemaId}
+                    onChange={(e) => setFilterSubtemaId(e.target.value)}
+                    className="app-form-select mt-3"
+                    disabled={!filterTemaId || filterSubtemas.length === 0}
+                  >
+                    <option value="">Todos los subtemas</option>
+                    {filterSubtemas.map((subtema) => (
+                      <option key={subtema.id} value={subtema.id}>{subtema.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
               <div className="app-content-filter-grid">
                 <div className="app-content-filter-block">

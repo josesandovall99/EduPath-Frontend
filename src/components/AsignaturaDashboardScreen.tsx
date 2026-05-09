@@ -15,10 +15,11 @@ import {
   ClipboardList,
   FileText,
   Layers,
-  Users,
+  List,
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 import { buildAuthHeaders } from '../utils/authHeaders';
+import { cachedFetch } from '../utils/fetchCache';
 
 interface AsignaturaDashboardScreenProps {
   asignaturaId: number;
@@ -40,7 +41,7 @@ interface AsignaturaStats {
   temasActivos: number;
   totalContenidos: number;
   contenidosActivos: number;
-  totalEstudiantes: number;
+  totalSubtemas: number;
   totalMiniproyectos: number;
 }
 
@@ -49,7 +50,7 @@ const EMPTY: AsignaturaStats = {
   temasActivos: 0,
   totalContenidos: 0,
   contenidosActivos: 0,
-  totalEstudiantes: 0,
+  totalSubtemas: 0,
   totalMiniproyectos: 0,
 };
 
@@ -71,51 +72,59 @@ export function AsignaturaDashboardScreen({
     setLoading(true);
 
     const headers = buildAuthHeaders({ Accept: 'application/json' });
+    const opts = { headers, credentials: 'include' as const };
 
-    const fetchJson = async (url: string) => {
-      try {
-        const r = await fetch(url, { headers, credentials: 'include' });
-        if (!r.ok) return [];
-        return r.json();
-      } catch {
-        return [];
-      }
-    };
+    // cachedFetch (60s) — datos estructurales del área, cambian poco
+    const get = (url: string) =>
+      (cachedFetch(url, opts) as Promise<any[]>).catch(() => []);
 
     (async () => {
-      const [temas, contenidos, estudiantes, miniproyectos] = await Promise.all([
-        fetchJson(`${API_BASE_URL}/temas?asignatura_id=${asignaturaId}`),
-        fetchJson(`${API_BASE_URL}/contenidos?asignatura_id=${asignaturaId}`),
-        fetchJson(`${API_BASE_URL}/estudiante`),
-        fetchJson(`${API_BASE_URL}/miniproyectos?asignatura_id=${asignaturaId}`),
+      // Ronda 1: temas (endpoint correcto) + contenidos + miniproyectos en paralelo
+      const [temas, contenidos, miniproyectos] = await Promise.all([
+        get(`${API_BASE_URL}/temas/por-asignatura/${asignaturaId}`),
+        get(`${API_BASE_URL}/contenidos?asignatura_id=${asignaturaId}`),
+        get(`${API_BASE_URL}/miniproyectos?asignatura_id=${asignaturaId}`),
       ]);
 
       if (cancelled) return;
 
       const temasArr      = Array.isArray(temas)        ? temas        : [];
       const contenidosArr = Array.isArray(contenidos)   ? contenidos   : [];
-      const estudArr      = Array.isArray(estudiantes)  ? estudiantes  : [];
       const minisArr      = Array.isArray(miniproyectos)? miniproyectos: [];
+      const temaIds       = temasArr.map((t: any) => t.id);
 
-      setStats({
-        totalTemas:          temasArr.length,
-        temasActivos:        temasArr.filter((t: any) => t.estado !== false).length,
-        totalContenidos:     contenidosArr.length,
-        contenidosActivos:   contenidosArr.filter((c: any) => c.estado !== false).length,
-        totalEstudiantes:    estudArr.filter((e: any) => e.persona?.estado !== false).length,
-        totalMiniproyectos:  minisArr.length,
-      });
-      setLoading(false);
+      // Render inmediato con los datos ya disponibles
+      setStats(prev => ({
+        ...prev,
+        totalTemas:        temasArr.length,
+        temasActivos:      temasArr.filter((t: any) => t.estado !== false).length,
+        totalContenidos:   contenidosArr.length,
+        contenidosActivos: contenidosArr.filter((c: any) => c.estado !== false).length,
+        totalMiniproyectos: minisArr.length,
+      }));
+      setLoading(false); // muestra métricas disponibles ya
+
+      // Ronda 2: subtemas (necesita temaIds) — actualiza sin bloquear el render
+      if (temaIds.length > 0) {
+        const subtemasFetches = await Promise.all(
+          temaIds.map((id: number) =>
+            get(`${API_BASE_URL}/subtemas/por-tema/${id}`)
+          )
+        );
+        if (cancelled) return;
+        const totalSub = subtemasFetches.flat().length;
+        setStats(prev => ({ ...prev, totalSubtemas: totalSub }));
+      }
     })();
 
     return () => { cancelled = true; };
   }, [asignaturaId]);
 
   const metrics = [
-    { label: 'Temas activos',      value: loading ? '…' : `${stats.temasActivos} / ${stats.totalTemas}`,         icon: Layers,      color: '#2563EB' },
-    { label: 'Contenidos activos', value: loading ? '…' : `${stats.contenidosActivos} / ${stats.totalContenidos}`, icon: FileText,    color: '#059669' },
-    { label: 'Estudiantes',        value: loading ? '…' : stats.totalEstudiantes,                                  icon: Users,       color: '#D97706' },
-    { label: 'Miniproyectos',      value: loading ? '…' : stats.totalMiniproyectos,                                icon: ClipboardList, color: '#6D28D9' },
+    { label: 'Temas activos',      value: loading ? '…' : `${stats.temasActivos} / ${stats.totalTemas}`,           icon: Layers,       color: '#2563EB' },
+    { label: 'Subtemas',           value: stats.totalSubtemas === 0 && loading ? '…' : stats.totalSubtemas,         icon: List,         color: '#0891B2' },
+    { label: 'Contenidos activos', value: loading ? '…' : `${stats.contenidosActivos} / ${stats.totalContenidos}`,  icon: FileText,     color: '#059669' },
+    { label: 'Miniproyectos',      value: loading ? '…' : stats.totalMiniproyectos,                                 icon: ClipboardList, color: '#6D28D9' },
   ];
 
   const accesos = [

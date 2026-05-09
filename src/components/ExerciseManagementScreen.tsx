@@ -2441,10 +2441,22 @@ export function ExerciseManagementScreen({
     setFilterSubtemaId('');
     setFilterSubtemas([]);
     if (!filterAsignaturaId) { setFilterTemas([]); return; }
+    // Primero intenta filtrar desde los temas ya cargados en memoria
     const temasFiltrados = temasOptions.filter(
       (t) => String(t.asignatura_id) === filterAsignaturaId
     );
-    setFilterTemas(temasFiltrados);
+    if (temasFiltrados.length > 0) {
+      setFilterTemas(temasFiltrados);
+    } else {
+      // Si no están en memoria (área activa recién seleccionada), los pide al backend
+      fetch(`${API_BASE_URL}/temas/por-asignatura/${filterAsignaturaId}`, {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      })
+        .then((r) => r.ok ? r.json() : [])
+        .then((data) => setFilterTemas(Array.isArray(data) ? data : []))
+        .catch(() => setFilterTemas([]));
+    }
   }, [filterAsignaturaId, temasOptions]);
 
   // Al cambiar el tema, recarga subtemas y limpia el filtro de subtema.
@@ -4158,18 +4170,20 @@ export function ExerciseManagementScreen({
         {/* Filtros jerárquicos por asignatura / tema / subtema */}
         <section className="app-toolbar-card mb-6">
           <div className="mb-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Filtrar por asignatura, tema y subtema</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              {docenteAsignaturaId || isDocenteMode ? 'Filtrar por tema y subtema' : 'Filtrar por asignatura, tema y subtema'}
+            </p>
             <p className="mt-0.5 text-sm text-slate-500">Acota el listado según la jerarquía académica.</p>
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            {/* Asignatura — deshabilitado en modo docente */}
-            <div>
+
+          {/* Asignatura — solo visible en modo global (sin área activa) */}
+          {!docenteAsignaturaId && !isDocenteMode && (
+            <div className="mb-4">
               <label className="app-form-label mb-1 block">Asignatura</label>
               <select
                 value={filterAsignaturaId}
                 onChange={(e) => setFilterAsignaturaId(e.target.value)}
-                disabled={isDocenteMode}
-                className="app-form-select disabled:bg-slate-100 disabled:cursor-not-allowed"
+                className="app-form-select"
                 aria-label="Filtrar por asignatura"
               >
                 <option value="">Todas las asignaturas</option>
@@ -4178,14 +4192,16 @@ export function ExerciseManagementScreen({
                 ))}
               </select>
             </div>
+          )}
 
-            {/* Tema */}
+          {/* Tema y Subtema — siempre visibles, uno al lado del otro */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="app-form-label mb-1 block">Tema</label>
               <select
                 value={filterTemaId}
                 onChange={(e) => setFilterTemaId(e.target.value)}
-                disabled={!filterAsignaturaId || filterTemas.length === 0}
+                disabled={filterTemas.length === 0}
                 className="app-form-select disabled:bg-slate-100 disabled:cursor-not-allowed"
                 aria-label="Filtrar por tema"
               >
@@ -4196,7 +4212,6 @@ export function ExerciseManagementScreen({
               </select>
             </div>
 
-            {/* Subtema */}
             <div>
               <label className="app-form-label mb-1 block">Subtema</label>
               <select

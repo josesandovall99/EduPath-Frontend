@@ -8,6 +8,7 @@ import { MultipleChoiceExercise } from './MultipleChoiceExercise';
 import { OrderingExercise } from './OrderingExercise';
 import { MatchingExercise } from './MatchingExercise';
 import { API_BASE_URL } from '../utils/constants';
+import { cachedFetch } from '../utils/fetchCache';
 
 // Estilos para renderizado de HTML
 const htmlContentStyles = `
@@ -576,36 +577,28 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       let mapSubtemas = new Map<string, any>();
       let mapContenidos = new Map<string, any>();
 
-      // Intentar cargar estado de subtemas
-      const urlSubtemas = `${API_BASE_URL}/progresos/estado-subtemas-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
-      
-      const responseSubtemas = await fetch(urlSubtemas);
+      // Ambas peticiones en paralelo
+      const [responseSubtemas, responseContenidos] = await Promise.all([
+        fetch(`${API_BASE_URL}/progresos/estado-subtemas-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`),
+        fetch(`${API_BASE_URL}/progresos/estado-contenidos-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`),
+      ]);
+
       if (responseSubtemas.ok) {
         const dataSubtemas = await responseSubtemas.json();
         const rawSub = Array.isArray(dataSubtemas) ? dataSubtemas : dataSubtemas?.subtemas;
         mapSubtemas = new Map<string, any>(
-          Array.isArray(rawSub)
-            ? rawSub.map((item: any) => [String(item.id ?? item.subtema_id), item])
-            : []
+          Array.isArray(rawSub) ? rawSub.map((item: any) => [String(item.id ?? item.subtema_id), item]) : []
         );
         setSubtemasConEstadoProgreso(mapSubtemas);
-      } else {
       }
 
-      // Intentar cargar estado de contenidos
-      const urlContenidos = `${API_BASE_URL}/progresos/estado-contenidos-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`;
-      
-      const responseContenidos = await fetch(urlContenidos);
       if (responseContenidos.ok) {
         const dataContenidos = await responseContenidos.json();
         const rawCont = Array.isArray(dataContenidos) ? dataContenidos : dataContenidos?.contenidos;
         mapContenidos = new Map<string, any>(
-          Array.isArray(rawCont)
-            ? rawCont.map((item: any) => [String(item.id ?? item.contenido_id), item])
-            : []
+          Array.isArray(rawCont) ? rawCont.map((item: any) => [String(item.id ?? item.contenido_id), item]) : []
         );
         setContenidosConEstadoProgreso(mapContenidos);
-      } else {
       }
 
       return { subtemas: mapSubtemas, contenidos: mapContenidos };
@@ -647,16 +640,16 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
     setEjercicioAsociado(null);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/ejercicios`);
-      
+      // Filtra directamente por contenido en el servidor
+      const url = `${API_BASE_URL}/ejercicios?contenido_id=${contenidoId}`;
+      const response = await fetch(url);
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const ejercicios: Ejercicio[] = await response.json();
-      
-      
-      // Buscar el ejercicio que coincida con el contenido_id
+
       const ejercicio = ejercicios.find(ej => {
         // Comparar ambos como números para evitar problemas de tipo string vs number
         return Number(ej.contenido_id) === parseInt(contenidoId);
@@ -699,87 +692,90 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_BASE_URL}/subtemas/por-tema/${temaId}`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        const token = localStorage.getItem('authToken');
+        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const contentType = response.headers.get('content-type');
-        if (!contentType?.includes('application/json')) {
-          throw new Error('Response is not JSON');
-        }
+        // Datos estructurales con caché (60s TTL) — segunda visita es instantánea
+        // Datos de progreso sin caché — siempre frescos
+        const subtemasPromise      = cachedFetch(`${API_BASE_URL}/subtemas/por-tema/${temaId}`, { headers }) as Promise<any[]>;
+        const seqPromise           = cachedFetch(`${API_BASE_URL}/secuencias-subtema/tema/${temaId}/ordenados`, { headers }) as Promise<any>;
+        const estSubtemasPromise   = estudianteId
+          ? fetch(`${API_BASE_URL}/progresos/estado-subtemas-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`, { headers })
+          : Promise.resolve(null);
+        const estContenidosPromise = estudianteId
+          ? fetch(`${API_BASE_URL}/progresos/estado-contenidos-tema?estudiante_id=${estudianteId}&tema_id=${temaId}`, { headers })
+          : Promise.resolve(null);
 
-        let subtemas = await response.json();
+        // Fase 1: estructura — datos en caché llegan en <1ms en revisitas
+        // seqData ya viene ordenado del backend (es array de subtemas, no de secuencias)
+        const [subtemasData, seqData] = await Promise.all([subtemasPromise, seqPromise]);
 
-        // Intentar cargar estado de desbloqueo (OPCIONAL)
-        const estadoProgresoMaps = await intentarCargarEstadoDesbloqueo();
+        // El endpoint /ordenados devuelve los subtemas ya ordenados — usarlos directamente.
+        // Si devuelve array vacío o falla, caer al array de subtemas sin ordenar.
+        let subtemas: any[] = (Array.isArray(seqData) && seqData.length > 0)
+          ? seqData
+          : (Array.isArray(subtemasData) ? subtemasData : []);
 
-        // Calcular progreso de cada subtema
-        const progresoSubtemas = await calcularProgresoSubtemas(subtemas);
-
-        // Cargar secuencias de subtemas para ordenarlos
-        try {
-          const seqResponse = await fetch(`${API_BASE_URL}/secuencias-subtema`);
-          if (seqResponse.ok) {
-            const sequences = await seqResponse.json();
-            
-            // Ordenar subtemas basado en las secuencias
-            subtemas = orderSubtemasBySequence(subtemas, sequences);
-          }
-        } catch (err) {
-          console.warn('Error cargando secuencias, ocultando subtemas no secuenciados:', err);
-          subtemas = [];
-        }
-
-        // Transform subtemas to modules format - incluir estado de desbloqueo
+        // Render inmediato: todos desbloqueados por defecto, el progreso llega en Fase 2
         const transformedModules: Module[] = Array.isArray(subtemas)
-          ? subtemas.map((subtema: any, idx: number) => {
-              const estadoProgreso = estadoProgresoMaps.subtemas.get(String(subtema.id));
-              const progresoSubtema = progresoSubtemas.get(String(subtema.id));
-              const porcentaje = progresoSubtema?.porcentaje ?? 0;
-              
-              let desbloqueado: boolean;
-              if (!secuencialActivado) {
-                desbloqueado = true;
-              } else if (estadoProgreso?.desbloqueado !== undefined) {
-                desbloqueado = estadoProgreso.desbloqueado;
-              } else if (idx === 0) {
-                desbloqueado = true;
-              } else {
-                const subtemaAnterior = subtemas[idx - 1];
-                const progresoAnterior = progresoSubtemas.get(String(subtemaAnterior.id));
-                desbloqueado = (progresoAnterior?.porcentaje ?? 0) >= 100;
-              }
-              
-              const completo = estadoProgreso?.completo ?? (porcentaje >= 100);
-              
-              return {
-                id: subtema.id || `subtema-${idx}`,
-                title: subtema.nombre || `Subtema ${idx + 1}`,
-                items: [],
-                expanded: idx === 0, // Expand first one by default
-                loadingItems: idx === 0, // Load items for first one
-                desbloqueado,
-                completo,
-              };
-            })
+          ? subtemas.map((subtema: any, idx: number) => ({
+              id: subtema.id || `subtema-${idx}`,
+              title: subtema.nombre || `Subtema ${idx + 1}`,
+              items: [],
+              expanded: idx === 0,
+              loadingItems: idx === 0,
+              desbloqueado: true, // optimista; se corrige en Fase 2 si hay secuencial
+              completo: false,
+            }))
           : [];
 
-        setModules(transformedModules.length > 0 ? transformedModules : FALLBACK_MODULES);
-        
-        // Fetch contents for first subtema automatically
+        const initialModules = transformedModules.length > 0 ? transformedModules : FALLBACK_MODULES;
+        setModules(initialModules);
+        setLoading(false); // ← barra lateral visible en ~100-200ms
+
+        // Carga el contenido del primer subtema en paralelo con Fase 2
         if (transformedModules.length > 0) {
-          loadContenidosForSubtema(transformedModules[0].id, transformedModules, estadoProgresoMaps.contenidos);
+          loadContenidosForSubtema(transformedModules[0].id, transformedModules, new Map());
         }
 
-        // Actualizar progreso después de cargar contenidos
-        obtenerProgresoAsignatura();
+        // Fase 2 (en background): progreso — actualiza el estado de desbloqueo/completado
+        const [estSubtemasRes, estContenidosRes] = await Promise.all([estSubtemasPromise, estContenidosPromise]);
+
+        let mapSubtemas = new Map<string, any>();
+        let mapContenidos = new Map<string, any>();
+
+        if (estSubtemasRes?.ok) {
+          const d = await estSubtemasRes.json();
+          const raw = Array.isArray(d) ? d : d?.subtemas;
+          if (Array.isArray(raw)) {
+            mapSubtemas = new Map(raw.map((item: any) => [String(item.id ?? item.subtema_id), item]));
+            setSubtemasConEstadoProgreso(mapSubtemas);
+          }
+        }
+        if (estContenidosRes?.ok) {
+          const d = await estContenidosRes.json();
+          const raw = Array.isArray(d) ? d : d?.contenidos;
+          if (Array.isArray(raw)) {
+            mapContenidos = new Map(raw.map((item: any) => [String(item.id ?? item.contenido_id), item]));
+            setContenidosConEstadoProgreso(mapContenidos);
+          }
+        }
+
+        // Actualiza módulos con estado real de desbloqueo y completado
+        if (mapSubtemas.size > 0 && secuencialActivado) {
+          setModules(prev => prev.map((mod, idx) => {
+            const est = mapSubtemas.get(String(mod.id));
+            const porcentaje = est?.porcentaje ?? 0;
+            let desbloqueado = est?.desbloqueado ?? (idx === 0);
+            const completo = est?.completo ?? (porcentaje >= 100);
+            return { ...mod, desbloqueado, completo };
+          }));
+        }
+
       } catch (err) {
         console.error('Error fetching subtemas:', err);
         setError(`Error loading subtemas: ${err instanceof Error ? err.message : 'Unknown error'}`);
         setModules(FALLBACK_MODULES);
-      } finally {
         setLoading(false);
       }
     };
@@ -797,75 +793,49 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
     estadoContenidosActual: Map<string, any> = contenidosConEstadoProgreso
   ) => {
     try {
-      // Usar el nuevo endpoint que ordena por secuencia del backend
-      const response = await fetch(`${API_BASE_URL}/secuencias-contenido/subtema/${subtemaId}/ordenados`);
-      
-      if (!response.ok) {
-        console.warn(`HTTP ${response.status} when fetching contenidos`);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const token = localStorage.getItem('authToken');
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const contentType = response.headers.get('content-type');
-      if (!contentType?.includes('application/json')) {
-        throw new Error('Response is not JSON');
-      }
+      // Contenidos y ejercicios con caché — en paralelo y rápidos en revisitas
+      const [contenidosData, ejerciciosData] = await Promise.all([
+        cachedFetch(`${API_BASE_URL}/secuencias-contenido/subtema/${subtemaId}/ordenados`, { headers }) as Promise<Contenido[]>,
+        asignaturaId
+          ? cachedFetch(`${API_BASE_URL}/ejercicios?asignatura_id=${asignaturaId}`, { headers }) as Promise<any[]>
+          : Promise.resolve(null),
+      ]);
 
-      const contenidos: Contenido[] = await response.json();
+      const contenidos: Contenido[] = Array.isArray(contenidosData) ? contenidosData : [];
 
-      // Obtener todas las secuencias para identificar qué contenidos están en alguna secuencia
-      let sequencias: any[] = [];
-      try {
-        const seqResp = await fetch(`${API_BASE_URL}/secuencias-contenido`);
-        if (seqResp.ok) {
-          sequencias = await seqResp.json();
-        } else {
-          console.warn('No se pudo obtener secuencias, status:', seqResp.status);
-        }
-      } catch (e) {
-        console.warn('Error al obtener secuencias:', e);
-      }
+      // El endpoint /ordenados ya devuelve solo los contenidos en secuencia — no hace falta
+      // cargar todas las secuencias globales para filtrar
+      const contenidosSecuenciados = contenidos;
 
-      const contenidoIds = new Set(contenidos.map(c => c.id));
-      const sequencedIds = new Set<number>();
-      sequencias.forEach(s => {
-        const ori = s.contenido_origen_id ?? s.origen?.id;
-        const dst = s.contenido_destino_id ?? s.destino?.id;
-        if (ori && contenidoIds.has(ori)) sequencedIds.add(ori);
-        if (dst && contenidoIds.has(dst)) sequencedIds.add(dst);
+      // Mapear a ModuleItem usando estadoContenidosActual (ya cargado) en vez de N fetches
+      const items: ModuleItem[] = contenidosSecuenciados.map((contenido: Contenido, idx: number) => {
+        const estadoProgreso = estadoContenidosActual.get(String(contenido.id));
+        // completado del mapa equivale a visualizado
+        const visualizado = estadoProgreso?.completado ?? estadoProgreso?.completo ?? false;
+        const completo = estadoProgreso?.completo ?? estadoProgreso?.completado ?? visualizado;
+        return {
+          id: contenido.id.toString(),
+          title: contenido.titulo,
+          duration: undefined,
+          type: mapTipoToType(contenido.tipo),
+          completed: false,
+          visualizado,
+          descripcion: contenido.descripcion,
+          url: contenido.url,
+          recommended: idx === 0,
+          desbloqueado: false,
+          completo,
+        };
       });
-
-      // Filtrar solo contenidos que forman parte de alguna secuencia
-      const contenidosSecuenciados = contenidos.filter(c => sequencedIds.has(c.id));
-
-      // Transform contenidosSecuenciados to ModuleItem format (sin gating todavía;
-      // el gating se aplica DESPUÉS de mezclar contenidos + ejercicios en orden)
-      const items: ModuleItem[] = await Promise.all(
-        contenidosSecuenciados.map(async (contenido: Contenido, idx: number) => {
-          const visualizado = await obtenerEstadoVisualizacion(contenido.id.toString());
-          const estadoProgreso = estadoContenidosActual.get(String(contenido.id));
-          const completo = estadoProgreso?.completo ?? visualizado;
-          return {
-            id: contenido.id.toString(),
-            title: contenido.titulo,
-            duration: undefined,
-            type: mapTipoToType(contenido.tipo),
-            completed: false,
-            visualizado,
-            descripcion: contenido.descripcion,
-            url: contenido.url,
-            recommended: idx === 0,
-            desbloqueado: false, // se calcula al final
-            completo,
-          };
-        })
-      );
 
       // Cargar ejercicios asociados y agregarlos como ítems separados
       try {
-        const ejerciciosResponse = await fetch(`${API_BASE_URL}/ejercicios`);
-        
-        if (ejerciciosResponse.ok) {
-          const todosEjercicios: Ejercicio[] = await ejerciciosResponse.json();
+        // Usa ejerciciosData ya cargado en el Promise.all superior
+        if (ejerciciosData && Array.isArray(ejerciciosData)) {
+          const todosEjercicios: Ejercicio[] = ejerciciosData;
           
           // IDs de contenidos de este subtema
           const contenidoIdsDeEsteSubtema = contenidosSecuenciados.map(c => String(c.id));

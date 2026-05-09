@@ -16,15 +16,18 @@
  *    agrupadas por categoría (`workflow` / `support`).
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useArea } from '../context/AreaContext';
 import {
   ArrowRight,
   BarChart3,
   Bot,
   BookOpen,
+  ChevronRight,
   ClipboardList,
   FileEdit,
   Loader2,
   LogOut,
+  Plus,
   Shield,
   TrendingUp,
   Upload,
@@ -141,6 +144,8 @@ const ScreenLoader = () => (
 const isActiveFlag = (value: unknown) => value !== false;
 
 export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
+  const { setArea, clearArea } = useArea();
+
   /** Pantalla que se renderiza actualmente. */
   const [currentScreen, setCurrentScreen] = useState<AdminScreen>('dashboard');
   /** Pila de pantallas previas; se usa al pulsar "volver". */
@@ -157,6 +162,10 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
 
   const [statsData, setStatsData] = useState<DashboardStats>(EMPTY_STATS);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
+
+  // Asignaturas para el listado directo del dashboard
+  const [asignaturasList, setAsignaturasList] = useState<{ id: number; nombre: string; tipo_pilar: string | null }[]>([]);
+  const [loadingAsignaturas, setLoadingAsignaturas] = useState(false);
 
   /**
    * Hidrata el estado del dashboard desde `localStorage` al montar.
@@ -306,6 +315,20 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
     };
   }, [currentScreen]);
 
+  // Cargar asignaturas al montar el dashboard
+  useEffect(() => {
+    if (currentScreen !== 'dashboard') return;
+    let cancelled = false;
+    setLoadingAsignaturas(true);
+    const token = localStorage.getItem('authToken');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    (cachedFetch(`${API_BASE_URL}/asignaturas`, { headers }) as Promise<any[]>)
+      .then((data) => { if (!cancelled) setAsignaturasList(Array.isArray(data) ? data : []); })
+      .catch(() => { if (!cancelled) setAsignaturasList([]); })
+      .finally(() => { if (!cancelled) setLoadingAsignaturas(false); });
+    return () => { cancelled = true; };
+  }, [currentScreen]);
+
   /**
    * Empuja la pantalla actual al historial y abre `nextScreen`. Si ya estamos
    * en esa pantalla, no hace nada (evita ciclos en el historial).
@@ -336,11 +359,12 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
     });
   }, []);
 
-  /** Vuelve al dashboard descartando todo el historial de navegación. */
+  /** Vuelve al dashboard descartando todo el historial de navegación y el área activa. */
   const goHome = useCallback(() => {
     setNavigationHistory([]);
     setCurrentScreen('dashboard');
-  }, []);
+    clearArea();
+  }, [clearArea]);
 
   /**
    * Selecciona un asignatura desde la pantalla de asignaturas y limpia los niveles
@@ -354,11 +378,11 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       setSelectedTemaName('');
       setSelectedSubtemaId(null);
       setSelectedSubtemaNombre('');
-      // Primero muestra el dashboard específico de la asignatura.
-      // Desde allí el admin navega a temas, contenidos, etc.
+      // Publica el área activa en el contexto global
+      setArea(asignaturaId, asignaturaName);
       navigateTo('asignatura-dashboard');
     },
-    [navigateTo],
+    [navigateTo, setArea],
   );
 
   /**
@@ -491,8 +515,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
    * directo desde el dashboard. Determina si la pantalla de contenidos debe
    * filtrarse por contexto (`flow`) o mostrar el catálogo completo (`catalog`).
    */
-  const isContentManagementFlowScoped =
-    lastNavigationScreen === 'contents' && (hasAsignaturaContext || hasTemaContext || hasSubtemaContext);
+  // Scoped siempre que haya un área seleccionada, sin importar desde dónde se llegó
+  const isContentManagementFlowScoped = hasAsignaturaContext;
 
   /**
    * Despacha la activación de una tarjeta. Si tiene `onClick` lo ejecuta
@@ -704,7 +728,11 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'miniproyectos') {
     return (
       <Suspense fallback={<ScreenLoader />}>
-        <MiniproyectoManagementScreen onBack={goBack} onHome={goHome} />
+        <MiniproyectoManagementScreen
+          onBack={goBack}
+          onHome={goHome}
+          docenteAsignaturaId={selectedAsignaturaId || undefined}
+        />
       </Suspense>
     );
   }
@@ -712,7 +740,11 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   if (currentScreen === 'ejercicios') {
     return (
       <Suspense fallback={<ScreenLoader />}>
-        <ExerciseManagementScreen onBack={goBack} onHome={goHome} />
+        <ExerciseManagementScreen
+          onBack={goBack}
+          onHome={goHome}
+          docenteAsignaturaId={selectedAsignaturaId || undefined}
+        />
       </Suspense>
     );
   }
@@ -894,28 +926,69 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
       </header>
 
       <main className="app-main">
-        <div className="app-section-head mb-6">
-          <div>
-            <h2 className="app-section-title">Módulos del administrador</h2>
-            <p className="app-section-description">Panel principal con acceso a los módulos del rol administrador.</p>
-          </div>
-        </div>
 
+        {/* Asignaturas — punto de entrada directo al área */}
         <section className="mb-8">
-          <div className="app-section-head">
+          <div className="app-section-head mb-4">
             <div>
-              <h3 className="app-section-title">Gestión académica</h3>
-              <p className="app-section-description">Módulos para asignaturas, contenidos, ejercicios y miniproyectos.</p>
+              <h2 className="app-section-title">Áreas académicas</h2>
+              <p className="app-section-description">Selecciona un área para gestionar sus temas, contenidos, ejercicios y miniproyectos.</p>
             </div>
+            <button
+              type="button"
+              onClick={() => navigateTo('asignaturas')}
+              className="app-btn app-btn-primary flex items-center gap-2"
+              aria-label="Crear nueva asignatura"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nueva asignatura</span>
+            </button>
           </div>
-          <div className="app-card-grid">{academicActions.map(renderActionCard)}</div>
+
+          {loadingAsignaturas ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin text-[#4A90E2]" />
+            </div>
+          ) : asignaturasList.length === 0 ? (
+            <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-500 text-sm">
+              No hay asignaturas registradas.{' '}
+              <button type="button" onClick={() => navigateTo('asignaturas')} className="text-[#4A90E2] underline">
+                Crear una ahora
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {asignaturasList.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => handleasignaturaselect(a.id, a.nombre)}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-5 py-4 flex items-center gap-4 hover:border-[#4A90E2] hover:shadow-md transition-all text-left group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-[#4A90E2]/10 flex items-center justify-center shrink-0">
+                    <BookOpen className="w-5 h-5 text-[#4A90E2]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#1E293B] group-hover:text-[#4A90E2] transition-colors truncate">
+                      {a.nombre}
+                    </p>
+                    {a.tipo_pilar && (
+                      <p className="text-xs text-gray-400 mt-0.5">{a.tipo_pilar}</p>
+                    )}
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#4A90E2] shrink-0 transition-colors" />
+                </button>
+              ))}
+            </div>
+          )}
         </section>
 
+        {/* Herramientas de soporte — sin cambios */}
         <section className="mb-8">
           <div className="app-section-head">
             <div>
               <h3 className="app-section-title">Administración y soporte</h3>
-              <p className="app-section-description">Módulos para usuarios, informes, carga masiva y servicios del sistema.</p>
+              <p className="app-section-description">Usuarios, informes, carga masiva y servicios del sistema.</p>
             </div>
           </div>
           <div className="app-card-grid">{supportActions.map(renderActionCard)}</div>

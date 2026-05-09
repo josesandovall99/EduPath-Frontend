@@ -6,9 +6,14 @@
   import "./styles/globals.css";
   import "./styles/admin-consistency.css";
   import { applyAuthHeaders, setupAuthFetch } from "./utils/authHeaders";
+  import { AreaProvider } from "./context/AreaContext.tsx";
 
   setupAuthFetch();
   applyAuthHeaders();
 
-  createRoot(document.getElementById("root")!).render(<App />);
+  createRoot(document.getElementById("root")!).render(
+    <AreaProvider>
+      <App />
+    </AreaProvider>
+  );
   

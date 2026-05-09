@@ -2,6 +2,7 @@ import { LogOut, Code, BookOpen, TrendingUp, User } from 'lucide-react';
 import { ChatbotButton } from './ChatbotButton';
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../utils/constants';
+import { cachedFetch } from '../utils/fetchCache';
 
 interface Subject {
   id: string;
@@ -9,6 +10,7 @@ interface Subject {
   icon: typeof Code;
   color: string;
   progresion_secuencial?: boolean;
+  tipoPilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null;
 }
 
 interface Asignatura {
@@ -16,6 +18,7 @@ interface Asignatura {
   nombre: string;
   descripcion?: string;
   progresion_secuencial?: boolean;
+  tipo_pilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null;
 }
 
 interface DashboardScreenProps {
@@ -99,9 +102,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
     if (!estudianteId) return empty;
     try {
       const url = `${API_BASE_URL}/progresos/por-asignatura?asignatura_id=${asignaturaId}&estudiante_id=${estudianteId}`;
-      const response = await fetch(url);
-      if (!response.ok) return empty;
-      const data = await response.json();
+      // Caché de 30s — el progreso no cambia durante la navegación normal
+      const data = await cachedFetch(url, {}, 30_000) as any;
       return {
         porcentaje: Math.round(data.resumen?.porcentajeTotalAsignatura || 0),
         temasTotal: Number(data.temas?.total ?? 0),
@@ -122,19 +124,12 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         setError(null);
 
 
-        const response = await fetch(`${API_BASE_URL}/asignaturas`);
+        // cachedFetch devuelve JSON directo — en revisitas es instantáneo (<1ms)
+        const asignaturas = await cachedFetch(`${API_BASE_URL}/asignaturas`) as any[];
 
-        // Validación crítica: verificar si la respuesta es exitosa
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (!Array.isArray(asignaturas)) {
+          throw new Error('Respuesta inválida del servidor');
         }
-
-        const contentType = response.headers.get('content-type');
-        if (!contentType?.includes('application/json')) {
-          throw new Error(`Invalid content type. Expected JSON, got: ${contentType}`);
-        }
-
-        const asignaturas = await response.json();
 
         // Filtro de seguridad: obtener semestre del estudiante
         // NOTA: Esto debería venir del backend en producción
@@ -160,6 +155,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           id: Asignatura.id.toString(),
           name: Asignatura.nombre,
           progresion_secuencial: Boolean(Asignatura.progresion_secuencial),
+          tipoPilar: Asignatura.tipo_pilar ?? null,
           icon: Code,
           color: colorPalette[index % colorPalette.length],
         }));
@@ -180,21 +176,22 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
     fetchasignaturas();
   }, []);
 
-  // Cargar progreso real (en paralelo) cuando las asignaturas se carguen
+  // Carga el progreso de cada asignatura en background — las tarjetas ya son visibles
   useEffect(() => {
-    if (subjects.length > 0 && estudianteId) {
-      const cargarProgresos = async () => {
-        const entries = await Promise.all(
-          subjects.map(async (s) => {
-            const asignaturaId = parseInt(s.id);
-            const progreso = await obtenerProgresoAsignatura(asignaturaId);
-            return [asignaturaId, progreso] as const;
-          })
-        );
-        setProgresosPorAsignatura(new Map(entries));
-      };
-      cargarProgresos();
-    }
+    if (subjects.length === 0 || !estudianteId) return;
+    let cancelled = false;
+
+    // Lanza todas las peticiones en paralelo sin bloquear el render
+    subjects.forEach(async (s) => {
+      const asignaturaId = parseInt(s.id);
+      const progreso = await obtenerProgresoAsignatura(asignaturaId);
+      if (!cancelled) {
+        // Actualiza solo la tarjeta que acaba de responder — no espera a las demás
+        setProgresosPorAsignatura(prev => new Map(prev).set(asignaturaId, progreso));
+      }
+    });
+
+    return () => { cancelled = true; };
   }, [subjects, estudianteId]);
 
   return (
@@ -279,7 +276,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
             return (
               <button
                 key={subject.id}
-                onClick={() => onSubjectSelect({ id: subject.id, name: subject.name, progresion_secuencial: subject.progresion_secuencial })}
+                onClick={() => onSubjectSelect({ id: subject.id, name: subject.name, progresion_secuencial: subject.progresion_secuencial, tipoPilar: subject.tipoPilar })}
                 className="app-list-card group"
               >
                 <div className="app-list-card__head">

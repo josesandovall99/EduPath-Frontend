@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useArea } from '../context/AreaContext';
 
 import { ArrowLeft, Download, Filter, X, User, Calendar, Activity, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, BarChart3, Award, AlertTriangle } from 'lucide-react';
 
@@ -537,6 +538,9 @@ const mergeFailuresWithasignaturas = (data: FailuresReportData, asignaturas: Bas
 
 
 export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePersonaId, docenteAsignaturaId }: ReportsScreenProps) {
+  const { asignaturaId: areaContextId } = useArea();
+  // En modo admin usa el área activa del contexto si no se pasó un id explícito
+  const effectiveAsignaturaId = docenteAsignaturaId ?? (mode === 'admin' ? areaContextId ?? undefined : undefined);
 
   const isDocenteMode = mode === 'docente';
 
@@ -744,9 +748,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     }
 
-    if (docenteAsignaturaId) {
+    if (effectiveAsignaturaId) {
 
-      headers['x-asignatura-id'] = String(docenteAsignaturaId);
+      headers['x-asignatura-id'] = String(effectiveAsignaturaId);
 
     }
 
@@ -878,7 +882,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             if (Array.isArray(fallbackData.students)) {
 
-              const asignaturaId = docenteAsignaturaId ? String(docenteAsignaturaId) : null;
+              const asignaturaId = effectiveAsignaturaId ? String(effectiveAsignaturaId) : null;
 
               const normalizedAsignaturas = normalizeasignaturasCatalog(Array.isArray(fallbackData.asignaturas) ? fallbackData.asignaturas : []);
 
@@ -1201,7 +1205,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     loadStudentsAndProgress();
 
-  }, [isDocenteMode, docenteId, docentePersonaId, docenteAsignaturaId]);
+  }, [isDocenteMode, docenteId, docentePersonaId, effectiveAsignaturaId]);
 
 
 
@@ -1259,9 +1263,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             const docenteResponse = await api.get(`/docente/reportes/fallos?${params.toString()}`, getDocenteRequestConfig());
 
-            const scoped = scopeFailuresDataByAsignatura(docenteResponse.data || {}, docenteAsignaturaId);
+            const scoped = scopeFailuresDataByAsignatura(docenteResponse.data || {}, effectiveAsignaturaId);
 
-            const merged = mergeFailuresWithasignaturas(scoped, asignaturasCatalog, docenteAsignaturaId);
+            const merged = mergeFailuresWithasignaturas(scoped, asignaturasCatalog, effectiveAsignaturaId);
 
             setFailuresData(merged);
 
