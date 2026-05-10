@@ -28,44 +28,7 @@ interface DashboardScreenProps {
   estudianteId?: number;
 }
 
-type RestrictedAsignaturaCategory = 'fundamentos' | 'analisis' | 'atc';
-
 const colorPalette = ['#4A90E2', '#7ED6A7', '#F5A97F', '#FFB84D', '#A78BFA', '#EC4899'];
-
-const normalizeasignaturaName = (value?: string | null) =>
-  (value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ');
-
-const getRestrictedAsignaturaCategory = (asignaturaName?: string | null): RestrictedAsignaturaCategory | null => {
-  const normalizedName = normalizeasignaturaName(asignaturaName);
-
-  if (normalizedName.includes('fundamentos') && normalizedName.includes('program')) {
-    return 'fundamentos';
-  }
-
-  if (normalizedName.includes('analisis')) {
-    return 'analisis';
-  }
-
-  if (
-    normalizedName === 'atc' ||
-    normalizedName.includes('alcance') ||
-    normalizedName.includes('tiempo') ||
-    normalizedName.includes('costo') ||
-    normalizedName.includes('gestion de proyectos') ||
-    normalizedName.includes('gestion proyectos')
-  ) {
-    return 'atc';
-  }
-
-  return null;
-};
-
-// Si el fetch de asignaturas falla, mostramos lista vacía + alerta — no se inventan datos.
 
 export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudianteId }: DashboardScreenProps) {
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -80,18 +43,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
     siguienteTema: string;
   };
   const [progresosPorAsignatura, setProgresosPorAsignatura] = useState<Map<number, AsignaturaProgress>>(new Map());
-
-  // Función para obtener asignaturas permitidas según el semestre
-  const obtenerasignaturasPermitidas = (semestre: number): RestrictedAsignaturaCategory[] => {
-    if (semestre >= 1 && semestre <= 4) {
-      return ['fundamentos'];
-    } else if (semestre >= 5 && semestre <= 6) {
-      return ['fundamentos', 'analisis'];
-    } else if (semestre >= 7 && semestre <= 10) {
-      return ['fundamentos', 'analisis', 'atc'];
-    }
-    return []; // Si el semestre está fuera de rango
-  };
 
   // Obtener progreso real de un asignatura (porcentaje + info de temas)
   const obtenerProgresoAsignatura = async (asignaturaId: number): Promise<AsignaturaProgress> => {
@@ -131,27 +82,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           throw new Error('Respuesta inválida del servidor');
         }
 
-        // Filtro de seguridad: obtener semestre del estudiante
-        // NOTA: Esto debería venir del backend en producción
-        const semestre = parseInt(localStorage.getItem('semestreEstudiante') || '1');
-        const asignaturasPermitidas = obtenerasignaturasPermitidas(semestre);
-        
-        // Filtrar asignaturas según el semestre
-        const asignaturasFiltradas = asignaturas.filter((Asignatura: Asignatura) => {
-          const restrictedCategory = getRestrictedAsignaturaCategory(Asignatura.nombre);
-
-          // Las asignaturas históricas siguen limitadas por semestre.
-          // Cualquier asignatura nueva queda visible para todos los estudiantes.
-          if (!restrictedCategory) {
-            return true;
-          }
-
-          return asignaturasPermitidas.includes(restrictedCategory);
-        });
-
-
-        // Transformar asignaturas a formato de subjects (los temas/progreso se cargan después desde el backend)
-        const transformedSubjects = asignaturasFiltradas.map((Asignatura: Asignatura, index: number) => ({
+        // Todas las asignaturas activas del backend son visibles para cualquier estudiante
+        const transformedSubjects = asignaturas.map((Asignatura: Asignatura, index: number) => ({
           id: Asignatura.id.toString(),
           name: Asignatura.nombre,
           progresion_secuencial: Boolean(Asignatura.progresion_secuencial),

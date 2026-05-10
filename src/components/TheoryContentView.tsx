@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Play, FileText, CheckCircle2, BookOpen, ChevronDown, ChevronRight, Loader, Lock } from 'lucide-react';
 import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
 import { ProgrammingContentView } from './ProgrammingContentView';
@@ -359,8 +359,46 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   const [loadingEjercicio, setLoadingEjercicio] = useState(false);
   const [subtemasConEstadoProgreso, setSubtemasConEstadoProgreso] = useState<Map<string, any>>(new Map());
   const [contenidosConEstadoProgreso, setContenidosConEstadoProgreso] = useState<Map<string, any>>(new Map());
+  /** Refs con el último mapa del servidor (el estado de React puede ir atrasado en callbacks de setModules). */
+  const subtemasEstadoSrvRef = useRef<Map<string, any>>(new Map());
+  const contenidosEstadoSrvRef = useRef<Map<string, any>>(new Map());
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
-  const secuencialActivado = Boolean(progresionSecuencial);
+  const secuencialRef = useRef(Boolean(progresionSecuencial));
+  const seleccionMarcarRef = useRef<{ contentId: string | null; estudianteId: number | undefined }>({
+    contentId: null,
+    estudianteId: undefined,
+  });
+
+  useEffect(() => {
+    seleccionMarcarRef.current = {
+      contentId: selectedContentId,
+      estudianteId,
+    };
+  }, [selectedContentId, estudianteId]);
+
+  useEffect(() => {
+    secuencialRef.current = Boolean(progresionSecuencial);
+  }, [progresionSecuencial]);
+
+  /** No pisar desbloqueo que ya calculó el backend (evita F5 con todo bloqueado por la cadena local). */
+  const aplicarServidorDesbloqueoContenidos = (itemsIn: ModuleItem[], mapSrv: Map<string, any>): ModuleItem[] => {
+    if (!secuencialRef.current || mapSrv.size === 0) return itemsIn;
+    return itemsIn.map((it) => {
+      if (it.ejercicioData) return it;
+      const row = mapSrv.get(String(it.id));
+      if (row?.desbloqueado !== true) return it;
+      return { ...it, desbloqueado: true };
+    });
+  };
+
+  const aplicarServidorDesbloqueoSubtemas = (modsIn: Module[], mapSrv: Map<string, any>): Module[] => {
+    if (!secuencialRef.current || mapSrv.size === 0) return modsIn;
+    return modsIn.map((m) => {
+      const row = mapSrv.get(String(m.id));
+      if (row?.desbloqueado !== true) return m;
+      return { ...m, desbloqueado: true };
+    });
+  };
 
   // Inyectar estilos en el documento
   useEffect(() => {
@@ -377,7 +415,28 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
     obtenerProgresoAsignatura();
   }, [asignaturaId, temaId, estudianteId]);
 
-  // Polling automático: actualizar progreso en segundo plano (sin ocultar el porcentaje en pantalla)
+  // Intentar persistir progreso antes de cerrar/recargar (el timer de 3s a veedor no llega si F5 rápido)
+  useEffect(() => {
+    const flushMarcarSeleccion = () => {
+      const { contentId, estudianteId: sid } = seleccionMarcarRef.current;
+      if (!contentId || !sid || contentId.startsWith('ejercicio-')) return;
+      const token = localStorage.getItem('authToken');
+      fetch(`${API_BASE_URL}/contenidos/marcar-visualizado`, {
+        method: 'POST',
+        keepalive: true,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          contenido_id: parseInt(contentId, 10),
+          estudiante_id: sid,
+        }),
+      }).catch(() => {});
+    };
+    window.addEventListener('pagehide', flushMarcarSeleccion);
+    return () => window.removeEventListener('pagehide', flushMarcarSeleccion);
+  }, []);
   useEffect(() => {
     if (!estudianteId || (!asignaturaId && !temaId)) return;
 
@@ -455,7 +514,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   };
 
   const recalcularGatingItems = (items: ModuleItem[]): ModuleItem[] => {
-    if (!secuencialActivado) {
+    if (!secuencialRef.current) {
       return items.map((item) => ({ ...item, desbloqueado: true }));
     }
     return items.map((item, i) => {
@@ -477,7 +536,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   );
 
   const recalcularGatingSubtemas = (mods: Module[]): Module[] => {
-    if (!secuencialActivado) {
+    if (!secuencialRef.current) {
       return mods.map((module) => ({ ...module, desbloqueado: true }));
     }
     return mods.map((module, idx) => {
@@ -521,21 +580,34 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
+      const cid = String(contenidoId);
+      const nuevo = new Map(contenidosEstadoSrvRef.current);
+      const prev = nuevo.get(cid) ?? {};
+      nuevo.set(cid, { ...prev, completado: true, completado_srv: true });
+      contenidosEstadoSrvRef.current = nuevo;
+      setContenidosConEstadoProgreso(nuevo);
+
       // Actualizar el estado del módulo para mostrar que fue visualizado y recalcular gating
       setModules(prevModules => {
         const updated = prevModules.map(m => ({
           ...m,
-          items: recalcularGatingItems(
-            m.items.map(item =>
-              item.id === contenidoId ? { ...item, visualizado: true, completo: true } : item
-            )
+          items: aplicarServidorDesbloqueoContenidos(
+            recalcularGatingItems(
+              m.items.map(item =>
+                item.id === contenidoId ? { ...item, visualizado: true, completo: true } : item
+              )
+            ),
+            contenidosEstadoSrvRef.current
           )
         }));
-        return recalcularGatingSubtemas(
-          updated.map(m => ({
-            ...m,
-            completo: m.items.length > 0 ? esModuloCompletoPorItems(m.items) : m.completo
-          }))
+        return aplicarServidorDesbloqueoSubtemas(
+          recalcularGatingSubtemas(
+            updated.map(m => ({
+              ...m,
+              completo: m.items.length > 0 ? esModuloCompletoPorItems(m.items) : m.completo
+            }))
+          ),
+          subtemasEstadoSrvRef.current
         );
       });
 
@@ -550,16 +622,22 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       const updated = prevModules.map(m => {
         const hasItem = m.items.some(i => i.id === ejercicioItemId);
         if (!hasItem) return m;
-        const updatedItems = recalcularGatingItems(
-          m.items.map(item =>
-            item.id === ejercicioItemId
-              ? { ...item, completo: true, visualizado: true }
-              : item
-          )
+        const updatedItems = aplicarServidorDesbloqueoContenidos(
+          recalcularGatingItems(
+            m.items.map(item =>
+              item.id === ejercicioItemId
+                ? { ...item, completo: true, visualizado: true }
+                : item
+            )
+          ),
+          contenidosEstadoSrvRef.current
         );
         return { ...m, items: updatedItems, completo: esModuloCompletoPorItems(updatedItems) };
       });
-      return recalcularGatingSubtemas(updated);
+      return aplicarServidorDesbloqueoSubtemas(
+        recalcularGatingSubtemas(updated),
+        subtemasEstadoSrvRef.current
+      );
     });
     obtenerProgresoAsignatura();
   };
@@ -590,6 +668,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
           Array.isArray(rawSub) ? rawSub.map((item: any) => [String(item.id ?? item.subtema_id), item]) : []
         );
         setSubtemasConEstadoProgreso(mapSubtemas);
+        subtemasEstadoSrvRef.current = mapSubtemas;
       }
 
       if (responseContenidos.ok) {
@@ -599,6 +678,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
           Array.isArray(rawCont) ? rawCont.map((item: any) => [String(item.id ?? item.contenido_id), item]) : []
         );
         setContenidosConEstadoProgreso(mapContenidos);
+        contenidosEstadoSrvRef.current = mapContenidos;
       }
 
       return { subtemas: mapSubtemas, contenidos: mapContenidos };
@@ -695,6 +775,23 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
         const token = localStorage.getItem('authToken');
         const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
+        // Tras F5 el prop puede estar incompleto: leer modo secuencial desde el servidor antes de gated items
+        let modoSecuencial = secuencialRef.current;
+        try {
+          if (asignaturaId != null && String(asignaturaId).trim() !== '') {
+            const ar = await fetch(`${API_BASE_URL}/asignaturas/${asignaturaId}`, { headers });
+            if (ar.ok) {
+              const ad = await ar.json();
+              if (typeof ad?.progresion_secuencial === 'boolean') {
+                modoSecuencial = Boolean(ad.progresion_secuencial);
+              }
+            }
+          }
+        } catch (_) {
+          /* mantener modo del prop */
+        }
+        secuencialRef.current = modoSecuencial;
+
         // Datos estructurales con caché (60s TTL) — segunda visita es instantánea
         // Datos de progreso sin caché — siempre frescos
         const subtemasPromise      = cachedFetch(`${API_BASE_URL}/subtemas/por-tema/${temaId}`, { headers }) as Promise<any[]>;
@@ -716,7 +813,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
           ? seqData
           : (Array.isArray(subtemasData) ? subtemasData : []);
 
-        // Render inmediato: todos desbloqueados por defecto, el progreso llega en Fase 2
+        // Estructura de subtemas; si hay progresión secuencial sin mapa del servidor todavía, solo el primero aparece disponible como pista inicial
         const transformedModules: Module[] = Array.isArray(subtemas)
           ? subtemas.map((subtema: any, idx: number) => ({
               id: subtema.id || `subtema-${idx}`,
@@ -724,21 +821,14 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
               items: [],
               expanded: idx === 0,
               loadingItems: idx === 0,
-              desbloqueado: true, // optimista; se corrige en Fase 2 si hay secuencial
+              desbloqueado: !modoSecuencial || idx === 0,
               completo: false,
             }))
           : [];
 
-        const initialModules = transformedModules.length > 0 ? transformedModules : FALLBACK_MODULES;
-        setModules(initialModules);
-        setLoading(false); // ← barra lateral visible en ~100-200ms
+        const haySubtemasReales = transformedModules.length > 0;
 
-        // Carga el contenido del primer subtema en paralelo con Fase 2
-        if (transformedModules.length > 0) {
-          loadContenidosForSubtema(transformedModules[0].id, transformedModules, new Map());
-        }
-
-        // Fase 2 (en background): progreso — actualiza el estado de desbloqueo/completado
+        // Fase 2: progreso del servidor antes de pintar contenidos/subtemas finales (evita F5 descoordinando locks)
         const [estSubtemasRes, estContenidosRes] = await Promise.all([estSubtemasPromise, estContenidosPromise]);
 
         let mapSubtemas = new Map<string, any>();
@@ -750,6 +840,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
           if (Array.isArray(raw)) {
             mapSubtemas = new Map(raw.map((item: any) => [String(item.id ?? item.subtema_id), item]));
             setSubtemasConEstadoProgreso(mapSubtemas);
+            subtemasEstadoSrvRef.current = mapSubtemas;
           }
         }
         if (estContenidosRes?.ok) {
@@ -758,18 +849,29 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
           if (Array.isArray(raw)) {
             mapContenidos = new Map(raw.map((item: any) => [String(item.id ?? item.contenido_id), item]));
             setContenidosConEstadoProgreso(mapContenidos);
+            contenidosEstadoSrvRef.current = mapContenidos;
           }
         }
 
-        // Actualiza módulos con estado real de desbloqueo y completado
-        if (mapSubtemas.size > 0 && secuencialActivado) {
-          setModules(prev => prev.map((mod, idx) => {
+        let modsParaMostrar: Module[] = haySubtemasReales ? transformedModules : FALLBACK_MODULES;
+
+        if (modoSecuencial && mapSubtemas.size > 0 && haySubtemasReales) {
+          modsParaMostrar = transformedModules.map((mod, idx) => {
             const est = mapSubtemas.get(String(mod.id));
             const porcentaje = est?.porcentaje ?? 0;
-            let desbloqueado = est?.desbloqueado ?? (idx === 0);
+            const desbloqueado = est?.desbloqueado ?? (idx === 0);
             const completo = est?.completo ?? (porcentaje >= 100);
             return { ...mod, desbloqueado, completo };
-          }));
+          });
+        }
+
+        setModules(modsParaMostrar);
+        setLoading(false);
+
+        const primeraSubId =
+          haySubtemasReales ? String(transformedModules[0].id) : null;
+        if (primeraSubId) {
+          await loadContenidosForSubtema(primeraSubId, modsParaMostrar, mapContenidos);
         }
 
       } catch (err) {
@@ -790,9 +892,11 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   const loadContenidosForSubtema = async (
     subtemaId: string,
     modulosActuales?: Module[],
-    estadoContenidosActual: Map<string, any> = contenidosConEstadoProgreso
+    estadoContenidosActual?: Map<string, any>
   ) => {
     try {
+      const mapSrvContenidos = estadoContenidosActual ?? contenidosEstadoSrvRef.current;
+
       const token = localStorage.getItem('authToken');
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -810,9 +914,9 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       // cargar todas las secuencias globales para filtrar
       const contenidosSecuenciados = contenidos;
 
-      // Mapear a ModuleItem usando estadoContenidosActual (ya cargado) en vez de N fetches
+      // Mapear a ModuleItem usando mapSrvContenidos (ya cargado) en vez de N fetches
       const items: ModuleItem[] = contenidosSecuenciados.map((contenido: Contenido, idx: number) => {
-        const estadoProgreso = estadoContenidosActual.get(String(contenido.id));
+        const estadoProgreso = mapSrvContenidos.get(String(contenido.id));
         // completado del mapa equivale a visualizado
         const visualizado = estadoProgreso?.completado ?? estadoProgreso?.completo ?? false;
         const completo = estadoProgreso?.completo ?? estadoProgreso?.completado ?? visualizado;
@@ -821,7 +925,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
           title: contenido.titulo,
           duration: undefined,
           type: mapTipoToType(contenido.tipo),
-          completed: false,
+          completed: visualizado,
           visualizado,
           descripcion: contenido.descripcion,
           url: contenido.url,
@@ -899,14 +1003,19 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
 
           // Reemplazar el array items
           items.length = 0;
-          items.push(...recalcularGatingItems(itemsConEjercicios));
+          items.push(
+            ...aplicarServidorDesbloqueoContenidos(
+              recalcularGatingItems(itemsConEjercicios),
+              mapSrvContenidos
+            )
+          );
         }
       } catch (err) {
         console.error('Error al cargar ejercicios para el menú:', err);
         // No es crítico, continuar sin ejercicios
       }
 
-      const gatedItems = recalcularGatingItems(items);
+      const gatedItems = aplicarServidorDesbloqueoContenidos(recalcularGatingItems(items), mapSrvContenidos);
 
       // Update the module with the loaded items
       setModules(prevModules => {
@@ -920,7 +1029,10 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
               }
             : m
         );
-        return recalcularGatingSubtemas(updatedModules);
+        return aplicarServidorDesbloqueoSubtemas(
+          recalcularGatingSubtemas(updatedModules),
+          subtemasEstadoSrvRef.current
+        );
       });
 
       // Seleccionar el primer contenido secuenciado automáticamente si existe
@@ -967,25 +1079,21 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
     });
   };
 
-  // Marcar contenido como visualizado cuando se selecciona
   useEffect(() => {
-    if (selectedContentId && estudianteId) {
-      // Verificar si ya fue visualizado
-      const item = modules.flatMap(m => m.items).find(i => i.id === selectedContentId);
-      
-      // Si no ha sido visualizado aún, marcar después de 3 segundos.
-      // Los ejercicios no se marcan por tiempo: solo cuentan cuando se aprueban.
-      if (item && !item.ejercicioData && !item.visualizado) {
-        const timer = setTimeout(async () => {
-          await marcarContenidoVisualizado(selectedContentId);
-          // Actualizar progreso después de marcar como visualizado
-          obtenerProgresoAsignatura();
-        }, 3000);
+    if (!selectedContentId || !estudianteId) return;
+    if (selectedContentId.startsWith('ejercicio-')) return;
 
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [selectedContentId, estudianteId, modules]);
+    const srv = contenidosEstadoSrvRef.current.get(String(selectedContentId));
+    if (srv?.completado === true || srv?.completo === true) return;
+
+    const contenidoActual = selectedContentId;
+    const timer = window.setTimeout(() => {
+      void marcarContenidoVisualizado(contenidoActual);
+      void obtenerProgresoAsignatura();
+    }, 2000);
+
+    return () => window.clearTimeout(timer);
+  }, [selectedContentId, estudianteId]);
 
   const getItemIcon = (type: string) => {
     switch (type) {
