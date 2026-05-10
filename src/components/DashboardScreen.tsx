@@ -19,6 +19,7 @@ interface Asignatura {
   descripcion?: string;
   progresion_secuencial?: boolean;
   tipo_pilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null;
+  estado?: boolean;
 }
 
 interface DashboardScreenProps {
@@ -43,6 +44,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
     siguienteTema: string;
   };
   const [progresosPorAsignatura, setProgresosPorAsignatura] = useState<Map<number, AsignaturaProgress>>(new Map());
+
 
   // Obtener progreso real de un asignatura (porcentaje + info de temas)
   const obtenerProgresoAsignatura = async (asignaturaId: number): Promise<AsignaturaProgress> => {
@@ -82,8 +84,11 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           throw new Error('Respuesta inválida del servidor');
         }
 
-        // Todas las asignaturas activas del backend son visibles para cualquier estudiante
-        const transformedSubjects = asignaturas.map((Asignatura: Asignatura, index: number) => ({
+
+        // Solo asignaturas activas; el detalle de temas/progreso se carga después desde el backend
+        const asignaturasFiltradas = asignaturas.filter((Asignatura: Asignatura) => Asignatura.estado !== false);
+        const transformedSubjects = asignaturasFiltradas.map((Asignatura: Asignatura, index: number) => ({
+
           id: Asignatura.id.toString(),
           name: Asignatura.nombre,
           progresion_secuencial: Boolean(Asignatura.progresion_secuencial),

@@ -27,7 +27,7 @@ export function LoginScreen({ onLoginSuccess, onDocenteLoginSuccess, onLogin, on
     localStorage.removeItem('estudianteId');
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('nombreEstudiante');
-    localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem('periodoAcademicoEstudiante');
     localStorage.removeItem('adminId');
     localStorage.removeItem('personaId');
     localStorage.removeItem('authToken');

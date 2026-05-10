@@ -12,7 +12,7 @@ const clearStoredAuthState = () => {
   localStorage.removeItem('estudianteId');
   localStorage.removeItem('codigoEstudiante');
   localStorage.removeItem('nombreEstudiante');
-  localStorage.removeItem('semestreEstudiante');
+  localStorage.removeItem('periodoAcademicoEstudiante');
   localStorage.removeItem('adminId');
   localStorage.removeItem('personaId');
   localStorage.removeItem('authToken');
