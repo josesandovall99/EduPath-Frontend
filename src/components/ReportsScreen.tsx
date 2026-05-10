@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useArea } from '../context/AreaContext';
 
-import { ArrowLeft, Download, Filter, X, User, Calendar, Activity, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, BarChart3, Award, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Download, Filter, X, User, Calendar, Activity, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, BarChart3, Award, AlertTriangle, Eye } from 'lucide-react';
 
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -240,6 +240,31 @@ interface FailuresReportData {
 }
 
 
+
+interface RankingContenido {
+  id: number;
+  nombre: string;
+  tipo: string;
+  asignatura: string;
+  tema: string;
+  subtema: string;
+  vistas: number;
+}
+
+interface RankingItem {
+  id: number;
+  nombre: string;
+  asignatura?: string;
+  tema?: string;
+  vistas: number;
+}
+
+interface RankingVisualizaciones {
+  contenidos: RankingContenido[];
+  subtemas: RankingItem[];
+  temas: RankingItem[];
+  asignaturas: RankingItem[];
+}
 
 interface BasicAsignatura {
 
@@ -546,7 +571,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   const subjectPalette = ['#4A90E2', '#7ED6A7', '#F5A97F'];
 
-  const [activeTab, setActiveTab] = useState<'student' | 'date' | 'activity' | 'failures'>('student');
+  const [activeTab, setActiveTab] = useState<'student' | 'date' | 'activity' | 'failures' | 'content-views'>('student');
 
   const [showFilters, setShowFilters] = useState(true);
 
@@ -619,6 +644,12 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   const [failuresData, setFailuresData] = useState<FailuresReportData | null>(null);
 
   const [failuresLoading, setFailuresLoading] = useState(false);
+
+  const [rankingData, setRankingData] = useState<RankingVisualizaciones | null>(null);
+
+  const [rankingLoading, setRankingLoading] = useState(false);
+
+  const [rankingAsignaturaFilter, setRankingAsignaturaFilter] = useState<string>('all');
 
   const [selectedAreaByStudent, setSelectedAreaByStudent] = useState<{[studentId: string]: string}>({});
 
@@ -1341,6 +1372,50 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   useEffect(() => {
 
+    if (activeTab !== 'content-views') return;
+
+    const loadRanking = async () => {
+
+      try {
+
+        setRankingLoading(true);
+
+        const params = new URLSearchParams();
+
+        const asignaturaIdToUse = effectiveAsignaturaId
+          ? String(effectiveAsignaturaId)
+          : (!isDocenteMode && rankingAsignaturaFilter !== 'all' ? rankingAsignaturaFilter : null);
+
+        if (asignaturaIdToUse) params.append('asignatura_id', asignaturaIdToUse);
+
+        params.append('limit', '10');
+
+        const response = await api.get(`/progresos/ranking-visualizaciones?${params.toString()}`);
+
+        setRankingData(response.data ?? null);
+
+      } catch (error) {
+
+        console.error('Error cargando ranking de visualizaciones:', error);
+
+        setRankingData(null);
+
+      } finally {
+
+        setRankingLoading(false);
+
+      }
+
+    };
+
+    loadRanking();
+
+  }, [activeTab, effectiveAsignaturaId, rankingAsignaturaFilter]);
+
+
+
+  useEffect(() => {
+
     if (isDocenteMode && (activeTab === 'date' || activeTab === 'activity')) {
 
       setActiveTab('student');
@@ -1445,15 +1520,17 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   const handleExport = () => {
 
+    if (activeTab === 'content-views' && rankingLoading) return;
+
     downloadPdf(activeTab);
 
   };
 
 
 
-  const downloadPdf = async (type: 'student' | 'date' | 'activity' | 'failures') => {
+  const downloadPdf = async (type: 'student' | 'date' | 'activity' | 'failures' | 'content-views') => {
 
-    if (!hasAppliedFilters) {
+    if (!hasAppliedFilters && type !== 'content-views') {
 
       alert('Aplica los filtros antes de descargar el informe.');
 
@@ -1478,6 +1555,12 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
       if (type === 'failures' && appliedFilters.student !== 'all') {
 
         params.append('estudiante_id', appliedFilters.student);
+
+      }
+
+      if (type === 'content-views' && !isDocenteMode && rankingAsignaturaFilter !== 'all') {
+
+        params.append('asignatura_id', rankingAsignaturaFilter);
 
       }
 
@@ -1549,7 +1632,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         link.href = url;
 
-        const nombreES: Record<string, string> = { student: 'estudiante', date: 'fecha', activity: 'actividad', failures: 'fallos' };
+        const nombreES: Record<string, string> = { student: 'estudiante', date: 'fecha', activity: 'actividad', failures: 'fallos', 'content-views': 'contenidos-vistos' };
 
         link.download = `reporte_${nombreES[type] ?? type}.pdf`;
 
@@ -2241,7 +2324,11 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         ? 'Desempeño por actividad'
 
-        : 'Fallos por actividad';
+        : activeTab === 'content-views'
+
+          ? 'Contenidos más vistos por área'
+
+          : 'Fallos por actividad';
 
   const reportViewDescription = activeTab === 'student'
 
@@ -2255,7 +2342,11 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         ? 'Concentra uso, completitud y rendimiento por actividad o asignatura.'
 
-        : 'Prioriza fallos, intentos y focos de atención por estudiante y actividad.';
+        : activeTab === 'content-views'
+
+          ? 'Identifica qué contenidos generan más engagement por asignatura, tema y subtema.'
+
+          : 'Prioriza fallos, intentos y focos de atención por estudiante y actividad.';
 
   const reportVisibleCount = activeTab === 'student'
 
@@ -2269,7 +2360,11 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         ? activityTabStudents.length
 
-        : failuresItemsDisplay.length;
+        : activeTab === 'content-views'
+
+          ? (rankingData?.contenidos.length ?? 0)
+
+          : failuresItemsDisplay.length;
 
   const reportVisibleLabel = activeTab === 'date'
 
@@ -2563,6 +2658,28 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             </button>
 
+            <button
+
+              onClick={() => setActiveTab('content-views')}
+
+              className={`app-filter-tab ${
+
+                activeTab === 'content-views'
+
+                  ? 'app-filter-tab--blue'
+
+                  : ''
+
+              }`}
+
+            >
+
+              <Eye className="w-5 h-5" />
+
+              <span>Contenidos más vistos</span>
+
+            </button>
+
           </div>
 
         </div>
@@ -2571,7 +2688,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         {/* Filtros */}
 
-        {showFilters && (
+        {showFilters && activeTab !== 'content-views' && (
 
           <div className="app-toolbar-card mb-6">
 
@@ -2906,7 +3023,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
 
-        {!showFilters && (
+        {!showFilters && activeTab !== 'content-views' && (
 
           <button
 
@@ -5264,6 +5381,272 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
           </div>
 
+        )}
+
+        {/* Tab 5: Contenidos más vistos — Podios + Rankings */}
+        {activeTab === 'content-views' && (
+          <div>
+            {/* Filtro de asignatura — solo admin */}
+            {!isDocenteMode && (
+              <div className="mb-4 flex items-center rounded-xl border border-[#E5E7EB] bg-white shadow-sm overflow-hidden">
+                {/* Etiqueta */}
+                <div className="flex items-center gap-2.5 px-4 py-3 border-r border-[#E5E7EB] shrink-0">
+                  <Filter className="w-4 h-4 text-[#9CA3AF]" />
+                  <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider whitespace-nowrap">
+                    Asignatura
+                  </span>
+                </div>
+
+                {/* Selector */}
+                <div className="flex-1 bg-[#F9FAFB] px-4 py-3">
+                  <select
+                    value={rankingAsignaturaFilter}
+                    onChange={e => setRankingAsignaturaFilter(e.target.value)}
+                    className="w-full bg-transparent text-sm text-[#3A4A5B] outline-none cursor-pointer"
+                  >
+                    <option value="all">Todas las asignaturas</option>
+                    {asignaturasCatalog.map(a => (
+                      <option key={a.id} value={String(a.id)}>{a.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Botón limpiar */}
+                {rankingAsignaturaFilter !== 'all' && (
+                  <button
+                    onClick={() => setRankingAsignaturaFilter('all')}
+                    className="flex items-center gap-1.5 px-4 py-3 border-l border-[#E5E7EB] text-xs text-[#6B7280] hover:bg-[#F3F4F6] transition-colors shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Limpiar</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {rankingLoading && (
+              <div className="app-panel flex items-center justify-center py-16">
+                <div className="flex flex-col items-center gap-3 text-[#3A4A5B]">
+                  <div className="w-8 h-8 border-2 border-[#4A90E2] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm">Cargando ranking...</span>
+                </div>
+              </div>
+            )}
+
+            {!rankingLoading && !rankingData && (
+              <div className="app-panel flex flex-col items-center justify-center py-16 gap-3 text-[#3A4A5B]">
+                <Eye className="w-12 h-12 opacity-30" />
+                <p className="text-sm">No hay datos de visualización registrados aún.</p>
+              </div>
+            )}
+
+            {!rankingLoading && rankingData && (() => {
+              const top = {
+                contenido:  rankingData.contenidos[0]  ?? null,
+                subtema:    rankingData.subtemas[0]    ?? null,
+                tema:       rankingData.temas[0]       ?? null,
+                asignatura: rankingData.asignaturas[0] ?? null,
+              };
+
+              const podiosTodos = [
+                { label: 'Contenido más visto',  icon: <Award      className="w-4 h-4 text-[#4A90E2]" />, color: '#4A90E2', nombre: top.contenido?.nombre,    sub: top.contenido  ? `${top.contenido.asignatura} · ${top.contenido.tema}`  : null, vistas: top.contenido?.vistas  ?? 0 },
+                { label: 'Subtema más visto',    icon: <Clock      className="w-4 h-4 text-[#F5A97F]" />, color: '#F5A97F', nombre: top.subtema?.nombre,     sub: top.subtema   ? `${top.subtema.asignatura} · ${top.subtema.tema}`        : null, vistas: top.subtema?.vistas    ?? 0 },
+                { label: 'Tema más visto',       icon: <TrendingUp className="w-4 h-4 text-[#7ED6A7]" />, color: '#7ED6A7', nombre: top.tema?.nombre,        sub: top.tema      ? top.tema.asignatura                                     : null, vistas: top.tema?.vistas       ?? 0 },
+                { label: 'Asignatura más vista', icon: <BarChart3  className="w-4 h-4 text-[#A78BFA]" />, color: '#A78BFA', nombre: top.asignatura?.nombre,  sub: null,                                                                          vistas: top.asignatura?.vistas ?? 0 },
+              ];
+
+              const filtradoPorAsignatura = isDocenteMode || rankingAsignaturaFilter !== 'all';
+
+              const podios = filtradoPorAsignatura
+                ? podiosTodos.filter(p => p.label !== 'Asignatura más vista')
+                : podiosTodos;
+
+              const rankings = [
+                {
+                  titulo: 'Top Contenidos',
+                  icon: <Award className="w-4 h-4" />,
+                  color: '#4A90E2',
+                  items: rankingData.contenidos,
+                  sublabel: (it: any) => filtradoPorAsignatura ? `${it.tema}  ·  ${it.subtema}` : `${it.asignatura}  ·  ${it.tema}  ·  ${it.subtema}`,
+                  badge: (it: any) => it.tipo,
+                },
+                {
+                  titulo: 'Top Subtemas',
+                  icon: <Clock className="w-4 h-4" />,
+                  color: '#F5A97F',
+                  items: rankingData.subtemas,
+                  sublabel: (it: any) => filtradoPorAsignatura ? it.tema : `${it.asignatura}  ·  ${it.tema}`,
+                  badge: null,
+                },
+                {
+                  titulo: 'Top Temas',
+                  icon: <TrendingUp className="w-4 h-4" />,
+                  color: '#7ED6A7',
+                  items: rankingData.temas,
+                  sublabel: (it: any) => filtradoPorAsignatura ? null : it.asignatura,
+                  badge: null,
+                },
+                ...(!filtradoPorAsignatura ? [{
+                  titulo: 'Top Asignaturas',
+                  icon: <BarChart3 className="w-4 h-4" />,
+                  color: '#A78BFA',
+                  items: rankingData.asignaturas,
+                  sublabel: null,
+                  badge: null,
+                }] : []),
+              ];
+
+              return (
+                <>
+                  {/* Podios */}
+                  <div className={`grid gap-4 mb-6 ${filtradoPorAsignatura ? 'grid-cols-3' : 'grid-cols-4'}`}>
+                    {podios.map((p) => (
+                      <div
+                        key={p.label}
+                        className="flex flex-col gap-4 rounded-2xl p-5 bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
+                        style={{ border: `1px solid ${p.color}28` }}
+                      >
+                        {/* Ícono + etiqueta */}
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: `${p.color}1A` }}
+                          >
+                            {p.icon}
+                          </div>
+                          <span className="text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-widest leading-none">
+                            {p.label}
+                          </span>
+                        </div>
+
+                        {/* Valor principal */}
+                        {p.nombre ? (
+                          <>
+                            <div className="flex-1 min-h-0">
+                              <p className="text-base font-bold text-[#1E3A5F] leading-snug line-clamp-2 mb-1">
+                                {p.nombre}
+                              </p>
+                              {p.sub && (
+                                <p className="text-xs text-[#9CA3AF] truncate">{p.sub}</p>
+                              )}
+                            </div>
+
+                            {/* Contador — sin borde, solo espaciado */}
+                            <div className="flex items-center gap-1.5 mt-auto">
+                              <Eye className="w-3.5 h-3.5" style={{ color: p.color }} />
+                              <span className="text-xl font-extrabold" style={{ color: p.color }}>
+                                {p.vistas}
+                              </span>
+                              <span className="text-xs text-[#9CA3AF]">estudiantes</span>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-xs text-[#9CA3AF] italic">Sin datos</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Rankings */}
+                  {(() => {
+                    const badgeStyle: Record<string, { bg: string; text: string }> = {
+                      video:    { bg: '#EFF6FF', text: '#3B82F6' },
+                      activity: { bg: '#F0FDF4', text: '#16A34A' },
+                      document: { bg: '#FFF7ED', text: '#EA580C' },
+                      teoria:   { bg: '#F5F3FF', text: '#7C3AED' },
+                    };
+                    const getBadge = (tipo: string) => {
+                      const style = badgeStyle[tipo?.toLowerCase()] ?? { bg: '#F3F4F6', text: '#6B7280' };
+                      return (
+                        <span
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                          style={{ backgroundColor: style.bg, color: style.text }}
+                        >
+                          {tipo}
+                        </span>
+                      );
+                    };
+
+                    return (
+                      <div className={`grid gap-6 ${filtradoPorAsignatura ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                        {rankings.map((ranking) => (
+                          <div key={ranking.titulo} className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] overflow-hidden">
+
+                            {/* Encabezado del panel */}
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-[#F3F4F6]">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-7 h-7 rounded-full flex items-center justify-center"
+                                  style={{ backgroundColor: `${ranking.color}1A` }}
+                                >
+                                  <span style={{ color: ranking.color }}>{ranking.icon}</span>
+                                </div>
+                                <h4 className="font-bold text-[#1E3A5F] text-sm">{ranking.titulo}</h4>
+                              </div>
+                              <div className="flex items-center gap-1 text-[#9CA3AF]">
+                                <Eye className="w-3.5 h-3.5" />
+                                <span className="text-xs">Vistas</span>
+                              </div>
+                            </div>
+
+                            {/* Lista */}
+                            <div>
+                              {ranking.items.length === 0 && (
+                                <p className="text-xs text-[#9CA3AF] italic text-center py-8">Sin datos</p>
+                              )}
+                              {ranking.items.map((item: any, idx: number) => {
+                                const isLast = idx === ranking.items.length - 1;
+                                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className={`flex items-center gap-3 px-5 py-3 hover:bg-[#FAFAFA] transition-colors ${!isLast ? 'border-b border-gray-100' : ''}`}
+                                  >
+                                    {/* Columna rango — ancho fijo */}
+                                    <div className="w-6 shrink-0 flex items-center justify-center">
+                                      {medal ? (
+                                        <span className="text-base leading-none">{medal}</span>
+                                      ) : (
+                                        <span className="text-xs font-semibold text-[#9CA3AF]">{idx + 1}</span>
+                                      )}
+                                    </div>
+
+                                    {/* Columna texto — flex-1 */}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-semibold text-[#1E3A5F] truncate leading-snug">
+                                        {item.nombre}
+                                      </p>
+                                      {ranking.sublabel && ranking.sublabel(item) && (
+                                        <p className="text-xs text-[#9CA3AF] truncate mt-0.5">
+                                          {ranking.sublabel(item)}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {/* Columna derecha — badge + vistas */}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {ranking.badge && getBadge(ranking.badge(item))}
+                                      <div className="flex items-center gap-1">
+                                        <Eye className="w-3.5 h-3.5 text-[#9CA3AF]" />
+                                        <span className="text-sm font-bold" style={{ color: ranking.color }}>
+                                          {item.vistas}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                </>
+              );
+            })()}
+          </div>
         )}
 
       </main>
