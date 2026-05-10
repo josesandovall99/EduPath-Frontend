@@ -28,7 +28,7 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ["Nombres", "Apellidos", "Email_institucional", "CodigoEstudiantil", "Programa", "Semestre"];
+    const headers = ["Nombres", "Apellidos", "Email_institucional", "CodigoEstudiantil", "Programa", "PeriodoAcademico"];
     const ws = XLSX.utils.aoa_to_sheet([headers]);
     ws['!autofilter'] = { ref: `A1:F1` };
     ws['!cols'] = [
@@ -136,7 +136,7 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#4A90E2] mt-1">•</span>
-                  <span>Columnas obligatorias: <b>Nombres, Apellidos, Email_institucional, CodigoEstudiantil, Programa, Semestre</b>.</span>
+                  <span>Columnas obligatorias: <b>Nombres, Apellidos, Email_institucional, CodigoEstudiantil, Programa, PeriodoAcademico</b>.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#4A90E2] mt-1">•</span>

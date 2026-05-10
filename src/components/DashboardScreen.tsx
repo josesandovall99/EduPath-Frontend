@@ -81,17 +81,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
   };
   const [progresosPorAsignatura, setProgresosPorAsignatura] = useState<Map<number, AsignaturaProgress>>(new Map());
 
-  // Función para obtener asignaturas permitidas según el semestre
-  const obtenerasignaturasPermitidas = (semestre: number): RestrictedAsignaturaCategory[] => {
-    if (semestre >= 1 && semestre <= 4) {
-      return ['fundamentos'];
-    } else if (semestre >= 5 && semestre <= 6) {
-      return ['fundamentos', 'analisis'];
-    } else if (semestre >= 7 && semestre <= 10) {
-      return ['fundamentos', 'analisis', 'atc'];
-    }
-    return []; // Si el semestre está fuera de rango
-  };
 
   // Obtener progreso real de un asignatura (porcentaje + info de temas)
   const obtenerProgresoAsignatura = async (asignaturaId: number): Promise<AsignaturaProgress> => {
@@ -131,23 +120,8 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           throw new Error('Respuesta inválida del servidor');
         }
 
-        // Filtro de seguridad: obtener semestre del estudiante
-        // NOTA: Esto debería venir del backend en producción
-        const semestre = parseInt(localStorage.getItem('semestreEstudiante') || '1');
-        const asignaturasPermitidas = obtenerasignaturasPermitidas(semestre);
-        
-        // Filtrar asignaturas según el semestre
-        const asignaturasFiltradas = asignaturas.filter((Asignatura: Asignatura) => {
-          const restrictedCategory = getRestrictedAsignaturaCategory(Asignatura.nombre);
-
-          // Las asignaturas históricas siguen limitadas por semestre.
-          // Cualquier asignatura nueva queda visible para todos los estudiantes.
-          if (!restrictedCategory) {
-            return true;
-          }
-
-          return asignaturasPermitidas.includes(restrictedCategory);
-        });
+        // Todos los estudiantes ven todas las asignaturas activas
+        const asignaturasFiltradas = asignaturas.filter((Asignatura: Asignatura) => Asignatura.estado !== false);
 
 
         // Transformar asignaturas a formato de subjects (los temas/progreso se cargan después desde el backend)

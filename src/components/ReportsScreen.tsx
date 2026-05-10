@@ -620,6 +620,10 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   const [failuresLoading, setFailuresLoading] = useState(false);
 
+  const [selectedAreaByStudent, setSelectedAreaByStudent] = useState<{[studentId: string]: string}>({});
+
+  const [failuresPeriodo, setFailuresPeriodo] = useState<string>('all');
+
 
 
   const completeStudentSubjectsWithasignaturas = (rawSubjects: any[], asignaturas: BasicAsignatura[]) => {
@@ -1173,7 +1177,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             createdDate: st.createdAt ? st.createdAt.split('T')[0] : (st.createdDate || ''),
 
-            semester: st.semestre ?? st.semester ?? st.persona?.semestre ?? st.semestreActual ?? '',
+            periodo_academico: st.periodo_academico ?? st.persona?.periodo_academico ?? '',
 
             codigo: st.codigoEstudiantil ?? st.codigo ?? '',
 
@@ -1255,6 +1259,12 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         }
 
+        if (failuresPeriodo !== 'all') {
+
+          params.append('periodo_academico', failuresPeriodo);
+
+        }
+
 
 
         if (isDocenteMode) {
@@ -1325,7 +1335,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     loadFailuresReport();
 
-  }, [activeTab, hasAppliedFilters, appliedFilters.student, isDocenteMode, docenteId, docentePersonaId, docenteAsignaturaId]);
+  }, [activeTab, hasAppliedFilters, appliedFilters.student, failuresPeriodo, isDocenteMode, docenteId, docentePersonaId, docenteAsignaturaId]);
 
 
 
@@ -1647,13 +1657,15 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     sourceStudents.forEach(student => {
 
-      if (!grouped[student.createdDate]) {
+      const periodo = student.periodo_academico || 'Sin periodo';
 
-        grouped[student.createdDate] = [];
+      if (!grouped[periodo]) {
+
+        grouped[periodo] = [];
 
       }
 
-      grouped[student.createdDate].push(student);
+      grouped[periodo].push(student);
 
     });
 
@@ -1661,9 +1673,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     return Object.entries(grouped)
 
-      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+      .sort(([a], [b]) => a.localeCompare(b))
 
-      .map(([date, students]) => {
+      .map(([periodo, students]) => {
 
       const sumAvg = students.reduce((sum, s) => {
 
@@ -1683,9 +1695,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       return {
 
-        date,
+        date: periodo,
 
-        cohortLabel: formatCohortDate(date),
+        cohortLabel: periodo,
 
         avgProgress,
 
@@ -1869,7 +1881,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       studentsData
 
-        .map(student => (student.semester ?? '').toString().trim())
+        .map(student => (student.periodo_academico ?? '').toString().trim())
 
         .filter(Boolean)
 
@@ -2223,7 +2235,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     : activeTab === 'date'
 
-      ? 'Comparativo por cohorte'
+      ? 'Comparativo por periodo académico'
 
       : activeTab === 'activity'
 
@@ -2237,7 +2249,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     : activeTab === 'date'
 
-      ? 'Compara cohortes y fechas de ingreso bajo la misma lectura visual.'
+      ? 'Compara el rendimiento de estudiantes por periodo académico.'
 
       : activeTab === 'activity'
 
@@ -2261,7 +2273,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   const reportVisibleLabel = activeTab === 'date'
 
-    ? 'Cohortes visibles'
+    ? 'Periodos visibles'
 
     : activeTab === 'failures'
 
@@ -2655,31 +2667,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
 
-              <div className="app-form-field">
-
-                <label className="app-form-label">Semestre</label>
-
-                <select
-
-                  value={filters.semester}
-
-                  onChange={(e) => setFilters({ ...filters, semester: e.target.value })}
-
-                  className="app-form-select"
-
-                >
-
-                  <option value="all">Todos los semestres</option>
-
-                  {semesterOptions.map((semester) => (
-
-                    <option key={semester} value={semester}>{semester}</option>
-
-                  ))}
-
-                </select>
-
-              </div>
 
             </div>
 
@@ -2826,6 +2813,32 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             {activeTab === 'failures' && (
 
               <div className="grid grid-cols-1 gap-4 mb-4">
+
+                <div className="app-form-field">
+
+                  <label className="app-form-label">Periodo Académico</label>
+
+                  <select
+
+                    value={failuresPeriodo}
+
+                    onChange={(e) => setFailuresPeriodo(e.target.value)}
+
+                    className="app-form-select"
+
+                  >
+
+                    <option value="all">Todos los periodos</option>
+
+                    {semesterOptions.map((p) => (
+
+                      <option key={p} value={p}>{p}</option>
+
+                    ))}
+
+                  </select>
+
+                </div>
 
                 <div className="app-form-field">
 
@@ -3147,15 +3160,24 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                     <div className="grid grid-cols-3 gap-4 mb-4">
 
-                      {student.subjects.map((subject) => (
+                      {student.subjects.map((subject) => {
 
-                        <div 
+                        const isSelected = selectedAreaByStudent[student.id] === subject.name;
+
+                        return (
+
+                        <div
 
                           key={subject.name}
 
-                          className="border-2 rounded-xl p-4"
+                          className="border-2 rounded-xl p-4 cursor-pointer transition-all"
 
-                          style={{ borderColor: subject.color + '40' }}
+                          style={{ borderColor: isSelected ? subject.color : subject.color + '40', backgroundColor: isSelected ? subject.color + '12' : 'white' }}
+
+                          onClick={() => setSelectedAreaByStudent(prev => ({
+                            ...prev,
+                            [student.id]: isSelected ? '' : subject.name
+                          }))}
 
                         >
 
@@ -3241,7 +3263,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                         </div>
 
-                      ))}
+                        );
+                      })}
 
                     </div>
 
@@ -3251,11 +3274,20 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                     <div className="bg-gray-50 rounded-lg p-4">
 
-                      <h5 className="text-[#3A4A5B] text-sm mb-3">Detalle por Tema y Subtema</h5>
+                      <h5 className="text-[#3A4A5B] text-sm mb-3">
+                        Detalle por Tema y Subtema
+                        {selectedAreaByStudent[student.id] && (
+                          <span className="ml-2 text-xs text-gray-400 font-normal">— {selectedAreaByStudent[student.id]}</span>
+                        )}
+                      </h5>
+
+                      {!selectedAreaByStudent[student.id] && (
+                        <p className="text-xs text-gray-400 mb-3">Selecciona un área para ver el detalle.</p>
+                      )}
 
                       <div className="space-y-4">
 
-                        {student.subjects.map((subject) => (
+                        {student.subjects.filter(s => !selectedAreaByStudent[student.id] || s.name === selectedAreaByStudent[student.id]).map((subject) => (
 
                           <div key={subject.name}>
 
@@ -3349,7 +3381,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               <div className="app-alert app-alert--warning">
 
-                Mostrando {dateDataVisible.length} cohortes con mayor avance. Hay {hiddenCohortsCount} cohortes adicionales ocultas para mejorar legibilidad y rendimiento.
+                Mostrando {dateDataVisible.length} periodos con mayor avance. Hay {hiddenCohortsCount} periodos adicionales ocultos para mejorar legibilidad y rendimiento.
 
               </div>
 
@@ -3367,13 +3399,13 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                   <Calendar className="w-5 h-5 text-[#7ED6A7]" />
 
-                  Avance Promedio por Cohorte
+                  Avance Promedio por Periodo Académico
 
                 </h3>
 
                 <p className="text-xs text-gray-500 mb-3">
 
-                  Cohorte = grupo de estudiantes creado en la misma fecha. Esta barra muestra el promedio de avance de ese grupo.
+                  Cada barra representa el promedio de avance de los estudiantes en ese periodo académico.
 
                 </p>
 
@@ -3407,11 +3439,11 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                           const point = payload[0]?.payload;
 
-                          return `Cohorte ${point?.cohortLabel || label} (${point?.studentCount || 0} estudiantes)`;
+                          return `Periodo ${point?.cohortLabel || label} (${point?.studentCount || 0} estudiantes)`;
 
                         }
 
-                        return `Cohorte ${String(label)}`;
+                        return `Periodo ${String(label)}`;
 
                       }}
 
@@ -4988,7 +5020,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                         )}
 
-                        {failuresItemsDisplay.map((item) => {
+                        {failuresItemsDisplay.map((item, idx) => {
 
                           const isSelected = isAllStudentsFailuresView &&
 
@@ -5000,7 +5032,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                           <tr
 
-                            key={`${item.tipo}-${item.actividad_id}-${item.estudiante_id}`}
+                            key={`${item.tipo}-${item.actividad_id}-${item.estudiante_id}-${idx}`}
 
                             className={`transition-colors ${isAllStudentsFailuresView ? 'cursor-pointer' : ''} ${isSelected ? 'bg-red-50' : 'hover:bg-gray-50'}`}
 
