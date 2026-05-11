@@ -174,44 +174,91 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        // Estructura con caché (60s) — progreso sin caché (siempre fresco)
-        const [temasData, minisData, estadoRes, progresoRes] = await Promise.all([
+        // Incluye metadatos de asignatura (progresión secuencial) para no depender solo del estado en memoria tras F5
+        const [
+          asignaturaJson,
+          temasData,
+          minisData,
+          estadoRes,
+          progresoRes,
+        ] = await Promise.all([
+          fetch(`${API_BASE_URL}/asignaturas/${subject.id}`, { headers }).then(async (r) =>
+            r.ok ? r.json() : null,
+          ),
           cachedFetch(`${API_BASE_URL}/temas/por-asignatura/${subject.id}`, { headers }) as Promise<Tema[]>,
           cachedFetch(`${API_BASE_URL}/miniproyectos?asignatura_id=${subject.id}`, { headers }) as Promise<any[]>,
           estudianteId
-            ? fetch(`${API_BASE_URL}/progresos/estado-temas-asignatura?estudiante_id=${estudianteId}&asignatura_id=${subject.id}`, { headers })
+            ? fetch(`${API_BASE_URL}/progresos/estado-temas-asignatura?estudiante_id=${estudianteId}&asignatura_id=${subject.id}`, {
+                headers,
+              })
             : Promise.resolve(null),
           estudianteId
-            ? fetch(`${API_BASE_URL}/progresos/por-asignatura?asignatura_id=${subject.id}&estudiante_id=${estudianteId}`, { headers })
+            ? fetch(`${API_BASE_URL}/progresos/por-asignatura?asignatura_id=${subject.id}&estudiante_id=${estudianteId}`, {
+                headers,
+              })
             : Promise.resolve(null),
         ]);
+
+        let progresionSecuencial = Boolean(subject.progresion_secuencial);
+        if (asignaturaJson && typeof asignaturaJson.progresion_secuencial === 'boolean') {
+          progresionSecuencial = Boolean(asignaturaJson.progresion_secuencial);
+        }
 
         const temas: Tema[] = Array.isArray(temasData) ? temasData : [];
         const temasOrdenados = temas.sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0));
 
-        // Progreso global de la asignatura
+        let progresoJson: any = null;
+
+        // Progreso global de la asignatura (+ detalle por tema como respaldo del desbloqueo)
         if (progresoRes?.ok) {
-          const progresoData = await progresoRes.json();
-          if (!cancelled) setCurrentProgress(Math.round(progresoData?.resumen?.porcentajeTotalAsignatura || 0));
+          progresoJson = await progresoRes.json();
+          if (!cancelled) setCurrentProgress(Math.round(progresoJson?.resumen?.porcentajeTotalAsignatura || 0));
         }
 
-        // Estado de desbloqueo + porcentaje por tema — reemplaza el loop N+1
-        const estadoMap = new Map<string, { desbloqueado: boolean; completo: boolean; porcentaje: number }>();
+        const temaProgPorId = new Map<string, { porcentaje: number; completo: boolean }>();
+        const detalle = progresoJson?.temas?.detalle;
+        if (Array.isArray(detalle)) {
+          detalle.forEach((row: any) => {
+            const idStr = String(row.id);
+            const total =
+              Number(row.totalContenidos ?? 0) + Number(row.totalEjercicios ?? 0);
+            const done =
+              Number(row.contenidosVistos ?? 0) + Number(row.ejerciciosAprobados ?? 0);
+            const pct = row.completado ? 100 : total > 0 ? Math.round((done / total) * 100) : 0;
+            temaProgPorId.set(idStr, { porcentaje: pct, completo: Boolean(row.completado) });
+          });
+        }
+
+        // Estado de desbloqueo oficial + porcentaje por tema — si falla o falta huecos, usar temaProgPorId
+        const estadoMap = new Map<string, { desbloqueado?: boolean; completo?: boolean; porcentaje: number }>();
         if (estadoRes?.ok) {
           const estadoData = await estadoRes.json();
           if (Array.isArray(estadoData.temas)) {
             estadoData.temas.forEach((t: any) => {
-              estadoMap.set(t.id.toString(), {
+              estadoMap.set(String(t.id), {
                 desbloqueado: t.desbloqueado,
                 completo: t.completo,
-                porcentaje: t.porcentaje || 0,
+                porcentaje: typeof t.porcentaje === 'number' ? t.porcentaje : temaProgPorId.get(String(t.id))?.porcentaje ?? 0,
               });
             });
           }
         }
 
-        const progresionSecuencial = Boolean(subject.progresion_secuencial);
-
+        temasOrdenados.forEach((tema) => {
+          const sid = String(tema.id);
+          const fb = temaProgPorId.get(sid);
+          const cur = estadoMap.get(sid);
+          if (!fb && !cur) return;
+          estadoMap.set(sid, {
+            desbloqueado: cur?.desbloqueado,
+            completo:
+              cur?.completo ??
+              fb?.completo ??
+              ((typeof cur?.porcentaje === 'number' ? cur.porcentaje : fb?.porcentaje ?? 0) >= 100),
+            porcentaje:
+              typeof cur?.porcentaje === 'number' ? cur.porcentaje : (fb?.porcentaje ?? 0),
+          });
+        });
         const transformedContent = temasOrdenados.map((tema, index) => {
           const temaId = tema.id.toString();
           const estado = estadoMap.get(temaId);
@@ -220,7 +267,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
           let desbloqueado: boolean;
           if (!progresionSecuencial) {
             desbloqueado = true;
-          } else if (estado?.desbloqueado !== undefined) {
+          } else if (typeof estado?.desbloqueado === 'boolean') {
             desbloqueado = estado.desbloqueado;
           } else if (index === 0) {
             desbloqueado = true;

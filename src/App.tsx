@@ -176,7 +176,7 @@ export default function App() {
     localStorage.removeItem('personaId');
     localStorage.removeItem('nombreEstudiante');
     localStorage.removeItem('codigoEstudiante');
-    localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem('periodoAcademicoEstudiante');
     localStorage.removeItem('adminId');
     localStorage.removeItem('authToken');
     localStorage.removeItem(DOCENTE_SESSION_KEY);
@@ -337,8 +337,8 @@ export default function App() {
     localStorage.setItem('personaId', apiResponse.estudiante.personaId.toString());
     localStorage.setItem('nombreEstudiante', apiResponse.estudiante.nombre);
     localStorage.setItem('codigoEstudiante', apiResponse.estudiante.codigo);
-    if (apiResponse.estudiante.semestre) {
-      localStorage.setItem('semestreEstudiante', apiResponse.estudiante.semestre.toString());
+    if (apiResponse.estudiante.periodo_academico) {
+      localStorage.setItem('periodoAcademicoEstudiante', apiResponse.estudiante.periodo_academico);
     }
     persistAuthToken(apiResponse);
     applyAuthHeaders();
@@ -354,7 +354,7 @@ export default function App() {
     localStorage.removeItem('estudianteId');
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('nombreEstudiante');
-    localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem('periodoAcademicoEstudiante');
     localStorage.removeItem('adminId');
     localStorage.removeItem(ADMIN_SESSION_KEY);
 
@@ -385,7 +385,7 @@ export default function App() {
     localStorage.removeItem('estudianteId');
     localStorage.removeItem('codigoEstudiante');
     localStorage.removeItem('nombreEstudiante');
-    localStorage.removeItem('semestreEstudiante');
+    localStorage.removeItem('periodoAcademicoEstudiante');
     localStorage.removeItem(DOCENTE_SESSION_KEY);
 
     const session: AdminSession = {

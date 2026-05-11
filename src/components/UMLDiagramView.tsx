@@ -1,10 +1,28 @@
-﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 
 import { ArrowLeft, Square, GitMerge, Share2, Boxes, Diamond, RotateCcw, Redo2, Trash2, BookOpen, Save, Send, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 import * as joint from 'jointjs';
 
 import 'jointjs/dist/joint.css';
+
+import {
+
+  createUmlClassCell,
+
+  layoutAllUmlCells,
+
+  layoutUmlClassCell,
+
+  migrateDiagramCellsJson,
+
+  ensureUmlClassShapeRegistered,
+
+  refreshJointLinksForElements,
+
+  refreshAllJointLinks,
+
+} from '../joint/umlClassShape';
 
 import { API_BASE_URL } from '../utils/constants';
 
@@ -216,21 +234,69 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
   useEffect(() => {
 
+    ensureUmlClassShapeRegistered();
+
+    const el = containerRef.current;
+
+    if (!el) return;
+
+
+
     const graph = new joint.dia.Graph();
 
     graphRef.current = graph;
 
 
 
-    const paper = new joint.dia.Paper({
+    const measurePaperHost = () => {
 
-      el: containerRef.current!,
+      const r = el.getBoundingClientRect();
+
+      const w = Math.max(400, Math.floor(r.width));
+
+      const h = Math.max(480, Math.floor(r.height));
+
+      return { w, h };
+
+    };
+
+
+
+    const { w: initialW, h: initialH } = measurePaperHost();
+
+    let paper!: joint.dia.Paper;
+
+
+
+    let resizeRaf = 0;
+
+    const syncPaperDimensions = () => {
+
+      cancelAnimationFrame(resizeRaf);
+
+      resizeRaf = window.requestAnimationFrame(() => {
+
+        const { w, h } = measurePaperHost();
+
+        paper.setDimensions(w, h);
+
+        refreshAllJointLinks(graph, paper);
+
+      });
+
+    };
+
+
+
+    paper = new joint.dia.Paper({
+
+      el,
 
       model: graph,
 
-      width: '100%',
+      width: initialW,
 
-      height: '100%',
+      height: initialH,
 
       gridSize: 10,
 
@@ -238,12 +304,23 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
       background: { color: '#ffffff' },
 
-      interactive: true
+      interactive: true,
+
+      cellViewNamespace: joint.shapes,
+
+      overflow: true,
 
     });
 
     paperRef.current = paper;
 
+
+
+    syncPaperDimensions();
+
+    window.addEventListener('resize', syncPaperDimensions);
+
+    queueMicrotask(syncPaperDimensions);
 
 
     paper.on('element:pointerclick', (elementView: joint.dia.ElementView) => {
@@ -377,6 +454,10 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     return () => {
 
+      window.removeEventListener('resize', syncPaperDimensions);
+
+      cancelAnimationFrame(resizeRaf);
+
       graphRef.current = null;
 
       paperRef.current = null;
@@ -395,7 +476,9 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     if (serialized && typeof serialized === 'object' && graphRef.current.getCells().length === 0) {
 
-      graphRef.current.fromJSON(serialized);
+      graphRef.current.fromJSON(migrateDiagramCellsJson(serialized as Record<string, unknown>) as joint.dia.Graph.JSON);
+
+      layoutAllUmlCells(graphRef.current, paperRef.current);
 
     }
 
@@ -453,19 +536,9 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     saveToUndoStack();
 
-    const newClass = new joint.shapes.standard.Rectangle();
+    const newClass = createUmlClassCell();
 
     newClass.position(100 + Math.random() * 600, 100 + Math.random() * 300);
-
-    newClass.resize(200, 100);
-
-    newClass.attr({
-
-      body: { fill: '#ffffff', stroke: '#7ED6A7', strokeWidth: 2 },
-
-      label: { text: 'NuevaClase\n- atributo: tipo\n+ metodo(): retorno', fill: '#3A4A5B' }
-
-    });
 
     graphRef.current?.addCell(newClass);
 
@@ -521,15 +594,14 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     const link = new joint.shapes.standard.Link();
 
-    link.source(source);
+    link.source(source as joint.dia.Element, { selector: 'body' });
 
-    link.target(target);
-
+    link.target(target as joint.dia.Element, { selector: 'body' });
 
 
     let lineStyle: any = { stroke: '#7ED6A7', strokeWidth: 2 };
 
-    let targetMarker: any = { type: 'classic' };
+    let targetMarker: any = { type: 'path', d: 'M 10 -5 0 0 10 5 z', fill: '#7ED6A7', stroke: '#7ED6A7' };
 
 
 
@@ -553,7 +625,37 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
 
 
-    link.attr('line', { stroke: lineStyle.stroke, strokeWidth: lineStyle.strokeWidth, targetMarker });
+    link.attr({
+
+      line: {
+
+        connection: true,
+
+        fill: 'none',
+
+        strokeLinejoin: 'round',
+
+        stroke: lineStyle.stroke,
+
+        strokeWidth: lineStyle.strokeWidth,
+
+        targetMarker,
+
+      },
+
+      wrapper: {
+
+        connection: true,
+
+        strokeLinejoin: 'round',
+
+        strokeWidth: 10,
+
+        stroke: 'transparent',
+
+      },
+
+    });
 
     
 
@@ -599,6 +701,16 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
 
 
+    const pv = paperRef.current;
+
+    if (pv) {
+
+      (pv as unknown as { updateViews: (o?: { async?: boolean }) => void }).updateViews?.({ async: false });
+
+      (pv.findViewByModel(link) as joint.dia.LinkView | undefined)?.requestConnectionUpdate({});
+
+    }
+
 
     // Resetear diálogo
 
@@ -627,6 +739,10 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
     if (selectedElement) {
 
       selectedElement.attr('label/text', classText);
+
+      layoutUmlClassCell(selectedElement);
+
+      refreshJointLinksForElements(graphRef.current, paperRef.current, [selectedElement]);
 
     }
 
@@ -662,11 +778,13 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     }
 
-    if (undoStack.length > 0) {
+    if (undoStack.length > 0 && graphRef.current) {
 
       const lastState = undoStack[undoStack.length - 1];
 
-      graphRef.current?.fromJSON(JSON.parse(lastState));
+      graphRef.current.fromJSON(migrateDiagramCellsJson(JSON.parse(lastState) as Record<string, unknown>) as joint.dia.Graph.JSON);
+
+      layoutAllUmlCells(graphRef.current, paperRef.current);
 
       setUndoStack(undoStack.slice(0, -1));
 
@@ -686,11 +804,13 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     }
 
-    if (redoStack.length > 0) {
+    if (redoStack.length > 0 && graphRef.current) {
 
       const lastState = redoStack[redoStack.length - 1];
 
-      graphRef.current?.fromJSON(JSON.parse(lastState));
+      graphRef.current.fromJSON(migrateDiagramCellsJson(JSON.parse(lastState) as Record<string, unknown>) as joint.dia.Graph.JSON);
+
+      layoutAllUmlCells(graphRef.current, paperRef.current);
 
       setRedoStack(redoStack.slice(0, -1));
 
@@ -1935,7 +2055,7 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
       {/* Layout Horizontal: Sidebar + Canvas */}
 
-      <div className="flex" style={{ height: '650px' }}>
+      <div className="flex min-h-[560px] h-[min(78vh,880px)]">
 
         {/* Sidebar izquierdo con herramientas - 30% */}
 
@@ -2129,7 +2249,7 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
         {/* Asignatura principal del canvas - 70% */}
 
-        <div className="flex-1 flex flex-col bg-white overflow-hidden">
+        <div className="flex-1 flex flex-col bg-white overflow-hidden min-h-0">
 
           {/* Editor de clase seleccionada */}
 
@@ -2227,13 +2347,13 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
           {/* Canvas principal */}
 
-          <div className="flex-1 p-6 bg-gray-50 overflow-hidden relative">
+          <div className="flex-1 min-h-0 p-6 bg-gray-50 overflow-hidden relative flex flex-col">
 
             <div 
 
               ref={containerRef} 
 
-              className="w-full h-full bg-white rounded-xl shadow-inner border-2 border-gray-200"
+              className="uml-joint-host flex-1 min-h-[520px] w-full bg-white rounded-xl shadow-inner border-2 border-gray-200"
 
             />
 
