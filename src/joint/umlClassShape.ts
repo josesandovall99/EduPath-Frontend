@@ -278,6 +278,45 @@ export function layoutUmlClassCell(element: joint.dia.Cell | null): void {
   element.resize(finalW, Math.max(totalH, nameCellH + attrsCellH + methCellH + PAD_TOP));
 }
 
+export function refreshAllJointLinks(graph: joint.dia.Graph | null, paper: joint.dia.Paper | null | undefined): void {
+  if (!graph || !paper) return;
+
+  graph.getCells().forEach((cell) => {
+
+    if (!(cell instanceof joint.dia.Link)) return;
+
+    (paper.findViewByModel(cell) as joint.dia.LinkView)?.requestConnectionUpdate({});
+  });
+}
+
+export function refreshJointLinksForElements(
+  graph: joint.dia.Graph | null,
+
+  paper: joint.dia.Paper | null | undefined,
+
+  elements: joint.dia.Element[],
+): void {
+  if (!graph || !paper || elements.length === 0) return;
+
+  const seen = new Set<string>();
+
+  elements.forEach((el) => {
+
+    graph.getConnectedLinks(el).forEach((lnk) => {
+
+      const lid = String(lnk.id || '');
+
+      if (!lid || seen.has(lid)) return;
+
+      seen.add(lid);
+
+      (paper.findViewByModel(lnk) as joint.dia.LinkView)?.requestConnectionUpdate({});
+    });
+
+  });
+
+}
+
 export function createUmlClassCell(): joint.dia.Element {
   ensureUmlClassShapeRegistered();
 
@@ -293,7 +332,12 @@ export function createUmlClassCell(): joint.dia.Element {
   return cell;
 }
 
-export function layoutAllUmlCells(graph: joint.dia.Graph | null): void {
+export function layoutAllUmlCells(graph: joint.dia.Graph | null, paper?: joint.dia.Paper | null): void {
+
   if (!graph) return;
+
   graph.getElements().forEach((el) => layoutUmlClassCell(el));
+
+  refreshAllJointLinks(graph, paper ?? null);
+
 }

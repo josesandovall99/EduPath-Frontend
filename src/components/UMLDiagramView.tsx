@@ -18,6 +18,10 @@ import {
 
   ensureUmlClassShapeRegistered,
 
+  refreshJointLinksForElements,
+
+  refreshAllJointLinks,
+
 } from '../joint/umlClassShape';
 
 import { API_BASE_URL } from '../utils/constants';
@@ -232,21 +236,49 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     ensureUmlClassShapeRegistered();
 
+    const el = containerRef.current;
+
+    if (!el) return;
+
+
+
     const graph = new joint.dia.Graph();
 
     graphRef.current = graph;
 
 
 
-    const paper = new joint.dia.Paper({
+    const initialW = Math.max(320, Math.floor(el.clientWidth || el.getBoundingClientRect().width));
 
-      el: containerRef.current!,
+    const initialH = Math.max(240, Math.floor(el.clientHeight || el.getBoundingClientRect().height));
+
+    let paper!: joint.dia.Paper;
+
+
+
+    const fitPaperToContainer = () => {
+
+      const w = Math.max(320, Math.floor(el.clientWidth));
+
+      const h = Math.max(240, Math.floor(el.clientHeight));
+
+      paper.setDimensions(w, h);
+
+      refreshAllJointLinks(graph, paper);
+
+    };
+
+
+
+    paper = new joint.dia.Paper({
+
+      el,
 
       model: graph,
 
-      width: '100%',
+      width: initialW,
 
-      height: '100%',
+      height: initialH,
 
       gridSize: 10,
 
@@ -254,11 +286,21 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
       background: { color: '#ffffff' },
 
-      interactive: true
+      interactive: true,
+
+      cellViewNamespace: joint.shapes,
 
     });
 
     paperRef.current = paper;
+
+
+
+    const resizeObserver = new ResizeObserver(fitPaperToContainer);
+
+    resizeObserver.observe(el);
+
+    queueMicrotask(fitPaperToContainer);
 
 
 
@@ -393,6 +435,8 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     return () => {
 
+      resizeObserver.disconnect();
+
       graphRef.current = null;
 
       paperRef.current = null;
@@ -413,7 +457,7 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
       graphRef.current.fromJSON(migrateDiagramCellsJson(serialized as Record<string, unknown>) as joint.dia.Graph.JSON);
 
-      layoutAllUmlCells(graphRef.current);
+      layoutAllUmlCells(graphRef.current, paperRef.current);
 
     }
 
@@ -537,7 +581,7 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     let lineStyle: any = { stroke: '#7ED6A7', strokeWidth: 2 };
 
-    let targetMarker: any = { type: 'classic' };
+    let targetMarker: any = { type: 'path', d: 'M 10 -5 0 0 10 5 z', fill: '#7ED6A7', stroke: '#7ED6A7' };
 
 
 
@@ -567,6 +611,8 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
         connection: true,
 
+        fill: 'none',
+
         strokeLinejoin: 'round',
 
         stroke: lineStyle.stroke,
@@ -574,6 +620,18 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
         strokeWidth: lineStyle.strokeWidth,
 
         targetMarker,
+
+      },
+
+      wrapper: {
+
+        connection: true,
+
+        strokeLinejoin: 'round',
+
+        strokeWidth: 10,
+
+        stroke: 'transparent',
 
       },
 
@@ -623,6 +681,16 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
 
 
+    queueMicrotask(() => {
+
+      const pv = paperRef.current?.findViewByModel(link) as joint.dia.LinkView | undefined;
+
+      pv?.requestConnectionUpdate({});
+
+    });
+
+
+
 
     // Resetear diálogo
 
@@ -653,6 +721,8 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
       selectedElement.attr('label/text', classText);
 
       layoutUmlClassCell(selectedElement);
+
+      refreshJointLinksForElements(graphRef.current, paperRef.current, [selectedElement]);
 
     }
 
@@ -694,7 +764,7 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
       graphRef.current.fromJSON(migrateDiagramCellsJson(JSON.parse(lastState) as Record<string, unknown>) as joint.dia.Graph.JSON);
 
-      layoutAllUmlCells(graphRef.current);
+      layoutAllUmlCells(graphRef.current, paperRef.current);
 
       setUndoStack(undoStack.slice(0, -1));
 
@@ -720,7 +790,7 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
       graphRef.current.fromJSON(migrateDiagramCellsJson(JSON.parse(lastState) as Record<string, unknown>) as joint.dia.Graph.JSON);
 
-      layoutAllUmlCells(graphRef.current);
+      layoutAllUmlCells(graphRef.current, paperRef.current);
 
       setRedoStack(redoStack.slice(0, -1));
 
