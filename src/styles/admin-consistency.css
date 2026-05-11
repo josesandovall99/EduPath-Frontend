@@ -9,9 +9,30 @@
 }
 
 .app-header {
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 2px rgba(58, 74, 91, 0.08);
+  background: linear-gradient(135deg, #1a56db 0%, #1e429f 55%, #142d61 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 12px rgba(14, 30, 70, 0.35);
+}
+
+/* Todos los textos dentro del header heredan blanco */
+.app-header h1,
+.app-header h2,
+.app-header h3 {
+  color: #ffffff !important;
+}
+
+.app-header p,
+.app-header span:not(.app-badge) {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Breadcrumb y botones de navegación dentro del header */
+.app-header button:not(.app-btn-ghost):not(.app-btn-primary) {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.app-header button:not(.app-btn-ghost):not(.app-btn-primary):hover {
+  color: #ffffff;
 }
 
 .app-main {
@@ -43,11 +64,12 @@
 }
 
 .app-brand-icon {
-  width: 3rem;
-  height: 3rem;
-  padding: 0.65rem;
-  border-radius: 1rem;
-  background: linear-gradient(135deg, rgba(74, 144, 226, 0.16) 0%, rgba(126, 214, 167, 0.22) 100%);
+  width: 3.2rem;
+  height: 3.2rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.25);
 }
 
 .app-brand-icon img {
@@ -67,13 +89,13 @@
 }
 
 .app-user-chip__meta p:first-child {
-  color: #334155;
+  color: #ffffff;
   font-weight: 700;
 }
 
 .app-user-chip__meta p:last-child {
   margin-top: 0.15rem;
-  color: var(--color-text-placeholder);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.82rem;
 }
 
@@ -81,8 +103,9 @@
   width: 3rem;
   height: 3rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, #4A90E2 0%, #7ED6A7 100%);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .app-page-hero {
@@ -2510,13 +2533,13 @@
 }
 
 .app-btn-ghost {
-  background: rgba(74, 144, 226, 0.08);
-  color: var(--primary);
-  border: 1px solid rgba(74, 144, 226, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 .app-btn-ghost:hover {
-  background: rgba(74, 144, 226, 0.12);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .app-btn-icon {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { AlertCircle, ArrowLeft, CheckCircle2, Lightbulb, Loader2, Lock, Trash2, XCircle } from 'lucide-react';
 
-import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 
 import { toast } from 'sonner';
 

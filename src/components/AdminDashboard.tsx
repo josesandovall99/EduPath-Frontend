@@ -33,7 +33,7 @@ import {
   Upload,
   Users,
 } from 'lucide-react';
-import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { API_BASE_URL } from '../utils/constants';
 import { cachedFetch } from '../utils/fetchCache';
 import { AdminFlowGuide } from './ui/AdminFlowGuide';
@@ -898,8 +898,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
                 />
               </div>
               <div>
-                <h1 className="text-[#3A4A5B]">Panel de Administrador</h1>
-                <p className="text-slate-600 text-sm">Acceso a los módulos del rol administrador.</p>
+                <h1 className="text-white">Panel de Administrador</h1>
+                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>Acceso a los módulos del rol administrador.</p>
               </div>
             </div>
 

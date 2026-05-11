@@ -13,7 +13,7 @@ import { API_BASE_URL } from '../utils/constants';
 
 
 
-const logoImage = new URL('../assets/898bd8e2c46596e40b55d8328f5f754f003aa92a.png', import.meta.url).href;
+const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 
 
 

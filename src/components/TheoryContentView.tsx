@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Play, FileText, CheckCircle2, BookOpen, ChevronDown, ChevronRight, Loader, Lock } from 'lucide-react';
-import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { ProgrammingContentView } from './ProgrammingContentView';
 import { UMLDiagramView } from './UMLDiagramView';
 import { QuizActivityView } from './QuizActivityView';

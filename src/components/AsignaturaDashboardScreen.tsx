@@ -18,6 +18,7 @@ import {
   List,
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
+const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { buildAuthHeaders } from '../utils/authHeaders';
 import { cachedFetch } from '../utils/fetchCache';
 
@@ -139,30 +140,34 @@ export function AsignaturaDashboardScreen({
       <header className="app-header">
         <div className="app-main py-4">
           <div className="app-page-header">
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="app-brand-block">
               <button
                 type="button"
-                onClick={onBack}
-                aria-label="Volver al listado de asignaturas"
-                className="app-btn app-btn-ghost"
+                onClick={onHome}
+                className="app-brand-icon"
+                title="Ir al panel principal"
               >
-                <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </button>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Asignatura</p>
-                <h1 className="text-[#1E293B] font-bold text-lg leading-tight truncate">{asignaturaName}</h1>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.65)', letterSpacing: '0.15em' }}>Asignatura</p>
+                <h1>{asignaturaName}</h1>
               </div>
             </div>
-            {onHome && (
-              <button type="button" onClick={onHome} className="app-btn app-btn-secondary px-4 py-2">
-                Panel admin
-              </button>
-            )}
           </div>
         </div>
       </header>
 
       <main className="app-main">
+        <button
+          type="button"
+          onClick={onBack}
+          className="app-back-button mb-6"
+          aria-label="Volver al listado de asignaturas"
+        >
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+          <span>Volver</span>
+        </button>
         {/* ── Métricas específicas de la asignatura ───────────────────────── */}
         <section aria-label={`Indicadores de ${asignaturaName}`} className="app-metric-grid mb-8">
           {metrics.map((m) => {

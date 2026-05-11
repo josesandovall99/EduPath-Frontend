@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Code, Database, BarChart3, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Plus, Edit2, ChevronUp, X, Search } from 'lucide-react';
 import axios from 'axios';
-import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { API_BASE_URL } from '../utils/constants';
 
 const api = axios.create({

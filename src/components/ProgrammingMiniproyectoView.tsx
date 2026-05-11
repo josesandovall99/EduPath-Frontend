@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Loader2, Trash2, Lock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
-import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { submitMiniproyecto } from '../utils/submitMiniproyecto';
 import { API_BASE_URL } from '../utils/constants';
 import { CONSOLA_IO_SOURCE } from '../utils/consolaIOSource';

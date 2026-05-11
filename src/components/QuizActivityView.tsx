@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, CheckCircle2, Play, FileText, Lightbulb, SkipBack, SkipForward } from 'lucide-react';
-import logoImage from 'figma:asset/898bd8e2c46596e40b55d8328f5f754f003aa92a.png';
+const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { submitExercise } from '../utils/submitExercise';
 
 interface QuizActivityViewProps {
