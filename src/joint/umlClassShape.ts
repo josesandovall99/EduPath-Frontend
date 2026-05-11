@@ -84,6 +84,22 @@ export function migrateDiagramCellsJson(diagramJson: Record<string, unknown> | u
       if (cell?.type === 'standard.Rectangle') {
         return { ...cell, type: UML_CLASS_CELL_TYPE };
       }
+      if (cell?.type === 'standard.Link' && cell.attrs && typeof cell.attrs === 'object') {
+        const attrs = cell.attrs as Record<string, Record<string, unknown>>;
+        const line = { ...(attrs.line || {}), connection: true, strokeLinejoin: 'round' };
+
+        const wrapper = {
+          connection: true,
+          strokeWidth: 10,
+          strokeLinejoin: 'round',
+          stroke: 'transparent',
+          ...(attrs.wrapper || {}),
+        };
+
+        wrapper.connection = true;
+
+        return { ...cell, attrs: { ...attrs, line, wrapper } };
+      }
       return cell;
     }),
   };

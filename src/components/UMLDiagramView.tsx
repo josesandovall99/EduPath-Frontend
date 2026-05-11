@@ -561,7 +561,23 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
 
 
-    link.attr('line', { stroke: lineStyle.stroke, strokeWidth: lineStyle.strokeWidth, targetMarker });
+    link.attr({
+
+      line: {
+
+        connection: true,
+
+        strokeLinejoin: 'round',
+
+        stroke: lineStyle.stroke,
+
+        strokeWidth: lineStyle.strokeWidth,
+
+        targetMarker,
+
+      },
+
+    });
 
     
 
