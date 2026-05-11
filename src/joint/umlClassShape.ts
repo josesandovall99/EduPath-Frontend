@@ -84,21 +84,51 @@ export function migrateDiagramCellsJson(diagramJson: Record<string, unknown> | u
       if (cell?.type === 'standard.Rectangle') {
         return { ...cell, type: UML_CLASS_CELL_TYPE };
       }
-      if (cell?.type === 'standard.Link' && cell.attrs && typeof cell.attrs === 'object') {
-        const attrs = cell.attrs as Record<string, Record<string, unknown>>;
-        const line = { ...(attrs.line || {}), connection: true, strokeLinejoin: 'round' };
+      if (cell?.type === 'standard.Link') {
+        const patchEnds = (end: unknown): unknown => {
 
-        const wrapper = {
-          connection: true,
-          strokeWidth: 10,
-          strokeLinejoin: 'round',
-          stroke: 'transparent',
-          ...(attrs.wrapper || {}),
+          if (!end || typeof end !== 'object' || Array.isArray(end)) return end;
+
+          const e = { ...(end as Record<string, unknown>) };
+
+          if (typeof e.id === 'string' && e.selector === undefined) {
+
+            return { ...e, selector: 'body' };
+
+          }
+
+          return e;
+
         };
 
-        wrapper.connection = true;
+        let nextCell: Record<string, unknown> = {
 
-        return { ...cell, attrs: { ...attrs, line, wrapper } };
+          ...cell,
+
+          source: patchEnds(cell.source),
+
+          target: patchEnds(cell.target),
+
+        };
+
+        if (nextCell.attrs && typeof nextCell.attrs === 'object') {
+          const attrs = nextCell.attrs as Record<string, Record<string, unknown>>;
+          const line = { ...(attrs.line || {}), connection: true, strokeLinejoin: 'round', fill: attrs.line?.fill ?? 'none' };
+
+          const wrapper = {
+            connection: true,
+            strokeWidth: 10,
+            strokeLinejoin: 'round',
+            stroke: 'transparent',
+            ...(attrs.wrapper || {}),
+          };
+
+          wrapper.connection = true;
+
+          nextCell = { ...nextCell, attrs: { ...attrs, line, wrapper } };
+        }
+
+        return nextCell;
       }
       return cell;
     }),

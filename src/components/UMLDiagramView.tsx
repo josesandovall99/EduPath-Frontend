@@ -248,23 +248,41 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
 
 
-    const initialW = Math.max(320, Math.floor(el.clientWidth || el.getBoundingClientRect().width));
+    const measurePaperHost = () => {
 
-    const initialH = Math.max(240, Math.floor(el.clientHeight || el.getBoundingClientRect().height));
+      const r = el.getBoundingClientRect();
+
+      const w = Math.max(400, Math.floor(r.width));
+
+      const h = Math.max(480, Math.floor(r.height));
+
+      return { w, h };
+
+    };
+
+
+
+    const { w: initialW, h: initialH } = measurePaperHost();
 
     let paper!: joint.dia.Paper;
 
 
 
-    const fitPaperToContainer = () => {
+    let resizeRaf = 0;
 
-      const w = Math.max(320, Math.floor(el.clientWidth));
+    const syncPaperDimensions = () => {
 
-      const h = Math.max(240, Math.floor(el.clientHeight));
+      cancelAnimationFrame(resizeRaf);
 
-      paper.setDimensions(w, h);
+      resizeRaf = window.requestAnimationFrame(() => {
 
-      refreshAllJointLinks(graph, paper);
+        const { w, h } = measurePaperHost();
+
+        paper.setDimensions(w, h);
+
+        refreshAllJointLinks(graph, paper);
+
+      });
 
     };
 
@@ -290,18 +308,19 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
       cellViewNamespace: joint.shapes,
 
+      overflow: true,
+
     });
 
     paperRef.current = paper;
 
 
 
-    const resizeObserver = new ResizeObserver(fitPaperToContainer);
+    syncPaperDimensions();
 
-    resizeObserver.observe(el);
+    window.addEventListener('resize', syncPaperDimensions);
 
-    queueMicrotask(fitPaperToContainer);
-
+    queueMicrotask(syncPaperDimensions);
 
 
     paper.on('element:pointerclick', (elementView: joint.dia.ElementView) => {
@@ -435,7 +454,9 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     return () => {
 
-      resizeObserver.disconnect();
+      window.removeEventListener('resize', syncPaperDimensions);
+
+      cancelAnimationFrame(resizeRaf);
 
       graphRef.current = null;
 
@@ -573,10 +594,9 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     const link = new joint.shapes.standard.Link();
 
-    link.source(source);
+    link.source(source as joint.dia.Element, { selector: 'body' });
 
-    link.target(target);
-
+    link.target(target as joint.dia.Element, { selector: 'body' });
 
 
     let lineStyle: any = { stroke: '#7ED6A7', strokeWidth: 2 };
@@ -681,15 +701,15 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
 
 
-    queueMicrotask(() => {
+    const pv = paperRef.current;
 
-      const pv = paperRef.current?.findViewByModel(link) as joint.dia.LinkView | undefined;
+    if (pv) {
 
-      pv?.requestConnectionUpdate({});
+      (pv as unknown as { updateViews: (o?: { async?: boolean }) => void }).updateViews?.({ async: false });
 
-    });
+      (pv.findViewByModel(link) as joint.dia.LinkView | undefined)?.requestConnectionUpdate({});
 
-
+    }
 
 
     // Resetear diálogo
@@ -2035,7 +2055,7 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
       {/* Layout Horizontal: Sidebar + Canvas */}
 
-      <div className="flex" style={{ height: '650px' }}>
+      <div className="flex min-h-[560px] h-[min(78vh,880px)]">
 
         {/* Sidebar izquierdo con herramientas - 30% */}
 
@@ -2229,7 +2249,7 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
         {/* Asignatura principal del canvas - 70% */}
 
-        <div className="flex-1 flex flex-col bg-white overflow-hidden">
+        <div className="flex-1 flex flex-col bg-white overflow-hidden min-h-0">
 
           {/* Editor de clase seleccionada */}
 
@@ -2327,13 +2347,13 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
           {/* Canvas principal */}
 
-          <div className="flex-1 p-6 bg-gray-50 overflow-hidden relative">
+          <div className="flex-1 min-h-0 p-6 bg-gray-50 overflow-hidden relative flex flex-col">
 
             <div 
 
               ref={containerRef} 
 
-              className="w-full h-full bg-white rounded-xl shadow-inner border-2 border-gray-200"
+              className="uml-joint-host flex-1 min-h-[520px] w-full bg-white rounded-xl shadow-inner border-2 border-gray-200"
 
             />
 
