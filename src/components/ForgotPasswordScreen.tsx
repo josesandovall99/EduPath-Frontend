@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { Mail, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 
+const logoUdes = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
+
 interface ForgotPasswordScreenProps {
   onBack: () => void;
 }
@@ -31,85 +33,174 @@ export function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenProps) {
 
       setSuccess(true);
     } catch (err: any) {
-      setError(err?.message || String(err) || 'Ocurrio un error inesperado');
+      setError(err?.message || String(err) || 'Ocurrió un error inesperado');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#4A90E2] via-[#5B9FED] to-[#7ED6A7] p-8">
-      <div className="w-full max-w-md mx-auto">
-        <div className="mb-8 text-center">
-          <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl shadow-lg flex items-center justify-center p-4">
-            <Mail className="h-8 w-8 text-[#4A90E2]" />
+    <div
+      className="min-h-screen flex flex-col items-center justify-center"
+      style={{
+        background: 'radial-gradient(ellipse at center, #1e3a5f 0%, #16294a 50%, #0d1e36 100%)',
+      }}
+    >
+      {/* Card principal */}
+      <div
+        className="flex rounded-2xl overflow-hidden shadow-2xl"
+        style={{ width: '780px', maxWidth: '95vw', minHeight: '400px' }}
+      >
+        {/* ── Panel izquierdo: marca EduPath ── */}
+        <div
+          className="relative flex flex-col items-center justify-center gap-5"
+          style={{
+            width: '50%',
+            background: 'linear-gradient(160deg, #1a56db 0%, #1e429f 40%, #1a3a7c 70%, #142d61 100%)',
+          }}
+        >
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div style={{ position: 'absolute', width: '260px', height: '260px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.08)', top: '-60px', left: '-60px' }} />
+            <div style={{ position: 'absolute', width: '180px', height: '180px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)', bottom: '-40px', right: '-40px' }} />
           </div>
-          <h1 className="text-white mb-2 text-3xl font-bold">Recuperar contrasena</h1>
-          <p className="text-white/90">Envío de enlace para restablecimiento de acceso.</p>
+
+          {/* Logo UDES */}
+          <div
+            className="flex items-center justify-center rounded-full"
+            style={{
+              width: '130px', height: '130px',
+              background: '#ffffff',
+              borderRadius: '50%',
+              boxShadow: '0 0 0 8px rgba(255,255,255,0.25), 0 4px 20px rgba(0,0,0,0.3)',
+              padding: '8px',
+            }}
+          >
+            <img
+              src={logoUdes}
+              alt="Logo UDES Ingeniería de Sistemas"
+              style={{ width: '110px', height: '110px', objectFit: 'contain' }}
+            />
+          </div>
+
+          <div className="text-center">
+            <h1 className="text-white font-bold" style={{ fontSize: '32px', letterSpacing: '1px' }}>EduPath</h1>
+            <p className="text-white text-sm mt-1">Aplicación de Apoyo Académico</p>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        {/* ── Panel derecho: formulario ── */}
+        <div
+          className="flex flex-col justify-between"
+          style={{ width: '50%', background: '#f0f5ff', padding: '40px 36px 28px' }}
+        >
+          <div>
+            <h2 className="font-bold mb-1" style={{ fontSize: '24px', color: '#1e3a5f' }}>
+              Recuperar contraseña
+            </h2>
+            <p className="text-sm mb-6" style={{ color: '#4a6fa5' }}>
+              Envío de enlace para restablecimiento de acceso.
+            </p>
+
             {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 text-sm border border-red-100">
-                <AlertCircle className="w-4 h-4" />
-                {error}
+              <div
+                role="alert"
+                className="mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm"
+                style={{ borderColor: '#fca5a5', backgroundColor: '#fef2f2', color: '#991b1b' }}
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: '#b91c1c' }} />
+                <p className="font-semibold leading-relaxed" style={{ color: '#991b1b' }}>{error}</p>
               </div>
             )}
 
             {success ? (
-              <div className="text-center space-y-4">
-                <div className="flex items-center justify-center gap-2 text-green-600">
-                  <CheckCircle className="w-6 h-6" />
-                  <span className="font-medium">Solicitud registrada</span>
+              <div className="space-y-4">
+                <div
+                  className="flex items-start gap-3 rounded-lg p-4"
+                  style={{ background: '#e8f5e9', border: '1px solid #a5d6a7' }}
+                >
+                  <CheckCircle className="w-5 h-5 mt-0.5 shrink-0" style={{ color: '#2e7d32' }} />
+                  <div>
+                    <p className="font-semibold text-sm" style={{ color: '#1b5e20' }}>Solicitud registrada</p>
+                    <p className="text-xs mt-1" style={{ color: '#2e7d32' }}>
+                      Si el correo existe en el sistema, se enviará un enlace para restablecer la contraseña.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-600">
-                  Si el correo existe en el sistema, se enviará un enlace para restablecer la contraseña.
-                </p>
                 <button
                   type="button"
                   onClick={onBack}
-                  className="w-full bg-[#F5A97F] text-white p-3 rounded-lg hover:bg-[#F39759] transition-all"
+                  className="w-full rounded-lg font-bold text-white transition-all duration-200 hover:opacity-90 active:scale-95"
+                  style={{ background: '#1a56db', padding: '12px', fontSize: '14px', letterSpacing: '1px' }}
                 >
                   Volver al inicio de sesión
                 </button>
               </div>
             ) : (
-              <>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Campo correo */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Correo</label>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#1e3a5f' }}>Correo electrónico</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <Mail
+                      className="absolute top-1/2 -translate-y-1/2 w-5 h-5"
+                      style={{ left: '14px', color: '#4a7ac8' }}
+                    />
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg p-3 pl-11 bg-white focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent transition-all"
                       placeholder="correo@ejemplo.com"
+                      className="w-full rounded-lg py-3 pl-11 pr-4 outline-none transition-all"
+                      style={{
+                        background: '#fff',
+                        border: '1.5px solid #bfd3f5',
+                        color: '#1e3a5f',
+                        fontSize: '15px',
+                      }}
                       required
                     />
                   </div>
                 </div>
 
+                {/* Botón enviar */}
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`w-full bg-[#F5A97F] text-white p-3 rounded-lg hover:bg-[#F39759] transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-[1.02] ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  className="w-full rounded-lg font-bold text-white transition-all duration-200 hover:opacity-90 active:scale-95"
+                  style={{
+                    background: loading ? '#6b8fc8' : '#1a56db',
+                    padding: '12px',
+                    fontSize: '14px',
+                    letterSpacing: '1.5px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                  }}
                 >
-                  {loading ? 'Enviando...' : 'Enviar enlace'}
+                  {loading ? 'Enviando...' : 'ENVIAR ENLACE'}
                 </button>
 
+                {/* Volver */}
                 <button
                   type="button"
                   onClick={onBack}
-                  className="w-full flex items-center justify-center gap-2 text-[#4A90E2] hover:text-[#3A7BC8] transition-colors"
+                  className="w-full flex items-center justify-center gap-2 text-sm transition-colors hover:underline"
+                  style={{ color: '#3a6abf' }}
                 >
                   <ArrowLeft className="w-4 h-4" />
                   Volver al inicio de sesión
                 </button>
-              </>
+              </form>
             )}
-          </form>
+          </div>
+
+          {/* Footer créditos */}
+          <div className="text-center mt-6" style={{ borderTop: '1px solid #bfd3f5', paddingTop: '14px' }}>
+            <p className="text-xs" style={{ color: '#3a5a8a' }}>
+              Desarrollado por <span className="font-semibold">Edgar Parada, José Sandoval, Cristian Estrada</span>
+            </p>
+            <p className="text-xs mt-1" style={{ color: '#6b8fc8' }}>
+              © {new Date().getFullYear()} EduPath — Todos los derechos reservados
+            </p>
+          </div>
         </div>
       </div>
     </div>

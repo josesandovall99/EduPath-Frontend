@@ -1,7 +1,9 @@
-import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, AlertCircle, Eye, EyeOff, User } from 'lucide-react';
 import { useState } from 'react';
 import { applyAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
+
+const logoUdes = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 
 
 interface LoginScreenProps {
@@ -210,94 +212,167 @@ const handleStudentLogin = async () => {
 
 
 return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#4A90E2] via-[#5B9FED] to-[#7ED6A7]">
-      <div className="w-full max-w-md p-8">
-        
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl shadow-lg flex items-center justify-center p-4">
-            <Lock className="h-8 w-8 text-[#4A90E2]" />
+    <div
+      className="min-h-screen flex flex-col items-center justify-center"
+      style={{
+        background: 'radial-gradient(ellipse at center, #1e3a5f 0%, #16294a 50%, #0d1e36 100%)',
+      }}
+    >
+      {/* Card principal — dos mitades simétricas */}
+      <div
+        className="flex rounded-2xl overflow-hidden shadow-2xl"
+        style={{ width: '780px', maxWidth: '95vw', minHeight: '460px' }}
+      >
+        {/* ── Panel izquierdo: marca EduPath ── */}
+        <div
+          className="relative flex flex-col items-center justify-center gap-5"
+          style={{
+            width: '50%',
+            background: 'linear-gradient(160deg, #1a56db 0%, #1e429f 40%, #1a3a7c 70%, #142d61 100%)',
+          }}
+        >
+          {/* Círculos decorativos de fondo */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div style={{ position:'absolute', width:'260px', height:'260px', borderRadius:'50%', border:'1px solid rgba(255,255,255,0.08)', top:'-60px', left:'-60px' }}/>
+            <div style={{ position:'absolute', width:'180px', height:'180px', borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', bottom:'-40px', right:'-40px' }}/>
           </div>
-          <h1 className="text-white mb-2 text-3xl">EduPath</h1>
-          <p className="text-white/90">Plataforma Educativa para Ingeniería de Sistemas</p>
+
+          {/* Logo UDES */}
+          <div
+            className="flex items-center justify-center rounded-full"
+            style={{
+              width: '130px', height: '130px',
+              background: '#ffffff',
+              borderRadius: '50%',
+              boxShadow: '0 0 0 8px rgba(255,255,255,0.25), 0 4px 20px rgba(0,0,0,0.3)',
+              padding: '8px',
+            }}
+          >
+            <img
+              src={logoUdes}
+              alt="Logo UDES Ingeniería de Sistemas"
+              style={{ width: '110px', height: '110px', objectFit: 'contain' }}
+            />
+          </div>
+
+          {/* Nombre y subtítulo */}
+          <div className="text-center">
+            <h1 className="text-white font-bold" style={{ fontSize: '32px', letterSpacing: '1px' }}>EduPath</h1>
+            <p className="text-white text-sm mt-1">Aplicación de Apoyo Académico</p>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-8 backdrop-blur-sm">
-          <h2 className="text-[#3A4A5B] mb-6 text-center text-2xl">Iniciar Sesión</h2>
-          
-          {error && (
-            <div
-              role="alert"
-              aria-live="assertive"
-              className="mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm shadow-sm"
-              style={{ borderColor: '#fca5a5', backgroundColor: '#fef2f2', color: '#991b1b' }}
-            >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: '#b91c1c' }} />
-              <p className="text-left font-semibold leading-relaxed" style={{ color: '#991b1b' }}>{error}</p>
-            </div>
-          )}
+        {/* ── Panel derecho: formulario ── */}
+        <div
+          className="flex flex-col justify-between"
+          style={{ width: '50%', background: '#f0f5ff', padding: '40px 36px 28px' }}
+        >
+          <div>
+            <h2 className="font-bold mb-6" style={{ fontSize: '28px', color: '#1e3a5f' }}>¡Bienvenido!</h2>
 
-          <div className="space-y-4">
-            {/* Usuario */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+            {error && (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="mb-4 flex items-start gap-2 rounded-lg border p-3 text-sm shadow-sm"
+                style={{ borderColor: '#fca5a5', backgroundColor: '#fef2f2', color: '#991b1b' }}
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: '#b91c1c' }} />
+                <p className="text-left font-semibold leading-relaxed" style={{ color: '#991b1b' }}>{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {/* Campo usuario */}
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <User
+                  className="absolute top-1/2 -translate-y-1/2 w-5 h-5"
+                  style={{ left: '14px', color: '#4a7ac8' }}
+                />
                 <input
                   type="text"
                   value={codigoEstudiantil}
                   onChange={(e) => setCodigoEstudiantil(e.target.value)}
-                  className={`w-full rounded-lg p-3 pl-11 bg-white focus:outline-none focus:ring-2 focus:border-transparent transition-all ${hasAuthError ? 'border border-red-300 focus:ring-red-300' : 'border border-gray-300 focus:ring-[#4A90E2]'}`}
-                  style={hasAuthError ? { borderColor: '#f87171', color: '#991b1b' } : undefined}
-                  placeholder="Ej: 1151234"
+                  onKeyDown={(e) => e.key === 'Enter' && handleStudentLogin()}
+                  placeholder="Código de acceso"
+                  className="w-full rounded-lg py-3 pl-11 pr-4 outline-none transition-all"
+                  style={{
+                    background: '#fff',
+                    border: hasAuthError ? '1.5px solid #f87171' : '1.5px solid #bfd3f5',
+                    color: hasAuthError ? '#991b1b' : '#1e3a5f',
+                    fontSize: '15px',
+                  }}
                 />
               </div>
-            </div>
 
-            {/* Contraseña */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+              {/* Campo contraseña */}
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Lock
+                  className="absolute top-1/2 -translate-y-1/2 w-5 h-5"
+                  style={{ left: '14px', color: '#4a7ac8' }}
+                />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full appearance-none rounded-lg p-3 pl-11 pr-14 bg-white focus:outline-none focus:ring-2 focus:border-transparent transition-all ${hasAuthError ? 'border border-red-300 focus:ring-red-300' : 'border border-gray-300 focus:ring-[#4A90E2]'}`}
-                  style={hasAuthError ? { borderColor: '#f87171', color: '#991b1b' } : undefined}
-                  placeholder="••••••••"
+                  onKeyDown={(e) => e.key === 'Enter' && handleStudentLogin()}
+                  placeholder="Contraseña"
+                  className="w-full appearance-none rounded-lg py-3 pl-11 pr-12 outline-none transition-all"
+                  style={{
+                    background: '#fff',
+                    border: hasAuthError ? '1.5px solid #f87171' : '1.5px solid #bfd3f5',
+                    color: hasAuthError ? '#991b1b' : '#1e3a5f',
+                    fontSize: '15px',
+                  }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="z-10 text-gray-400 hover:text-gray-600"
-                  style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}
+                  className="absolute top-1/2 -translate-y-1/2"
+                  style={{ right: '14px', color: '#6b8fc8' }}
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
-                  {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+
+              {/* Fila: recuperar contraseña + botón ingresar */}
+              <div className="flex items-center justify-between gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => onShowForgotPassword && onShowForgotPassword()}
+                  className="text-sm whitespace-nowrap transition-colors hover:underline"
+                  style={{ color: '#3a6abf' }}
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+                <button
+                  onClick={handleStudentLogin}
+                  disabled={loading}
+                  className="rounded-lg font-bold tracking-widest text-white transition-all duration-200 hover:opacity-90 active:scale-95"
+                  style={{
+                    background: loading ? '#6b8fc8' : '#1a56db',
+                    fontSize: '13px',
+                    letterSpacing: '2px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    padding: '10px 22px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {loading ? '...' : 'INGRESAR'}
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* Botón Ingresar (Estudiantes) */}
-            <button 
-              onClick={handleStudentLogin}
-              disabled={loading}
-              className={`w-full bg-[#F5A97F] text-white p-3 rounded-lg hover:bg-[#F39759] transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-[1.02] flex items-center justify-center gap-2 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              <span>{loading ? 'Verificando...' : 'Ingresar'}</span>
-              {!loading && <ArrowRight className="w-5 h-5" />}
-            </button>
-
-            {/* Forgot Password Link */}
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => onShowForgotPassword && onShowForgotPassword()}
-                className="text-[#4A90E2] hover:text-[#3A7BC8] transition-colors"
-              >
-                Recuperar contraseña
-              </button>
-            </div>
+          {/* Footer créditos */}
+          <div className="text-center" style={{ borderTop: '1px solid #bfd3f5', paddingTop: '14px', marginTop: '24px' }}>
+            <p className="text-xs" style={{ color: '#3a5a8a' }}>
+              Desarrollado por <span className="font-semibold">Edgar Parada, José Sandoval, Cristian Estrada</span>
+            </p>
+            <p className="text-xs mt-1" style={{ color: '#6b8fc8' }}>
+              © {new Date().getFullYear()} EduPath — Todos los derechos reservados
+            </p>
           </div>
         </div>
       </div>
