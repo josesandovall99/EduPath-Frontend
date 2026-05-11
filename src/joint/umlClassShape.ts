@@ -187,9 +187,7 @@ export function ensureUmlClassShapeRegistered(): void {
     } as Record<string, unknown>
   );
 
-  Object.assign(joint.shapes.standard, {
-    UmlClass: UmlClassDefined,
-  });
+  /** No usar `joint.shapes.standard.UmlClass = …`: el bundle de producción congela ese objeto (`Object.preventExtensions`). */
 }
 
 export function layoutUmlClassCell(element: joint.dia.Cell | null): void {
