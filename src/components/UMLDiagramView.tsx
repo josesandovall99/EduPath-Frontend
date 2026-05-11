@@ -1,10 +1,24 @@
-﻿﻿﻿﻿﻿﻿import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 
 import { ArrowLeft, Square, GitMerge, Share2, Boxes, Diamond, RotateCcw, Redo2, Trash2, BookOpen, Save, Send, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 import * as joint from 'jointjs';
 
 import 'jointjs/dist/joint.css';
+
+import {
+
+  createUmlClassCell,
+
+  layoutAllUmlCells,
+
+  layoutUmlClassCell,
+
+  migrateDiagramCellsJson,
+
+  ensureUmlClassShapeRegistered,
+
+} from '../joint/umlClassShape';
 
 import { API_BASE_URL } from '../utils/constants';
 
@@ -216,6 +230,8 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
   useEffect(() => {
 
+    ensureUmlClassShapeRegistered();
+
     const graph = new joint.dia.Graph();
 
     graphRef.current = graph;
@@ -395,7 +411,9 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     if (serialized && typeof serialized === 'object' && graphRef.current.getCells().length === 0) {
 
-      graphRef.current.fromJSON(serialized);
+      graphRef.current.fromJSON(migrateDiagramCellsJson(serialized as Record<string, unknown>) as joint.dia.Graph.JSON);
+
+      layoutAllUmlCells(graphRef.current);
 
     }
 
@@ -453,19 +471,9 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     saveToUndoStack();
 
-    const newClass = new joint.shapes.standard.Rectangle();
+    const newClass = createUmlClassCell();
 
     newClass.position(100 + Math.random() * 600, 100 + Math.random() * 300);
-
-    newClass.resize(200, 100);
-
-    newClass.attr({
-
-      body: { fill: '#ffffff', stroke: '#7ED6A7', strokeWidth: 2 },
-
-      label: { text: 'NuevaClase\n- atributo: tipo\n+ metodo(): retorno', fill: '#3A4A5B' }
-
-    });
 
     graphRef.current?.addCell(newClass);
 
@@ -628,6 +636,8 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
       selectedElement.attr('label/text', classText);
 
+      layoutUmlClassCell(selectedElement);
+
     }
 
   };
@@ -662,11 +672,13 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     }
 
-    if (undoStack.length > 0) {
+    if (undoStack.length > 0 && graphRef.current) {
 
       const lastState = undoStack[undoStack.length - 1];
 
-      graphRef.current?.fromJSON(JSON.parse(lastState));
+      graphRef.current.fromJSON(migrateDiagramCellsJson(JSON.parse(lastState) as Record<string, unknown>) as joint.dia.Graph.JSON);
+
+      layoutAllUmlCells(graphRef.current);
 
       setUndoStack(undoStack.slice(0, -1));
 
@@ -686,11 +698,13 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     }
 
-    if (redoStack.length > 0) {
+    if (redoStack.length > 0 && graphRef.current) {
 
       const lastState = redoStack[redoStack.length - 1];
 
-      graphRef.current?.fromJSON(JSON.parse(lastState));
+      graphRef.current.fromJSON(migrateDiagramCellsJson(JSON.parse(lastState) as Record<string, unknown>) as joint.dia.Graph.JSON);
+
+      layoutAllUmlCells(graphRef.current);
 
       setRedoStack(redoStack.slice(0, -1));
 
