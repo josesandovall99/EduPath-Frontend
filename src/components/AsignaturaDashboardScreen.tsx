@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
+  ArrowRight,
   BookOpen,
   ClipboardList,
   FileText,
@@ -74,65 +75,61 @@ export function AsignaturaDashboardScreen({
 
     const headers = buildAuthHeaders({ Accept: 'application/json' });
     const opts = { headers, credentials: 'include' as const };
-
-    // cachedFetch (60s) — datos estructurales del área, cambian poco
     const get = (url: string) =>
       (cachedFetch(url, opts) as Promise<any[]>).catch(() => []);
 
     (async () => {
-      // Ronda 1: temas (endpoint correcto) + contenidos + miniproyectos en paralelo
-      const [temas, contenidos, miniproyectos] = await Promise.all([
+      // ── Ronda 1: todo en paralelo (3 llamadas únicas) ───────────────────
+      // /contenidos?asignaturaId=X filtra por temas de la asignatura (backend lo resuelve)
+      const [temasRaw, contenidosRaw, minisRaw] = await Promise.all([
         get(`${API_BASE_URL}/temas/por-asignatura/${asignaturaId}`),
-        get(`${API_BASE_URL}/contenidos?asignatura_id=${asignaturaId}`),
+        get(`${API_BASE_URL}/contenidos?asignaturaId=${asignaturaId}`),
         get(`${API_BASE_URL}/miniproyectos?asignatura_id=${asignaturaId}`),
       ]);
-
       if (cancelled) return;
 
-      const temasArr      = Array.isArray(temas)        ? temas        : [];
-      const contenidosArr = Array.isArray(contenidos)   ? contenidos   : [];
-      const minisArr      = Array.isArray(miniproyectos)? miniproyectos: [];
-      const temaIds       = temasArr.map((t: any) => t.id);
+      const temasArr     = Array.isArray(temasRaw)     ? temasRaw     : [];
+      const contenidosArr= Array.isArray(contenidosRaw)? contenidosRaw: [];
+      const minisArr     = Array.isArray(minisRaw)     ? minisRaw     : [];
+      const temaIds      = temasArr.map((t: any) => Number(t.id));
 
-      // Render inmediato con los datos ya disponibles
       setStats(prev => ({
         ...prev,
-        totalTemas:        temasArr.length,
-        temasActivos:      temasArr.filter((t: any) => t.estado !== false).length,
-        totalContenidos:   contenidosArr.length,
-        contenidosActivos: contenidosArr.filter((c: any) => c.estado !== false).length,
+        totalTemas:         temasArr.length,
+        temasActivos:       temasArr.filter((t: any) => t.estado !== false).length,
+        totalContenidos:    contenidosArr.length,
+        contenidosActivos:  contenidosArr.filter((c: any) => c.estado !== false).length,
         totalMiniproyectos: minisArr.length,
       }));
-      setLoading(false); // muestra métricas disponibles ya
 
-      // Ronda 2: subtemas (necesita temaIds) — actualiza sin bloquear el render
-      if (temaIds.length > 0) {
-        const subtemasFetches = await Promise.all(
-          temaIds.map((id: number) =>
-            get(`${API_BASE_URL}/subtemas/por-tema/${id}`)
-          )
-        );
-        if (cancelled) return;
-        const totalSub = subtemasFetches.flat().length;
-        setStats(prev => ({ ...prev, totalSubtemas: totalSub }));
-      }
+      if (temaIds.length === 0) { setLoading(false); return; }
+
+      // ── Ronda 2: subtemas (necesita temaIds) ────────────────────────────
+      const subtemasLists = await Promise.all(
+        temaIds.map(id => get(`${API_BASE_URL}/subtemas/por-tema/${id}`))
+      );
+      if (cancelled) return;
+
+      const todasSubtemas = subtemasLists.flat();
+      setStats(prev => ({ ...prev, totalSubtemas: todasSubtemas.length }));
+      setLoading(false);
     })();
 
     return () => { cancelled = true; };
   }, [asignaturaId]);
 
   const metrics = [
-    { label: 'Temas activos',      value: loading ? '…' : `${stats.temasActivos} / ${stats.totalTemas}`,           icon: Layers,       color: '#2563EB' },
-    { label: 'Subtemas',           value: stats.totalSubtemas === 0 && loading ? '…' : stats.totalSubtemas,         icon: List,         color: '#0891B2' },
-    { label: 'Contenidos activos', value: loading ? '…' : `${stats.contenidosActivos} / ${stats.totalContenidos}`,  icon: FileText,     color: '#059669' },
-    { label: 'Miniproyectos',      value: loading ? '…' : stats.totalMiniproyectos,                                 icon: ClipboardList, color: '#6D28D9' },
+    { label: 'Temas activos',      value: loading ? '…' : `${stats.temasActivos} / ${stats.totalTemas}`,          icon: Layers },
+    { label: 'Subtemas',           value: stats.totalSubtemas === 0 && loading ? '…' : stats.totalSubtemas,        icon: List },
+    { label: 'Contenidos activos', value: loading ? '…' : `${stats.contenidosActivos} / ${stats.totalContenidos}`, icon: FileText },
+    { label: 'Miniproyectos',      value: loading ? '…' : stats.totalMiniproyectos,                                icon: ClipboardList },
   ];
 
   const accesos = [
-    { label: 'Temas y subtemas',    desc: 'Estructura temática de la asignatura.',          icon: Layers,       action: onGoToTemas,          color: '#2563EB' },
-    { label: 'Contenidos',          desc: 'Videos, documentos y recursos de esta asignatura.', icon: FileText,  action: onGoToContenidos,     color: '#059669' },
-    { label: 'Ejercicios',          desc: 'Actividades evaluativas asociadas.',               icon: BookOpen,   action: onGoToEjercicios,     color: '#0F766E' },
-    { label: 'Miniproyectos',       desc: 'Proyectos prácticos de la asignatura.',            icon: ClipboardList, action: onGoToMiniproyectos, color: '#6D28D9' },
+    { label: 'Temas y subtemas', desc: 'Estructura temática de la asignatura.',              icon: Layers,        action: onGoToTemas },
+    { label: 'Contenidos',       desc: 'Videos, documentos y recursos de la asignatura.',    icon: FileText,      action: onGoToContenidos },
+    { label: 'Ejercicios',       desc: 'Actividades evaluativas asociadas.',                 icon: BookOpen,      action: onGoToEjercicios },
+    { label: 'Miniproyectos',    desc: 'Proyectos prácticos de la asignatura.',              icon: ClipboardList, action: onGoToMiniproyectos },
   ];
 
   return (
@@ -141,17 +138,12 @@ export function AsignaturaDashboardScreen({
         <div className="app-main py-4">
           <div className="app-page-header">
             <div className="app-brand-block">
-              <button
-                type="button"
-                onClick={onHome}
-                className="app-brand-icon"
-                title="Ir al panel principal"
-              >
+              <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </button>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.65)', letterSpacing: '0.15em' }}>Asignatura</p>
-                <h1>{asignaturaName}</h1>
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>Asignatura</p>
+                <h1 className="leading-tight">{asignaturaName}</h1>
               </div>
             </div>
           </div>
@@ -159,26 +151,22 @@ export function AsignaturaDashboardScreen({
       </header>
 
       <main className="app-main">
-        <button
-          type="button"
-          onClick={onBack}
-          className="app-back-button mb-6"
-          aria-label="Volver al listado de asignaturas"
-        >
-          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+        <button type="button" onClick={onBack} className="app-back-button mb-6">
+          <ArrowLeft className="w-4 h-4" />
           <span>Volver</span>
         </button>
-        {/* ── Métricas específicas de la asignatura ───────────────────────── */}
-        <section aria-label={`Indicadores de ${asignaturaName}`} className="app-metric-grid mb-8">
+
+        {/* Métricas */}
+        <section className="app-metric-grid mb-8">
           {metrics.map((m) => {
             const Icon = m.icon;
             return (
-              <article key={m.label} className="app-metric-card" aria-label={`${m.label}: ${m.value}`}>
-                <div className="app-metric-icon" style={{ backgroundColor: `${m.color}18`, color: m.color }}>
-                  <Icon className="w-6 h-6" aria-hidden="true" />
+              <article key={m.label} className="app-metric-card">
+                <div className="app-metric-icon" style={{ background: '#1a56db', color: '#ffffff' }}>
+                  <Icon className="w-5 h-5" />
                 </div>
                 <div>
-                  <strong className="app-metric-value" style={{ color: m.color }}>{m.value}</strong>
+                  <strong className="app-metric-value" style={{ color: '#1a56db' }}>{m.value}</strong>
                   <p className="app-metric-label">{m.label}</p>
                 </div>
               </article>
@@ -186,17 +174,15 @@ export function AsignaturaDashboardScreen({
           })}
         </section>
 
-        {/* ── Acceso rápido a los módulos de la asignatura ────────────────── */}
-        <section aria-label="Módulos de la asignatura" className="mb-8">
-          <div className="app-section-head">
+        {/* Accesos directos */}
+        <section className="mb-8">
+          <div className="app-section-head mb-4">
             <div>
-              <h2 className="app-section-title">Gestiona esta asignatura</h2>
-              <p className="app-section-description">
-                Toda la información y herramientas corresponden exclusivamente a <strong>{asignaturaName}</strong>.
-              </p>
+              <h2 className="app-section-title">Módulos</h2>
+              <p className="app-section-description">Selecciona un módulo para gestionarlo.</p>
             </div>
           </div>
-          <div className="app-card-grid">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', gridAutoRows: '1fr' }}>
             {accesos.map((a) => {
               const Icon = a.icon;
               return (
@@ -204,26 +190,26 @@ export function AsignaturaDashboardScreen({
                   key={a.label}
                   type="button"
                   onClick={a.action}
-                  aria-label={`Ir a ${a.label}`}
-                  className="app-list-card group border-transparent text-left"
+                  className="app-list-card text-left"
+                  style={{ display: 'flex', flexDirection: 'column' }}
                 >
-                  <div className="app-list-card__head">
-                    <div
-                      className="app-list-card__icon shadow-sm"
-                      style={{ backgroundColor: `${a.color}18`, color: a.color }}
-                    >
-                      <Icon className="w-6 h-6" aria-hidden="true" />
+                  {/* Ícono + título */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center justify-center rounded-xl shrink-0" style={{ width: '2.4rem', height: '2.4rem', background: '#dbeafe' }}>
+                      <Icon className="w-4 h-4" style={{ color: '#1a56db' }} />
                     </div>
+                    <span className="app-list-card__title">{a.label}</span>
                   </div>
-                  <div>
-                    <div className="app-list-card__title group-hover:text-[#2563EB] transition-colors">
-                      {a.label}
+
+                  {/* Descripción que empuja el footer hacia abajo */}
+                  <p className="app-list-card__description" style={{ flex: 1 }}>{a.desc}</p>
+
+                  {/* Footer pegado al fondo */}
+                  <div className="flex items-center justify-between pt-3 mt-3" style={{ borderTop: '1px solid #e2e8f0' }}>
+                    <span className="text-sm font-semibold" style={{ color: '#1a56db' }}>Abrir</span>
+                    <div className="flex items-center justify-center rounded-full" style={{ width: '30px', height: '30px', background: '#dbeafe' }}>
+                      <ArrowRight className="w-3.5 h-3.5" style={{ color: '#1a56db' }} />
                     </div>
-                    <p className="app-list-card__description mt-2">{a.desc}</p>
-                  </div>
-                  <div className="app-list-card__footer">
-                    <span className="app-list-card__meta">Módulo de {asignaturaName}</span>
-                    <span className="text-sm font-semibold text-[#2563EB]">Abrir →</span>
                   </div>
                 </button>
               );

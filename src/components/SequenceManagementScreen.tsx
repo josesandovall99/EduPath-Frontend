@@ -2534,23 +2534,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
 
 
-  const getTypeColor = (type: string) => {
-
-    switch (type) {
-
-      case 'video': return '#4A90E2';
-
-      case 'document': return '#7ED6A7';
-
-      case 'activity': return '#F5A97F';
-
-      case 'explicacion': return '#F5A97F';
-
-      default: return '#999';
-
-    }
-
-  };
+  const getTypeColor = (_type: string) => '#1a56db';
 
 
 
@@ -2646,349 +2630,95 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
     <div className="app-shell">
 
+      {/* Header */}
       <header className="app-header">
-
         <div className="app-main py-4">
-
           <div className="app-page-header">
-
             <div className="app-brand-block">
-
-              <button
-
-                type="button"
-
-                onClick={onHome}
-
-                className="app-brand-icon"
-
-                title="Ir al panel principal"
-
-              >
-
+              <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-
               </button>
-
               <div>
-
-                <h1 className="text-[#3A4A5B]">
-
-                  {subtemaId ? 'Gestión de Secuencias de Contenidos' : 'Gestión de Secuencias'}
-
-                </h1>
-
-                {subtemaId && asignaturaName && temaName && subtemaNombre && (
-
-                  <p className="text-gray-500 text-sm">
-
-                    Asignatura: {asignaturaName} → Tema: {temaName} → Subtema: {subtemaNombre}
-
-                  </p>
-
-                )}
-
-                {subtemaId && !asignaturaName && (
-
-                  <p className="text-gray-500 text-sm">
-
-                    Subtema: {subtemas.find(s => s.id === subtemaId)?.nombre}
-
-                  </p>
-
-                )}
-
-                {!subtemaId && (
-
-                  <p className="text-gray-500 text-sm">{isDocenteMode ? 'Panel docente - EduPath' : 'Panel de Administrador - EduPath'}</p>
-
-                )}
-
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
+                  Secuencia de contenidos
+                </p>
+                <h1 className="leading-tight">{subtemaNombre || temaName || 'Secuencias'}</h1>
               </div>
-
             </div>
-
           </div>
-
         </div>
-
       </header>
 
-
-
       <main className="app-main">
+        {/* Volver */}
+        <button onClick={onBack} className="app-back-button mb-3">
+          <ArrowLeft className="w-4 h-4" />
+          <span>Volver</span>
+        </button>
 
-        <div className="mb-6">
-
-          <button 
-
-            onClick={onBack}
-
-            className="app-back-button"
-
-          >
-
-            <ArrowLeft className="w-4 h-4" />
-
-            <span>{subtemaId ? 'Volver a Secuencias de Subtemas' : (isDocenteMode ? 'Volver a Mis asignaturas' : 'Volver al Panel')}</span>
-
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 mb-6 flex-wrap" style={{ fontSize: '13px' }}>
+          <button type="button" onClick={onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(0) : onHome}
+            className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>
+            {isDocenteMode ? 'Panel docente' : 'Panel admin'}
           </button>
+          {asignaturaName && (<><span style={{ color: '#bfd3f5' }}>→</span>
+            <button type="button" onClick={onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(1) : onBack}
+              className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>{asignaturaName}</button></>)}
+          {temaName && (<><span style={{ color: '#bfd3f5' }}>→</span>
+            <button type="button" onClick={onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(2) : onBack}
+              className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>{temaName}</button></>)}
+          {subtemaNombre && (<><span style={{ color: '#bfd3f5' }}>→</span>
+            <button type="button" onClick={onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(3) : onBack}
+              className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>{subtemaNombre}</button></>)}
+          <span style={{ color: '#bfd3f5' }}>→</span>
+          <span style={{ color: '#1a56db', fontWeight: 700, background: '#dbeafe', padding: '2px 10px', borderRadius: '999px' }}>
+            Secuencias
+          </span>
+        </nav>
 
+        {/* Toolbar compacta */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          {subtemaId === undefined && (<>
+            <select value={effectiveSelectedAsignatura} onChange={e => handleFilterChange('Asignatura', e.target.value)}
+              className="rounded-xl px-3 text-sm font-medium outline-none"
+              style={{ background: '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '40px', minWidth: '180px' }}>
+              <option value="">Todas las asignaturas</option>
+              {asignaturas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+            </select>
+            <select value={effectiveSelectedTema} onChange={e => handleFilterChange('tema', e.target.value)}
+              disabled={!effectiveSelectedAsignatura}
+              className="rounded-xl px-3 text-sm font-medium outline-none disabled:opacity-50"
+              style={{ background: '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '40px', minWidth: '180px' }}>
+              <option value="">Todos los temas</option>
+              {filteredTemas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+            </select>
+            <select value={effectiveSelectedSubtema} onChange={e => handleFilterChange('subtema', e.target.value)}
+              disabled={!effectiveSelectedTema}
+              className="rounded-xl px-3 text-sm font-medium outline-none disabled:opacity-50"
+              style={{ background: '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '40px', minWidth: '180px' }}>
+              <option value="">Todos los subtemas</option>
+              {filteredSubtemas.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select>
+          </>)}
+          {/* Búsqueda */}
+          <div className="flex items-center gap-2 flex-1 min-w-[180px] rounded-xl px-3"
+            style={{ background: '#fff', border: '1.5px solid #bfd3f5', height: '40px' }}>
+            <Search className="w-4 h-4 shrink-0" style={{ color: '#4a7ac8' }} />
+            <input type="text" placeholder="Buscar secuencias..." value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="flex-1 outline-none text-sm bg-transparent" style={{ color: '#1e3a5f' }} />
+          </div>
+          {/* Crear */}
+          {!isDocenteMode && (
+            <button onClick={openCreateSequenceModal}
+              className="flex items-center gap-2 text-white font-bold text-sm px-4 rounded-xl transition-all hover:opacity-90 shrink-0"
+              style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)', height: '40px', whiteSpace: 'nowrap' }}>
+              <Plus className="w-4 h-4" />
+              Crear secuencia
+            </button>
+          )}
         </div>
-
-
-
-        <AdminFlowGuide
-
-          title="Secuencia de contenidos"
-
-          description="Organización del orden de contenidos dentro del subtema seleccionado."
-
-          breadcrumbs={[
-            { label: isDocenteMode ? 'Panel docente' : 'Panel admin', onClick: onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(0) : undefined },
-            { label: asignaturaName || 'Asignaturas', onClick: onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(1) : undefined },
-            { label: temaName || 'Temas', onClick: onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(2) : undefined },
-            { label: subtemaNombre || 'Subtema', onClick: onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(3) : undefined },
-            { label: 'Secuencia de contenidos', current: true },
-          ]}
-
-          steps={[
-
-            { label: 'Asignaturas', helper: 'Asignatura registrada en el contexto actual.', status: asignaturaName ? 'complete' : 'upcoming' },
-
-            { label: 'Temas', helper: 'Tema base del subtema seleccionado.', status: temaName ? 'complete' : 'upcoming' },
-
-            { label: 'Subtemas', helper: 'Subtema asociado a la edición actual.', status: subtemaNombre ? 'complete' : 'current' },
-
-            { label: 'Secuencia de contenidos', helper: 'Orden del contenido final.', status: 'current' }
-
-          ]}
-
-          asideTitle="Siguiente paso"
-
-          asideDescription="Si se requiere registrar recursos, use 'Gestionar contenidos'. Si el contenido existe, la secuencia puede crearse o ajustarse desde esta vista."
-
-        />
-
-
-
-        <section className="app-page-hero mb-6">
-
-          <div className="app-page-hero__content">
-
-            <div className="app-page-hero__copy">
-
-              <div className="app-page-hero__eyebrow">Secuencia de contenidos</div>
-
-              <h2 className="app-page-hero__title">Secuencia de contenidos</h2>
-
-              <p className="app-page-hero__description">
-
-                Consulta, ajusta y organiza la secuencia del subtema seleccionado.
-
-              </p>
-
-            </div>
-
-          </div>
-
-
-
-          <div className="app-hero-layout app-hero-layout--aside">
-
-            <div className="app-toolbar-card">
-
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-
-                <div>
-
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Filtros</p>
-
-                  <p className="mt-1 text-sm text-slate-600">Limita la vista por asignatura, tema o subtema antes de revisar el orden de contenidos.</p>
-
-                </div>
-
-                <div className="app-action-row justify-start">
-
-                  <button
-
-                    onClick={openCreateSequenceModal}
-
-                    className="app-btn app-btn-success"
-
-                  >
-
-                    <Plus className="w-5 h-5" />
-
-                    <span>Crear secuencia</span>
-
-                  </button>
-
-                </div>
-
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-3">
-
-            <div>
-
-              <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-
-                Asignatura
-
-              </label>
-
-              <select
-
-                value={effectiveSelectedAsignatura}
-
-                onChange={(e) => handleFilterChange('Asignatura', e.target.value)}
-
-                disabled={subtemaId !== undefined}
-
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-
-              >
-
-                <option value="">Todas las asignaturas</option>
-
-                {asignaturas.map(Asignatura => (
-
-                  <option key={Asignatura.id} value={Asignatura.id}>
-
-                    {Asignatura.nombre}
-
-                  </option>
-
-                ))}
-
-              </select>
-
-            </div>
-
-
-
-            <div>
-
-              <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-
-                Tema
-
-              </label>
-
-              <select
-
-                value={effectiveSelectedTema}
-
-                onChange={(e) => handleFilterChange('tema', e.target.value)}
-
-                disabled={!effectiveSelectedAsignatura || subtemaId !== undefined}
-
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-
-              >
-
-                <option value="">Todos los temas</option>
-
-                {filteredTemas.map(tema => (
-
-                  <option key={tema.id} value={tema.id}>
-
-                    {tema.nombre}
-
-                  </option>
-
-                ))}
-
-              </select>
-
-            </div>
-
-
-
-            <div>
-
-              <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-
-                Subtema
-
-              </label>
-
-              <select
-
-                value={effectiveSelectedSubtema}
-
-                onChange={(e) => handleFilterChange('subtema', e.target.value)}
-
-                disabled={!effectiveSelectedTema || subtemaId !== undefined}
-
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-
-              >
-
-                <option value="">Todos los subtemas</option>
-
-                {filteredSubtemas.map(subtema => (
-
-                  <option key={subtema.id} value={subtema.id}>
-
-                    {subtema.nombre}
-
-                  </option>
-
-                ))}
-
-              </select>
-
-            </div>
-
-              </div>
-
-            </div>
-
-
-
-            <div className="app-sidebar-stack">
-
-              <div className="app-soft-card app-soft-card--blue">
-
-                <div className="mb-4">
-
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda</p>
-
-                  <p className="mt-1 text-sm text-slate-600">Busca por título, descripción o relación entre contenidos.</p>
-
-                </div>
-
-                <div className="app-toolbar-card__search app-search-field">
-
-                  <Search className="app-search-field__icon" />
-
-                  <input
-
-                    type="text"
-
-                    placeholder="Buscar secuencias"
-
-                    value={searchTerm}
-
-                    onChange={(e) => setSearchTerm(e.target.value)}
-
-                    className="app-form-input"
-
-                  />
-
-                </div>
-
-              </div>
-
-
-
-            </div>
-
-          </div>
-
-        </section>
 
 
 
@@ -3020,7 +2750,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
             <div className="flex flex-col items-center gap-4">
 
-              <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
+              <Loader className="w-8 h-8 animate-spin text-[#1a56db]" />
 
               <p className="text-gray-600">Cargando secuencias...</p>
 
@@ -3046,52 +2776,19 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
                   </div>
 
-                  <div className="app-action-row justify-start">
-
+                  <div className="flex items-center gap-3">
                     <div className="app-sequence-reorder-note">
-
                       <ArrowDownUp className="w-4 h-4" />
-
                       <span>Arrastra para reordenar</span>
-
                     </div>
-
                     {onGoToContentManagement && (
-
-                      <button
-
-                        type="button"
-
-                        onClick={onGoToContentManagement}
-
-                        className="app-btn app-btn-ghost app-btn-sm"
-
-                      >
-
-                        <span>Gestionar contenidos</span>
-
-                        <ArrowRight className="w-4 h-4" />
-
+                      <button type="button" onClick={onGoToContentManagement}
+                        className="flex items-center gap-1.5 text-sm font-semibold px-4 rounded-xl transition-all hover:opacity-80"
+                        style={{ background: '#dbeafe', color: '#1a56db', height: '36px', whiteSpace: 'nowrap' }}>
+                        Gestionar contenidos
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
-
                     )}
-
-                    {insertAfterSequenceId && (
-
-                      <button
-
-                        onClick={() => setInsertAfterSequenceId(null)}
-
-                        className="app-btn app-btn-ghost app-btn-sm"
-
-                      >
-
-                        Cancelar inserción
-
-                      </button>
-
-                    )}
-
                   </div>
 
                 </div>
@@ -3202,7 +2899,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
                               } ${
 
-                                isDraggedOver ? 'ring-2 ring-[#4A90E2] ring-offset-2' : ''
+                                isDraggedOver ? 'ring-2 ring-[#1a56db] ring-offset-2' : ''
 
                               }`}
 
@@ -3243,49 +2940,11 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
                         </div>
 
                         {!isLast && (
-
                           <div className="app-sequence-connector">
-
                             <div className="app-sequence-connector__arrow">
-
                               <ArrowRight className="w-4 h-4" />
-
                             </div>
-
-                            {item.sequence_id && (
-
-                              <button
-
-                                onClick={() => {
-
-                                  if (insertAfterSequenceId === item.sequence_id) {
-
-                                    setInsertAfterSequenceId(null);
-
-                                    setShowCreateModal(true);
-
-                                  } else {
-
-                                    setInsertAfterSequenceId(item.sequence_id || null);
-
-                                  }
-
-                                }}
-
-                                className="app-sequence-connector__action"
-
-                                title="Insertar contenido aquí"
-
-                              >
-
-                                Insertar
-
-                              </button>
-
-                            )}
-
                           </div>
-
                         )}
 
                       </div>
@@ -3406,62 +3065,29 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
 
 
-                      <div className="app-action-row">
-
+                      <div className="flex items-center gap-2">
                         {!isDocenteMode && (
-
-                          <button
-
-                            onClick={() => handleToggleEstado(sequence.id, sequence.estado)}
-
+                          <button onClick={() => handleToggleEstado(sequence.id, sequence.estado)}
                             disabled={isLoading}
-
-                            className={`app-btn app-btn-icon app-btn-sm ${sequence.estado ? 'app-btn-secondary' : 'app-btn-success'}`}
-
-                            title={sequence.estado ? 'Desactivar' : 'Activar'}
-
-                          >
-
-                            {sequence.estado ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-
+                            className="flex items-center justify-center rounded-lg transition-all hover:opacity-80 disabled:opacity-40"
+                            style={{ width:'32px', height:'32px', ...(sequence.estado ? { background:'#fef2f2', color:'#b91c1c' } : { background:'#ecfdf5', color:'#047857' }) }}
+                            title={sequence.estado ? 'Desactivar' : 'Activar'}>
+                            {sequence.estado ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
-
                         )}
-
-
-
-                        <button
-
-                          onClick={() => handleEditSequence(sequence)}
-
-                          className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
-
-                          title="Editar"
-
-                        >
-
+                        <button onClick={() => handleEditSequence(sequence)}
+                          className="flex items-center justify-center rounded-lg transition-all hover:opacity-80"
+                          style={{ width:'32px', height:'32px', background:'#dbeafe', color:'#1a56db' }}
+                          title="Editar">
                           <Edit className="w-4 h-4" />
-
                         </button>
-
-
-
-                        <button
-
-                          onClick={() => handleDeleteSequence(sequence.id)}
-
+                        <button onClick={() => handleDeleteSequence(sequence.id)}
                           disabled={isLoading}
-
-                          className="app-btn app-btn-danger app-btn-icon app-btn-sm disabled:opacity-50"
-
-                          title="Eliminar"
-
-                        >
-
+                          className="flex items-center justify-center rounded-lg transition-all hover:opacity-80 disabled:opacity-40"
+                          style={{ width:'32px', height:'32px', background:'#fef2f2', color:'#b91c1c' }}
+                          title="Eliminar">
                           <Trash2 className="w-4 h-4" />
-
                         </button>
-
                       </div>
 
                     </div>
@@ -3487,78 +3113,31 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
       {/* Modal Crear/Editar Secuencia */}
 
       {showCreateModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center"
+          style={{ background: 'rgba(10,20,50,0.45)', backdropFilter: 'blur(4px)' }}
+          onClick={() => { setShowCreateModal(false); resetForm(); setInsertAfterSequenceId(null); setModalSelectedAsignatura(''); setModalSelectedTema(''); setModalSelectedSubtema(''); setModalTemas([]); setModalSubtemas([]); setModalContents([]); setSequenceCreationContext(null); }}>
+          <div className="rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+            style={{ width: '560px', maxHeight: '90vh', background: '#fff' }}
+            onClick={e => e.stopPropagation()}>
 
-        <div className="app-modal-overlay app-modal-overlay--top">
-
-          <div className="app-modal-card app-modal-card--lg">
-
-            <div className="app-modal-header">
-
+            {/* Cabecera azul */}
+            <div style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
               <div>
-
-                <div className="app-modal-kicker">Secuencias</div>
-
-                <h2 className="app-modal-title">
-
-                  {isEditMode ? 'Editar secuencia' : insertAfterSequenceId ? 'Insertar contenido en secuencia' : 'Crear secuencia'}
-
-                </h2>
-
-                {insertAfterSequenceId && (
-
-                  <p className="app-modal-description">
-
-                    El nuevo contenido se insertará dentro de la secuencia seleccionada.
-
-                  </p>
-
-                )}
-
+                <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)' }}>Secuencias de contenidos</p>
+                <h3 style={{ color: '#fff', fontWeight: 700, fontSize: '18px', marginTop: '4px' }}>
+                  {isEditMode ? 'Editar secuencia' : insertAfterSequenceId ? 'Insertar en secuencia' : 'Crear secuencia'}
+                </h3>
+                {insertAfterSequenceId && <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginTop: '2px' }}>El contenido se insertará dentro de la secuencia seleccionada.</p>}
               </div>
-
-              <button
-
-                onClick={() => {
-
-                  setShowCreateModal(false);
-
-                  resetForm();
-
-                  setInsertAfterSequenceId(null);
-
-                  // Limpiar estado del modal
-
-                  setModalSelectedAsignatura('');
-
-                  setModalSelectedTema('');
-
-                  setModalSelectedSubtema('');
-
-                  setModalTemas([]);
-
-                  setModalSubtemas([]);
-
-                  setModalContents([]);
-
-                  setSequenceCreationContext(null);
-
-                }}
-
-                className="app-modal-close"
-
-              >
-
-                ✕
-
+              <button type="button"
+                onClick={() => { setShowCreateModal(false); resetForm(); setInsertAfterSequenceId(null); setModalSelectedAsignatura(''); setModalSelectedTema(''); setModalSelectedSubtema(''); setModalTemas([]); setModalSubtemas([]); setModalContents([]); setSequenceCreationContext(null); }}
+                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: '8px', color: '#fff', cursor: 'pointer', padding: '6px', lineHeight: 0 }}>
+                <span style={{ fontSize: '14px', fontWeight: 700 }}>✕</span>
               </button>
-
             </div>
 
-
-
-            <div className="app-modal-scroll">
-
-            <div className="app-form-layout">
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ padding: '20px 22px' }}>
 
             <div className="app-form-note mb-6">
 
@@ -3598,7 +3177,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
                       disabled={subtemaId !== undefined}
 
-                      className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1a56db] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
 
                     >
 
@@ -3636,7 +3215,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
                       disabled={!modalSelectedAsignatura || subtemaId !== undefined}
 
-                      className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1a56db] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
 
                     >
 
@@ -3674,7 +3253,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
                       disabled={!modalSelectedTema || subtemaId !== undefined}
 
-                      className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1a56db] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
 
                     >
 
@@ -3732,7 +3311,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
                   disabled={isOriginLocked}
 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a56db] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
 
                   required
 
@@ -3788,7 +3367,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
                   onChange={handleInputChange}
 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a56db] focus:border-transparent"
 
                   required
 
@@ -3844,7 +3423,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
                   rows={3}
 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a56db] focus:border-transparent"
 
                 />
 
@@ -3870,7 +3449,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
                   onChange={handleInputChange}
 
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a56db] focus:border-transparent"
 
                 >
 
@@ -3886,90 +3465,26 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
               {/* Botones */}
 
-              <div className="app-form-footer mt-6 border-t-0 px-0 pb-0">
-
-                <button
-
-                  type="button"
-
-                  onClick={() => {
-
-                    setShowCreateModal(false);
-
-                    resetForm();
-
-                    setModalSelectedAsignatura('');
-
-                    setModalSelectedTema('');
-
-                    setModalSelectedSubtema('');
-
-                    setModalTemas([]);
-
-                    setModalSubtemas([]);
-
-                    setModalContents([]);
-
-                    setSequenceCreationContext(null);
-
-                  }}
-
-                  disabled={isLoading}
-
-                  className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
-
-                >
-
-                  Cancelar
-
-                </button>
-
-                <button
-
-                  type="submit"
-
-                  disabled={isLoading}
-
-                  className="px-6 py-2 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
-
-                >
-
-                  {isLoading ? (
-
-                    <>
-
-                      <Loader className="w-4 h-4 animate-spin" />
-
-                      <span>{isEditMode ? 'Actualizando...' : 'Creando...'}</span>
-
-                    </>
-
-                  ) : (
-
-                    <>
-
-                      <Plus className="w-4 h-4" />
-
-                      <span>{isEditMode ? 'Actualizar secuencia' : 'Crear secuencia'}</span>
-
-                    </>
-
-                  )}
-
-                </button>
-
-              </div>
-
             </form>
-
+            </div>
             </div>
 
+            {/* Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '14px 22px', borderTop: '1px solid #bfd3f5', background: '#f0f5ff', flexShrink: 0 }}>
+              <button type="button"
+                onClick={() => { setShowCreateModal(false); resetForm(); setModalSelectedAsignatura(''); setModalSelectedTema(''); setModalSelectedSubtema(''); setModalTemas([]); setModalSubtemas([]); setModalContents([]); setSequenceCreationContext(null); }}
+                disabled={isLoading}
+                style={{ padding: '9px 18px', borderRadius: '10px', border: '1.5px solid #bfd3f5', background: '#fff', color: '#1e3a5f', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button type="button" onClick={(e) => { const form = (e.currentTarget as HTMLElement).closest('.fixed')?.querySelector('form'); if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }}
+                disabled={isLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 22px', borderRadius: '10px', background: isLoading ? '#6b8fc8' : 'linear-gradient(135deg, #1a56db, #142d61)', color: '#fff', fontWeight: 700, fontSize: '13px', border: 'none', cursor: isLoading ? 'not-allowed' : 'pointer' }}>
+                {isLoading ? <><Loader className="w-4 h-4 animate-spin" />{isEditMode ? 'Actualizando...' : 'Creando...'}</> : <>{isEditMode ? 'Actualizar' : 'Crear secuencia'}</>}
+              </button>
             </div>
-
           </div>
-
         </div>
-
       )}
 
     </div>

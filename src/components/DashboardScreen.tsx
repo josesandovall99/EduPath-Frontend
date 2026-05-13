@@ -3,6 +3,7 @@ import { ChatbotButton } from './ChatbotButton';
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../utils/constants';
 import { cachedFetch } from '../utils/fetchCache';
+const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 
 interface Subject {
   id: string;
@@ -138,24 +139,22 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           <div className="app-page-header">
             <div className="app-brand-block">
               <div className="app-brand-icon">
-                <BookOpen className="w-6 h-6 text-[#4A90E2]" />
+                <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-[#3A4A5B]">EduPath</h1>
-                <p className="text-gray-500 text-sm">Panel del estudiante</p>
+                <h1>EduPath</h1>
+                <p className="text-sm">Panel del estudiante</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="app-user-chip">
-                <div className="app-user-chip__meta">
-                  <p>{userName || 'Estudiante'}</p>
-                  <p>Ingeniería de Sistemas</p>
-                </div>
-                <div className="app-user-avatar">
-                  <User className="h-5 w-5" />
-                </div>
+            <div className="app-user-chip">
+              <div className="app-user-chip__meta">
+                <p>{userName || 'Estudiante'}</p>
+                <p>Ingeniería de Sistemas</p>
               </div>
-              <button onClick={onLogout} className="app-btn app-btn-secondary px-4 py-2.5 text-slate-700">
+              <div className="app-user-avatar">
+                <User className="h-5 w-5" />
+              </div>
+              <button onClick={onLogout} className="app-btn app-btn-ghost">
                 <LogOut className="w-4 h-4" />
                 <span>Salir</span>
               </button>

@@ -25,7 +25,6 @@ const SYNTAX_GROUPS = [
       { key: 'if',      label: 'if / else' },
       { key: 'else if', label: 'else if' },
       { key: 'switch',  label: 'switch / case' },
-      { key: 'ternary', label: 'Ternario (? :)' },
     ],
   },
   {
@@ -58,10 +57,10 @@ const SYNTAX_GROUPS = [
 ] as const;
 
 const GROUP_BADGE: Record<string, string> = {
-  violet: 'bg-violet-100 text-violet-700 border-violet-200',
-  sky:    'bg-sky-100 text-sky-700 border-sky-200',
-  rose:   'bg-rose-100 text-rose-700 border-rose-200',
-  amber:  'bg-amber-100 text-amber-700 border-amber-200',
+  violet: 'bg-blue-50 text-blue-700 border-blue-200',
+  sky:    'bg-blue-50 text-blue-700 border-blue-200',
+  rose:   'bg-blue-50 text-blue-700 border-blue-200',
+  amber:  'bg-blue-50 text-blue-700 border-blue-200',
 };
 
 const EXERCISE_TYPES: ConfigurableExerciseType[] = ['Compilador', 'Diagramas UML', 'Preguntas', 'Opción única', 'Ordenar', 'Relacionar'];
@@ -344,45 +343,36 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                         </div>
                       </section>
 
-                      <div className="app-miniproyecto-visualizer__grid">
-                        <section className="app-miniproyecto-visualizer-card app-miniproyecto-visualizer-card--wide">
-                          <div className="app-miniproyecto-visualizer-card__head">
-                            <label className="app-miniproyecto-visualizer-card__label">Título del ejercicio</label>
-                            <span className="app-miniproyecto-visualizer-card__help">Nombre visible dentro del flujo</span>
-                          </div>
-                          <input value={exercise.titulo} onChange={(event) => handleUpdateExercise(index, { titulo: event.target.value })} className="app-form-input" />
-                        </section>
-
-                        <section className="app-miniproyecto-visualizer-card">
-                          <div className="app-miniproyecto-visualizer-card__head">
-                            <label className="app-miniproyecto-visualizer-card__label">Tipo elegido</label>
-                            <button type="button" onClick={() => setEditingTypeExerciseId((current) => current === exercise.id ? null : exercise.id)} className="app-miniproyecto-visualizer-card__action">
-                              {editingTypeExerciseId === exercise.id ? 'Cancelar' : 'Cambiar tipo'}
+                      {/* Título / Tipo / Puntos en 3 columnas */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: 700, color: '#1a56db', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Título</label>
+                          <input value={exercise.titulo} onChange={e => handleUpdateExercise(index, { titulo: e.target.value })} className="app-form-input" style={{ fontSize: '13px' }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ fontSize: '11px', fontWeight: 700, color: '#1a56db', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tipo</label>
+                            <button type="button" onClick={() => setEditingTypeExerciseId(c => c === exercise.id ? null : exercise.id)}
+                              style={{ fontSize: '11px', color: '#1a56db', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>
+                              {editingTypeExerciseId === exercise.id ? 'Cancelar' : 'Cambiar'}
                             </button>
                           </div>
-                          <span className="app-miniproyecto-visualizer__chip app-miniproyecto-visualizer__chip--soft">{exercise.tipo_ejercicio}</span>
-                          {editingTypeExerciseId === exercise.id ? (
-                            <select value={exercise.tipo_ejercicio} onChange={(event) => handleChangeExerciseType(index, event.target.value as ConfigurableExerciseType)} className="app-form-select mt-3">
-                              {EXERCISE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-                            </select>
-                          ) : null}
-                        </section>
-
-                        <section className="app-miniproyecto-visualizer-card">
-                          <div className="app-miniproyecto-visualizer-card__head">
-                            <label className="app-miniproyecto-visualizer-card__label">Puntos</label>
-                            <span className="app-miniproyecto-visualizer-card__help">Valor del ejercicio</span>
-                          </div>
-                          <input type="number" min={1} value={exercise.puntos} onChange={(event) => handleUpdateExercise(index, { puntos: Number(event.target.value) || 1 })} className="app-form-input" />
-                        </section>
-
-                        <section className="app-miniproyecto-visualizer-card app-miniproyecto-visualizer-card--full">
-                          <div className="app-miniproyecto-visualizer-card__head">
-                            <label className="app-miniproyecto-visualizer-card__label">Descripción</label>
-                            <span className="app-miniproyecto-visualizer-card__help">Contexto breve para el estudiante</span>
-                          </div>
-                          <textarea value={exercise.descripcion} onChange={(event) => handleUpdateExercise(index, { descripcion: event.target.value })} rows={3} className="app-form-textarea" />
-                        </section>
+                          {editingTypeExerciseId === exercise.id
+                            ? <select value={exercise.tipo_ejercicio} onChange={e => handleChangeExerciseType(index, e.target.value as ConfigurableExerciseType)} className="app-form-select" style={{ fontSize: '13px' }}>
+                                {EXERCISE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                              </select>
+                            : <div className="app-form-input" style={{ fontSize: '13px', fontWeight: 600, color: '#1a56db', background: '#f0f5ff', display: 'flex', alignItems: 'center' }}>{exercise.tipo_ejercicio}</div>
+                          }
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: 700, color: '#1a56db', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Puntos</label>
+                          <input type="number" min={1} value={exercise.puntos} onChange={e => handleUpdateExercise(index, { puntos: Number(e.target.value) || 1 })} className="app-form-input" style={{ fontSize: '13px' }} />
+                        </div>
+                      </div>
+                      {/* Descripción */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 700, color: '#1a56db', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Descripción</label>
+                        <textarea value={exercise.descripcion} onChange={e => handleUpdateExercise(index, { descripcion: e.target.value })} rows={3} className="app-form-textarea" style={{ fontSize: '13px' }} />
                       </div>
 
                       <div className="app-miniproyecto-visualizer__sections">
@@ -475,33 +465,40 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                                   )}
                                 </div>
 
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                  {SYNTAX_GROUPS.map((group) => {
+                                {/* Pills horizontales por grupo */}
+                                <div className="rounded-xl overflow-hidden" style={{ border: '1.5px solid #bfd3f5' }}>
+                                  {SYNTAX_GROUPS.map((group, gi) => {
                                     const sintaxis: string[] = Array.isArray(compilerConfig?.sintaxis) ? compilerConfig.sintaxis : [];
                                     return (
-                                      <div key={group.group} className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm space-y-2">
-                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{group.group}</div>
-                                        {group.items.map((item) => {
-                                          const checked = sintaxis.includes(item.key);
-                                          return (
-                                            <label key={item.key} className="flex items-center gap-2 cursor-pointer group">
-                                              <input
-                                                type="checkbox"
-                                                checked={checked}
-                                                onChange={() => {
-                                                  const next = checked
-                                                    ? sintaxis.filter((s) => s !== item.key)
-                                                    : [...sintaxis, item.key];
+                                      <div key={group.group}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
+                                          borderBottom: gi < SYNTAX_GROUPS.length - 1 ? '1px solid #e2e8f0' : 'none',
+                                          background: '#fff' }}>
+                                        {/* Punto de color */}
+                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                                          background: group.color === 'violet' ? '#8b5cf6' : group.color === 'sky' ? '#0ea5e9' : group.color === 'rose' ? '#f43f5e' : '#f59e0b' }} />
+                                        <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#475569', width: '100px', flexShrink: 0 }}>
+                                          {group.group}
+                                        </span>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', flex: 1 }}>
+                                          {group.items.map((item) => {
+                                            const checked = sintaxis.includes(item.key);
+                                            return (
+                                              <button key={item.key} type="button"
+                                                onClick={() => {
+                                                  const next = checked ? sintaxis.filter(s => s !== item.key) : [...sintaxis, item.key];
                                                   handleUpdateConfig(index, { tipo: 'mvc', sintaxis: next });
                                                 }}
-                                                className="h-3.5 w-3.5 rounded text-[#4A90E2] border-slate-300 cursor-pointer"
-                                              />
-                                              <span className={`text-[11px] font-mono transition-colors ${checked ? 'text-[#3A4A5B] font-semibold' : 'text-slate-500 group-hover:text-slate-700'}`}>
+                                                style={{
+                                                  fontSize: '12px', fontFamily: 'monospace', padding: '3px 12px', borderRadius: '999px', cursor: 'pointer', transition: 'all 0.15s',
+                                                  background: checked ? '#1a56db' : '#fff', color: checked ? '#fff' : '#475569',
+                                                  border: `1.5px solid ${checked ? '#1a56db' : '#cbd5e1'}`, fontWeight: checked ? 600 : 400,
+                                                }}>
                                                 {item.label}
-                                              </span>
-                                            </label>
-                                          );
-                                        })}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -535,7 +532,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                               {/* Casos de prueba */}
                               <div>
                                 <label className="app-miniproyecto-visualizer-card__label mb-2 block">Casos de prueba *</label>
-                                <p className="app-form-note mb-3">Define los inputs (stdin) y el output esperado para cada caso. El sistema ejecuta el programa completo con cada input y compara el resultado.</p>
+                                <p className="app-form-note mb-3">Define los inputs y el output esperado para cada caso. El sistema ejecuta el programa completo y compara el resultado.</p>
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                                   {([0, 1, 2] as const).map((caseIndex) => {
                                     const casos: { inputs: string; output: string }[] = Array.isArray(compilerConfig?.casos_prueba) ? compilerConfig.casos_prueba : [];
@@ -545,23 +542,31 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                                       handleUpdateConfig(index, { tipo: 'mvc', casos_prueba: next });
                                     };
                                     return (
-                                      <div key={caseIndex} className="app-miniproyecto-visualizer-mini-card space-y-2">
-                                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Caso {caseIndex + 1}</div>
-                                        <div>
-                                          <label className="block text-[11px] text-slate-500 mb-1">Inputs (stdin)</label>
-                                          <input value={caseItem.inputs} onChange={(e) => updateCase('inputs', e.target.value)} placeholder="Ej: 4,12000,10" className="app-form-input font-mono text-xs" />
-                                          <p className="mt-0.5 text-[10px] text-slate-400 font-mono">valores separados por coma</p>
+                                      <div key={caseIndex} className="space-y-3 rounded-xl" style={{ background: '#fff', border: '1.5px solid #bfd3f5', padding: '16px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#1a56db' }}>Caso {caseIndex + 1}</span>
+                                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>#{caseIndex + 1} / 3</span>
                                         </div>
                                         <div>
-                                          <label className="block text-[11px] text-slate-500 mb-1">Output esperado *</label>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                            <label style={{ fontSize: '12px', fontWeight: 600, color: '#1e3a5f' }}>Inputs</label>
+                                            <span title="Valores separados por coma que el programa recibirá como entrada estándar" style={{ fontSize: '11px', color: '#94a3b8', cursor: 'default' }}>ⓘ</span>
+                                          </div>
+                                          <input value={caseItem.inputs} onChange={(e) => updateCase('inputs', e.target.value)} placeholder="Ej: Juan,4.0,3.0"
+                                            className="app-form-input font-mono" style={{ fontSize: '12px' }} />
+                                        </div>
+                                        <div>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                            <label style={{ fontSize: '12px', fontWeight: 600, color: '#1e3a5f' }}>Output esperado *</label>
+                                            <span title="Una línea por cada println. El sistema compara exactamente con la salida del programa." style={{ fontSize: '11px', color: '#94a3b8', cursor: 'default' }}>ⓘ</span>
+                                          </div>
                                           <textarea
-                                            rows={3}
+                                            rows={7}
                                             value={caseItem.output}
                                             onChange={(e) => updateCase('output', e.target.value)}
                                             placeholder={"Total: 48000.0\nDescuento: 4800.0\nTotal a pagar: 43200.0"}
-                                            className="app-form-textarea font-mono text-xs resize-none"
+                                            className="app-form-textarea font-mono text-xs"
                                           />
-                                          <p className="mt-0.5 text-[10px] text-slate-400 font-mono">una línea por cada println</p>
                                         </div>
                                       </div>
                                     );

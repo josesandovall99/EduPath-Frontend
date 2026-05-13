@@ -368,25 +368,24 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
   return (
     <div className="min-h-screen bg-[#F2F2F2]">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="app-header">
         <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <div className="app-brand-icon">
+                <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-[#3A4A5B]">EduPath</h1>
-                <p className="text-gray-500 text-sm">{subject.name}</p>
+                <h1>EduPath</h1>
+                <p className="text-sm">{subject.name}</p>
               </div>
             </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-[#3A4A5B]">{localStorage.getItem('nombreEstudiante') || 'Estudiante'}</p>
-                <p className="text-gray-500 text-sm">EduPath</p>
+            <div className="app-user-chip">
+              <div className="app-user-chip__meta">
+                <p>{localStorage.getItem('nombreEstudiante') || 'Estudiante'}</p>
+                <p>Ingeniería de Sistemas</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-[#4A90E2] to-[#5B9FED] rounded-full flex items-center justify-center text-white shadow-md">
+              <div className="app-user-avatar">
                 <User className="h-5 w-5" />
               </div>
             </div>
@@ -397,9 +396,9 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-8 py-8">
         {/* Back Button */}
-        <button 
+        <button
           onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-[#3A4A5B] transition-colors"
+          className="app-back-button mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Volver al Dashboard</span>

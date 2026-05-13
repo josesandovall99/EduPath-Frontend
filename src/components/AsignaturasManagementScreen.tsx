@@ -278,134 +278,79 @@ export function AsignaturasManagementScreen({ onBack, onHome, onSelectAsignatura
 
   return (
     <div className="app-shell">
+      {/* Header */}
       <header className="app-header">
         <div className="app-main py-4">
           <div className="app-page-header">
             <div className="app-brand-block">
-              <button
-                type="button"
-                onClick={onHome}
-                className="app-brand-icon"
-                title="Ir al panel principal"
-              >
+              <button type="button" onClick={onHome} className="app-brand-icon" title="Ir al panel principal">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </button>
               <div>
-                <h1 className="text-[#3A4A5B]">{isDocenteMode ? 'Mis asignaturas - Temas - Subtemas - Contenidos' : 'Gestión de Asignaturas - Subtemas - Contenidos'}</h1>
-                <p className="text-gray-500 text-sm">{isDocenteMode ? 'Ruta docente para navegar la estructura académica asignada.' : 'Mapa académico y entrada a la estructura de contenidos de EduPath.'}</p>
+                <h1>{isDocenteMode ? 'Mis asignaturas' : 'Gestión de asignaturas'}</h1>
+                <p className="text-sm">{isDocenteMode ? 'Asignaturas asignadas al docente' : 'Administra el catálogo de asignaturas'}</p>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="app-main">
-        <button
-          onClick={onBack}
-          className="app-back-button mb-6"
-        >
+        {/* Volver */}
+        <button onClick={onBack} className="app-back-button mb-5">
           <ArrowLeft className="w-4 h-4" />
           <span>{isDocenteMode ? 'Volver al panel docente' : 'Volver al Panel'}</span>
         </button>
 
-        <AdminFlowGuide
-          title={isDocenteMode ? 'Mis asignaturas académicas' : 'Gestión de asignaturas académicas'}
-          description={isDocenteMode ? 'Selección de las asignaturas asignadas dentro de la estructura académica.' : 'Registro y selección de asignaturas dentro de la estructura académica.'}
-          breadcrumbs={[
-            { label: isDocenteMode ? 'Panel docente' : 'Panel admin' },
-            { label: isDocenteMode ? 'Mis asignaturas' : 'Asignaturas', current: true }
-          ]}
-          steps={[
-            { label: 'Asignaturas', helper: 'Registro o selección del asignatura base.', status: 'current' },
-            { label: 'Temas', helper: 'Organización temática por asignatura.', status: 'upcoming' },
-            { label: 'Subtemas', helper: 'Detalle de la estructura temática.', status: 'upcoming' },
-            { label: 'Secuencias', helper: 'Orden de la ruta académica.', status: 'upcoming' }
-          ]}
-          asideTitle="Siguiente paso"
-          asideDescription="La selección de un asignatura habilita la gestión temática dentro del mismo flujo."
-        />
-
-        <section className="app-page-hero mb-6">
-          <div className="app-page-hero__content">
-            <div className="app-page-hero__copy">
-              <div className="app-page-hero__eyebrow">Arquitectura académica</div>
-              <h2 className="app-page-hero__title">{isDocenteMode ? 'Mis asignaturas' : 'Gestión de asignaturas'}</h2>
-              <p className="app-page-hero__description">
-                {isDocenteMode ? 'Consulta tus asignaturas asignadas y accede a sus temas.' : 'Consulta asignaturas y accede a sus temas.'}
-              </p>
-            </div>
+        {/* Toolbar: filtros + búsqueda + nuevo */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          {/* Filtros */}
+          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: '#e8eef8' }}>
+            {[
+              { key: 'all',      label: `Todas (${asignaturas.length})` },
+              { key: 'active',   label: `Activas (${activeasignaturas})` },
+              { key: 'inactive', label: `Inactivas (${inactiveasignaturas})` },
+            ].map(f => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setStateFilter(f.key as 'all' | 'active' | 'inactive')}
+                className="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
+                style={{
+                  background: stateFilter === f.key ? '#1a56db' : 'transparent',
+                  color: stateFilter === f.key ? '#fff' : '#4a6fa5',
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
 
-          <div className="app-hero-layout app-hero-layout--aside">
-            <div className="app-toolbar-card">
-              <div className="app-hero-panel">
-                <div className="app-hero-panel__header">
-                  <div className="app-hero-panel__copy">
-                    <p className="app-hero-panel__eyebrow">Catálogo</p>
-                    <h3 className="app-hero-panel__title">{isDocenteMode ? 'Asignaturas asignadas' : 'Estado del catálogo'}</h3>
-                    <p className="app-hero-panel__description">Filtra por estado.</p>
-                  </div>
-                  {!readOnly && (
-                    <button onClick={handleOpenCreate} className="app-btn app-primary-btn">
-                      <Plus className="w-4 h-4" />
-                      <span>Nueva asignatura</span>
-                    </button>
-                  )}
-                </div>
-                <div className="app-hero-panel__body">
-                  <div className="app-filter-row">
-                    <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
-                      <span>Todas ({asignaturas.length})</span>
-                    </button>
-                    <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>
-                      <Eye className="h-4 w-4 shrink-0" />
-                      <span>Activas ({activeasignaturas})</span>
-                    </button>
-                    <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>
-                      <EyeOff className="h-4 w-4 shrink-0" />
-                      <span>Inactivas ({inactiveasignaturas})</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="app-sidebar-stack">
-              <div className="app-toolbar-card">
-                <div className="app-hero-panel">
-                  <div className="app-hero-panel__copy">
-                    <p className="app-hero-panel__eyebrow">Búsqueda</p>
-                    <h3 className="app-hero-panel__title">Buscar asignatura</h3>
-                    <p className="app-hero-panel__description">Busca por nombre.</p>
-                  </div>
-                  <div className="app-hero-panel__body">
-                    <div className="app-search-field">
-                      <Search className="app-search-field__icon" />
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(event) => setSearchTerm(event.target.value)}
-                        placeholder="Buscar asignatura"
-                        className="app-form-input"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-            </div>
+          {/* Búsqueda */}
+          <div className="flex items-center gap-2 flex-1 min-w-[180px] rounded-xl px-3 py-2" style={{ background: '#fff', border: '1.5px solid #bfd3f5' }}>
+            <Search className="w-4 h-4 shrink-0" style={{ color: '#4a7ac8' }} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Buscar asignatura..."
+              className="flex-1 outline-none text-sm bg-transparent"
+              style={{ color: '#1e3a5f' }}
+            />
           </div>
-        </section>
 
-        {successMessage && (
-          <div className="app-alert app-alert--success mb-6">
-            <p>{successMessage}</p>
-            <button onClick={() => setSuccessMessage(null)} className="text-green-600 hover:text-green-800">
-              <X className="w-5 h-5" />
+          {/* Botón nueva */}
+          {!readOnly && (
+            <button
+              onClick={handleOpenCreate}
+              className="app-btn flex items-center gap-2 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-all hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)', whiteSpace: 'nowrap' }}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nueva asignatura</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
         {isLoading ? (
           <div className="app-empty-panel py-12">
@@ -426,109 +371,78 @@ export function AsignaturasManagementScreen({ onBack, onHome, onSelectAsignatura
             <p className="mt-2 text-sm text-slate-500">Modifique el nombre o el estado visible del catálogo para ampliar el resultado.</p>
           </div>
         ) : (
-          <div className="app-card-grid app-Asignatura-catalog-grid">
-              {filteredAsignaturas.map((Asignatura, index) => {
-                const AsignaturaIsActive = isAsignaturaActive(Asignatura);
-                return (
-                  <div
-                    key={Asignatura.id}
-                    onClick={() => onSelectAsignatura(Asignatura.id, Asignatura.nombre)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        onSelectAsignatura(Asignatura.id, Asignatura.nombre);
-                      }
+          <div className="app-card-grid">
+            {filteredAsignaturas.map((Asignatura) => {
+              const AsignaturaIsActive = isAsignaturaActive(Asignatura);
+              const pillarLabel = Asignatura.es_asignatura_pilar && Asignatura.tipo_pilar
+                ? PILLAR_OPTIONS.find(o => o.value === Asignatura.tipo_pilar)?.label || Asignatura.tipo_pilar
+                : null;
+              return (
+                <div
+                  key={Asignatura.id}
+                  className={`app-list-card cursor-pointer flex flex-col ${AsignaturaIsActive ? '' : 'opacity-70'}`}
+                  style={{ position: 'relative' }}
+                  onClick={() => onSelectAsignatura(Asignatura.id, Asignatura.nombre)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectAsignatura(Asignatura.id, Asignatura.nombre); } }}
+                >
+                  {/* Badge estado — esquina superior derecha */}
+                  <span
+                    style={{
+                      position: 'absolute', top: '12px', right: '12px',
+                      fontSize: '11px', fontWeight: 600,
+                      padding: '2px 8px', borderRadius: '999px',
+                      ...(AsignaturaIsActive
+                        ? { background: '#dbeafe', color: '#1a56db' }
+                        : { background: '#fef3c7', color: '#92400e' })
                     }}
-                    className={`app-list-card app-Asignatura-catalog-card cursor-pointer ${AsignaturaIsActive ? '' : 'opacity-75'}`}
                   >
-                    <div className="app-Asignatura-catalog-card__top">
-                      <div className="flex flex-wrap items-center gap-2">
-                          <span className={`app-badge ${AsignaturaIsActive ? 'app-badge--blue' : 'bg-amber-100 text-amber-700'}`}>
-                            {AsignaturaIsActive ? 'Activa' : 'Inhabilitada'}
-                          </span>
-                          {Asignatura.es_asignatura_pilar && Asignatura.tipo_pilar ? (
-                            <span className="app-badge bg-emerald-100 text-emerald-700">
-                              Principal {PILLAR_OPTIONS.find((option) => option.value === Asignatura.tipo_pilar)?.label || Asignatura.tipo_pilar}
-                            </span>
-                          ) : null}
-                      </div>
-                      <span className="app-Asignatura-catalog-card__hint">
-                        {AsignaturaIsActive ? 'Abrir temas' : 'Consultar asignatura'}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <h2 className="app-list-card__title app-Asignatura-catalog-card__title">
-                        {Asignatura.nombre}
-                      </h2>
-                      <p className="app-list-card__description app-Asignatura-catalog-card__summary">
-                        {AsignaturaIsActive
-                          ? (isDocenteMode ? 'Acceso a temas, subtemas, secuencias y contenidos del asignatura asignada.' : 'Gestión de temas, subtemas y recursos vinculados.')
-                          : (isDocenteMode ? 'Asignatura inhabilitada, disponible solo para consulta.' : 'Registro inhabilitado, disponible para consulta o reactivación.')}
-                      </p>
-                    </div>
-                    <div className="app-Asignatura-catalog-card__body">
-                      <p className="app-Asignatura-catalog-card__label">Descripción</p>
-                      <p className="app-list-card__meta app-Asignatura-catalog-card__description">
-                        {Asignatura.descripcion || 'Sin descripción registrada.'}
-                      </p>
-                    </div>
-                    {isDocenteMode ? (
-                      <div
-                        className="px-4 pb-4"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        role="presentation"
+                    {AsignaturaIsActive ? 'Activa' : 'Inhabilitada'}
+                  </span>
+
+                  {/* Nombre */}
+                  <h3 className="app-list-card__title mb-1 pr-16">{Asignatura.nombre}</h3>
+
+                  {/* Descripción corta */}
+                  <p className="app-list-card__description flex-1" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {Asignatura.descripcion || 'Sin descripción.'}
+                  </p>
+
+                  {/* Footer: Editar + Inhabilitar */}
+                  {!readOnly && (
+                    <div
+                      className="flex items-center gap-2 mt-3 pt-3"
+                      style={{ borderTop: '1px solid #e2e8f0' }}
+                      onClick={e => e.stopPropagation()}
+                      onKeyDown={e => e.stopPropagation()}
+                      role="presentation"
+                    >
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); handleOpenEdit(Asignatura); }}
+                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
+                        style={{ background: '#dbeafe', color: '#1a56db' }}
                       >
-                        <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 text-left text-sm text-slate-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#4A90E2] focus:ring-[#4A90E2]"
-                            checked={Boolean(Asignatura.progresion_secuencial)}
-                            disabled={progresionPatchingId === Asignatura.id}
-                            onChange={(e) => handlePatchProgresionSecuencial(Asignatura, e.target.checked)}
-                          />
-                          <span>
-                            <span className="font-medium text-slate-800">Progresión secuencial para estudiantes</span>
-                            <span className="block text-xs text-slate-500 mt-1">
-                              Actívala para exigir orden (tema, subtema y contenido). Desactívala para que naveguen libremente.
-                            </span>
-                          </span>
-                        </label>
-                      </div>
-                    ) : null}
-                    {!readOnly && (
-                      <div className="app-list-card__footer app-Asignatura-catalog-card__footer">
-                        <div className="app-action-row">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleToggleAsignatura(Asignatura);
-                            }}
-                            className={`app-btn app-btn-sm ${AsignaturaIsActive ? 'app-btn-secondary' : 'app-btn-success'}`}
-                          >
-                            {AsignaturaIsActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            <span>{AsignaturaIsActive ? 'Inhabilitar' : 'Habilitar'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleOpenEdit(Asignatura);
-                            }}
-                            className="app-btn app-btn-sm app-btn-ghost"
-                          >
-                            <Pencil className="w-4 h-4" />
-                            <span>Editar</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                        <Pencil className="w-3 h-3" />
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); handleToggleAsignatura(Asignatura); }}
+                        className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
+                        style={AsignaturaIsActive
+                          ? { background: '#fef2f2', color: '#b91c1c' }
+                          : { background: '#ecfdf5', color: '#047857' }}
+                      >
+                        {AsignaturaIsActive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        {AsignaturaIsActive ? 'Inhabilitar' : 'Habilitar'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -552,122 +466,113 @@ export function AsignaturasManagementScreen({ onBack, onHome, onSelectAsignatura
             </div>
 
             <div className="app-modal-scroll">
-            <div className="app-form-layout">
-              {formError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                  {formError}
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+                {formError && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '12px 16px', borderRadius: '10px', fontSize: '14px' }}>
+                    {formError}
+                  </div>
+                )}
+
+                {/* Nombre */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#1e3a5f' }}>Nombre *</label>
+                  <input
+                    type="text"
+                    value={formData.nombre}
+                    onChange={e => setFormData({ ...formData, nombre: e.target.value })}
+                    className="app-form-input"
+                    placeholder="Ej: Fundamentos de Programación"
+                    style={{ fontSize: '15px', fontWeight: 500 }}
+                    required
+                  />
                 </div>
-              )}
 
-              <section className="app-form-section app-form-section--muted">
-              <div className="app-form-field">
-                <label className="app-form-label">Nombre *</label>
-                <input
-                  type="text"
-                  value={formData.nombre}
-                  onChange={(event) => setFormData({ ...formData, nombre: event.target.value })}
-                  className="app-form-input"
-                  placeholder="Ej: Programacion"
-                  required
-                />
-              </div>
+                {/* Descripción */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#1e3a5f' }}>Descripción</label>
+                  <textarea
+                    value={formData.descripcion}
+                    onChange={e => setFormData({ ...formData, descripcion: e.target.value })}
+                    className="app-form-textarea"
+                    placeholder="Descripción breve de la asignatura..."
+                    rows={5}
+                    style={{ fontSize: '14px', minHeight: '120px' }}
+                  />
+                </div>
 
-              <div className="app-form-field">
-                <label className="app-form-label">Descripción</label>
-                <textarea
-                  value={formData.descripcion}
-                  onChange={(event) => setFormData({ ...formData, descripcion: event.target.value })}
-                  className="app-form-textarea"
-                  placeholder="Descripcion breve del Asignatura"
-                  rows={3}
-                />
-              </div>
-
-              <div className="app-form-field">
-                <label className="app-form-label">Progresión del estudiante</label>
-                <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                {/* Progresión secuencial */}
+                <label
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px 16px', borderRadius: '12px', border: '1.5px solid #bfd3f5', background: formData.progresionSecuencial ? '#f0f5ff' : '#fff', cursor: 'pointer', transition: 'all 0.15s' }}
+                >
                   <input
                     type="checkbox"
                     checked={formData.progresionSecuencial}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, progresionSecuencial: event.target.checked }))}
-                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#4A90E2] focus:ring-[#4A90E2]"
+                    onChange={e => setFormData(prev => ({ ...prev, progresionSecuencial: e.target.checked }))}
+                    style={{ marginTop: '2px', accentColor: '#1a56db', width: '16px', height: '16px', flexShrink: 0 }}
                   />
                   <span>
-                    <span className="font-medium text-slate-800">Exigir progresión secuencial</span>
-                    <span className="block text-xs text-slate-500 mt-0.5">
-                      Los estudiantes deben completar en orden cada tema, subtema y contenido (según las secuencias definidas). Si no marcas esta opción, pueden abrir cualquier recurso libremente.
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: '14px', color: '#1e3a5f' }}>Progresión secuencial</span>
+                    <span style={{ display: 'block', fontSize: '12.5px', color: '#4a6fa5', marginTop: '3px', lineHeight: 1.5 }}>
+                      Los estudiantes deben completar en orden cada tema, subtema y contenido.
                     </span>
                   </span>
                 </label>
-              </div>
 
-              <div className="app-form-field">
-                <label className="app-form-label">Clasificación</label>
-                <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                {/* Asignatura principal */}
+                <label
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderRadius: '12px', border: '1.5px solid #bfd3f5', background: formData.esAsignaturaPilar ? '#f0f5ff' : '#fff', cursor: !editingasignaturaId && allPillarsTaken ? 'not-allowed' : 'pointer', opacity: !editingasignaturaId && allPillarsTaken ? 0.6 : 1 }}
+                >
                   <input
                     type="checkbox"
                     checked={formData.esAsignaturaPilar}
                     disabled={!editingasignaturaId && allPillarsTaken}
-                    onChange={(event) => setFormData((prev) => ({
-                      ...prev,
-                      esAsignaturaPilar: event.target.checked,
-                      tipoPilar: event.target.checked ? prev.tipoPilar : ''
-                    }))}
-                    className="h-4 w-4 rounded border-slate-300 text-[#4A90E2] focus:ring-[#4A90E2]"
+                    onChange={e => setFormData(prev => ({ ...prev, esAsignaturaPilar: e.target.checked, tipoPilar: e.target.checked ? prev.tipoPilar : '' }))}
+                    style={{ accentColor: '#1a56db', width: '16px', height: '16px', flexShrink: 0 }}
                   />
-                  <span>
+                  <span style={{ fontWeight: 600, fontSize: '14px', color: '#1e3a5f' }}>
                     Marcar como asignatura principal
-                    {!editingasignaturaId && allPillarsTaken ? ' (ya existen las tres asignaturas principales)' : ''}
+                    {!editingasignaturaId && allPillarsTaken && <span style={{ fontWeight: 400, color: '#4a6fa5', fontSize: '12px' }}> — ya existen las tres principales</span>}
                   </span>
                 </label>
+
+                {/* Tipo pilar */}
+                {formData.esAsignaturaPilar && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 600, color: '#1e3a5f' }}>Tipo de asignatura principal *</label>
+                    <select
+                      value={formData.tipoPilar}
+                      onChange={e => setFormData(prev => ({ ...prev, tipoPilar: e.target.value as '' | PillarType }))}
+                      className="app-form-select"
+                    >
+                      <option value="">Selecciona el tipo</option>
+                      {PILLAR_OPTIONS.map(o => (
+                        <option key={o.value} value={o.value} disabled={usedPillarTypes.has(o.value) && o.value !== formData.tipoPilar}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-
-              {formData.esAsignaturaPilar ? (
-                <div className="app-form-field">
-                  <label className="app-form-label">Tipo de asignatura principal *</label>
-                  <select
-                    value={formData.tipoPilar}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, tipoPilar: event.target.value as '' | PillarType }))}
-                    className="app-form-select"
-                  >
-                    <option value="">Selecciona el tipo principal</option>
-                    {PILLAR_OPTIONS.map((option) => (
-                      <option
-                        key={option.value}
-                        value={option.value}
-                        disabled={usedPillarTypes.has(option.value) && option.value !== formData.tipoPilar}
-                      >
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
-              </section>
-            </div>
             </div>
 
-            <div className="app-form-footer">
+            {/* Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '16px 20px', borderTop: '1px solid #bfd3f5', background: '#f0f5ff' }}>
               <button
                 onClick={handleCloseModal}
                 disabled={submitting}
-                className="app-btn app-btn-secondary px-4 py-2.5 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ padding: '10px 20px', borderRadius: '10px', border: '1.5px solid #bfd3f5', background: '#fff', color: '#1e3a5f', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSaveAsignatura}
                 disabled={submitting || !formData.nombre.trim()}
-                className="app-btn app-primary-btn px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ padding: '10px 24px', borderRadius: '10px', background: submitting || !formData.nombre.trim() ? '#6b8fc8' : 'linear-gradient(135deg, #1a56db, #142d61)', color: '#fff', fontWeight: 700, fontSize: '14px', border: 'none', cursor: submitting || !formData.nombre.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
-                {submitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>{editingasignaturaId !== null ? 'Actualizando...' : 'Guardando...'}</span>
-                  </>
-                ) : (
-                  <span>{editingasignaturaId !== null ? 'Actualizar Asignatura' : 'Crear Asignatura'}</span>
-                )}
+                {submitting && <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} />}
+                {submitting ? (editingasignaturaId !== null ? 'Actualizando...' : 'Guardando...') : (editingasignaturaId !== null ? 'Actualizar asignatura' : 'Crear asignatura')}
               </button>
             </div>
           </div>

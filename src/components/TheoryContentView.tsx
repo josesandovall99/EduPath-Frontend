@@ -1110,12 +1110,12 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       <div className="w-80 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto shadow-sm">
         {/* Sidebar Header — alineado en altura con el header derecho (px-8 py-4 + ícono 48x48) */}
         <div
-          className="px-6 py-4 border-b border-gray-200 text-white shadow-sm"
-          style={{ background: `linear-gradient(135deg, ${subjectColor} 0%, ${subjectColor}dd 100%)` }}
+          className="px-6 py-4 border-b text-white shadow-sm"
+          style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)', borderColor: 'rgba(255,255,255,0.1)' }}
         >
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center backdrop-blur-sm">
-              <BookOpen className="w-6 h-6" />
+            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1.5 shadow-md" style={{ boxShadow: '0 0 0 3px rgba(255,255,255,0.2)' }}>
+              <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
             </div>
             <div>
               <p className="font-semibold text-base leading-tight">Módulos del Curso</p>
@@ -1280,29 +1280,25 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       {/* Right Content Asignatura */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="app-header">
           <div className="px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button type="button" onClick={onHome} title="Ir al panel principal" className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-2.5 shadow-md">
-                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+            <div className="app-page-header">
+              <div className="app-brand-block">
+                <button type="button" onClick={onHome} title="Ir al panel principal" className="app-brand-icon">
+                  <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
                 </button>
                 <div>
-                  <h1 className="text-[#3A4A5B]">{subjectName}</h1>
-                  <p className="text-gray-500 text-sm">{content.title}</p>
+                  <h1>{subjectName}</h1>
+                  <p className="text-sm">{content.title}</p>
                 </div>
               </div>
-              
+
               {/* Progress */}
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-600 text-sm">Progreso:</span>
-                  <span className="text-xl" style={{ color: subjectColor }}>
-                    {`${currentProgress}%`}
-                  </span>
-                </div>
-                <div className="w-32 h-3 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${currentProgress}%`, backgroundColor: subjectColor }}></div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm" style={{ color: 'rgba(255,255,255,0.8)' }}>Progreso:</span>
+                <span className="font-bold text-white text-base">{`${currentProgress}%`}</span>
+                <div className="w-28 h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.25)' }}>
+                  <div className="h-full rounded-full bg-white" style={{ width: `${currentProgress}%` }} />
                 </div>
               </div>
             </div>

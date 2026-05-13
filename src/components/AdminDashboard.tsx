@@ -64,10 +64,9 @@ const DocenteManagementScreen        = lazyNamed(() => import('./DocenteManageme
 const AdminManagementScreen          = lazyNamed(() => import('./AdminManagementScreen'),          'AdminManagementScreen');
 
 interface AdminDashboardProps {
-  /** Cierra la sesión del administrador y vuelve a la pantalla de login. */
   onLogout: () => void;
-  /** Solicita al contenedor padre la navegación a una sección externa al dashboard. */
   onNavigate: (section: 'themes' | 'contents' | 'reports' | 'students' | 'upload' | 'subtema-sequences' | 'subthemes') => void;
+  adminName?: string;
 }
 
 /** Identificador interno de cada pantalla manejada por el router del dashboard. */
@@ -143,7 +142,7 @@ const ScreenLoader = () => (
  */
 const isActiveFlag = (value: unknown) => value !== false;
 
-export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
+export function AdminDashboard({ onLogout, onNavigate, adminName }: AdminDashboardProps) {
   const { setArea, clearArea } = useArea();
 
   /** Pantalla que se renderiza actualmente. */
@@ -159,6 +158,7 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
   const [selectedTemaName, setSelectedTemaName] = useState<string>('');
   const [selectedSubtemaId, setSelectedSubtemaId] = useState<number | null>(null);
   const [selectedSubtemaNombre, setSelectedSubtemaNombre] = useState<string>('');
+  const [selectedContenidoId, setSelectedContenidoId] = useState<string | null>(null);
 
   const [statsData, setStatsData] = useState<DashboardStats>(EMPTY_STATS);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
@@ -437,15 +437,15 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
    */
   const actions = useMemo<DashboardAction[]>(
     () => [
-      { id: 'asignaturas',          title: 'Gestión de Asignaturas',           description: 'Registro y organización de asignaturas académicas.',                       icon: BookOpen,      color: '#4A90E2', gradient: 'from-[#4A90E2] to-[#5B9FED]', group: 'workflow', badge: 'Paso 1',       tone: 'blue',  onClick: () => navigateTo('asignaturas') },
-      { id: 'contents',       title: 'Catálogo de Contenidos',     description: 'Administración del catálogo de contenidos, recursos y actividades.', icon: TrendingUp,    color: '#0F766E', gradient: 'from-[#0F766E] to-[#14B8A6]', group: 'workflow', badge: 'Paso final',   tone: 'green', onClick: () => navigateTo('content-management') },
-      { id: 'ejercicios',     title: 'Gestión de Ejercicios',      description: 'Creación y edición de ejercicios asociados a contenidos.',           icon: ClipboardList, color: '#0EA5E9', gradient: 'from-[#0EA5E9] to-[#38BDF8]', group: 'workflow', badge: 'Complemento',  tone: 'blue',  onClick: () => navigateTo('ejercicios') },
-      { id: 'miniproyectos',  title: 'Gestión de Miniproyectos',   description: 'Administración de miniproyectos y actividades relacionadas.',         icon: ClipboardList, color: '#0EA5E9', gradient: 'from-[#0EA5E9] to-[#38BDF8]', group: 'workflow', badge: 'Complemento',  tone: 'green', onClick: () => navigateTo('miniproyectos') },
-      { id: 'reports',        title: 'Generación de Informes',     description: 'Consulta y exportación de informes de progreso y estado.',           icon: BarChart3,     color: '#F5A97F', gradient: 'from-[#F5A97F] to-[#F7B98F]', group: 'support',  badge: 'Seguimiento',  tone: 'amber', navigateSection: 'reports' },
-      { id: 'docentes',       title: 'Gestión de Docentes',        description: 'Administración de docentes, especialidades y asignaturas asignadas.',      icon: Users,         color: '#14B8A6', gradient: 'from-[#14B8A6] to-[#2DD4BF]', group: 'support',  badge: 'Operación',    tone: 'green', onClick: () => navigateTo('docentes') },
-      { id: 'administradores',title: 'Gestión de Administradores', description: 'Administración de cuentas y credenciales del rol administrador.',    icon: Shield,        color: '#2563EB', gradient: 'from-[#2563EB] to-[#3B82F6]', group: 'support',  badge: 'Control',      tone: 'blue',  onClick: () => navigateTo('administradores') },
-      { id: 'upload',         title: 'Carga Masiva de Estudiantes',description: 'Importación masiva de estudiantes desde archivo Excel.',            icon: Upload,        color: '#F472B6', gradient: 'from-[#F472B6] to-[#FB87C6]', group: 'support',  badge: 'Operación',    tone: 'amber', navigateSection: 'upload' },
-      { id: 'chatbot',        title: 'Gestión del Chatbot',        description: 'Administración de documentos y actualización de la base de conocimiento.', icon: Bot,       color: '#6366F1', gradient: 'from-[#6366F1] to-[#818CF8]', group: 'support',  badge: 'Soporte',      tone: 'slate', onClick: () => navigateTo('chatbot') },
+      { id: 'asignaturas',     title: 'Gestión de Asignaturas',      description: 'Registro y organización de asignaturas académicas.',                       icon: BookOpen,      color: '#1a56db', gradient: 'from-[#1a56db] to-[#2563eb]', group: 'workflow', badge: 'Académico',   tone: 'blue', onClick: () => navigateTo('asignaturas') },
+      { id: 'contents',       title: 'Catálogo de Contenidos',      description: 'Administración del catálogo de contenidos, recursos y actividades.',      icon: TrendingUp,   color: '#1e429f', gradient: 'from-[#1e429f] to-[#1a56db]', group: 'workflow', badge: 'Académico',   tone: 'blue', onClick: () => navigateTo('content-management') },
+      { id: 'ejercicios',     title: 'Gestión de Ejercicios',       description: 'Creación y edición de ejercicios asociados a contenidos.',                 icon: ClipboardList, color: '#2563eb', gradient: 'from-[#2563eb] to-[#3b82f6]', group: 'workflow', badge: 'Académico',   tone: 'blue', onClick: () => navigateTo('ejercicios') },
+      { id: 'miniproyectos',  title: 'Gestión de Miniproyectos',    description: 'Administración de miniproyectos y actividades relacionadas.',              icon: FileEdit,      color: '#1a56db', gradient: 'from-[#1a56db] to-[#3b82f6]', group: 'workflow', badge: 'Académico',   tone: 'blue', onClick: () => navigateTo('miniproyectos') },
+      { id: 'reports',        title: 'Generación de Informes',      description: 'Consulta y exportación de informes de progreso y estado.',                  icon: BarChart3,     color: '#142d61', gradient: 'from-[#142d61] to-[#1e429f]', group: 'support',  badge: 'Soporte',     tone: 'blue', navigateSection: 'reports' },
+      { id: 'docentes',       title: 'Gestión de Docentes',         description: 'Administración de docentes, especialidades y asignaturas asignadas.',       icon: Users,         color: '#1e429f', gradient: 'from-[#1e429f] to-[#2563eb]', group: 'support',  badge: 'Soporte',     tone: 'blue', onClick: () => navigateTo('docentes') },
+      { id: 'administradores',title: 'Gestión de Administradores',  description: 'Administración de cuentas y credenciales del rol administrador.',           icon: Shield,        color: '#142d61', gradient: 'from-[#142d61] to-[#1a56db]', group: 'support',  badge: 'Soporte',     tone: 'blue', onClick: () => navigateTo('administradores') },
+      { id: 'upload',         title: 'Carga Masiva de Estudiantes', description: 'Importación masiva de estudiantes desde archivo Excel.',                    icon: Upload,        color: '#2563eb', gradient: 'from-[#2563eb] to-[#1a56db]', group: 'support',  badge: 'Soporte',     tone: 'blue', navigateSection: 'upload' },
+      { id: 'chatbot',        title: 'Gestión del Chatbot',         description: 'Administración de documentos y actualización de la base de conocimiento.',  icon: Bot,           color: '#1e429f', gradient: 'from-[#1e429f] to-[#142d61]', group: 'support',  badge: 'Soporte',     tone: 'blue', onClick: () => navigateTo('chatbot') },
     ],
     [navigateTo],
   );
@@ -550,26 +550,20 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           aria-label={`Abrir ${action.title}`}
           className="app-list-card group border-transparent text-left"
         >
-          <div className="app-list-card__head">
+          {/* Ícono integrado en el flujo de contenido */}
+          <div className="flex items-center gap-3 mb-1">
             <div
-              className={`app-list-card__icon bg-gradient-to-br ${action.gradient} shadow-md`}
-              style={{ backgroundColor: action.color }}
+              className="flex items-center justify-center rounded-xl shrink-0"
+              style={{ width: '2.4rem', height: '2.4rem', background: '#dbeafe' }}
             >
-              <Icon className="w-6 h-6 text-white" aria-hidden="true" />
+              <Icon className="w-4 h-4" style={{ color: '#1a56db' }} aria-hidden="true" />
             </div>
-            <span className={`app-badge app-badge--${action.tone}`}>{action.badge}</span>
+            <div className="app-list-card__title leading-tight">{action.title}</div>
           </div>
-          <div>
-            <div className="app-list-card__title">{action.title}</div>
-            <div className="app-list-card__description mt-2">{action.description}</div>
-          </div>
-          <div className="app-list-card__footer">
-            <span className="app-list-card__meta">
-              {action.group === 'workflow' ? 'Ruta principal' : 'Soporte operativo'}
-            </span>
-            <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#2563eb]">
-              Abrir
-              <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          <div className="app-list-card__description">{action.description}</div>
+          <div className="app-list-card__footer mt-auto pt-3">
+            <span className="inline-flex items-center gap-1 text-sm font-semibold" style={{ color: '#1a56db' }}>
+              Abrir <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
           </div>
         </button>
@@ -641,9 +635,8 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           initialAsignaturaId={selectedAsignaturaId}
           initialTemaId={selectedTemaId}
           onNavigateToBreadcrumb={handleBreadcrumbNavigation}
+          onSelectSubtema={handleSubtemaSelect}
           onManageSequences={(nextasignaturaId, nextasignaturaName, nextTemaId, nextTemaName) => {
-            // Salta a la gestión de secuencias dentro del mismo tema
-            // refrescando el contexto recibido por el callback.
             setSelectedasignaturaId(nextasignaturaId);
             setSelectedasignaturaName(nextasignaturaName);
             setSelectedTemaId(nextTemaId);
@@ -744,6 +737,12 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
           onBack={goBack}
           onHome={goHome}
           docenteAsignaturaId={selectedAsignaturaId || undefined}
+          initialTemaId={selectedTemaId || undefined}
+          initialSubtemaId={selectedSubtemaId || undefined}
+          initialContenidoId={selectedContenidoId || undefined}
+          flowAsignaturaName={selectedAsignaturaName || undefined}
+          flowTemaName={selectedTemaName || undefined}
+          flowSubtemaName={selectedSubtemaNombre || undefined}
         />
       </Suspense>
     );
@@ -834,6 +833,10 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             setNavigationHistory([]);
             setCurrentScreen('contents');
           }}
+          onGoToEjerciciosByContenido={(contenidoId) => {
+            setSelectedContenidoId(contenidoId);
+            navigateTo('ejercicios');
+          }}
         />
       </Suspense>
     );
@@ -874,6 +877,10 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
             setNavigationHistory([]);
             setCurrentScreen('contents');
           } : undefined}
+          onGoToEjerciciosByContenido={isContentManagementFlowScoped ? (contenidoId) => {
+            setSelectedContenidoId(contenidoId);
+            navigateTo('ejercicios');
+          } : undefined}
         />
       </Suspense>
     );
@@ -905,11 +912,13 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
 
             <div className="app-user-chip">
               <div className="app-user-chip__meta">
-                <p>Admin Usuario</p>
+                <p style={{ fontSize: '0.82rem' }}>{adminName || 'Administrador'}</p>
                 <p>Coordinador Académico</p>
               </div>
               <div className="app-user-avatar" aria-hidden="true">
-                <span className="text-xl">A</span>
+                <span className="text-base font-bold">
+                  {(adminName || 'A').charAt(0).toUpperCase()}
+                </span>
               </div>
               <button
                 type="button"
@@ -931,28 +940,28 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
         <section className="mb-8">
           <div className="app-section-head mb-4">
             <div>
-              <h2 className="app-section-title">Áreas académicas</h2>
-              <p className="app-section-description">Selecciona un área para gestionar sus temas, contenidos, ejercicios y miniproyectos.</p>
+              <h2 className="app-section-title">Asignaturas</h2>
+              <p className="app-section-description">Selecciona una asignatura para gestionar sus temas, contenidos, ejercicios y miniproyectos.</p>
             </div>
             <button
               type="button"
               onClick={() => navigateTo('asignaturas')}
               className="app-btn app-btn-primary flex items-center gap-2"
-              aria-label="Crear nueva asignatura"
+              aria-label="Gestionar asignaturas"
             >
-              <Plus className="w-4 h-4" />
-              <span>Nueva asignatura</span>
+              <FileEdit className="w-4 h-4" />
+              <span>Gestionar asignaturas</span>
             </button>
           </div>
 
           {loadingAsignaturas ? (
             <div className="flex justify-center py-10">
-              <Loader2 className="w-6 h-6 animate-spin text-[#4A90E2]" />
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#1a56db' }} />
             </div>
           ) : asignaturasList.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-500 text-sm">
               No hay asignaturas registradas.{' '}
-              <button type="button" onClick={() => navigateTo('asignaturas')} className="text-[#4A90E2] underline">
+              <button type="button" onClick={() => navigateTo('asignaturas')} className="underline" style={{ color: '#1a56db' }}>
                 Crear una ahora
               </button>
             </div>
@@ -963,27 +972,28 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
                   key={a.id}
                   type="button"
                   onClick={() => handleasignaturaselect(a.id, a.nombre)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-5 py-4 flex items-center gap-4 hover:border-[#4A90E2] hover:shadow-md transition-all text-left group"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-5 py-4 flex items-center gap-4 transition-all text-left group"
+                  style={{ borderLeft: '3px solid transparent' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderLeftColor = '#1a56db'; (e.currentTarget as HTMLElement).style.borderColor = '#bfd3f5'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderLeftColor = 'transparent'; (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0'; }}
                 >
-                  <div className="w-10 h-10 rounded-lg bg-[#4A90E2]/10 flex items-center justify-center shrink-0">
-                    <BookOpen className="w-5 h-5 text-[#4A90E2]" />
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#dbeafe' }}>
+                    <BookOpen className="w-5 h-5" style={{ color: '#1a56db' }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-[#1E293B] group-hover:text-[#4A90E2] transition-colors truncate">
-                      {a.nombre}
-                    </p>
+                    <p className="font-semibold text-[#1E293B] truncate">{a.nombre}</p>
                     {a.tipo_pilar && (
                       <p className="text-xs text-gray-400 mt-0.5">{a.tipo_pilar}</p>
                     )}
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#4A90E2] shrink-0 transition-colors" />
+                  <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
                 </button>
               ))}
             </div>
           )}
         </section>
 
-        {/* Herramientas de soporte — sin cambios */}
+        {/* Herramientas de soporte */}
         <section className="mb-8">
           <div className="app-section-head">
             <div>
@@ -991,7 +1001,9 @@ export function AdminDashboard({ onLogout, onNavigate }: AdminDashboardProps) {
               <p className="app-section-description">Usuarios, informes, carga masiva y servicios del sistema.</p>
             </div>
           </div>
-          <div className="app-card-grid">{supportActions.map(renderActionCard)}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.875rem' }}>
+            {supportActions.map(renderActionCard)}
+          </div>
         </section>
       </main>
 

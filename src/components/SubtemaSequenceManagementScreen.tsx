@@ -662,17 +662,11 @@ export function SubtemaSequenceManagementScreen({
 
 
     return filtered.filter(s => {
-
-      if (used.both.has(s.id) && s.id !== currentOrigenId) return false;
-
-      if (used.origin.has(s.id) && s.id !== currentOrigenId) return false;
-
-      if (currentDestinoId && s.id === currentDestinoId) return false;
-
+      if (used.both.has(s.id) && Number(s.id) !== Number(currentOrigenId)) return false;
+      if (used.origin.has(s.id) && Number(s.id) !== Number(currentOrigenId)) return false;
+      if (currentDestinoId && Number(s.id) === Number(currentDestinoId)) return false;
       if (currentDestinoId && hasExistingRelationBetween(s.id, currentDestinoId, currentSequenceId)) return false;
-
       return true;
-
     });
 
   };
@@ -716,19 +710,13 @@ export function SubtemaSequenceManagementScreen({
 
 
     return filtered.filter(s => {
-
-      if (used.both.has(s.id) && s.id !== currentDestinoId) return false;
-
-      if (used.destination.has(s.id) && s.id !== currentDestinoId) return false;
-
-      if (effectiveOrigenId && s.id === effectiveOrigenId) return false;
-
+      if (used.both.has(s.id) && Number(s.id) !== Number(currentDestinoId)) return false;
+      if (used.destination.has(s.id) && Number(s.id) !== Number(currentDestinoId)) return false;
+      // Excluir siempre el subtema seleccionado como origen
+      if (effectiveOrigenId && Number(s.id) === Number(effectiveOrigenId)) return false;
       if (!isEditMode && lockedOriginId && connectedSubtemaIds.has(Number(s.id))) return false;
-
       if (effectiveOrigenId && hasExistingRelationBetween(effectiveOrigenId, s.id, currentSequenceId)) return false;
-
       return true;
-
     });
 
   };
@@ -1164,25 +1152,29 @@ export function SubtemaSequenceManagementScreen({
 
 
   const handleEditSequence = (sequence: Sequence) => {
-
     setIsEditMode(true);
-
     setSelectedSequence(sequence);
-
     setFormData({
-
       subtema_origen_id: sequence.subtema_origen_id.toString(),
-
       subtema_destino_id: sequence.subtema_destino_id.toString(),
-
       descripcion: sequence.descripcion || '',
-
       estado: sequence.estado
-
     });
 
-    setShowCreateModal(true);
+    // Fijar contexto al tema actual para que los selects solo muestren subtemas del tema
+    if (temaId !== undefined) {
+      setModalSelectedTema(temaId.toString());
+      setModalSubtemas(subtemas.filter(s => Number(s.tema_id) === Number(temaId) && s.estado !== false));
+    } else if (asignaturaId !== undefined) {
+      setModalSelectedAsignatura(asignaturaId.toString());
+      const temasAsig = temas.filter(t => Number(t.asignatura_id) === Number(asignaturaId));
+      setModalTemas(temasAsig);
+      setModalSubtemas(subtemas.filter(s => temasAsig.some(t => Number(t.id) === Number(s.tema_id)) && s.estado !== false));
+    } else {
+      setModalSubtemas(subtemas.filter(s => s.estado !== false));
+    }
 
+    setShowCreateModal(true);
   };
 
 
@@ -1792,401 +1784,125 @@ export function SubtemaSequenceManagementScreen({
   return (
 
     <div className="app-shell">
-
+      {/* Header */}
       <header className="app-header">
-
         <div className="app-main py-4">
-
           <div className="app-page-header">
-
             <div className="app-brand-block">
-
-              <button
-
-                type="button"
-
-                onClick={onHome}
-
-                className="app-brand-icon"
-
-                title="Ir al panel principal"
-
-              >
-
+              <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-
               </button>
-
               <div>
-
-                <h1 className="text-[#3A4A5B]">Gestión de Secuencias de Subtemas</h1>
-
-                {asignaturaName && temaName && (
-
-                  <p className="text-gray-500 text-sm">Asignatura: {asignaturaName} → Tema: {temaName}</p>
-
-                )}
-
-                {asignaturaName && !temaName && (
-
-                  <p className="text-gray-500 text-sm">Asignatura: {asignaturaName}</p>
-
-                )}
-
-                {!asignaturaName && !temaName && (
-
-                  <p className="text-gray-500 text-sm">{isDocenteMode ? 'Panel docente - EduPath' : 'Panel de Administrador - EduPath'}</p>
-
-                )}
-
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
+                  Secuencia de subtemas
+                </p>
+                <h1 className="leading-tight">{temaName || asignaturaName || 'Secuencias'}</h1>
               </div>
-
             </div>
-
           </div>
-
         </div>
-
       </header>
 
-
-
       <main className="app-main">
-
-        <button
-
-          onClick={onBack}
-
-          className="app-back-button mb-6"
-
-        >
-
+        {/* Volver */}
+        <button onClick={onBack} className="app-back-button mb-3">
           <ArrowLeft className="w-4 h-4" />
-
-          <span>{temaId ? 'Volver a Temas' : (isDocenteMode ? 'Volver a Mis asignaturas' : 'Volver al Panel')}</span>
-
+          <span>Volver</span>
         </button>
 
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 mb-6 flex-wrap" style={{ fontSize: '13px' }}>
+          <button type="button" onClick={onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(0) : onHome}
+            className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>
+            {isDocenteMode ? 'Panel docente' : 'Panel admin'}
+          </button>
+          {asignaturaName && (<><span style={{ color: '#bfd3f5' }}>→</span>
+          <button type="button" onClick={onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(1) : onBack}
+            className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>{asignaturaName}</button></>)}
+          {temaName && (<><span style={{ color: '#bfd3f5' }}>→</span>
+          <button type="button" onClick={onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(2) : onBack}
+            className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>{temaName}</button></>)}
+          <span style={{ color: '#bfd3f5' }}>→</span>
+          <span style={{ color: '#1a56db', fontWeight: 700, background: '#dbeafe', padding: '2px 10px', borderRadius: '999px' }}>
+            Secuencias
+          </span>
+        </nav>
 
-
-        <AdminFlowGuide
-
-          title="Secuencia de subtemas"
-
-          description="Organización del orden de subtemas dentro del tema seleccionado."
-
-          breadcrumbs={[
-
-            { label: isDocenteMode ? 'Panel docente' : 'Panel admin', onClick: onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(0) : undefined },
-
-            { label: asignaturaName || 'Asignaturas', onClick: onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(1) : undefined },
-
-            { label: temaName || 'Temas', onClick: onNavigateToBreadcrumb ? () => onNavigateToBreadcrumb(2) : undefined },
-
-            { label: 'Secuencia de subtemas', current: true }
-
-          ]}
-
-          steps={[
-
-            { label: 'Asignaturas', helper: 'Asignatura registrada para la operación actual.', status: asignaturaName ? 'complete' : 'upcoming' },
-
-            { label: 'Temas', helper: 'Tema base de la secuencia académica.', status: temaName ? 'complete' : 'current' },
-
-            { label: 'Secuencias', helper: 'Ajuste del orden entre subtemas.', status: 'current' },
-
-            { label: 'Contenidos', helper: 'Acceso al nivel de contenidos por subtema.', status: 'upcoming' }
-
-          ]}
-
-          asideTitle="Siguiente paso"
-
-          asideDescription="La selección de un subtema habilita la secuencia de contenidos asociada."
-
-        />
-
-
-
-        <section className="app-page-hero mb-6">
-
-          <div className="app-page-hero__content">
-
-            <div className="app-page-hero__copy">
-
-              <div className="app-page-hero__eyebrow">Orden académico</div>
-
-              <h2 className="app-page-hero__title">Secuencia de subtemas</h2>
-
-              <p className="app-page-hero__description">
-
-                Consulta, ajusta y organiza la secuencia del tema seleccionado.
-
-              </p>
-
-            </div>
-
+        {/* Toolbar compacta */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          {/* Select Asignatura */}
+          {asignaturaId === undefined && (
+            <select
+              value={effectiveSelectedAsignatura}
+              onChange={e => handleFilterChange('Asignatura', e.target.value)}
+              className="rounded-xl px-3 text-sm font-medium outline-none"
+              style={{ background: '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '40px', minWidth: '200px' }}
+            >
+              <option value="">Todas las asignaturas</option>
+              {asignaturas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+            </select>
+          )}
+          {/* Select Tema */}
+          {temaId === undefined && (
+            <select
+              value={effectiveSelectedTema}
+              onChange={e => handleFilterChange('tema', e.target.value)}
+              disabled={!effectiveSelectedAsignatura}
+              className="rounded-xl px-3 text-sm font-medium outline-none disabled:opacity-50"
+              style={{ background: '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '40px', minWidth: '200px' }}
+            >
+              <option value="">Todos los temas</option>
+              {getFilteredTemas().map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+            </select>
+          )}
+          {/* Búsqueda */}
+          <div className="flex items-center gap-2 flex-1 min-w-[180px] rounded-xl px-3"
+            style={{ background: '#fff', border: '1.5px solid #bfd3f5', height: '40px' }}>
+            <Search className="w-4 h-4 shrink-0" style={{ color: '#4a7ac8' }} />
+            <input type="text" placeholder="Buscar secuencias..." value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="flex-1 outline-none text-sm bg-transparent" style={{ color: '#1e3a5f' }} />
           </div>
-
-
-
-          <div className="app-hero-layout app-hero-layout--balanced">
-
-            <div className="app-toolbar-card">
-
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-
-                <div>
-
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Filtros</p>
-
-                  <p className="mt-1 text-sm text-slate-600">Ajusta el listado por asignatura o tema antes de revisar el orden y las relaciones activas.</p>
-
-                </div>
-
-                <button
-
-                  onClick={() => {
-
-                    resetForm();
-
-                    setInsertAfterSequenceId(null);
-
-
-
-                    if (asignaturaId !== undefined && temaId !== undefined) {
-
-                      setModalSelectedAsignatura(asignaturaId.toString());
-
-                      setModalSelectedTema(temaId.toString());
-
-
-
-                      const subtemaFilter = subtemas.filter(s => Number(s.tema_id) === Number(temaId));
-
-                      setModalSubtemas(subtemaFilter);
-
-
-
-                      const temaFilter = temas.find(t => t.id === temaId);
-
-                      if (temaFilter) {
-
-                        setModalTemas([temaFilter]);
-
-                      }
-
-                    } else if (asignaturaId !== undefined) {
-
-                      setModalSelectedAsignatura(asignaturaId.toString());
-
-                      setModalSelectedTema('');
-
-
-
-                      const temasAsignatura = temas.filter(t => Number(t.asignatura_id) === Number(asignaturaId));
-
-                      setModalTemas(temasAsignatura);
-
-
-
-                      const subtemasAsignatura = subtemas.filter(s =>
-
-                        temasAsignatura.some(t => Number(t.id) === Number(s.tema_id))
-
-                      );
-
-                      setModalSubtemas(subtemasAsignatura);
-
-                    } else {
-
-                      setModalSelectedAsignatura('');
-
-                      setModalSelectedTema('');
-
-                      setModalTemas([]);
-
-                      setModalSubtemas(subtemas);
-
-                    }
-
-
-
-                    setShowCreateModal(true);
-
-                  }}
-
-                  className="app-btn app-btn-success"
-
-                >
-
-                  <Plus className="w-5 h-5" />
-
-                  <span>Crear secuencia</span>
-
-                </button>
-
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-
-            <div>
-
-              <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-
-                Asignatura
-
-              </label>
-
-              <select
-
-                value={effectiveSelectedAsignatura}
-
-                onChange={(e) => handleFilterChange('Asignatura', e.target.value)}
-
-                disabled={asignaturaId !== undefined}
-
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-
-              >
-
-                <option value="">Todas las asignaturas</option>
-
-                {asignaturas.map(Asignatura => (
-
-                  <option key={Asignatura.id} value={Asignatura.id}>
-
-                    {Asignatura.nombre}
-
-                  </option>
-
-                ))}
-
-              </select>
-
-            </div>
-
-
-
-            <div>
-
-              <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-
-                Tema
-
-              </label>
-
-              <select
-
-                value={effectiveSelectedTema}
-
-                onChange={(e) => handleFilterChange('tema', e.target.value)}
-
-                disabled={!effectiveSelectedAsignatura || temaId !== undefined}
-
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-
-              >
-
-                <option value="">Todos los temas</option>
-
-                {getFilteredTemas().map(tema => (
-
-                  <option key={tema.id} value={tema.id}>
-
-                    {tema.nombre}
-
-                  </option>
-
-                ))}
-
-              </select>
-
-            </div>
-
-              </div>
-
-            </div>
-
-
-
-            <div className="app-sidebar-stack">
-
-              <div className="app-soft-card app-soft-card--blue">
-
-                <div className="mb-4">
-
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda</p>
-
-                  <p className="mt-1 text-sm text-slate-600">Busca por origen, destino o descripción.</p>
-
-                </div>
-
-                <div className="app-toolbar-card__search app-search-field">
-
-                  <Search className="app-search-field__icon" />
-
-                  <input
-
-                    type="text"
-
-                    placeholder="Buscar secuencias"
-
-                    value={searchTerm}
-
-                    onChange={(e) => setSearchTerm(e.target.value)}
-
-                    className="app-form-input"
-
-                  />
-
-                </div>
-
-              </div>
-
-
-
-            </div>
-
-          </div>
-
-        </section>
+          {/* Crear */}
+          {!isDocenteMode && (
+            <button
+              onClick={() => {
+                resetForm(); setInsertAfterSequenceId(null);
+                if (asignaturaId !== undefined && temaId !== undefined) {
+                  setModalSelectedAsignatura(asignaturaId.toString());
+                  setModalSelectedTema(temaId.toString());
+                  setModalSubtemas(subtemas.filter(s => Number(s.tema_id) === Number(temaId)));
+                  const t = temas.find(t => t.id === temaId);
+                  if (t) setModalTemas([t]);
+                } else if (asignaturaId !== undefined) {
+                  setModalSelectedAsignatura(asignaturaId.toString());
+                  setModalSelectedTema('');
+                  const ta = temas.filter(t => Number(t.asignatura_id) === Number(asignaturaId));
+                  setModalTemas(ta);
+                  setModalSubtemas(subtemas.filter(s => ta.some(t => Number(t.id) === Number(s.tema_id))));
+                } else {
+                  setModalSelectedAsignatura(''); setModalSelectedTema(''); setModalTemas([]); setModalSubtemas(subtemas);
+                }
+                setShowCreateModal(true);
+              }}
+              className="flex items-center gap-2 text-white font-bold text-sm px-4 rounded-xl transition-all hover:opacity-90 shrink-0"
+              style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)', height: '40px', whiteSpace: 'nowrap' }}>
+              <Plus className="w-4 h-4" />
+              Crear secuencia
+            </button>
+          )}
+        </div>
 
 
 
         {error && (
-
-          <div className="app-alert app-alert--error mb-6">
-
-            <p>{error}</p>
-
-          </div>
-
+          <div className="app-alert app-alert--error mb-4"><p>{error}</p></div>
         )}
-
-        {success && (
-
-          <div className="app-alert app-alert--success mb-6">
-
-            <p>{success}</p>
-
-          </div>
-
-        )}
-
-
 
         {isLoadingData ? (
-
-          <div className="app-empty-panel py-12">
-
-            <div className="flex flex-col items-center gap-4">
-
-              <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
-
-              <p className="text-gray-600">Cargando secuencias...</p>
-
-            </div>
-
+          <div className="app-empty-panel py-12 flex flex-col items-center gap-3">
+            <Loader className="w-7 h-7 animate-spin" style={{ color: '#1a56db' }} />
+            <p style={{ color: '#4a6fa5' }}>Cargando secuencias...</p>
           </div>
 
         ) : (
@@ -2313,7 +2029,7 @@ export function SubtemaSequenceManagementScreen({
 
                             } ${
 
-                              isDraggedOver ? 'ring-2 ring-[#4A90E2] ring-offset-2' : ''
+                              isDraggedOver ? 'ring-2 ring-[#1a56db] ring-offset-2' : ''
 
                             }`}
 
@@ -2321,7 +2037,7 @@ export function SubtemaSequenceManagementScreen({
 
                           >
 
-                            <span className="app-sequence-node__type" style={{ backgroundColor: '#7ED6A7' }}>
+                            <span className="app-sequence-node__type" style={{ backgroundColor: '#1a56db' }}>
 
                               Subtema
 
@@ -2405,13 +2121,13 @@ export function SubtemaSequenceManagementScreen({
 
                           className="app-sequence-card"
 
-                          style={{ borderColor: '#7ED6A733' }}
+                          style={{ borderColor: '#1a56db33' }}
 
                           title={`Gestionar contenidos de ${origen?.nombre}`}
 
                         >
 
-                          <span className="app-sequence-card__label" style={{ backgroundColor: '#7ED6A7' }}>
+                          <span className="app-sequence-card__label" style={{ backgroundColor: '#1a56db' }}>
 
                             Origen
 
@@ -2445,13 +2161,13 @@ export function SubtemaSequenceManagementScreen({
 
                           className="app-sequence-card"
 
-                          style={{ borderColor: '#7ED6A733' }}
+                          style={{ borderColor: '#1a56db33' }}
 
                           title={`Gestionar contenidos de ${destino?.nombre}`}
 
                         >
 
-                          <span className="app-sequence-card__label" style={{ backgroundColor: '#7ED6A7' }}>
+                          <span className="app-sequence-card__label" style={{ backgroundColor: '#1a56db' }}>
 
                             Destino
 
@@ -2473,62 +2189,29 @@ export function SubtemaSequenceManagementScreen({
 
 
 
-                      <div className="app-action-row">
-
+                      <div className="flex items-center gap-2">
                         {!isDocenteMode && (
-
-                          <button
-
-                            onClick={() => handleToggleEstado(sequence.id, sequence.estado)}
-
+                          <button onClick={() => handleToggleEstado(sequence.id, sequence.estado)}
                             disabled={isLoading}
-
-                            className={`app-btn app-btn-icon app-btn-sm ${sequence.estado ? 'app-btn-secondary' : 'app-btn-success'}`}
-
-                            title={sequence.estado ? 'Desactivar' : 'Activar'}
-
-                          >
-
-                            {sequence.estado ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-
+                            className="flex items-center justify-center rounded-lg transition-all hover:opacity-80 disabled:opacity-40"
+                            style={{ width:'32px', height:'32px', ...(sequence.estado ? { background:'#fef2f2', color:'#b91c1c' } : { background:'#ecfdf5', color:'#047857' }) }}
+                            title={sequence.estado ? 'Desactivar' : 'Activar'}>
+                            {sequence.estado ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
-
                         )}
-
-
-
-                        <button
-
-                          onClick={() => handleEditSequence(sequence)}
-
-                          className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
-
-                          title="Editar"
-
-                        >
-
+                        <button onClick={() => handleEditSequence(sequence)}
+                          className="flex items-center justify-center rounded-lg transition-all hover:opacity-80"
+                          style={{ width:'32px', height:'32px', background:'#dbeafe', color:'#1a56db' }}
+                          title="Editar">
                           <Edit className="w-4 h-4" />
-
                         </button>
-
-
-
-                        <button
-
-                          onClick={() => handleDeleteSequence(sequence.id)}
-
+                        <button onClick={() => handleDeleteSequence(sequence.id)}
                           disabled={isLoading}
-
-                          className="app-btn app-btn-danger app-btn-icon app-btn-sm disabled:opacity-50"
-
-                          title="Eliminar"
-
-                        >
-
+                          className="flex items-center justify-center rounded-lg transition-all hover:opacity-80 disabled:opacity-40"
+                          style={{ width:'32px', height:'32px', background:'#fef2f2', color:'#b91c1c' }}
+                          title="Eliminar">
                           <Trash2 className="w-4 h-4" />
-
                         </button>
-
                       </div>
 
                     </div>
@@ -2552,413 +2235,131 @@ export function SubtemaSequenceManagementScreen({
 
 
       {/* Modal Crear/Editar Secuencia */}
-
       {showCreateModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center"
+          style={{ background: 'rgba(10,20,50,0.45)', backdropFilter: 'blur(4px)' }}
+          onClick={() => { setShowCreateModal(false); resetForm(); }}>
+          <div className="rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+            style={{ width: '460px', maxHeight: '90vh', background: '#fff' }}
+            onClick={e => e.stopPropagation()}>
 
-        <div className="app-modal-overlay app-modal-overlay--top">
-
-          <div className="app-modal-card app-modal-card--lg">
-
-            <div className="app-modal-header">
-
+            {/* Cabecera azul */}
+            <div style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
               <div>
-
-              <div className="app-modal-kicker">Secuencias</div>
-
-              <h2 className="app-modal-title">
-
-                {isEditMode ? 'Editar secuencia' : 'Crear secuencia'}
-
-              </h2>
-
+                <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)' }}>Secuencias</p>
+                <h3 style={{ color: '#fff', fontWeight: 700, fontSize: '18px', marginTop: '4px' }}>
+                  {isEditMode ? 'Editar secuencia' : 'Crear secuencia'}
+                </h3>
               </div>
-
-              <button
-
-                onClick={() => {
-
-                  setShowCreateModal(false);
-
-                  resetForm();
-
-                  setInsertAfterSequenceId(null);
-
-                  setModalSelectedAsignatura('');
-
-                  setModalSelectedTema('');
-
-                  setModalTemas([]);
-
-                  setModalSubtemas([]);
-
-                }}
-
-                className="app-modal-close"
-
-              >
-
-                ✕
-
+              <button type="button"
+                onClick={() => { setShowCreateModal(false); resetForm(); setModalSelectedAsignatura(''); setModalSelectedTema(''); setModalTemas([]); setModalSubtemas([]); }}
+                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: '8px', color: '#fff', cursor: 'pointer', padding: '6px', lineHeight: 0 }}>
+                <span style={{ fontSize: '14px', fontWeight: 700 }}>✕</span>
               </button>
-
             </div>
 
+            {/* Cuerpo */}
+            <form onSubmit={isEditMode ? handleUpdateSequence : handleCreateSequence}
+              style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-
-            <div className="app-modal-scroll">
-
-            <div className="app-form-layout">
-
-            <form onSubmit={isEditMode ? handleUpdateSequence : handleCreateSequence} className="space-y-4">
-
-              {/* Filtros en Modal */}
-
-              <div className="bg-gray-50 p-4 rounded-lg mb-6">
-
-                <h4 className="text-sm font-medium text-[#3A4A5B] mb-3">Filtrar subtemas</h4>
-
-                <div className="grid grid-cols-2 gap-3">
-
-                  <div>
-
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-
-                      Asignatura
-
-                    </label>
-
-                    <select
-
-                      value={effectiveModalSelectedAsignatura}
-
-                      onChange={(e) => handleModalFilterChange('Asignatura', e.target.value)}
-
-                      disabled={asignaturaId !== undefined}
-
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-
-                    >
-
-                      <option value="">Todas las asignaturas</option>
-
-                      {asignaturas.map(Asignatura => (
-
-                        <option key={Asignatura.id} value={Asignatura.id}>
-
-                          {Asignatura.nombre}
-
-                        </option>
-
-                      ))}
-
-                    </select>
-
+              {/* Filtros contexto */}
+              {(asignaturaId === undefined || temaId === undefined) && (
+                <div style={{ background: '#f0f5ff', borderRadius: '12px', padding: '12px 14px', border: '1.5px solid #bfd3f5' }}>
+                  <p style={{ fontSize: '11px', fontWeight: 600, color: '#4a6fa5', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Contexto</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    {asignaturaId === undefined && (
+                      <div>
+                        <label style={{ fontSize: '11px', fontWeight: 600, color: '#1e3a5f', display: 'block', marginBottom: '4px' }}>Asignatura</label>
+                        <select value={effectiveModalSelectedAsignatura}
+                          onChange={e => handleModalFilterChange('Asignatura', e.target.value)}
+                          disabled={asignaturaId !== undefined}
+                          className="app-form-select" style={{ fontSize: '12px', minHeight: 'unset', padding: '6px 10px' }}>
+                          <option value="">Todas</option>
+                          {asignaturas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {temaId === undefined && (
+                      <div>
+                        <label style={{ fontSize: '11px', fontWeight: 600, color: '#1e3a5f', display: 'block', marginBottom: '4px' }}>Tema</label>
+                        <select value={effectiveModalSelectedTema}
+                          onChange={e => handleModalFilterChange('tema', e.target.value)}
+                          disabled={!effectiveModalSelectedAsignatura || temaId !== undefined}
+                          className="app-form-select" style={{ fontSize: '12px', minHeight: 'unset', padding: '6px 10px' }}>
+                          <option value="">Todos</option>
+                          {effectiveModalTemas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                        </select>
+                      </div>
+                    )}
                   </div>
-
-
-
-                  <div>
-
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-
-                      Tema
-
-                    </label>
-
-                    <select
-
-                      value={effectiveModalSelectedTema}
-
-                      onChange={(e) => handleModalFilterChange('tema', e.target.value)}
-
-                      disabled={!effectiveModalSelectedAsignatura || temaId !== undefined}
-
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-
-                    >
-
-                      <option value="">Todos los temas</option>
-
-                      {effectiveModalTemas.map(tema => (
-
-                        <option key={tema.id} value={tema.id}>
-
-                          {tema.nombre}
-
-                        </option>
-
-                      ))}
-
-                    </select>
-
-                  </div>
-
                 </div>
-
-              </div>
-
-
+              )}
 
               {/* Subtema Origen */}
-
-              <div>
-
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-
-                  Subtema Origen *
-
-                </label>
-
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#1e3a5f' }}>Subtema Origen *</label>
                 {(() => {
-
                   const { lockedOriginId } = getModalChainContext();
-
                   const isOriginLocked = Boolean(lockedOriginId && !isEditMode);
-
                   return (
-
-                <select
-
-                  name="subtema_origen_id"
-
-                  value={formData.subtema_origen_id}
-
-                  onChange={handleInputChange}
-
-                  disabled={isOriginLocked}
-
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-
-                  required
-
-                >
-
-                  <option value="">Seleccionar subtema de origen</option>
-
-                  {getAvailableOriginModalSubtemas().map(s => (
-
-                    <option key={s.id} value={s.id}>
-
-                      {s.nombre}
-
-                    </option>
-
-                  ))}
-
-                </select>
-
+                    <select name="subtema_origen_id" value={formData.subtema_origen_id}
+                      onChange={handleInputChange} disabled={isOriginLocked} required
+                      className="app-form-select" style={{ fontSize: '13px' }}>
+                      <option value="">Seleccionar origen</option>
+                      {getAvailableOriginModalSubtemas().map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                    </select>
                   );
-
                 })()}
-
                 {!isEditMode && getModalChainContext().lockedOriginId && (
-
-                  <p className="mt-2 text-xs text-gray-500">
-
-                    El origen se definió con base en la secuencia actual.
-
-                  </p>
-
+                  <p style={{ fontSize: '11px', color: '#4a6fa5' }}>El origen se definió con base en la secuencia actual.</p>
                 )}
-
               </div>
-
-
 
               {/* Subtema Destino */}
-
-              <div>
-
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-
-                  Subtema Destino *
-
-                </label>
-
-                <select
-
-                  name="subtema_destino_id"
-
-                  value={formData.subtema_destino_id}
-
-                  onChange={handleInputChange}
-
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-
-                  required
-
-                >
-
-                  <option value="">Seleccionar subtema de destino</option>
-
-                  {getAvailableDestinationModalSubtemas().map(s => (
-
-                    <option key={s.id} value={s.id}>
-
-                      {s.nombre}
-
-                    </option>
-
-                  ))}
-
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#1e3a5f' }}>Subtema Destino *</label>
+                <select name="subtema_destino_id" value={formData.subtema_destino_id}
+                  onChange={handleInputChange} required className="app-form-select" style={{ fontSize: '13px' }}>
+                  <option value="">Seleccionar destino</option>
+                  {getAvailableDestinationModalSubtemas().map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                 </select>
-
-                {isEditMode && selectedSequence && formData.subtema_origen_id && Number(formData.subtema_origen_id) !== Number(selectedSequence.subtema_origen_id) && (
-
-                  <p className="mt-2 text-xs text-gray-500">
-
-                    El destino se mantiene para conservar la continuidad de la cadena.
-
-                  </p>
-
-                )}
-
               </div>
-
-
 
               {/* Descripción */}
-
-              <div>
-
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-
-                  Descripción (opcional)
-
-                </label>
-
-                <textarea
-
-                  name="descripcion"
-
-                  value={formData.descripcion}
-
-                  onChange={handleInputChange}
-
-                  placeholder="Descripción de la relación"
-
-                  rows={3}
-
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-
-                />
-
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#1e3a5f' }}>Descripción (opcional)</label>
+                <textarea name="descripcion" value={formData.descripcion} onChange={handleInputChange}
+                  placeholder="Descripción de la relación" rows={3}
+                  className="app-form-textarea" style={{ fontSize: '13px', minHeight: '80px' }} />
               </div>
-
-
 
               {/* Estado */}
-
-              <div>
-
-                <label className="block text-sm font-medium text-[#3A4A5B] mb-2">
-
-                  Estado
-
-                </label>
-
-                <select
-
-                  name="estado"
-
-                  value={formData.estado ? 'true' : 'false'}
-
-                  onChange={handleInputChange}
-
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent"
-
-                >
-
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#1e3a5f' }}>Estado</label>
+                <select name="estado" value={formData.estado ? 'true' : 'false'}
+                  onChange={handleInputChange} className="app-form-select" style={{ fontSize: '13px' }}>
                   <option value="true">Activo</option>
-
                   <option value="false">Inactivo</option>
-
                 </select>
-
               </div>
-
-
-
-              {/* Botones */}
-
-              <div className="app-form-footer mt-6 border-t-0 px-0 pb-0">
-
-                <button
-
-                  type="button"
-
-                  onClick={() => {
-
-                    setShowCreateModal(false);
-
-                    resetForm();
-
-                    setModalSelectedAsignatura('');
-
-                    setModalSelectedTema('');
-
-                    setModalTemas([]);
-
-                    setModalSubtemas([]);
-
-                  }}
-
-                  disabled={isLoading}
-
-                  className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
-
-                >
-
-                  Cancelar
-
-                </button>
-
-                <button
-
-                  type="submit"
-
-                  disabled={isLoading}
-
-                  className="px-6 py-2 bg-gradient-to-r from-[#7ED6A7] to-[#90E0B7] text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
-
-                >
-
-                  {isLoading ? (
-
-                    <>
-
-                      <Loader className="w-4 h-4 animate-spin" />
-
-                      <span>{isEditMode ? 'Actualizando...' : 'Creando...'}</span>
-
-                    </>
-
-                  ) : (
-
-                    <>
-
-                      <Plus className="w-4 h-4" />
-
-                      <span>{isEditMode ? 'Actualizar secuencia' : 'Crear secuencia'}</span>
-
-                    </>
-
-                  )}
-
-                </button>
-
-              </div>
-
             </form>
 
+            {/* Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '14px 22px', borderTop: '1px solid #bfd3f5', background: '#f0f5ff', flexShrink: 0 }}>
+              <button type="button"
+                onClick={() => { setShowCreateModal(false); resetForm(); setModalSelectedAsignatura(''); setModalSelectedTema(''); setModalTemas([]); setModalSubtemas([]); }}
+                disabled={isLoading}
+                style={{ padding: '9px 18px', borderRadius: '10px', border: '1.5px solid #bfd3f5', background: '#fff', color: '#1e3a5f', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button type="button" onClick={isEditMode ? handleUpdateSequence as any : handleCreateSequence as any}
+                disabled={isLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 22px', borderRadius: '10px', background: isLoading ? '#6b8fc8' : 'linear-gradient(135deg, #1a56db, #142d61)', color: '#fff', fontWeight: 700, fontSize: '13px', border: 'none', cursor: isLoading ? 'not-allowed' : 'pointer' }}>
+                {isLoading ? <><Loader className="w-4 h-4 animate-spin" />{isEditMode ? 'Actualizando...' : 'Creando...'}</> : <>{isEditMode ? 'Actualizar' : 'Crear secuencia'}</>}
+              </button>
             </div>
-
-            </div>
-
           </div>
-
         </div>
-
       )}
 
     </div>

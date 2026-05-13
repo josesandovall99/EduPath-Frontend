@@ -32,6 +32,15 @@ interface ExerciseManagementScreenProps {
 
   docenteAsignaturaId?: number;
 
+  /** Pre-filtros desde el flujo de contenidos */
+  initialTemaId?: number;
+  initialSubtemaId?: number;
+  initialContenidoId?: string;
+  /** Nombres para el breadcrumb del flujo */
+  flowAsignaturaName?: string;
+  flowTemaName?: string;
+  flowSubtemaName?: string;
+
 }
 
 
@@ -2226,7 +2235,17 @@ export function ExerciseManagementScreen({
 
   docenteAsignaturaId,
 
+  initialTemaId,
+  initialSubtemaId,
+  initialContenidoId,
+  flowAsignaturaName,
+  flowTemaName,
+  flowSubtemaName,
+
 }: ExerciseManagementScreenProps) {
+
+  // Ref para skip del reset de filtros en la carga inicial (cuando vienen pre-seteados)
+  const isInitialFilterLoad = useRef(true);
 
   const [ejercicios, setEjercicios] = useState<EjercicioItem[]>([]);
 
@@ -2325,8 +2344,9 @@ export function ExerciseManagementScreen({
   const [filterAsignaturaId, setFilterAsignaturaId] = useState<string>(
     docenteAsignaturaId ? String(docenteAsignaturaId) : ''
   );
-  const [filterTemaId, setFilterTemaId] = useState<string>('');
-  const [filterSubtemaId, setFilterSubtemaId] = useState<string>('');
+  const [filterTemaId, setFilterTemaId] = useState<string>(initialTemaId ? String(initialTemaId) : '');
+  const [filterSubtemaId, setFilterSubtemaId] = useState<string>(initialSubtemaId ? String(initialSubtemaId) : '');
+  const [filterContenidoId, setFilterContenidoId] = useState<string>(initialContenidoId ?? '');
   // Temas y subtemas cargados según el filtro de asignatura/tema seleccionado.
   const [filterTemas, setFilterTemas] = useState<{ id: number; nombre: string }[]>([]);
   const [filterSubtemas, setFilterSubtemas] = useState<{ id: number; nombre: string }[]>([]);
@@ -2435,20 +2455,30 @@ export function ExerciseManagementScreen({
   }, [docenteAsignaturaId, isDocenteMode]);
 
   // ── Cascada de filtros de lista ───────────────────────────────────────────
-  // Al cambiar la asignatura, recarga temas y limpia los filtros inferiores.
+  // Efecto 1: resetea filtros inferiores SOLO cuando el usuario cambia la asignatura
+  // (no cuando temasOptions se actualiza en background)
   useEffect(() => {
+    if (isInitialFilterLoad.current) {
+      // Primera ejecución — no resetear los valores que vienen del flujo
+      isInitialFilterLoad.current = false;
+      return;
+    }
+    // El usuario cambió la asignatura manualmente → limpiar cascada
     setFilterTemaId('');
     setFilterSubtemaId('');
     setFilterSubtemas([]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterAsignaturaId]);
+
+  // Efecto 2: carga las opciones de tema cuando cambia asignatura o cuando temasOptions carga
+  useEffect(() => {
     if (!filterAsignaturaId) { setFilterTemas([]); return; }
-    // Primero intenta filtrar desde los temas ya cargados en memoria
     const temasFiltrados = temasOptions.filter(
       (t) => String(t.asignatura_id) === filterAsignaturaId
     );
     if (temasFiltrados.length > 0) {
       setFilterTemas(temasFiltrados);
     } else {
-      // Si no están en memoria (área activa recién seleccionada), los pide al backend
       fetch(`${API_BASE_URL}/temas/por-asignatura/${filterAsignaturaId}`, {
         headers: getAuthHeaders(),
         credentials: 'include',
@@ -2459,14 +2489,24 @@ export function ExerciseManagementScreen({
     }
   }, [filterAsignaturaId, temasOptions]);
 
-  // Al cambiar el tema, recarga subtemas y limpia el filtro de subtema.
+  // Al cambiar el tema, recarga subtemas con fallback API.
   useEffect(() => {
-    setFilterSubtemaId('');
     if (!filterTemaId) { setFilterSubtemas([]); return; }
     const subtemasFiltrados = subtemasOptions.filter(
       (s) => String(s.tema_id) === filterTemaId
     );
-    setFilterSubtemas(subtemasFiltrados);
+    if (subtemasFiltrados.length > 0) {
+      setFilterSubtemas(subtemasFiltrados);
+    } else {
+      // Fallback: pide subtemas del tema al backend
+      fetch(`${API_BASE_URL}/subtemas/por-tema/${filterTemaId}`, {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      })
+        .then((r) => r.ok ? r.json() : [])
+        .then((data) => setFilterSubtemas(Array.isArray(data) ? data : []))
+        .catch(() => setFilterSubtemas([]));
+    }
   }, [filterTemaId, subtemasOptions]);
 
 
@@ -2983,19 +3023,8 @@ export function ExerciseManagementScreen({
 
 
 
-      toast.success(`Ejercicio ${updatedEstado ? 'habilitado' : 'inhabilitado'}`, {
-
-        description: `"${item.actividad?.titulo || `Ejercicio #${item.id}`}" cambió de estado correctamente.`
-
-      });
-
     } catch (err) {
-
-      toast.error('Error al cambiar estado', {
-
-        description: err instanceof Error ? err.message : 'No se pudo actualizar el ejercicio'
-
-      });
+      console.error('Error al cambiar estado:', err);
 
     }
 
@@ -3012,12 +3041,13 @@ export function ExerciseManagementScreen({
         stateFilter === 'all' ||
         (stateFilter === 'active' ? isEjercicioActivo(ejercicio) : !isEjercicioActivo(ejercicio));
 
-      // Filtros jerárquicos — resuelven la asignatura/tema/subtema via el contenido asociado.
-      if (filterAsignaturaId || filterTemaId || filterSubtemaId) {
+      // Filtros jerárquicos — resuelven la asignatura/tema/subtema/contenido via el contenido asociado.
+      if (filterAsignaturaId || filterTemaId || filterSubtemaId || filterContenidoId) {
         const contenido = contenidoMap.get(Number(ejercicio.contenido_id));
         if (filterAsignaturaId && String(contenido?.asignatura_id ?? '') !== filterAsignaturaId) return false;
-        if (filterTemaId      && String(contenido?.tema_id      ?? '') !== filterTemaId)       return false;
-        if (filterSubtemaId   && String(contenido?.subtema_id   ?? '') !== filterSubtemaId)    return false;
+        if (filterTemaId       && String(contenido?.tema_id       ?? '') !== filterTemaId)       return false;
+        if (filterSubtemaId    && String(contenido?.subtema_id    ?? '') !== filterSubtemaId)    return false;
+        if (filterContenidoId  && String(ejercicio.contenido_id   ?? '') !== filterContenidoId)  return false;
       }
 
       const searchableText = [
@@ -3033,7 +3063,7 @@ export function ExerciseManagementScreen({
 
       return matchesState && matchesSearch;
     });
-  }, [ejercicios, searchTerm, stateFilter, filterAsignaturaId, filterTemaId, filterSubtemaId, contenidosOptions]);
+  }, [ejercicios, searchTerm, stateFilter, filterAsignaturaId, filterTemaId, filterSubtemaId, filterContenidoId, contenidosOptions]);
 
 
 
@@ -3045,14 +3075,11 @@ export function ExerciseManagementScreen({
 
     setValidationErrors({});
 
+    // Pre-llenar con los filtros activos (flujo o selección manual)
     setContentFilters({
-
-      asignaturaId: isDocenteMode && docenteAsignaturaId ? String(docenteAsignaturaId) : '',
-
-      temaId: '',
-
-      subtemaId: ''
-
+      asignaturaId: filterAsignaturaId || (docenteAsignaturaId ? String(docenteAsignaturaId) : ''),
+      temaId: filterTemaId || '',
+      subtemaId: filterSubtemaId || '',
     });
 
     setFormData({
@@ -3071,7 +3098,7 @@ export function ExerciseManagementScreen({
 
       ejercicio: {
 
-        contenido_id: '',
+        contenido_id: filterContenidoId || initialContenidoId || '',
 
         puntos: '',
 
@@ -3397,9 +3424,21 @@ export function ExerciseManagementScreen({
 
   ].filter(Boolean).length;
 
-  const activeExercisesCount = ejercicios.filter((ejercicio) => isEjercicioActivo(ejercicio)).length;
-
-  const inactiveExercisesCount = Math.max(0, ejercicios.length - activeExercisesCount);
+  // Contadores basados en la misma lógica de filtrado jerárquico (sin filtro de estado)
+  // para que coincidan con lo que se muestra en la tabla al cambiar el estado.
+  const contenidoMapForCount = new Map(contenidosOptions.map((c) => [c.id, c]));
+  const jerarchicallyVisible = ejercicios.filter((ejercicio) => {
+    if (filterAsignaturaId || filterTemaId || filterSubtemaId || filterContenidoId) {
+      const contenido = contenidoMapForCount.get(Number(ejercicio.contenido_id));
+      if (filterAsignaturaId && String(contenido?.asignatura_id ?? '') !== filterAsignaturaId) return false;
+      if (filterTemaId       && String(contenido?.tema_id       ?? '') !== filterTemaId)       return false;
+      if (filterSubtemaId    && String(contenido?.subtema_id    ?? '') !== filterSubtemaId)    return false;
+      if (filterContenidoId  && String(ejercicio.contenido_id   ?? '') !== filterContenidoId)  return false;
+    }
+    return true;
+  });
+  const activeExercisesCount   = jerarchicallyVisible.filter(isEjercicioActivo).length;
+  const inactiveExercisesCount = Math.max(0, jerarchicallyVisible.length - activeExercisesCount);
 
   const exerciseTypesCount = new Set(ejercicios.map((ejercicio) => ejercicio.tipo_ejercicio).filter(Boolean)).size;
 
@@ -3919,326 +3958,131 @@ export function ExerciseManagementScreen({
 
     <div className="app-shell">
 
+      {/* Header */}
       <header className="app-header">
-
         <div className="app-main py-4">
-
           <div className="app-page-header">
-
             <div className="app-brand-block">
-
-              <button type="button" onClick={onHome} title="Ir al panel principal">
-
-                <div className="app-brand-icon">
-
-                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-
-                </div>
-
+              <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
+                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </button>
-
               <div>
-
-                <h1 className="text-[#3A4A5B]">Gestión de ejercicios</h1>
-
-                <p className="text-sm text-slate-500">Catálogo, estado y edición dentro del mismo entorno administrativo.</p>
-
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
+                  Gestión de ejercicios
+                </p>
+                <h1 className="leading-tight">Ejercicios</h1>
               </div>
-
             </div>
-
-            <div className="app-user-chip">
-
-              <div className="app-user-chip__meta">
-
-                <p>{isDocenteMode ? 'Panel docente' : 'Panel de administrador'}</p>
-
-                <p>{currentStateLabel}</p>
-
-              </div>
-
-              <div className="app-user-avatar">
-
-                <Eye className="h-5 w-5" />
-
-              </div>
-
-            </div>
-
           </div>
-
         </div>
-
       </header>
 
-
-
       <main className="app-main">
-
-        <button onClick={onBack} className="app-back-button mb-6">
-
+        {/* Volver */}
+        <button onClick={onBack} className="app-back-button mb-3">
           <ArrowLeft className="w-4 h-4" />
-
-          <span>Volver al Panel</span>
-
+          <span>Volver</span>
         </button>
 
+        {/* Breadcrumb — con flujo si viene desde contenidos */}
+        <nav className="flex items-center gap-2 mb-6 flex-wrap" style={{ fontSize: '13px' }}>
+          <button type="button" onClick={onHome} className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>
+            {isDocenteMode ? 'Panel docente' : 'Panel admin'}
+          </button>
+          {flowAsignaturaName && (<><span style={{ color: '#bfd3f5' }}>→</span>
+            <button type="button" onClick={onBack} className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>{flowAsignaturaName}</button></>)}
+          {flowTemaName && (<><span style={{ color: '#bfd3f5' }}>→</span>
+            <button type="button" onClick={onBack} className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>{flowTemaName}</button></>)}
+          {flowSubtemaName && (<><span style={{ color: '#bfd3f5' }}>→</span>
+            <button type="button" onClick={onBack} className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>{flowSubtemaName}</button></>)}
+          <span style={{ color: '#bfd3f5' }}>→</span>
+          <span style={{ color: '#1a56db', fontWeight: 700, background: '#dbeafe', padding: '2px 10px', borderRadius: '999px' }}>
+            Ejercicios
+          </span>
+        </nav>
 
-
-        <section className="app-page-hero mb-6">
-
-          <div className="app-page-hero__content">
-
-            <div className="app-page-hero__copy">
-
-              <div className="app-page-hero__eyebrow">Gestión Generalizada</div>
-
-              <h2 className="app-page-hero__title">Gestión de ejercicios</h2>
-
-              <p className="app-page-hero__description">
-
-                Consulta, filtra y actualiza ejercicios.
-
-              </p>
-
-            </div>
-
-
-
-            <div className="app-hero-metrics">
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">Catálogo</div>
-
-                <div className="app-hero-metric__value">{ejercicios.length}</div>
-
-                <div className="app-hero-metric__help">Registros totales disponibles.</div>
-
-              </div>
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">Visibles</div>
-
-                <div className="app-hero-metric__value">{filteredEjercicios.length}</div>
-
-                <div className="app-hero-metric__help">Resultados según búsqueda y estado.</div>
-
-              </div>
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">Activos</div>
-
-                <div className="app-hero-metric__value">{activeExercisesCount}</div>
-
-                <div className="app-hero-metric__help">Ejercicios habilitados actualmente.</div>
-
-              </div>
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">Cobertura</div>
-
-                <div className="app-hero-metric__value">{exerciseTypesCount}</div>
-
-                <div className="app-hero-metric__help">Tipos distintos presentes en el catálogo.</div>
-
-              </div>
-
-            </div>
-
+        {/* Toolbar principal */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          {/* Pills estado */}
+          <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: '40px' }}>
+            {[
+              { key: 'all',      label: `Todos (${jerarchicallyVisible.length})` },
+              { key: 'active',   label: `Activos (${activeExercisesCount})` },
+              { key: 'inactive', label: `Inactivos (${inactiveExercisesCount})` },
+            ].map(f => (
+              <button key={f.key} type="button" onClick={() => setStateFilter(f.key as any)}
+                className="px-3 py-1 rounded-lg text-sm font-semibold transition-all"
+                style={{ background: stateFilter === f.key ? '#1a56db' : 'transparent', color: stateFilter === f.key ? '#fff' : '#4a6fa5' }}>
+                {f.label}
+              </button>
+            ))}
           </div>
-
-
-
-          <div className="app-hero-layout app-hero-layout--aside">
-
-            <div className="app-toolbar-card">
-
-              <div className="app-hero-panel">
-
-                <div className="app-hero-panel__header">
-
-                  <div className="app-hero-panel__copy">
-
-                    <p className="app-hero-panel__eyebrow">Catálogo</p>
-
-                    <h3 className="app-hero-panel__title">Estado del ejercicio</h3>
-
-                    <p className="app-hero-panel__description">Filtra por estado.</p>
-
-                  </div>
-
-                  <button onClick={openCreate} className="app-btn app-btn-success">
-
-                    <Plus className="w-4 h-4" />
-
-                    <span>Nuevo ejercicio</span>
-
-                  </button>
-
-                </div>
-
-                <div className="app-hero-panel__body">
-
-                  <div className="app-filter-row">
-
-                    <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
-
-                      <span>Todos ({ejercicios.length})</span>
-
-                    </button>
-
-                    <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>
-
-                      <Eye className="h-4 w-4 shrink-0" />
-
-                      <span>Activos ({activeExercisesCount})</span>
-
-                    </button>
-
-                    <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>
-
-                      <EyeOff className="h-4 w-4 shrink-0" />
-
-                      <span>Inactivos ({inactiveExercisesCount})</span>
-
-                    </button>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            </div>
-
-
-
-            <div className="app-sidebar-stack">
-
-              <div className="app-toolbar-card">
-
-                <div className="app-hero-panel">
-
-                  <div className="app-hero-panel__copy">
-
-                    <p className="app-hero-panel__eyebrow">Búsqueda</p>
-
-                    <h3 className="app-hero-panel__title">Buscar ejercicio</h3>
-
-                    <p className="app-hero-panel__description">Busca por título, tipo o contenido.</p>
-
-                  </div>
-
-                  <div className="app-hero-panel__body">
-
-                    <div className="app-search-field">
-
-                      <Search className="app-search-field__icon" />
-
-                      <input
-
-                        type="text"
-
-                        value={searchTerm}
-
-                        onChange={(event) => setSearchTerm(event.target.value)}
-
-                        placeholder="Buscar ejercicios"
-
-                        className="app-form-input"
-
-                      />
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            </div>
-
+          {/* Búsqueda */}
+          <div className="flex items-center gap-2 flex-1 min-w-[180px] rounded-xl px-3"
+            style={{ background: '#fff', border: '1.5px solid #bfd3f5', height: '40px' }}>
+            <Search className="w-4 h-4 shrink-0" style={{ color: '#4a7ac8' }} />
+            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Buscar ejercicio..." className="flex-1 outline-none text-sm bg-transparent"
+              style={{ color: '#1e3a5f' }} />
           </div>
-
-        </section>
-
-        {/* Filtros jerárquicos por asignatura / tema / subtema */}
-        <section className="app-toolbar-card mb-6">
-          <div className="mb-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              {docenteAsignaturaId || isDocenteMode ? 'Filtrar por tema y subtema' : 'Filtrar por asignatura, tema y subtema'}
-            </p>
-            <p className="mt-0.5 text-sm text-slate-500">Acota el listado según la jerarquía académica.</p>
-          </div>
-
-          {/* Asignatura — solo visible en modo global (sin área activa) */}
-          {!docenteAsignaturaId && !isDocenteMode && (
-            <div className="mb-4">
-              <label className="app-form-label mb-1 block">Asignatura</label>
-              <select
-                value={filterAsignaturaId}
-                onChange={(e) => setFilterAsignaturaId(e.target.value)}
-                className="app-form-select"
-                aria-label="Filtrar por asignatura"
-              >
-                <option value="">Todas las asignaturas</option>
-                {asignaturasOptions.map((a) => (
-                  <option key={a.id} value={String(a.id)}>{a.nombre}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Tema y Subtema — siempre visibles, uno al lado del otro */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="app-form-label mb-1 block">Tema</label>
-              <select
-                value={filterTemaId}
-                onChange={(e) => setFilterTemaId(e.target.value)}
-                disabled={filterTemas.length === 0}
-                className="app-form-select disabled:bg-slate-100 disabled:cursor-not-allowed"
-                aria-label="Filtrar por tema"
-              >
-                <option value="">Todos los temas</option>
-                {filterTemas.map((t) => (
-                  <option key={t.id} value={String(t.id)}>{t.nombre}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="app-form-label mb-1 block">Subtema</label>
-              <select
-                value={filterSubtemaId}
-                onChange={(e) => setFilterSubtemaId(e.target.value)}
-                disabled={!filterTemaId || filterSubtemas.length === 0}
-                className="app-form-select disabled:bg-slate-100 disabled:cursor-not-allowed"
-                aria-label="Filtrar por subtema"
-              >
-                <option value="">Todos los subtemas</option>
-                {filterSubtemas.map((s) => (
-                  <option key={s.id} value={String(s.id)}>{s.nombre}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {(filterAsignaturaId || filterTemaId || filterSubtemaId) && (
-            <button
-              type="button"
-              onClick={() => { setFilterAsignaturaId(isDocenteMode && docenteAsignaturaId ? String(docenteAsignaturaId) : ''); setFilterTemaId(''); setFilterSubtemaId(''); }}
-              className="mt-3 text-xs font-semibold text-slate-500 hover:text-rose-500 transition-colors"
-            >
-              Limpiar filtros
+          {/* Nuevo */}
+          {!isDocenteMode && (
+            <button onClick={openCreate}
+              className="flex items-center gap-2 text-white font-bold text-sm px-4 rounded-xl transition-all hover:opacity-90 shrink-0"
+              style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)', height: '40px', whiteSpace: 'nowrap' }}>
+              <Plus className="w-4 h-4" />
+              Nuevo ejercicio
             </button>
           )}
-        </section>
+        </div>
+
+        {/* Filtros contextuales */}
+        <div className="flex flex-col gap-2 mb-6">
+          {!docenteAsignaturaId && !isDocenteMode && (
+            <select value={filterAsignaturaId} onChange={e => { setFilterAsignaturaId(e.target.value); setFilterTemaId(''); setFilterSubtemaId(''); setFilterContenidoId(''); }}
+              className="rounded-xl px-3 text-sm font-medium outline-none w-full"
+              style={{ background: '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '38px', width: '100%' }}>
+              <option value="">Todas las asignaturas</option>
+              {asignaturasOptions.map(a => <option key={a.id} value={String(a.id)}>{a.nombre}</option>)}
+            </select>
+          )}
+          <select value={filterTemaId} onChange={e => { setFilterTemaId(e.target.value); setFilterSubtemaId(''); setFilterContenidoId(''); }}
+            disabled={filterTemas.length === 0 || !!initialTemaId}
+            className="rounded-xl px-3 text-sm font-medium outline-none disabled:opacity-70 w-full"
+            style={{ background: initialTemaId ? '#f0f5ff' : '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '38px', width: '100%' }}>
+            <option value="">Todos los temas</option>
+            {filterTemas.map(t => <option key={t.id} value={String(t.id)}>{t.nombre}</option>)}
+          </select>
+          <select value={filterSubtemaId} onChange={e => { setFilterSubtemaId(e.target.value); setFilterContenidoId(''); }}
+            disabled={!filterTemaId || filterSubtemas.length === 0 || !!initialSubtemaId}
+            className="rounded-xl px-3 text-sm font-medium outline-none disabled:opacity-70 w-full"
+            style={{ background: initialSubtemaId ? '#f0f5ff' : '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '38px', width: '100%' }}>
+            <option value="">Todos los subtemas</option>
+            {filterSubtemas.map(s => <option key={s.id} value={String(s.id)}>{s.nombre}</option>)}
+          </select>
+          {/* Filtro por contenido */}
+          <select value={filterContenidoId} onChange={e => setFilterContenidoId(e.target.value)}
+            disabled={(contenidosOptions.filter(c => !filterSubtemaId || String(c.subtema_id) === filterSubtemaId).length === 0) || !!initialContenidoId}
+            className="rounded-xl px-3 text-sm font-medium outline-none disabled:opacity-70 w-full"
+            style={{ background: initialContenidoId ? '#f0f5ff' : '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '38px', width: '100%' }}>
+            <option value="">Todos los contenidos</option>
+            {contenidosOptions
+              .filter(c => !filterSubtemaId || String(c.subtema_id) === filterSubtemaId)
+              .filter(c => !filterTemaId    || String(c.tema_id)    === filterTemaId)
+              .map(c => <option key={c.id} value={String(c.id)}>{c.titulo}</option>)}
+          </select>
+          {/* Solo mostrar si hay filtros manuales activos (no el de asignatura bloqueado) */}
+          {(filterTemaId || filterSubtemaId || filterContenidoId || (filterAsignaturaId && !docenteAsignaturaId)) && (
+            <div>
+              <button type="button"
+                onClick={() => { setFilterAsignaturaId(docenteAsignaturaId ? String(docenteAsignaturaId) : ''); setFilterTemaId(''); setFilterSubtemaId(''); setFilterContenidoId(''); }}
+                className="text-xs font-semibold rounded-lg px-3 transition-all hover:opacity-80"
+                style={{ height: '38px', background: '#fef2f2', color: '#b91c1c' }}>
+                Limpiar filtros
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Loading */}
 
@@ -4306,96 +4150,41 @@ export function ExerciseManagementScreen({
 
                     return (
 
-                    <tr key={e.id} className={ejercicioActivo ? '' : 'bg-slate-50/80'}>
-
-                      <td className="text-[#3A4A5B]">{e.actividad?.titulo || `Ejercicio #${e.id}`}</td>
-
-                      <td>
-
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-
-                          e.tipo_ejercicio === 'Compilador' ? 'bg-blue-100 text-blue-700' :
-
-                          e.tipo_ejercicio === 'Diagramas UML' ? 'bg-purple-100 text-purple-700' :
-
-                          'bg-green-100 text-green-700'
-
-                        }`}>
-
-                          {e.tipo_ejercicio || 'Compilador'}
-
-                        </span>
-
+                    <tr key={e.id} className={ejercicioActivo ? '' : 'opacity-60'}>
+                      <td style={{ color: '#1e3a5f', fontWeight: 500, fontSize: '13.5px' }}>
+                        {e.actividad?.titulo || `Ejercicio #${e.id}`}
                       </td>
-
-                      <td>{e.contenido?.titulo || e.Contenido?.titulo || `Contenido ID ${e.contenido_id}`}</td>
-
-                      <td>{e.puntos}</td>
-
-                      <td>{e.actividad?.nivel_dificultad || '-'}</td>
-
-                      <td>
-
-                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-
-                          ejercicioActivo
-
-                            ? 'bg-emerald-100 text-emerald-700'
-
-                            : 'bg-amber-100 text-amber-700'
-
-                        }`}>
-
-                          {ejercicioActivo ? 'Activo' : 'Inhabilitado'}
-
-                        </span>
-
+                      <td style={{ color: '#4a6fa5', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                        {e.tipo_ejercicio || 'Compilador'}
                       </td>
-
-                      <td className="align-middle">
-
-                        <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-
-                          <button
-
-                            onClick={() => openEdit(e)}
-
-                            className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
-
-                            title="Editar"
-
-                          >
-
-                            <Edit className="w-4 h-4" />
-
+                      <td style={{ color: '#475569', fontSize: '13px' }}>
+                        {e.contenido?.titulo || e.Contenido?.titulo || `Contenido ID ${e.contenido_id}`}
+                      </td>
+                      <td style={{ color: '#1a56db', fontSize: '13px', fontWeight: 600 }}>
+                        {e.puntos}
+                      </td>
+                      <td style={{ color: '#475569', fontSize: '13px', textTransform: 'capitalize' }}>
+                        {e.actividad?.nivel_dificultad || '-'}
+                      </td>
+                      <td style={{ color: ejercicioActivo ? '#1a56db' : '#b45309', fontSize: '13px', fontWeight: 500 }}>
+                        {ejercicioActivo ? 'Activo' : 'Inhabilitado'}
+                      </td>
+                      <td>
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => openEdit(e)}
+                            className="flex items-center justify-center rounded-lg transition-all hover:opacity-80"
+                            style={{ width: '28px', height: '28px', background: '#dbeafe', color: '#1a56db' }}
+                            title="Editar">
+                            <Edit className="w-3 h-3" />
                           </button>
-
-                          <button
-
-                            onClick={() => handleToggleEstado(e)}
-
-                            className={`app-btn app-btn-secondary app-btn-sm ${
-
-                              ejercicioActivo
-
-                                ? 'text-amber-700'
-
-                                : 'text-emerald-700'
-
-                            }`}
-
-                            title={ejercicioActivo ? 'Inhabilitar ejercicio' : 'Habilitar ejercicio'}
-
-                          >
-
-                            {ejercicioActivo ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-
-                            <span>{ejercicioActivo ? 'Inhabilitar' : 'Habilitar'}</span>
-
+                          <button onClick={() => handleToggleEstado(e)}
+                            className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                            style={ejercicioActivo ? { background: '#fef2f2', color: '#b91c1c' } : { background: '#ecfdf5', color: '#047857' }}
+                            title={ejercicioActivo ? 'Inhabilitar' : 'Habilitar'}>
+                            {ejercicioActivo ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            {ejercicioActivo ? 'Inhabilitar' : 'Habilitar'}
                           </button>
-
                         </div>
-
                       </td>
 
                     </tr>

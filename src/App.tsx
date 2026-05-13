@@ -557,6 +557,7 @@ export default function App() {
         {currentScreen === 'admin-dashboard' && (
           <AdminDashboard
             onLogout={handleLogout}
+            adminName={adminSession?.nombre}
             onNavigate={(section) => {
               if (section === 'themes') setCurrentScreen('admin-themes');
               if (section === 'contents') setCurrentScreen('admin-contents');
@@ -711,26 +712,39 @@ export default function App() {
       </Suspense>
 
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-[#3A4A5B]">Confirmar cierre de sesión</h3>
-              <p className="text-sm text-gray-500 mt-1">La sesión actual será cerrada al confirmar.</p>
-            </div>
-            <div className="px-6 py-4 flex items-center justify-end gap-3 bg-gray-50">
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center"
+          style={{ background: 'rgba(10,20,50,0.45)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowLogoutConfirm(false)}
+        >
+          <div
+            className="rounded-2xl shadow-2xl"
+            style={{ width: '380px', background: '#fff', padding: '32px 28px 24px' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="font-bold text-lg mb-2" style={{ color: '#1e3a5f' }}>
+              ¿Deseas cerrar sesión?
+            </h3>
+            <p className="text-sm leading-relaxed" style={{ color: '#4a6fa5' }}>
+              ¿Confirmas que deseas cerrar sesión?
+            </p>
+
+            <div className="flex items-center justify-center gap-3 mt-7">
               <button
                 type="button"
                 onClick={() => setShowLogoutConfirm(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-all"
+                className="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80"
+                style={{ background: '#fff', color: '#1e3a5f', border: '1.5px solid #bfd3f5' }}
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={executeLogout}
-                className="px-4 py-2 bg-[#4A90E2] text-white rounded-lg hover:bg-[#3B82F6] transition-all"
+                className="px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)' }}
               >
-                Sí, cerrar sesión
+                Cerrar sesión
               </button>
             </div>
           </div>

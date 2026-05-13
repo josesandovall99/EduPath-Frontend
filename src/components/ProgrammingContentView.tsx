@@ -1983,34 +1983,27 @@ export function ProgrammingContentView({ content, onBack, onComplete, embedded =
 
       {!embedded && (
 
-        <header className="border-b border-gray-200 bg-white shadow-sm">
+        <header className="app-header">
 
           <div className="mx-auto max-w-full px-6 py-4 lg:px-8">
 
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="app-page-header">
 
-              <div className="flex min-w-0 items-center gap-4">
+              <div className="app-brand-block">
 
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white p-2.5 shadow-md">
-
-                  <img src={logoImage} alt="EduPath" className="h-full w-full object-contain" />
-
+                <div className="app-brand-icon">
+                  <img src={logoImage} alt="Logo UDES" className="h-full w-full object-contain" />
                 </div>
 
                 <div className="min-w-0">
-
-                  <h1 className="truncate font-bold text-[#3A4A5B]">Fundamentos de Programacion</h1>
-
-                  <p className="truncate text-sm text-gray-500">{content.title}</p>
-
+                  <h1 className="truncate">Fundamentos de Programación</h1>
+                  <p className="truncate text-sm">{content.title}</p>
                 </div>
 
               </div>
 
-              <div className="rounded-lg px-4 py-2 font-mono text-sm shadow-sm" style={{ backgroundColor: `${subjectColor}15`, color: subjectColor }}>
-
+              <div className="rounded-lg px-4 py-2 font-mono text-sm font-bold" style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }}>
                 Java
-
               </div>
 
             </div>

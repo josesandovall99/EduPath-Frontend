@@ -2130,224 +2130,72 @@ export function MiniproyectoManagementScreen({
 
     <div className="app-shell">
 
+      {/* Header */}
       <header className="app-header">
-
         <div className="app-main py-4">
-
           <div className="app-page-header">
-
             <div className="app-brand-block">
-
-              <button type="button" onClick={onHome} title="Ir al panel principal">
-
-                <div className="app-brand-icon">
-
-                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-
-                </div>
-
+              <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
+                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
               </button>
-
               <div>
-
-                <h1 className="text-[#3A4A5B]">Gestión de Miniproyectos</h1>
-
-                <p className="text-gray-500 text-sm">Listado, edición y seguimiento dentro del mismo lenguaje visual del panel.</p>
-
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
+                  Gestión de miniproyectos
+                </p>
+                <h1 className="leading-tight">Miniproyectos</h1>
               </div>
-
             </div>
-
-
-
-            <div className="app-action-row">
-
-              <button
-
-                onClick={openCreateModal}
-
-                className="app-btn app-primary-btn"
-
-              >
-
-                <Plus className="w-4 h-4" />
-
-                <span>Crear configurable</span>
-
-              </button>
-
-              <button
-
-                onClick={loadMiniproyectos}
-
-                className="app-btn app-btn-secondary"
-
-              >
-
-                <RefreshCw className="w-4 h-4" />
-
-                <span>Actualizar</span>
-
-              </button>
-
-            </div>
-
           </div>
-
         </div>
-
       </header>
 
-
-
       <main className="app-main">
-
-        <button onClick={onBack} className="app-back-button mb-6">
-
+        {/* Volver */}
+        <button onClick={onBack} className="app-back-button mb-3">
           <ArrowLeft className="w-4 h-4" />
-
-          <span>Volver al Panel</span>
-
+          <span>Volver</span>
         </button>
 
-
-
-        <section className="app-page-hero app-miniproyecto-hero mb-5">
-
-          <div className="app-miniproyecto-hero-grid">
-
-            <div className="app-miniproyecto-hero-main">
-
-              <div className="app-page-hero__copy">
-
-              <div className="app-page-hero__eyebrow">Edición docente</div>
-
-              <h2 className="app-page-hero__title">Gestión de miniproyectos</h2>
-
-              <p className="app-page-hero__description">Administra el catálogo y trabaja el editor desde una composición compacta y coherente con el panel.</p>
-
-              </div>
-
-
-
-              <div className="app-toolbar-card app-miniproyecto-toolbar app-miniproyecto-toolbar--hero">
-
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-
-                  <div>
-
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Catálogo visible</p>
-
-                    <p className="mt-1 text-sm text-slate-600">Selecciona un asignatura y filtra por título o nivel.</p>
-
-                  </div>
-
-                  <div className="max-w-full truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
-
-                    {resultadosMostrados} visibles
-
-                  </div>
-
-                </div>
-
-                {/* Oculto cuando hay area activa — admin con contexto o docente */}
-                {!docenteAsignaturaId && !isDocenteMode && (
-                  <div className="mb-3">
-                    <label className="app-form-label">Asignatura</label>
-                    <select
-                      value={selectedAsignaturaFilterId}
-                      onChange={(event) => setSelectedAsignaturaFilterId(event.target.value)}
-                      className="app-form-select"
-                    >
-                      <option value="">Todas las asignaturas</option>
-                      {availableAsignaturas.map((Asignatura) => (
-                        <option key={Asignatura.id} value={String(Asignatura.id)}>{Asignatura.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="app-search-field">
-
-                  <Search className="app-search-field__icon" />
-
-                  <input
-
-                    value={query}
-
-                    onChange={(event) => setQuery(event.target.value)}
-
-                    placeholder="Buscar por título o nivel"
-
-                    className="app-form-input"
-
-                  />
-
-                </div>
-
-              </div>
-
-            </div>
-
-
-
-            <aside className="app-miniproyecto-hero-side">
-
-            <div className="app-hero-metrics app-miniproyecto-hero-metrics">
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">Catálogo</div>
-
-                <div className="app-hero-metric__value">{isDocenteMode ? totalMiniproyectos : asignaturasRepresented}</div>
-
-                <div className="app-hero-metric__help">{isDocenteMode ? 'Miniproyectos registrados.' : 'Asignaturas con miniproyectos visibles.'}</div>
-
-              </div>
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">Asignados</div>
-
-                <div className="app-hero-metric__value">{publishedMiniproyectos}</div>
-
-                <div className="app-hero-metric__help">Miniproyecto actual del asignatura.</div>
-
-              </div>
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">Activos</div>
-
-                <div className="app-hero-metric__value">{activeMiniproyectos}</div>
-
-                <div className="app-hero-metric__help">Disponibles en el flujo principal.</div>
-
-              </div>
-
-            </div>
-
-
-
-            <div className="app-soft-card app-context-card app-miniproyecto-hero-context">
-
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Proyecto activo</p>
-
-              <p className="app-context-card__title">{selectedMiniproyectoTitle}</p>
-
-              <p className="app-context-card__text">Asignatura seleccionada: {selectedAsignaturaFilterName}</p>
-
-              <p className="app-context-card__text">Asignatura del registro: {selectedMiniproyectoAsignatura}</p>
-
-              <p className="app-context-card__text">Editor: {selectedEditorMode}</p>
-
-            </div>
-
-            </aside>
-
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 mb-6 flex-wrap" style={{ fontSize: '13px' }}>
+          <button type="button" onClick={onHome} className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>
+            {isDocenteMode ? 'Panel docente' : 'Panel admin'}
+          </button>
+          <span style={{ color: '#bfd3f5' }}>→</span>
+          <span style={{ color: '#1a56db', fontWeight: 700, background: '#dbeafe', padding: '2px 10px', borderRadius: '999px' }}>
+            Miniproyectos
+          </span>
+        </nav>
+
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          {/* Asignatura — solo en modo global */}
+          {!docenteAsignaturaId && !isDocenteMode && (
+            <select value={selectedAsignaturaFilterId} onChange={e => setSelectedAsignaturaFilterId(e.target.value)}
+              className="rounded-xl px-3 text-sm font-medium outline-none flex-1"
+              style={{ background: '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '40px', minWidth: '180px' }}>
+              <option value="">Todas las asignaturas</option>
+              {availableAsignaturas.map(a => <option key={a.id} value={String(a.id)}>{a.nombre}</option>)}
+            </select>
+          )}
+          {/* Búsqueda */}
+          <div className="flex items-center gap-2 flex-1 min-w-[180px] rounded-xl px-3"
+            style={{ background: '#fff', border: '1.5px solid #bfd3f5', height: '40px' }}>
+            <Search className="w-4 h-4 shrink-0" style={{ color: '#4a7ac8' }} />
+            <input value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="Buscar por título o nivel..."
+              className="flex-1 outline-none text-sm bg-transparent" style={{ color: '#1e3a5f' }} />
           </div>
-
-        </section>
+          {/* Nuevo */}
+          {!isDocenteMode && (
+            <button onClick={openCreateModal}
+              className="flex items-center gap-2 text-white font-bold text-sm px-4 rounded-xl transition-all hover:opacity-90 shrink-0"
+              style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)', height: '40px', whiteSpace: 'nowrap' }}>
+              <Plus className="w-4 h-4" />
+              Nuevo miniproyecto
+            </button>
+          )}
+        </div>
 
 
 
@@ -2355,16 +2203,9 @@ export function MiniproyectoManagementScreen({
 
           <section className="app-table-card">
 
-            <div className="app-table-card__header app-table-card__header--blue">
-
-              <div>
-
-                <div className="app-table-card__title">Listado de miniproyectos</div>
-
-                <p className="app-table-card__description">Selecciona un registro para cargarlo en el editor lateral.</p>
-
-              </div>
-
+            <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0' }}>
+              <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Listado de miniproyectos</p>
+              <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Selecciona un registro para cargarlo en el editor lateral.</p>
             </div>
 
             <div className="app-table-card__body app-miniproyecto-table-body">
@@ -2449,76 +2290,49 @@ export function MiniproyectoManagementScreen({
 
                           onClick={() => handleSelect(item)}
 
-                          className={`app-list-card app-list-card--compact app-miniproyecto-catalog-card w-full border-2 ${selected?.id === item.id ? 'shadow-lg translate-y-[-1px]' : ''}`}
-
-                          style={
-
-                            selected?.id === item.id
-
-                              ? {
-
-                                  borderColor: '#4A90E2',
-
-                                  backgroundColor: '#F8FBFF'
-
-                                }
-
-                              : {
-
-                                  borderColor: index % 3 === 0 ? '#BFDBFE' : index % 3 === 1 ? '#BBF7D0' : '#FDE68A',
-
-                                  backgroundColor: '#FFFFFF'
-
-                                }
-
-                          }
-
+                          className={`app-list-card app-list-card--compact app-miniproyecto-catalog-card w-full`}
+                          style={{
+                            borderColor: selected?.id === item.id ? '#1a56db' : '#bfd3f5',
+                            borderWidth: selected?.id === item.id ? '2px' : '1.5px',
+                            backgroundColor: selected?.id === item.id ? '#f0f5ff' : '#fff',
+                          }}
                         >
 
                           <div className="app-list-card__head app-miniproyecto-catalog-card__head">
 
                             <div className="min-w-0 flex-1">
 
-                              <div className="mb-3 flex flex-wrap items-center gap-2">
-
-                                <span className={`app-badge ${item.Actividad?.estado !== false ? 'app-badge--green' : 'app-badge--amber'}`}>
-
-                                  {item.Actividad?.estado !== false ? 'Activo' : 'Inhabilitado'}
-
-                                </span>
-
-                                <span className="app-badge app-badge--blue">{item.Actividad?.nivel_dificultad || 'Nivel no definido'}</span>
-
-                                {item.seleccionadoParaEstudiantes ? (
-
-                                  <span className="app-badge app-badge--green">Miniproyecto del asignatura</span>
-
-                                ) : null}
-
+                              {/* Badge estado esquina derecha */}
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex flex-wrap gap-1.5">
+                                  <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '999px',
+                                    ...(item.Actividad?.estado !== false ? { background: '#dbeafe', color: '#1a56db' } : { background: '#fef3c7', color: '#b45309' }) }}>
+                                    {item.Actividad?.estado !== false ? 'Activo' : 'Inhabilitado'}
+                                  </span>
+                                  <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '999px', background: '#e0e7ff', color: '#4338ca', textTransform: 'capitalize' }}>
+                                    {item.Actividad?.nivel_dificultad || 'Sin nivel'}
+                                  </span>
+                                  {item.seleccionadoParaEstudiantes && (
+                                    <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '999px', background: '#dcfce7', color: '#166534' }}>
+                                      Asignado
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-
-                              <h3 className="app-list-card__title uppercase">{item.Actividad?.titulo || 'Sin título'}</h3>
-
-                              <p className="app-list-card__description mt-1.5">{item.Asignatura?.nombre || 'Sin asignatura asignada'}</p>
-
+                              <h3 className="app-list-card__title" style={{ fontSize: '13px', lineHeight: 1.4 }}>{item.Actividad?.titulo || 'Sin título'}</h3>
                             </div>
-
-                            <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#4A90E2] app-miniproyecto-catalog-card__action">
-
-                              <ClipboardList className="w-4 h-4" />
-
+                            <div className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg shrink-0 self-start"
+                              style={{ background: '#dbeafe', color: '#1a56db' }}>
+                              <ClipboardList className="w-3 h-3" />
                               <span>Editar</span>
-
                             </div>
 
                           </div>
 
                           <div className="app-list-card__footer">
-
-                            <span className="app-list-card__meta">{item.chatbots?.length ? `${item.chatbots.length} chatbot(s) vinculados` : 'Sin chatbot vinculado'}</span>
-
-                            <span className="app-list-card__meta">Actividad #{item.actividad_id || item.Actividad?.id || item.id}</span>
-
+                            <span className="app-list-card__meta" style={{ fontSize: '11px' }}>
+                              {item.chatbots?.length ? `${item.chatbots.length} chatbot(s) vinculados` : 'Sin chatbot vinculado'}
+                            </span>
                           </div>
 
                         </button>
@@ -2549,16 +2363,25 @@ export function MiniproyectoManagementScreen({
 
           <section className="app-table-card">
 
-            <div className={`app-table-card__header ${selected ? 'app-table-card__header--green' : ''}`}>
-
+            <div style={{
+              background: selected ? '#dbeafe' : '#f0f5ff',
+              padding: '14px 18px',
+              borderRadius: '0.875rem 0.875rem 0 0',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
               <div>
-
-                <div className="app-table-card__title">Editor de miniproyecto</div>
-
-                <p className="app-table-card__description">Ajusta la ficha del registro seleccionado y conserva el mismo orden visual que en el resto del panel.</p>
-
+                <p style={{ color: '#1a56db', fontWeight: 700, fontSize: '15px' }}>Editor de miniproyecto</p>
+                <p style={{ color: '#4a6fa5', fontSize: '12px', marginTop: '2px' }}>
+                  {selected ? `Editando: ${selected.Actividad?.titulo || 'Sin título'}` : 'Selecciona un miniproyecto para editar sus datos.'}
+                </p>
               </div>
-
+              {selected && (
+                <button type="button" onClick={() => setSelected(null)}
+                  style={{ background: 'rgba(26,86,219,0.1)', border: '1px solid #bfd3f5', borderRadius: '8px', color: '#1a56db', cursor: 'pointer', padding: '6px', lineHeight: 0 }}
+                  title="Cerrar editor">
+                  <span style={{ fontSize: '14px', fontWeight: 700 }}>✕</span>
+                </button>
+              )}
             </div>
 
             <div className="app-table-card__body app-miniproyecto-table-body">
@@ -2989,68 +2812,41 @@ export function MiniproyectoManagementScreen({
 
                         </p>
 
-                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+                        <div className="grid grid-cols-3 gap-3">
 
                           {mvcCasosPrueba.map((caso, idx) => (
 
-                            <div key={idx} className="space-y-2 bg-white rounded-xl border border-blue-100 p-4 shadow-sm">
-
-                              <div className="text-xs font-semibold uppercase tracking-wide text-[#3A4A5B]">Caso {idx + 1}</div>
-
+                            <div key={idx} className="space-y-3 rounded-xl" style={{ background: '#fff', border: '1.5px solid #bfd3f5', padding: '16px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: '#1a56db' }}>Caso {idx + 1}</span>
+                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>#{idx + 1} / 3</span>
+                              </div>
                               <div>
-
-                                <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Inputs (stdin)</label>
-
+                                <label className="block text-xs font-medium mb-1" style={{ color: '#1e3a5f' }}>Inputs</label>
                                 <input
-
                                   type="text"
-
                                   value={caso.inputs}
-
                                   onChange={(e) => {
-
                                     const next = mvcCasosPrueba.map((c, i) => i === idx ? { ...c, inputs: e.target.value } : c);
-
                                     setMvcCasosPrueba(next);
-
                                   }}
-
                                   placeholder="Ej: 4,12000,10"
-
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] text-sm font-mono"
-
+                                  className="app-form-input font-mono" style={{ fontSize: '12px' }}
                                 />
-
                               </div>
-
                               <div>
-
-                                <label className="block text-xs font-medium text-[#3A4A5B] mb-1">Output esperado *</label>
-
+                                <label className="block text-xs font-medium mb-1" style={{ color: '#1e3a5f' }}>Output esperado *</label>
                                 <textarea
-
-                                  rows={4}
-
+                                  rows={8}
                                   value={caso.output}
-
                                   onChange={(e) => {
-
                                     const next = mvcCasosPrueba.map((c, i) => i === idx ? { ...c, output: e.target.value } : c);
-
                                     setMvcCasosPrueba(next);
-
                                   }}
-
                                   placeholder={"Total: 48000.0\nDescuento: 4800.0\nTotal a pagar: 43200.0"}
-
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90E2] text-sm font-mono resize-none"
-
+                                  className="app-form-textarea font-mono" style={{ fontSize: '12px', minHeight: '180px' }}
                                 />
-
-                                <p className="mt-0.5 text-[10px] text-gray-400 font-mono">una línea por cada println</p>
-
                               </div>
-
                             </div>
 
                           ))}
@@ -3785,49 +3581,6 @@ export function MiniproyectoManagementScreen({
 
 
 
-                <section className="app-form-section app-form-section--accent app-miniproyecto-summary-section">
-
-                  <h4 className="app-form-section-title">Resumen del registro</h4>
-
-                  <div className="app-miniproyecto-summary-grid mt-4 text-sm">
-
-                    <div className="app-form-summary-card">
-
-                      <div className="app-form-summary-label">Proyecto</div>
-
-                      <div className="app-form-summary-value">{selectedMiniproyectoTitle}</div>
-
-                      <div className="app-form-summary-help">{selectedMiniproyectoAsignatura}</div>
-
-                    </div>
-
-                    <div className="app-form-summary-card">
-
-                      <div className="app-form-summary-label">Editor</div>
-
-                      <div className="app-form-summary-value">{selectedEditorMode}</div>
-
-                    </div>
-
-                    <div className="app-form-summary-card">
-
-                      <div className="app-form-summary-label">Estado</div>
-
-                      <div className="app-form-summary-value">{selected?.Actividad?.estado !== false ? 'Activo' : 'Inhabilitado'}</div>
-
-                    </div>
-
-                    <div className="app-form-summary-card">
-
-                      <div className="app-form-summary-label">Estudiantes</div>
-
-                      <div className="app-form-summary-value">{selected?.seleccionadoParaEstudiantes ? 'Asignado al asignatura' : 'No asignado'}</div>
-
-                    </div>
-
-                  </div>
-
-                </section>
 
 
 
@@ -3859,20 +3612,11 @@ export function MiniproyectoManagementScreen({
 
                   </button>
 
-                  <button
-
-                    type="submit"
-
-                    disabled={isSaving}
-
-                    className="app-btn app-primary-btn disabled:opacity-70"
-
-                  >
-
+                  <button type="submit" disabled={isSaving}
+                    className="flex items-center gap-2 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-60"
+                    style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)' }}>
                     <Save className="w-4 h-4" />
-
                     {isSaving ? 'Guardando...' : 'Guardar cambios'}
-
                   </button>
 
                 </div>

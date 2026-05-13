@@ -652,6 +652,18 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   const [rankingAsignaturaFilter, setRankingAsignaturaFilter] = useState<string>('all');
 
   const [selectedAreaByStudent, setSelectedAreaByStudent] = useState<{[studentId: string]: string}>({});
+  const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
+  const [exportAllAsignaturas, setExportAllAsignaturas] = useState(false);
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [studentSortOrder, setStudentSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Cerrar menú exportar al hacer clic fuera
+  useEffect(() => {
+    if (!showExportOptions) return;
+    const handler = () => setShowExportOptions(false);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [showExportOptions]);
 
   const [failuresPeriodo, setFailuresPeriodo] = useState<string>('all');
 
@@ -1528,6 +1540,170 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
 
+  // Genera PDF limpio desde los datos — sin capturar DOM con estilos de UI
+  const printStudentReport = () => {
+    const student = detailStudentId
+      ? studentTabStudents.find(s => String(s.id) === detailStudentId)
+      : studentTabStudents[0];
+    if (!student) return;
+
+    const currentStudentKey = detailStudentId || String(student.id || '');
+    const selectedArea = selectedAreaByStudent[currentStudentKey];
+    const isAllSubjects = exportAllAsignaturas || !selectedArea;
+    const asignaturaLabel = isAllSubjects ? 'Todas las asignaturas' : selectedArea;
+
+    const fecha = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+    const avgGeneral = student.subjects.length
+      ? student.subjects.reduce((a, s) => a + s.progress, 0) / student.subjects.length : 0;
+
+    // Filtrar asignaturas según selección
+    const subjectsToShow = student.subjects.filter(s => isAllSubjects || s.name === selectedArea);
+
+    // Tarjetas simétricas — barra de progreso + stats sin línea divisoria
+    const subjectCardsHTML = subjectsToShow.map(s => `
+      <div style="border:1.5px solid #bfd3f5;border-radius:8px;padding:12px;display:flex;flex-direction:column;">
+        <div style="font-size:10px;font-weight:800;color:#111;text-transform:uppercase;letter-spacing:.04em;line-height:1.35;min-height:30px;">${s.name}</div>
+        <div style="margin-top:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:9px;color:#666;">Progreso</span>
+            <span style="font-size:13px;font-weight:800;color:#111;">${Math.round(s.progress)}%</span>
+          </div>
+          <div style="height:5px;background:#e2e8f0;border-radius:999px;overflow:hidden;">
+            <div style="width:${Math.min(s.progress,100)}%;height:100%;background:#1a56db;border-radius:999px;"></div>
+          </div>
+        </div>
+        <div style="display:flex;margin-top:10px;">
+          <div style="flex:1;text-align:center;">
+            <div style="font-size:15px;font-weight:800;color:#111;">${s.contentViewed ?? 0}</div>
+            <div style="font-size:9px;color:#666;margin-top:2px;">Contenidos</div>
+          </div>
+          <div style="flex:1;text-align:center;">
+            <div style="font-size:15px;font-weight:800;color:#111;">${s.exercisesCompleted ?? 0}</div>
+            <div style="font-size:9px;color:#666;margin-top:2px;">Ejercicios</div>
+          </div>
+          <div style="flex:1;text-align:center;">
+            <div style="font-size:15px;font-weight:800;color:#111;">${s.miniprojectsDone ?? 0}</div>
+            <div style="font-size:9px;color:#666;margin-top:2px;">Proyectos</div>
+          </div>
+        </div>
+      </div>`).join('');
+
+    // Detalle temas/subtemas por asignatura
+    const detailHTML = subjectsToShow.map(s => `
+      <div style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:8px;padding-bottom:6px;border-bottom:1.5px solid #1a56db;margin-bottom:10px;page-break-after:avoid;break-after:avoid;">
+          <span style="font-size:11px;font-weight:800;color:#1a56db;text-transform:uppercase;letter-spacing:.08em;">${s.name}</span>
+          <span style="font-size:10px;font-weight:700;color:#fff;background:#1a56db;padding:1px 8px;border-radius:999px;margin-left:auto;">${Math.round(s.progress)}%</span>
+        </div>
+        ${s.topics.map(t => `
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#f0f5ff;border-radius:6px;margin-bottom:5px;">
+              <span style="font-size:12px;font-weight:700;color:#1a56db;">${t.name}</span>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="width:80px;height:5px;background:#e2e8f0;border-radius:999px;overflow:hidden;"><div style="width:${Math.min(t.progress,100)}%;height:100%;background:#1a56db;border-radius:999px;"></div></div>
+                <span style="font-size:11px;font-weight:700;color:#1a56db;width:32px;text-align:right;">${Math.round(t.progress)}%</span>
+              </div>
+            </div>
+            ${t.subtopics.map(sub => `
+              <div style="display:flex;align-items:center;gap:8px;padding:4px 10px 4px 18px;">
+                <span style="font-size:11px;color:#475569;flex:1;">· ${sub.name}${sub.hasContent===false?' <span style="color:#dc2626;font-size:9px;">(sin contenido)</span>':''}</span>
+                <div style="width:100px;height:4px;background:#e2e8f0;border-radius:999px;overflow:hidden;"><div style="width:${Math.min(sub.progress||0,100)}%;height:100%;background:${(sub.progress||0)>0?'#1a56db':'#e2e8f0'};border-radius:999px;"></div></div>
+                <span style="font-size:10px;color:#94a3b8;width:28px;text-align:right;">${Math.round(sub.progress||0)}%</span>
+              </div>`).join('')}
+          </div>`).join('')}
+      </div>`).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Informe — ${student.name}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',Arial,sans-serif;color:#1e3a5f;font-size:13px;background:#fff;
+         -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    /* Contenido: padding-right reserva columna del logo */
+    .doc{padding:0 80px 0 0;}
+    /* Logo fijo: valores negativos lo colocan en el margen @page superior */
+    /* @page top=88px → logo a -74px = físicamente top:14px de la hoja */
+    .page-logo img{width:60px;height:60px;object-fit:contain;border-radius:50%;border:1.5px solid #bfd3f5;}
+    /* Línea superior: top:-8px = físicamente top:80px (dentro del margen superior) */
+    /* Línea inferior: bottom:-20px = físicamente 8px del borde inferior */
+    /* Bordes laterales */
+    @media print{
+      @page{margin:88px 20px 30px 20px;size:A4;}
+      /* Mismas reglas — los valores negativos se calculan sobre los márgenes @page */
+    }
+  </style>
+</head>
+<body>
+  <!-- Logo sutil + bordes fijos en TODAS las páginas -->
+
+  <!-- Encabezado del informe -->
+  <div style="padding-bottom:14px;border-bottom:2px solid #1a56db;margin-bottom:16px;">
+    <div style="min-width:0;">
+      <div style="font-size:18px;font-weight:800;color:#1a56db;line-height:1.2;">Informe de Progreso Académico</div>
+      <div style="font-size:12px;font-weight:600;color:#1e3a5f;margin-top:3px;">${isAllSubjects ? 'Todas las asignaturas' : selectedArea}</div>
+      <div style="font-size:10px;color:#64748b;margin-top:3px;">EduPath · Ingeniería de Sistemas UDES · ${fecha}</div>
+      <div style="display:flex;align-items:center;gap:20px;margin-top:10px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#1e3a5f;">${student.name}</div>
+          <div style="font-size:11px;color:#64748b;">${student.email}</div>
+        </div>
+        ${isAllSubjects ? `<div style="margin-left:auto;text-align:right;">
+          <div style="font-size:20px;font-weight:800;color:#1a56db;">${Math.round(avgGeneral)}%</div>
+          <div style="font-size:9px;color:#64748b;">Progreso general</div>
+        </div>` : `<div style="margin-left:auto;text-align:right;">
+          <div style="font-size:20px;font-weight:800;color:#1a56db;">${Math.round(subjectsToShow[0]?.progress || 0)}%</div>
+          <div style="font-size:9px;color:#64748b;">Progreso en la asignatura</div>
+        </div>`}
+      </div>
+    </div>
+  </div>
+
+  <!-- Tarjetas resumen -->
+  <div style="display:grid;grid-template-columns:repeat(${Math.min(subjectsToShow.length,4)},1fr);gap:10px;margin-bottom:18px;align-items:stretch;">
+    ${subjectCardsHTML}
+  </div>
+
+  <!-- Detalle temas/subtemas -->
+  <div style="font-size:12px;font-weight:700;color:#1e3a5f;margin-bottom:10px;padding-bottom:4px;border-bottom:1px solid #e2e8f0;">Detalle por Tema y Subtema</div>
+  ${detailHTML}
+
+  </div><!-- /doc -->
+</body>
+</html>`;
+
+    // Imprimir con iframe oculto — flag para evitar loop al cancelar
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;visibility:hidden;';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) { document.body.removeChild(iframe); return; }
+
+    iframeDoc.open();
+    iframeDoc.write(html);
+    iframeDoc.close();
+
+    // Usar setTimeout en lugar de load event para evitar el loop de impresión
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch(e) { /* ignorar */ }
+      setTimeout(() => {
+        try { document.body.removeChild(iframe); } catch(e) { /* ya removido */ }
+      }, 2000);
+    }, 500);
+
+    // Fallback: nunca dejar el iframe colgado
+    setTimeout(() => {
+      try { document.body.removeChild(iframe); } catch(e) { /* ok */ }
+    }, 60000);
+
+  };
+
   const downloadPdf = async (type: 'student' | 'date' | 'activity' | 'failures' | 'content-views') => {
 
     if (!hasAppliedFilters && type !== 'content-views') {
@@ -1546,10 +1722,21 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       const params = new URLSearchParams({ type });
 
-      if (type === 'student' && appliedFilters.student !== 'all') {
+      // En modo detalle de estudiante, usar el ID del estudiante actualmente visible
+      const exportEstudianteId = type === 'student' && detailStudentId
+        ? detailStudentId
+        : appliedFilters.student !== 'all' ? appliedFilters.student : null;
 
-        params.append('estudiante_id', appliedFilters.student);
+      if (exportEstudianteId) {
+        params.append('estudiante_id', exportEstudianteId);
+      }
 
+      // Filtrar por asignatura según selección del admin (solo si NO es "todas")
+      if (type === 'student' && !exportAllAsignaturas && detailStudentId) {
+        const areaSeleccionada = selectedAreaByStudent[detailStudentId];
+        if (areaSeleccionada) {
+          params.append('asignatura_nombre', areaSeleccionada);
+        }
       }
 
       if (type === 'failures' && appliedFilters.student !== 'all') {
@@ -2382,142 +2569,73 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     <div className="app-shell">
 
+      {/* Header */}
       <header className="app-header">
-
         <div className="app-main py-4">
-
           <div className="app-page-header">
-
             <div className="app-brand-block">
-
-              <div className="app-brand-icon">
-
+              <button type="button" onClick={onBack} className="app-brand-icon" title="Volver">
                 <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
-
-              </div>
-
-              <div>
-
-                <h1 className="text-[#3A4A5B]">Reportes académicos</h1>
-
-                <p className="text-sm text-slate-500">{isDocenteMode ? 'Lectura docente del rendimiento y avance' : 'Centro analítico del panel administrativo'}</p>
-
-              </div>
-
-            </div>
-
-            <div className="app-action-row">
-
-              <button onClick={handleExport} className="app-btn app-primary-btn">
-
-                <Download className="w-4 h-4" />
-
-                <span>Exportar PDF</span>
-
               </button>
-
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
+                  Reportes académicos
+                </p>
+                <h1 className="leading-tight">Informes</h1>
+              </div>
             </div>
-
           </div>
-
         </div>
-
       </header>
 
-
-
       <main className="app-main">
-
-        <button onClick={onBack} className="app-back-button mb-6">
-
+        {/* Volver + breadcrumb */}
+        <button onClick={onBack} className="app-back-button mb-3">
           <ArrowLeft className="w-4 h-4" />
-
-          <span>Volver al Panel</span>
-
+          <span>Volver</span>
         </button>
+        <nav className="flex items-center gap-2 mb-6 flex-wrap" style={{ fontSize: '13px' }}>
+          <button type="button" onClick={onBack} className="hover:underline" style={{ color: '#4a6fa5', fontWeight: 500 }}>
+            {isDocenteMode ? 'Panel docente' : 'Panel admin'}
+          </button>
+          <span style={{ color: '#bfd3f5' }}>→</span>
+          <span style={{ color: '#1a56db', fontWeight: 700, background: '#dbeafe', padding: '2px 10px', borderRadius: '999px' }}>
+            Reportes
+          </span>
+        </nav>
 
-
-
-        <section className="app-page-hero mb-6">
-
-          <div className="app-page-hero__content">
-
-            <div className="app-page-hero__copy">
-
-              <div className="app-page-hero__eyebrow">Analítica Generalizada</div>
-
-              <h2 className="app-page-hero__title">{reportViewLabel}</h2>
-
-              <p className="app-page-hero__description">{reportViewDescription}</p>
-
-            </div>
-
-
-
-            <div className="app-hero-metrics">
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">Estudiantes</div>
-
-                <div className="app-hero-metric__value">{studentsData.length}</div>
-
-                <div className="app-hero-metric__help">Base actual disponible para análisis.</div>
-
-              </div>
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">Asignaturas</div>
-
-                <div className="app-hero-metric__value">{asignaturasCatalog.length}</div>
-
-                <div className="app-hero-metric__help">Cobertura temática con seguimiento activo.</div>
-
-              </div>
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">{reportVisibleLabel}</div>
-
-                <div className="app-hero-metric__value">{reportVisibleCount}</div>
-
-                <div className="app-hero-metric__help">Resultados en la vista seleccionada.</div>
-
-              </div>
-
-              <div className="app-hero-metric">
-
-                <div className="app-hero-metric__label">Avance global</div>
-
-                <div className="app-hero-metric__value">{formatPercent(globalAverageProgress)}%</div>
-
-                <div className="app-hero-metric__help">Promedio consolidado del entorno.</div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
+        {/* Métricas compactas — top dashboard unificado */}
+        <div className="app-metric-grid mb-6">
+          {[
+            { label: 'Estudiantes', value: studentsData.length, icon: User },
+            { label: 'Asignaturas', value: asignaturasCatalog.length, icon: BarChart3 },
+            { label: 'Avance global', value: `${formatPercent(globalAverageProgress)}%`, icon: TrendingUp },
+            { label: reportVisibleLabel, value: reportVisibleCount, icon: Activity },
+          ].map(m => {
+            const Icon = m.icon;
+            return (
+              <article key={m.label} className="app-metric-card">
+                <div className="app-metric-icon" style={{ background: '#dbeafe', color: '#1a56db' }}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <strong className="app-metric-value" style={{ color: '#1a56db' }}>{m.value}</strong>
+                  <p className="app-metric-label">{m.label}</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
 
 
 
         {pdfLoading && (
-
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-
-            <div className="bg-white rounded-xl shadow-xl px-6 py-4 flex items-center gap-3">
-
-              <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-
-              <span className="text-sm text-gray-600">Generando PDF...</span>
-
+          <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(10,20,50,0.45)', backdropFilter: 'blur(4px)' }}>
+            <div className="flex items-center gap-3 rounded-2xl px-6 py-4" style={{ background: '#fff', boxShadow: '0 8px 32px rgba(26,86,219,0.2)', border: '1.5px solid #bfd3f5' }}>
+              <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#1a56db', borderTopColor: 'transparent' }} />
+              <span className="text-sm font-semibold" style={{ color: '#1e3a5f' }}>Generando PDF...</span>
             </div>
-
           </div>
-
         )}
 
 
@@ -2556,292 +2674,91 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
 
-        {/* Tabs */}
-
-        <div className="app-panel mb-6 overflow-hidden">
-
-          <div className="app-filter-tab-row">
-
-            <button
-
-              onClick={() => setActiveTab('student')}
-
-              className={`app-filter-tab ${
-
-                activeTab === 'student'
-
-                  ? 'app-filter-tab--blue'
-
-                  : ''
-
-              }`}
-
-            >
-
-              <User className="w-5 h-5" />
-
-              <span>Progreso por Estudiante</span>
-
-            </button>
-
-            {!isDocenteMode && (
-
-              <button
-
-                onClick={() => setActiveTab('date')}
-
-                className={`app-filter-tab ${
-
-                  activeTab === 'date'
-
-                    ? 'app-filter-tab--green'
-
-                    : ''
-
-                }`}
-
-              >
-
-                <Calendar className="w-5 h-5" />
-
-                <span>Progreso por Fecha de Creación</span>
-
+        {/* Tabs — ancho completo simétrico */}
+        <div className="mb-6" style={{ display: 'grid', gridTemplateColumns: `repeat(${isDocenteMode ? 3 : 5}, 1fr)`, gap: '8px' }}>
+          {[
+            { key: 'student', label: 'Por estudiante', icon: User },
+            ...(!isDocenteMode ? [
+              { key: 'date', label: 'Por fecha', icon: Calendar },
+              { key: 'activity', label: 'Por actividad', icon: Activity },
+            ] : []),
+            { key: 'failures', label: 'Fallos', icon: AlertTriangle },
+            { key: 'content-views', label: 'Más vistos', icon: Eye },
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
+              <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key as any)}
+                className="flex items-center justify-center gap-2 text-sm font-semibold py-2.5 rounded-xl transition-all hover:opacity-90"
+                style={{
+                  background: isActive ? '#1a56db' : '#fff',
+                  color: isActive ? '#fff' : '#4a6fa5',
+                  border: `1.5px solid ${isActive ? '#1a56db' : '#bfd3f5'}`,
+                }}>
+                <Icon className="w-4 h-4" />
+                {tab.label}
               </button>
-
-            )}
-
-            {!isDocenteMode && (
-
-              <button
-
-                onClick={() => setActiveTab('activity')}
-
-                className={`app-filter-tab ${
-
-                  activeTab === 'activity'
-
-                    ? 'app-filter-tab--amber'
-
-                    : ''
-
-                }`}
-
-              >
-
-                <Activity className="w-5 h-5" />
-
-                <span>Desempeño por Actividad</span>
-
-              </button>
-
-            )}
-
-            <button
-
-              onClick={() => setActiveTab('failures')}
-
-              className={`app-filter-tab ${
-
-                activeTab === 'failures'
-
-                  ? 'app-filter-tab--red'
-
-                  : ''
-
-              }`}
-
-            >
-
-              <AlertTriangle className="w-5 h-5" />
-
-              <span>Fallos por Actividad</span>
-
-            </button>
-
-            <button
-
-              onClick={() => setActiveTab('content-views')}
-
-              className={`app-filter-tab ${
-
-                activeTab === 'content-views'
-
-                  ? 'app-filter-tab--blue'
-
-                  : ''
-
-              }`}
-
-            >
-
-              <Eye className="w-5 h-5" />
-
-              <span>Contenidos más vistos</span>
-
-            </button>
-
-          </div>
-
+            );
+          })}
         </div>
 
 
 
-        {/* Filtros */}
+        {/* Filtros — siempre visibles, inline */}
+        {activeTab !== 'content-views' && (
+          <div className="mb-6">
 
-        {showFilters && activeTab !== 'content-views' && (
 
-          <div className="app-toolbar-card mb-6">
 
-            <div className="app-section-head mb-4">
+            <div className="flex flex-wrap items-end gap-3 mb-4">
 
-              <div>
+              <div style={{ flex: 1, minWidth: '160px' }}>
 
-                <div className="flex items-center gap-2">
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#1e3a5f', display: 'block', marginBottom: '4px' }}>Código o nombre</label>
 
-                  <Filter className="w-5 h-5 text-[#3A4A5B]" />
-
-                  <h3 className="app-section-title">Filtros avanzados</h3>
-
+                <div className="flex items-center gap-2 rounded-xl px-3" style={{ background: '#fff', border: '1.5px solid #bfd3f5', height: '40px' }}>
+                  <Filter className="w-3.5 h-3.5 shrink-0" style={{ color: '#4a7ac8' }} />
+                  <input type="text" value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)}
+                    placeholder="Buscar estudiante..." className="flex-1 outline-none text-sm bg-transparent" style={{ color: '#1e3a5f' }} />
                 </div>
-
-                <p className="app-section-description">Usa un solo punto de control para buscar, acotar y aplicar la lectura actual.</p>
-
-              </div>
-
-              <button
-
-                onClick={() => setShowFilters(false)}
-
-                className="app-btn app-btn-secondary app-btn-sm text-slate-500"
-
-              >
-
-                <X className="w-5 h-5" />
-
-              </button>
-
-            </div>
-
-            <div className="app-alert app-alert--warning mb-4">
-
-              <span className="text-sm">La información se muestra cuando confirmas la combinación actual de filtros.</span>
-
-              <span className="text-xs font-semibold uppercase tracking-[0.18em]">{appliedFilterCount} activos</span>
-
-            </div>
-
-            
-
-            <div className="grid grid-cols-3 gap-4 mb-4">
-
-              <div className="app-form-field">
-
-                <label className="app-form-label">Buscar por código</label>
-
-                <input
-
-                  type="text"
-
-                  value={studentSearch}
-
-                  onChange={(e) => setStudentSearch(e.target.value)}
-
-                  placeholder="Ej: 123456..."
-
-                  className="app-form-input"
-
-                />
-
               </div>
 
 
 
-              <div className="app-form-field">
-
-                <label className="app-form-label">Estudiante</label>
-
-                <select 
-
-                  value={filters.student}
-
-                  onChange={(e) => handleStudentSelect(e.target.value)}
-
-                  className="app-form-select"
-
-                >
-
-                  <option value="all">Todos los estudiantes</option>
-
-                  {studentsData.map(student => (
-
-                    <option key={student.id} value={student.id}>{student.name}{student.codigo ? ` — ${student.codigo}` : ''}</option>
-
-                  ))}
-
-                </select>
-
-              </div>
-
-
-
-
-            </div>
-
-
-
-            {activeTab === 'student' && (
-
-              <div className="grid grid-cols-1 gap-4 mb-4">
-
-                <div className="app-form-field">
-
-                  <label className="flex items-center gap-2 app-form-label">
-
-                    <span>Estado de Avance</span>
-
-                    <button
-
-                      type="button"
-
-                      className="text-gray-400 hover:text-gray-600"
-
-                      title="Completado: 100% en todas las asignaturas. En progreso: inició pero no terminó. No iniciado: 0% en todas las asignaturas."
-
-                      aria-label="Información sobre el estado de avance"
-
-                    >
-
-                      <AlertCircle className="w-4 h-4" />
-
-                    </button>
-
-                  </label>
-
-                  <select 
-
-                    value={filters.status}
-
-                    onChange={(e) => setFilters({...filters, status: e.target.value})}
-
-                    className="app-form-select"
-
-                  >
-
+              {/* Estado de Avance — inline */}
+              {activeTab === 'student' && (
+                <div style={{ minWidth: '160px', flex: 1 }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#1e3a5f', display: 'block', marginBottom: '4px' }}>Estado</label>
+                  <select value={filters.status} onChange={(e) => setFilters({...filters, status: e.target.value})}
+                    className="rounded-xl px-3 text-sm font-medium outline-none w-full"
+                    style={{ background: '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', height: '40px' }}>
                     <option value="all">Todos</option>
-
                     <option value="completed">Completado</option>
-
-                    <option value="in-progress">En Progreso</option>
-
-                    <option value="not-started">No Iniciado</option>
-
+                    <option value="in-progress">En progreso</option>
+                    <option value="not-started">No iniciado</option>
                   </select>
-
                 </div>
+              )}
 
+              {/* Botones alineados con los inputs */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ display: 'block', height: '20px' }} />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={applyFilters}
+                    style={{ height: '40px', padding: '0 20px', borderRadius: '10px', background: 'linear-gradient(135deg, #1a56db, #142d61)', color: '#fff', fontWeight: 700, fontSize: '13px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    Aplicar
+                  </button>
+                  {appliedFilterCount > 0 && (
+                    <button onClick={clearFilters}
+                      style={{ height: '40px', padding: '0 16px', borderRadius: '10px', border: '1.5px solid #bfd3f5', background: '#fff', color: '#1e3a5f', fontWeight: 600, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      Limpiar
+                    </button>
+                  )}
+                </div>
               </div>
 
-            )}
+            </div>
+
 
 
 
@@ -2986,60 +2903,11 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
               </div>
 
             )}
-
-
-
-            <div className="app-action-row justify-start">
-
-              <button 
-
-                onClick={clearFilters}
-
-                className="app-btn app-btn-secondary"
-
-              >
-
-                Limpiar Filtros
-
-              </button>
-
-              <button
-
-                onClick={applyFilters}
-
-                className="app-btn app-primary-btn"
-
-              >
-
-                Aplicar Filtros
-
-              </button>
-
-            </div>
-
           </div>
-
         )}
 
 
 
-        {!showFilters && activeTab !== 'content-views' && (
-
-          <button
-
-            onClick={() => setShowFilters(true)}
-
-            className="app-btn app-btn-secondary mb-6"
-
-          >
-
-            <Filter className="w-4 h-4" />
-
-            <span className="text-sm">Mostrar Filtros</span>
-
-          </button>
-
-        )}
 
 
 
@@ -3058,174 +2926,106 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
         {hasAppliedFilters && activeTab === 'student' && (
-
           <div className="space-y-6">
 
-            {/* Resumen Cards */}
 
-            <div className="app-metric-grid">
 
-              <div className="app-metric-card">
 
-                <div className="app-metric-icon app-metric-icon--blue">
+            {/* Selección / Detalle por estudiante */}
 
-                  <User className="w-5 h-5" />
-
-                </div>
-
-                <div>
-
-                  <div className="app-metric-value">{studentTabStudents.length}</div>
-
-                  <div className="app-metric-label">Total estudiantes</div>
-
-                  <div className="mt-1 text-xs text-slate-500">Activos en el sistema.</div>
-
-                </div>
-
+            {studentTabStudents.length === 0 ? (
+              <div className="app-empty-panel py-10" style={{ color: '#4a6fa5' }}>
+                No se encontraron estudiantes con esos filtros.
               </div>
-
-
-
-              <div className="app-metric-card">
-
-                <div className="app-metric-icon app-metric-icon--green">
-
-                  <TrendingUp className="w-5 h-5" />
-
-                </div>
-
-                <div>
-
-                  <div className="app-metric-value">
-
-                    {formatPercent(
-
-                      studentTabStudents.length
-
-                        ? studentTabStudents.reduce((sum, s) => {
-
-                            const avg = s.subjects.length
-
-                              ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
-
-                              : 0;
-
-                            return sum + avg;
-
-                          }, 0) / studentTabStudents.length
-
-                        : 0
-
-                    )}%
-
+            ) : studentTabStudents.length > 1 && !detailStudentId ? (
+              /* Lista de selección cuando hay múltiples resultados */
+              <div className="app-table-card">
+                <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Selecciona un estudiante</p>
+                    <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>
+                      {studentTabStudents.length} resultados — ordenados por progreso {studentSortOrder === 'asc' ? '↑ menor a mayor' : '↓ mayor a menor'}
+                    </p>
                   </div>
-
-                  <div className="app-metric-label">Progreso promedio</div>
-
-                  <div className="mt-1 text-xs text-slate-500">En todas las materias.</div>
-
+                  <button type="button"
+                    onClick={() => setStudentSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
+                    style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '8px', color: '#fff', cursor: 'pointer', padding: '6px 14px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {studentSortOrder === 'asc' ? '↑ Menor progreso' : '↓ Mayor progreso'}
+                  </button>
                 </div>
-
+                <div className="app-table-card__body" style={{ padding: 0 }}>
+                  {[...studentTabStudents].sort((a, b) => {
+                    const avgA = a.subjects.length ? a.subjects.reduce((acc, s) => acc + s.progress, 0) / a.subjects.length : 0;
+                    const avgB = b.subjects.length ? b.subjects.reduce((acc, s) => acc + s.progress, 0) / b.subjects.length : 0;
+                    return studentSortOrder === 'asc' ? avgA - avgB : avgB - avgA;
+                  }).map((student, idx) => {
+                    const avg = student.subjects.length
+                      ? student.subjects.reduce((acc, s) => acc + s.progress, 0) / student.subjects.length
+                      : 0;
+                    const initials = student.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
+                    return (
+                      <button key={student.id} type="button"
+                        onClick={() => setDetailStudentId(String(student.id))}
+                        className="w-full text-left"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px',
+                          borderBottom: idx < studentTabStudents.length - 1 ? '1px solid #e2e8f0' : 'none',
+                          background: 'transparent', border: 'none', cursor: 'pointer',
+                          transition: 'background 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f0f5ff')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#1a56db', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
+                            {initials}
+                          </div>
+                          <div>
+                            <p style={{ fontWeight: 600, fontSize: '14px', color: '#1e3a5f' }}>{student.name}</p>
+                            <p style={{ fontSize: '12px', color: '#94a3b8' }}>{student.email}</p>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '100px', height: '6px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div style={{ width: `${Math.min(avg, 100)}%`, height: '100%', background: '#1a56db', borderRadius: '999px' }} />
+                          </div>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#1a56db', width: '40px', textAlign: 'right' }}>{Math.round(avg)}%</span>
+                          <span style={{ fontSize: '12px', color: '#bfd3f5' }}>→</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-
-
-
-              <div className="app-metric-card">
-
-                <div className="app-metric-icon app-metric-icon--green">
-
-                  <CheckCircle2 className="w-5 h-5" />
-
-                </div>
-
-                <div>
-
-                  <div className="app-metric-value">
-
-                    {studentTabStudents.filter(s => {
-
-                      const avg = s.subjects.length
-
-                        ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
-
-                        : 0;
-
-                      return avg >= 70;
-
-                    }).length}
-
+            ) : (
+              /* Detalle completo de UN estudiante */
+              (() => {
+                const visibleStudents = detailStudentId
+                  ? studentTabStudents.filter(s => String(s.id) === detailStudentId)
+                  : studentTabStudents;
+                return (
+              <div className="app-table-card" style={{ position: 'relative' }} id="student-detail-report">
+                <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <div>
+                    <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Informe detallado</p>
+                    <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Avance en asignaturas, temas y actividades.</p>
                   </div>
-
-                  <div className="app-metric-label">Estudiantes al día</div>
-
-                  <div className="mt-1 text-xs text-slate-500">Con 70% o más de progreso.</div>
-
-                </div>
-
-              </div>
-
-
-
-              <div className="app-metric-card">
-
-                <div className="app-metric-icon app-metric-icon--amber">
-
-                  <AlertCircle className="w-5 h-5" />
-
-                </div>
-
-                <div>
-
-                  <div className="app-metric-value">
-
-                    {studentTabStudents.filter(s => {
-
-                      const avg = s.subjects.length
-
-                        ? s.subjects.reduce((acc, subj) => acc + subj.progress, 0) / s.subjects.length
-
-                        : 0;
-
-                      return avg < 50;
-
-                    }).length}
-
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* Volver a la lista cuando hay detailStudentId */}
+                    {detailStudentId && (
+                      <button type="button" onClick={() => setDetailStudentId(null)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        Volver
+                      </button>
+                    )}
+                    {/* Botón exportar — directo */}
+                    <button type="button" onClick={() => printStudentReport()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                      <Download className="w-3.5 h-3.5" />
+                      Exportar PDF
+                    </button>
                   </div>
-
-                  <div className="app-metric-label">Estudiantes rezagados</div>
-
-                  <div className="mt-1 text-xs text-slate-500">Por debajo del 50%.</div>
-
                 </div>
-
-              </div>
-
-            </div>
-
-
-
-            {/* Tabla detallada por estudiante */}
-
-            <div className="app-table-card">
-
-              <div className="app-table-card__header app-table-card__header--blue">
-
-                <div>
-
-                  <h3 className="app-table-card__title">Progreso detallado por estudiante</h3>
-
-                  <p className="app-table-card__description">Avance en asignaturas, temas y actividades con una lectura más homogénea.</p>
-
-                </div>
-
-              </div>
-
-              
-
-              <div className="app-table-card__body">
-
-                {studentTabStudents.map((student) => (
+                <div className="app-table-card__body">
+                  {visibleStudents.map((student) => (
 
                   <div key={student.id} className="mb-8 last:mb-0 border-b border-gray-200 last:border-0 pb-8 last:pb-0">
 
@@ -3239,7 +3039,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                         </div>
 
-                        <div>
+                        <div id="student-report-header">
 
                           <h4 className="text-[#3A4A5B]">{student.name}</h4>
 
@@ -3273,13 +3073,33 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
 
-                    {/* Estadísticas por materia */}
+                    {/* Checkbox: todas las asignaturas */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#475569', cursor: 'pointer', fontWeight: 500 }}>
+                        <input type="checkbox" checked={exportAllAsignaturas}
+                          onChange={e => {
+                            setExportAllAsignaturas(e.target.checked);
+                            if (e.target.checked) {
+                              // Limpiar selección para mostrar todas
+                              setSelectedAreaByStudent(prev => ({ ...prev, [student.id]: '' }));
+                            }
+                          }}
+                          style={{ accentColor: '#1a56db', width: '15px', height: '15px' }} />
+                        Seleccionar todas las asignaturas
+                      </label>
+                      {!exportAllAsignaturas && selectedAreaByStudent[student.id] && (
+                        <span style={{ fontSize: '11px', color: '#1a56db', background: '#dbeafe', padding: '2px 8px', borderRadius: '999px', fontWeight: 600 }}>
+                          Filtrando: {selectedAreaByStudent[student.id]}
+                        </span>
+                      )}
+                    </div>
 
-                    <div className="grid grid-cols-3 gap-4 mb-4">
+                    {/* Estadísticas por materia */}
+                    <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
 
                       {student.subjects.map((subject) => {
 
-                        const isSelected = selectedAreaByStudent[student.id] === subject.name;
+                        const isSelected = !exportAllAsignaturas && selectedAreaByStudent[student.id] === subject.name;
 
                         return (
 
@@ -3287,29 +3107,23 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                           key={subject.name}
 
-                          className="border-2 rounded-xl p-4 cursor-pointer transition-all"
+                          className="rounded-xl transition-all"
 
-                          style={{ borderColor: isSelected ? subject.color : subject.color + '40', backgroundColor: isSelected ? subject.color + '12' : 'white' }}
+                          style={{ padding: '12px', borderWidth: '1.5px', borderStyle: 'solid',
+                            borderColor: isSelected ? '#1a56db' : exportAllAsignaturas ? '#e2e8f0' : '#bfd3f5',
+                            backgroundColor: isSelected ? '#f0f5ff' : 'white',
+                            cursor: exportAllAsignaturas ? 'default' : 'pointer' }}
 
-                          onClick={() => setSelectedAreaByStudent(prev => ({
+                          onClick={() => !exportAllAsignaturas && setSelectedAreaByStudent(prev => ({
                             ...prev,
                             [student.id]: isSelected ? '' : subject.name
                           }))}
 
                         >
 
-                          <div className="flex items-center gap-2 mb-3">
-
-                            <div 
-
-                              className="w-3 h-3 rounded-full"
-
-                              style={{ backgroundColor: subject.color }}
-
-                            />
-
-                            <span className="text-[#3A4A5B] text-sm">{subject.name}</span>
-
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: subject.color }} />
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#1e3a5f', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{subject.name}</span>
                           </div>
 
                           
@@ -3389,91 +3203,63 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                     {/* Detalle de temas y subtemas */}
 
-                    <div className="bg-gray-50 rounded-lg p-4">
-
-                      <h5 className="text-[#3A4A5B] text-sm mb-3">
-                        Detalle por Tema y Subtema
+                    <div id="student-tema-detail" style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e3a5f' }}>Detalle por Tema y Subtema</span>
                         {selectedAreaByStudent[student.id] && (
-                          <span className="ml-2 text-xs text-gray-400 font-normal">— {selectedAreaByStudent[student.id]}</span>
+                          <span style={{ fontSize: '11px', color: '#1a56db', background: '#dbeafe', padding: '2px 8px', borderRadius: '999px', fontWeight: 600 }}>
+                            {selectedAreaByStudent[student.id]}
+                          </span>
                         )}
-                      </h5>
-
-                      {!selectedAreaByStudent[student.id] && (
-                        <p className="text-xs text-gray-400 mb-3">Selecciona un área para ver el detalle.</p>
-                      )}
-
-                      <div className="space-y-4">
-
-                        {student.subjects.filter(s => !selectedAreaByStudent[student.id] || s.name === selectedAreaByStudent[student.id]).map((subject) => (
-
-                          <div key={subject.name}>
-
-                            {subject.topics.map((topic) => {
-
-                              return (
-
-                              <div key={topic.name} className="mb-4 last:mb-0">
-
-                                <div className="flex items-center justify-between mb-2">
-
-                                  <span className="text-sm text-[#3A4A5B]">{topic.name}</span>
-
-                                  <span className="text-sm text-[#3A4A5B]">{formatPercent(topic.progress)}%</span>
-
-                                </div>
-
-                                <div className="pl-3 space-y-2">
-
-                                  {topic.subtopics.map((subtopic) => (
-
-                                    <div key={subtopic.name} className="grid items-center gap-3 text-xs" style={{ gridTemplateColumns: '1fr 180px 40px' }}>
-
-                                      <span className="text-gray-600">
-
-                                        • {subtopic.name}
-
-                                        {subtopic.hasContent === false ? <span className="text-red-600"> (no tiene contenido)</span> : null}
-
-                                      </span>
-
-                                      <div style={{ width: '180px', height: '8px', backgroundColor: '#D1D5DB', borderRadius: '9999px', overflow: 'hidden' }}>
-
-                                          <div 
-
-                                            style={{ 
-
-                                              width: `${normalizePercent(subtopic.progress)}%`,
-
-                                              height: '100%',
-
-                                              borderRadius: '9999px',
-
-                                              backgroundColor: subject.color || '#4A90E2'
-
-                                            }}
-
-                                          />
-
-                                      </div>
-
-                                      <span className="text-gray-500 text-right">{formatPercent(subtopic.progress)}%</span>
-
-                                    </div>
-
-                                  ))}
-
-                                </div>
-
-                              </div>
-
-                            )})}
-
-                          </div>
-
-                        ))}
-
                       </div>
 
+                      {!selectedAreaByStudent[student.id] && !exportAllAsignaturas && (
+                        <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '8px' }}>Selecciona una asignatura o marca "todas" para ver el detalle completo.</p>
+                      )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {student.subjects.filter(s => exportAllAsignaturas || !selectedAreaByStudent[student.id] || s.name === selectedAreaByStudent[student.id]).map((subject) => (
+                          <div key={subject.name}>
+                            {/* Header de asignatura — siempre visible para distinguir */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', paddingBottom: '8px', borderBottom: '2px solid #1a56db' }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: subject.color || '#1a56db', flexShrink: 0 }} />
+                              <span style={{ fontSize: '12px', fontWeight: 800, color: '#1a56db', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{subject.name}</span>
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#fff', background: '#1a56db', padding: '1px 8px', borderRadius: '999px', marginLeft: 'auto' }}>{formatPercent(subject.progress)}%</span>
+                            </div>
+                            {subject.topics.map((topic) => (
+                              <div key={topic.name} style={{ marginBottom: '12px' }}>
+                                {/* Tema — barra más visible */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', padding: '8px 10px', background: '#fff', borderRadius: '8px', border: '1.5px solid #bfd3f5' }}>
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#1a56db' }}>{topic.name}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '100px', height: '6px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                                      <div style={{ width: `${normalizePercent(topic.progress)}%`, height: '100%', borderRadius: '999px', background: '#1a56db' }} />
+                                    </div>
+                                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#1a56db', width: '36px', textAlign: 'right' }}>{formatPercent(topic.progress)}%</span>
+                                  </div>
+                                </div>
+
+                                {/* Subtemas — sangría y diferenciados */}
+                                <div style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  {topic.subtopics.map((subtopic) => (
+                                    <div key={subtopic.name} style={{ display: 'grid', alignItems: 'center', gap: '10px', gridTemplateColumns: '1fr 140px 36px' }}>
+                                      <span style={{ fontSize: '12px', color: '#475569' }}>
+                                        <span style={{ color: '#94a3b8', marginRight: '4px' }}>·</span>
+                                        {subtopic.name}
+                                        {subtopic.hasContent === false && <span style={{ color: '#dc2626', fontSize: '10px' }}> (sin contenido)</span>}
+                                      </span>
+                                      <div style={{ height: '5px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                                        <div style={{ width: `${normalizePercent(subtopic.progress)}%`, height: '100%', borderRadius: '999px', background: subtopic.progress > 0 ? '#1a56db' : '#e2e8f0' }} />
+                                      </div>
+                                      <span style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'right' }}>{formatPercent(subtopic.progress)}%</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                   </div>
@@ -3481,8 +3267,10 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                 ))}
 
               </div>
-
             </div>
+                );
+              })()
+            )}
 
           </div>
 
@@ -3638,16 +3426,16 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             <div className="app-table-card">
 
-              <div className="app-table-card__header app-table-card__header--green">
-
+              <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-
-                  <h3 className="app-table-card__title">Análisis por fecha de creación</h3>
-
-                  <p className="app-table-card__description">Comparación de cohortes y detección temprana de rezago.</p>
-
+                  <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Análisis por fecha de creación</p>
+                  <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Comparación de cohortes y detección temprana de rezago.</p>
                 </div>
-
+                <button onClick={() => downloadPdf('date')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                  <Download className="w-3.5 h-3.5" />
+                  Exportar PDF
+                </button>
               </div>
 
               
@@ -3906,7 +3694,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               <div className="app-metric-card">
 
-                <div className="app-metric-icon app-metric-icon--blue">
+                <div className="app-metric-icon" style={{ background: "#dbeafe", color: "#1a56db" }}>
 
                   <Activity className="w-5 h-5" />
 
@@ -3928,7 +3716,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               <div className="app-metric-card">
 
-                <div className="app-metric-icon app-metric-icon--green">
+                <div className="app-metric-icon" style={{ background: "#dbeafe", color: "#1a56db" }}>
 
                   <CheckCircle2 className="w-5 h-5" />
 
@@ -3950,7 +3738,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               <div className="app-metric-card">
 
-                <div className="app-metric-icon app-metric-icon--amber">
+                <div className="app-metric-icon" style={{ background: "#dbeafe", color: "#1a56db" }}>
 
                   <Award className="w-5 h-5" />
 
@@ -4090,16 +3878,16 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             <div className="app-table-card">
 
-              <div className="app-table-card__header app-table-card__header--amber">
-
+              <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-
-                  <h3 className="app-table-card__title">Desempeño detallado por actividad</h3>
-
-                  <p className="app-table-card__description">Análisis de completitud, volumen de uso y calificación estimada.</p>
-
+                  <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Desempeño por actividad</p>
+                  <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Análisis de completitud, volumen de uso y calificación estimada.</p>
                 </div>
-
+                <button onClick={() => downloadPdf('activity')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                  <Download className="w-3.5 h-3.5" />
+                  Exportar PDF
+                </button>
               </div>
 
               
@@ -4889,16 +4677,16 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                 <div className="app-table-card">
 
-                  <div className="app-table-card__header app-table-card__header--red">
-
+                  <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-
-                      <h3 className="app-table-card__title">Resumen de fallos por asignatura</h3>
-
-                      <p className="app-table-card__description">Intentos y fallos acumulados.</p>
-
+                      <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Fallos por actividad</p>
+                      <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Intentos, fallos y tasa de error acumulados.</p>
                     </div>
-
+                    <button onClick={() => downloadPdf('failures')}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                      <Download className="w-3.5 h-3.5" />
+                      Exportar PDF
+                    </button>
                   </div>
 
                   <div className="app-table-card__body overflow-x-auto">
@@ -4989,7 +4777,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                 <div className="app-table-card">
 
-                  <div className="app-table-card__header app-table-card__header--red">
+                  <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0' }}>
 
                     <div>
 
@@ -5075,7 +4863,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                 <div className="app-table-card">
 
-                  <div className="app-table-card__header app-table-card__header--red">
+                  <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0' }}>
 
                     <div>
 
@@ -5253,7 +5041,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                     <div className="app-table-card border-2 border-red-200">
 
-                      <div className="app-table-card__header app-table-card__header--red">
+                      <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0' }}>
 
                         <div>
 
@@ -5386,6 +5174,18 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         {/* Tab 5: Contenidos más vistos — Podios + Rankings */}
         {activeTab === 'content-views' && (
           <div>
+            {/* Header con exportar */}
+            <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Contenidos más vistos</p>
+                <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Ranking de visualizaciones por contenido, subtema, tema y asignatura.</p>
+              </div>
+              <button onClick={() => downloadPdf('content-views')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                <Download className="w-3.5 h-3.5" />
+                Exportar PDF
+              </button>
+            </div>
             {/* Filtro de asignatura — solo admin */}
             {!isDocenteMode && (
               <div className="mb-4 flex items-center rounded-xl border border-[#E5E7EB] bg-white shadow-sm overflow-hidden">
