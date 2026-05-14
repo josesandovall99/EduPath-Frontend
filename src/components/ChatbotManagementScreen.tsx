@@ -1,19 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Bot,
-  Database,
+  ChevronDown,
+  ChevronRight,
+  Download,
   Eye,
   FileText,
   Loader,
   MessageCircle,
+  Pencil,
   Plus,
   RefreshCw,
   Save,
   Search,
   Send,
-  ToggleLeft,
-  ToggleRight,
   Trash2,
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
@@ -73,16 +74,6 @@ interface ChatbotItem {
   temperature?: number;
   estado?: boolean;
   documentos?: ChatbotDocumentItem[];
-}
-
-interface ChatbotStats {
-  success?: boolean;
-  provider?: string;
-  model?: string;
-  documentos?: number;
-  documentsCount?: number;
-  chunksLoaded?: number;
-  message?: string;
 }
 
 interface ChatMessage {
@@ -198,6 +189,14 @@ function isRoleScopedGeneralType(type: ChatbotFormState['tipo']) {
 
 function isGeneralType(type: ChatbotFormState['tipo']) {
   return type === 'GENERAL' || isRoleScopedGeneralType(type);
+}
+
+/** En la biblioteca del administrador: solo bots de alcance global/plataforma (no por asignatura ni miniproyecto). */
+function isAdminBibliotecaChatbot(chatbot: ChatbotItem): boolean {
+  if (chatbot.tipo === 'MINIPROYECTO') return false;
+  if (chatbot.tipo === 'GENERAL_ADMINISTRADOR' || chatbot.tipo === 'GENERAL_DOCENTE') return true;
+  if (chatbot.tipo === 'GENERAL') return chatbot.asignatura_id == null;
+  return false;
 }
 
 function getChatbotTypeLabel(type: ChatbotFormState['tipo'], mode: 'admin' | 'docente' = 'admin') {
@@ -351,9 +350,9 @@ export function ChatbotManagementScreen({
   const [asignaturas, setAsignaturas] = useState<AsignaturaItem[]>([]);
   const [miniproyectos, setMiniproyectos] = useState<MiniproyectoItem[]>([]);
   const [selectedChatbotId, setSelectedChatbotId] = useState<number | null>(null);
+  const [catalogExpandedChatbotId, setCatalogExpandedChatbotId] = useState<number | null>(null);
   const [form, setForm] = useState<ChatbotFormState>(emptyForm());
   const [documents, setDocuments] = useState<ChatbotDocumentItem[]>([]);
-  const [stats, setStats] = useState<ChatbotStats | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -369,6 +368,7 @@ export function ChatbotManagementScreen({
   const [stateFilter, setStateFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [statusMessage, setStatusMessage] = useState('');
   const [pdfSizeError, setPdfSizeError] = useState('');
+  const [isDownloadingPdfs, setIsDownloadingPdfs] = useState(false);
 
   const requestHeaders = useMemo(() => {
     const authToken = localStorage.getItem('authToken');
@@ -416,6 +416,12 @@ export function ChatbotManagementScreen({
   useEffect(() => {
     void loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (!isDocenteMode && typeFilter === 'MINIPROYECTO') {
+      setTypeFilter('all');
+    }
+  }, [isDocenteMode, typeFilter]);
 
   useEffect(() => {
     // No limpiar campos automáticamente si el usuario está editando un chatbot existente.
@@ -494,6 +500,19 @@ export function ChatbotManagementScreen({
 
   const AsignaturaOptions = useMemo(() => asignaturas.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)), [asignaturas]);
 
+  const resetCatalogSelection = useCallback(() => {
+    setCatalogExpandedChatbotId(null);
+    setSelectedChatbotId(null);
+    setDocuments([]);
+    setMessages([]);
+    setSelectedFile(null);
+    setForm(
+      isDocenteMode
+        ? enforceDocenteFormMode(emptyForm(), docenteAsignaturaId, Number(AsignaturaOptions[0]?.id))
+        : { ...emptyForm(), asignatura_id: '' },
+    );
+  }, [AsignaturaOptions, docenteAsignaturaId, isDocenteMode]);
+
   useEffect(() => {
     if (!isDocenteMode || form.asignatura_id || AsignaturaOptions.length !== 1) {
       return;
@@ -501,6 +520,24 @@ export function ChatbotManagementScreen({
 
     setForm((prev) => ({ ...prev, asignatura_id: String(AsignaturaOptions[0].id) }));
   }, [AsignaturaOptions, form.asignatura_id, isDocenteMode]);
+
+  useEffect(() => {
+    if (isFormVisible) return;
+    if (catalogExpandedChatbotId == null && selectedChatbotId == null) return;
+    const visibleIds = new Set(visibleChatbots.map((c) => c.id));
+    if (
+      (catalogExpandedChatbotId != null && !visibleIds.has(catalogExpandedChatbotId)) ||
+      (selectedChatbotId != null && !visibleIds.has(selectedChatbotId))
+    ) {
+      resetCatalogSelection();
+    }
+  }, [
+    catalogExpandedChatbotId,
+    isFormVisible,
+    resetCatalogSelection,
+    selectedChatbotId,
+    visibleChatbots,
+  ]);
 
   const miniproyectoOptions = useMemo(() => {
     const asignaturaId = Number(form.asignatura_id);
@@ -524,47 +561,6 @@ export function ChatbotManagementScreen({
   const miniproyectoChatbots = chatbots.filter((chatbot) => chatbot.tipo === 'MINIPROYECTO').length;
   const selectedChatbot = chatbots.find((chatbot) => chatbot.id === selectedChatbotId) || null;
   const selectedChatbotIsActive = selectedChatbot?.estado !== false;
-  const selectedChatbotDescription = form.descripcion.trim() || 'Sin descripción breve.';
-  const selectedChatbotScope =
-    form.tipo === 'GENERAL'
-      ? selectedAsignatura?.nombre
-        ? isDocenteMode
-          ? `General del asignatura ${selectedAsignatura.nombre}.`
-          : `General con foco en ${selectedAsignatura.nombre}.`
-        : isDocenteMode
-          ? 'Cobertura general del asignatura asignada.'
-          : 'Cobertura general.'
-      : form.tipo === 'GENERAL_ADMINISTRADOR'
-        ? 'Disponible para el panel de administrador.'
-        : form.tipo === 'GENERAL_DOCENTE'
-          ? 'Disponible para el panel de docente.'
-      : selectedMiniproyecto
-        ? `Vinculado a ${getMiniproyectoLabel(selectedMiniproyecto)}.`
-        : 'Miniproyecto pendiente.';
-  const selectedChatbotReadiness = selectedChatbotId
-    ? documents.length > 0
-      ? 'Listo para probar.'
-      : 'Faltan documentos.'
-    : 'Crea el chatbot primero.';
-  const statsProvider = stats?.provider || selectedChatbot?.provider || '-';
-  const statsModel = stats?.model || selectedChatbot?.model_name || form.model || '-';
-  const statsDocuments = stats?.documentos ?? stats?.documentsCount ?? documents.length;
-  const statsChunks = stats?.chunksLoaded ?? stats?.documentsCount ?? 0;
-  const statsMessage =
-    stats?.message ||
-    (selectedChatbotId
-      ? documents.length > 0
-        ? `${documents.length} documento(s) asociado(s) al chatbot.`
-        : 'Sin fragmentos cargados todavía.'
-      : 'Selecciona un chatbot para ver su estado.');
-  const formCompletion = [
-    form.nombre_chatbot.trim(),
-    form.descripcion.trim(),
-    form.tipo,
-    form.model.trim(),
-    isGeneralType(form.tipo) && !isDocenteMode ? true : form.asignatura_id,
-    isGeneralType(form.tipo) ? true : form.miniproyecto_id,
-  ].filter(Boolean).length;
   const canConfirmPdf = Boolean(selectedChatbotId && selectedFile && !isUploading);
   const canCancelPdf = Boolean(selectedFile);
 
@@ -583,6 +579,51 @@ export function ChatbotManagementScreen({
     window.setTimeout(() => {
       uploadInputRef.current?.click();
     }, 150);
+  }
+
+  function resolveAsignaturaIdForDocumentsApi(): number | null | undefined {
+    const fromBot = selectedChatbot?.asignatura_id ?? null;
+    if (Number.isFinite(Number(fromBot))) return Number(fromBot);
+    if (form.asignatura_id) return Number(form.asignatura_id);
+    if (Number.isFinite(Number(docenteAsignaturaId))) return Number(docenteAsignaturaId);
+    return undefined;
+  }
+
+  function resolveAsignaturaForCatalogChatbot(ancho: ChatbotItem): number | null | undefined {
+    const aid = ancho.asignatura_id ?? null;
+    if (Number.isFinite(Number(aid))) return Number(aid);
+    if (Number.isFinite(Number(docenteAsignaturaId))) return Number(docenteAsignaturaId);
+    return undefined;
+  }
+
+  async function downloadChatbotPdfDocument(
+    chatbotId: number,
+    doc: ChatbotDocumentItem,
+    asignaturaOverride?: number | null,
+  ) {
+    const response = await apiFetch(
+      `/chatbots/${chatbotId}/documents/${doc.id}/download`,
+      { method: 'GET' },
+      asignaturaOverride ?? undefined,
+    );
+    if (!response.ok) {
+      let msg = 'No se pudo descargar el PDF';
+      try {
+        const body = await response.json();
+        if (body?.mensaje) msg = body.mensaje;
+      } catch { /* ignore */ }
+      throw new Error(msg);
+    }
+    const blob = await response.blob();
+    const fn = doc.nombre_original || doc.nombre_archivo || `documento_${doc.id}.pdf`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fn;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   async function loadInitialData() {
@@ -606,15 +647,28 @@ export function ChatbotManagementScreen({
         miniproyectosResponse.json(),
       ]);
 
-      const nextChatbots = Array.isArray(chatbotsData) ? chatbotsData : [];
+      const rawChatbots = Array.isArray(chatbotsData) ? chatbotsData : [];
+      const nextChatbots = mode === 'admin' ? rawChatbots.filter(isAdminBibliotecaChatbot) : rawChatbots;
       setChatbots(nextChatbots);
-      setAsignaturas(Array.isArray(asignaturasData) ? asignaturasData : []);
+      const listaAsign = Array.isArray(asignaturasData) ? asignaturasData : [];
+      const firstAsignaturaId = listaAsign[0]?.id != null ? Number(listaAsign[0].id) : NaN;
+      setAsignaturas(listaAsign);
       setMiniproyectos(Array.isArray(miniproyectosData) ? miniproyectosData : []);
 
-      if (nextChatbots.length > 0) {
-        await selectChatbot(nextChatbots[0]);
-      } else {
+      if (nextChatbots.length === 0) {
         handleCreateNew();
+      } else {
+        setCatalogExpandedChatbotId(null);
+        setSelectedChatbotId(null);
+        setDocuments([]);
+        setMessages([]);
+        setSelectedFile(null);
+        setIsFormVisible(false);
+        setForm(
+          isDocenteMode
+            ? enforceDocenteFormMode(emptyForm(), docenteAsignaturaId, Number.isFinite(firstAsignaturaId) ? firstAsignaturaId : undefined)
+            : { ...emptyForm(), asignatura_id: '' },
+        );
       }
     } catch (error) {
       console.error('Error loading chatbot admin data:', error);
@@ -631,7 +685,8 @@ export function ChatbotManagementScreen({
     }
 
     const data = await response.json();
-    const nextChatbots = Array.isArray(data) ? data : [];
+    const raw = Array.isArray(data) ? data : [];
+    const nextChatbots = mode === 'admin' ? raw.filter(isAdminBibliotecaChatbot) : raw;
     setChatbots(nextChatbots);
     return nextChatbots;
   }
@@ -647,29 +702,30 @@ export function ChatbotManagementScreen({
     setMessages([]);
 
     try {
-      const [documentsResponse, statsResponse] = await Promise.all([
-        apiFetch(`/chatbots/${chatbot.id}/documents`),
-        apiFetch(`/chatbots/${chatbot.id}/stats`),
-      ]);
+      const documentsResponse = await apiFetch(`/chatbots/${chatbot.id}/documents`);
 
       if (documentsResponse.ok) {
         const documentsData = await documentsResponse.json();
-        setDocuments(Array.isArray(documentsData) ? documentsData : []);
-      }
-
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        setStats(statsData);
-      } else {
-        setStats(null);
+        const arr = Array.isArray(documentsData) ? documentsData : [];
+        setDocuments(arr);
+        setChatbots((prev) => prev.map((c) => (c.id === chatbot.id ? { ...c, documentos: arr } : c)));
       }
     } catch (error) {
       console.error('Error selecting chatbot:', error);
-      setStats(null);
     }
   }
 
+  async function toggleCatalogDetail(chatbot: ChatbotItem) {
+    if (catalogExpandedChatbotId === chatbot.id) {
+      resetCatalogSelection();
+      return;
+    }
+    setCatalogExpandedChatbotId(chatbot.id);
+    await selectChatbot(chatbot);
+  }
+
   function handleCreateNew() {
+    setCatalogExpandedChatbotId(null);
     setSelectedChatbotId(null);
     setForm(
       isDocenteMode
@@ -680,7 +736,6 @@ export function ChatbotManagementScreen({
           }
     );
     setDocuments([]);
-    setStats(null);
     setSelectedFile(null);
     setMessages([]);
     setIsFormVisible(true);
@@ -705,6 +760,7 @@ export function ChatbotManagementScreen({
         ? enforceDocenteFormMode(mapChatbotToForm(selectedChatbot), docenteAsignaturaId, Number(AsignaturaOptions[0]?.id))
         : mapChatbotToForm(selectedChatbot)
     );
+    setCatalogExpandedChatbotId(selectedChatbot.id);
     setIsFormVisible(true);
     setStatusMessage('Editando configuración del chatbot seleccionado.');
   }
@@ -799,6 +855,8 @@ export function ChatbotManagementScreen({
       const selected = refreshed.find((item) => item.id === data.id);
       if (selected) {
         await selectChatbot(selected);
+        const savedId = Number(selected.id ?? data.id);
+        if (Number.isFinite(savedId)) setCatalogExpandedChatbotId(savedId);
       }
 
       setIsFormVisible(false);
@@ -832,16 +890,16 @@ export function ChatbotManagementScreen({
       }
 
       const refreshed = await loadChatbots();
-      if (refreshed.length > 0) {
-        await selectChatbot(refreshed[0]);
-      } else {
-        setSelectedChatbotId(null);
-        setForm(emptyForm());
-        setDocuments([]);
-        setStats(null);
-        setSelectedFile(null);
-        setMessages([]);
-      }
+      setCatalogExpandedChatbotId(null);
+      setSelectedChatbotId(null);
+      setDocuments([]);
+      setSelectedFile(null);
+      setMessages([]);
+      setForm(
+        isDocenteMode
+          ? enforceDocenteFormMode(emptyForm(), docenteAsignaturaId, Number(AsignaturaOptions[0]?.id))
+          : { ...emptyForm(), asignatura_id: '' },
+      );
       setIsFormVisible(false);
       setStatusMessage('Chatbot eliminado correctamente.');
     } catch (error) {
@@ -852,9 +910,9 @@ export function ChatbotManagementScreen({
     }
   }
 
-  async function handleToggleEstado(chatbot: ChatbotItem, event: React.MouseEvent) {
+  async function handleSetChatbotEstado(chatbot: ChatbotItem, newEstado: boolean, event: React.MouseEvent) {
     event.stopPropagation();
-    const newEstado = chatbot.estado === false ? true : false;
+    if ((chatbot.estado !== false) === newEstado) return;
     setStatusMessage(newEstado ? 'Habilitando chatbot...' : 'Deshabilitando chatbot...');
 
     try {
@@ -880,6 +938,16 @@ export function ChatbotManagementScreen({
       console.error('Error toggling chatbot estado:', error);
       setStatusMessage(error instanceof Error ? error.message : 'Error al actualizar el estado del chatbot.');
     }
+  }
+
+  function handleOpenEditFromList(chatbot: ChatbotItem, event: React.MouseEvent) {
+    event.stopPropagation();
+    void (async () => {
+      setCatalogExpandedChatbotId(chatbot.id);
+      await selectChatbot(chatbot);
+      setIsFormVisible(true);
+      setStatusMessage(`Editando «${chatbot.nombre}».`);
+    })();
   }
 
   async function handleUploadDocument() {
@@ -1074,107 +1142,83 @@ export function ChatbotManagementScreen({
         </div>
       </header>
 
-      <main className="app-main chatbot-admin-main">
+      <main className="app-main">
         <button onClick={onBack} className="app-back-button mb-3">
           <ArrowLeft className="w-4 h-4" />
           <span>Volver</span>
         </button>
 
-        <section className="chatbot-admin-hero app-panel mb-8 overflow-hidden">
-          <div className="chatbot-admin-hero__orb chatbot-admin-hero__orb--blue" />
-          <div className="chatbot-admin-hero__orb chatbot-admin-hero__orb--mint" />
-          <div className="chatbot-admin-hero__content">
-            <div className="chatbot-admin-hero__copy">
-              <div className="chatbot-admin-hero__eyebrow">Gestión inteligente</div>
-              <h2 className="chatbot-admin-hero__title">Gestión de chatbots</h2>
-              <p className="chatbot-admin-hero__description">
-                Estado, documentos y prueba de chat bot.
-              </p>
-            </div>
-
-            <div className="chatbot-admin-hero__side">
-              <div className="chatbot-admin-hero-balance-card">
-                <div className="chatbot-admin-hero-balance-card__label">Selección actual</div>
-                <div className="chatbot-admin-hero-balance-card__title">
-                  {selectedChatbotId ? form.nombre_chatbot || `Chatbot #${selectedChatbotId}` : 'Sin chatbot seleccionado'}
-                </div>
-                <div className="chatbot-admin-hero-balance-card__text">{selectedChatbotScope}</div>
-
-                <div className="chatbot-admin-pill-row chatbot-admin-pill-row--compact">
-                  <span className={`chatbot-admin-pill ${getChatbotTypePillClass(form.tipo)}`}>
-                    {getChatbotTypeLabel(form.tipo, isDocenteMode ? 'docente' : 'admin')}
-                  </span>
-                  <span className={`chatbot-admin-pill ${selectedChatbotId && selectedChatbotIsActive ? 'chatbot-admin-pill--green' : 'chatbot-admin-pill--slate'}`}>
-                    {selectedChatbotId ? (selectedChatbotIsActive ? 'Activo' : 'Inactivo') : 'Borrador'}
-                  </span>
-                </div>
-
-                <div className="chatbot-admin-hero__actions chatbot-admin-hero__actions--stacked">
-                  {selectedChatbotId ? (
-                    <button onClick={handleEditSelected} className="app-btn app-btn-secondary px-4 py-3">
-                      Editar chatbot
-                    </button>
-                  ) : null}
-                  <button onClick={handleCreateNew} className="app-btn app-btn-success px-4 py-3">
-                    <Plus className="w-4 h-4" />
-                    {selectedChatbotId ? 'Nuevo chatbot' : 'Crear chatbot'}
-                  </button>
+        <section className="mb-8 app-panel p-6" style={{ border: '1.5px solid #bfd3f5' }}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="app-section-head" style={{ marginBottom: '0.25rem' }}>
+                <div>
+                  <h2 className="app-section-title">Gestión de chatbots</h2>
+                  <p className="app-section-description">
+                    Administra el catálogo, la base documental en PDF y prueba cada asistente.
+                  </p>
                 </div>
               </div>
+            </div>
+            <div className="flex flex-shrink-0 flex-wrap gap-2">
+              <button type="button" onClick={handleCreateNew} className="app-btn app-primary-btn px-5 py-2.5 gap-2">
+                <Plus className="w-4 h-4" />
+                Crear chatbot
+              </button>
             </div>
           </div>
         </section>
 
-        <section className="chatbot-admin-stats mb-8">
-          <article className="chatbot-admin-stat-card chatbot-admin-stat-card--blue">
-            <div className="chatbot-admin-stat-card__icon">
+        <section className="app-metric-grid mb-8">
+          <article className="app-metric-card">
+            <div className="app-metric-icon" style={{ background: '#1a56db', color: '#ffffff' }}>
               <Bot className="w-5 h-5" />
             </div>
             <div>
-              <div className="chatbot-admin-stat-card__value">{totalChatbots}</div>
-              <div className="chatbot-admin-stat-card__label">Total</div>
+              <strong className="app-metric-value" style={{ color: '#1a56db' }}>{totalChatbots}</strong>
+              <p className="app-metric-label">Total</p>
             </div>
           </article>
-
-          <article className="chatbot-admin-stat-card chatbot-admin-stat-card--green">
-            <div className="chatbot-admin-stat-card__icon">
+          <article className="app-metric-card">
+            <div className="app-metric-icon" style={{ background: '#1a56db', color: '#ffffff' }}>
               <Eye className="w-5 h-5" />
             </div>
             <div>
-              <div className="chatbot-admin-stat-card__value">{activeChatbots}</div>
-              <div className="chatbot-admin-stat-card__label">Activos</div>
+              <strong className="app-metric-value" style={{ color: '#1a56db' }}>{activeChatbots}</strong>
+              <p className="app-metric-label">Activos</p>
             </div>
           </article>
-
-          <article className="chatbot-admin-stat-card chatbot-admin-stat-card--mint">
-            <div className="chatbot-admin-stat-card__icon">
+          <article className="app-metric-card">
+            <div className="app-metric-icon" style={{ background: '#1a56db', color: '#ffffff' }}>
               <MessageCircle className="w-5 h-5" />
             </div>
             <div>
-              <div className="chatbot-admin-stat-card__value">{generalChatbots}</div>
-              <div className="chatbot-admin-stat-card__label">{isDocenteMode ? 'Generales de asignatura' : 'Generales'}</div>
+              <strong className="app-metric-value" style={{ color: '#1a56db' }}>{generalChatbots}</strong>
+              <p className="app-metric-label">{isDocenteMode ? 'Generales de asignatura' : 'Generales'}</p>
             </div>
           </article>
-
-          <article className="chatbot-admin-stat-card chatbot-admin-stat-card--amber">
-            <div className="chatbot-admin-stat-card__icon">
-              <FileText className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="chatbot-admin-stat-card__value">{miniproyectoChatbots}</div>
-              <div className="chatbot-admin-stat-card__label">Miniproyecto</div>
-            </div>
-          </article>
+          {isDocenteMode ? (
+            <article className="app-metric-card">
+              <div className="app-metric-icon" style={{ background: '#1a56db', color: '#ffffff' }}>
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <strong className="app-metric-value" style={{ color: '#1a56db' }}>{miniproyectoChatbots}</strong>
+                <p className="app-metric-label">Miniproyecto</p>
+              </div>
+            </article>
+          ) : null}
         </section>
 
-        <div className="chatbot-admin-workspace">
-          <section className="chatbot-admin-primary-column space-y-6">
-            <section className="app-panel overflow-hidden">
+        <div className="chatbot-admin-workspace chatbot-admin-workspace--compact">
+            <section className="app-panel overflow-hidden chatbot-admin-catalog-panel">
               <div className="chatbot-admin-panel-head">
                 <div>
-                  <div className="chatbot-admin-section-kicker">Catálogo</div>
-                  <h3 className="chatbot-admin-section-title">Biblioteca de chatbots</h3>
-                  <p className="chatbot-admin-section-description">Filtra y selecciona rápido.</p>
+                  <div className="app-form-summary-label" style={{ marginBottom: '0.35rem' }}>Catálogo</div>
+                  <h3 className="app-section-title" style={{ fontSize: '1.15rem' }}>Biblioteca de chatbots</h3>
+                  <p className="app-section-description">
+                    Tras aplicar filtros verás solo el nombre de cada chatbot; al pulsar una fila se despliega el detalle, los PDF disponibles desde el catálogo y las acciones de edición o estado.
+                  </p>
                 </div>
                 <div className="chatbot-admin-count-badge">{visibleChatbots.length}</div>
               </div>
@@ -1202,10 +1246,12 @@ export function ChatbotManagementScreen({
                         Docente
                       </button>
                     ) : null}
-                    <button onClick={() => setTypeFilter('MINIPROYECTO')} className={`app-filter-chip ${typeFilter === 'MINIPROYECTO' ? 'app-filter-chip--amber' : ''}`}>
-                      <FileText className="w-4 h-4" />
-                      Miniproyecto
-                    </button>
+                    {isDocenteMode ? (
+                      <button onClick={() => setTypeFilter('MINIPROYECTO')} className={`app-filter-chip ${typeFilter === 'MINIPROYECTO' ? 'app-filter-chip--amber' : ''}`}>
+                        <FileText className="w-4 h-4" />
+                        Miniproyecto
+                      </button>
+                    ) : null}
                   </div>
 
                   <div className="app-filter-row">
@@ -1235,7 +1281,7 @@ export function ChatbotManagementScreen({
 
               {isLoading ? (
                 <div className="chatbot-admin-empty-state">
-                  <Loader className="w-8 h-8 animate-spin text-[#4A90E2]" />
+                  <Loader className="w-8 h-8 animate-spin" style={{ color: '#1a56db' }} />
                   <p>Cargando chatbots...</p>
                 </div>
               ) : visibleChatbots.length === 0 ? (
@@ -1244,73 +1290,173 @@ export function ChatbotManagementScreen({
                   <p>No hay chatbots que coincidan con los filtros activos.</p>
                 </div>
               ) : (
-                <div className="chatbot-admin-library">
+                <div className="chatbot-admin-library chatbot-admin-library--accordion">
                   {visibleChatbots.map((chatbot) => {
-                    const isSelected = chatbot.id === selectedChatbotId;
                     const chatbotIsActive = chatbot.estado !== false;
-                    const documentCount = chatbot.documentos?.length ?? 0;
+                    const docList = Array.isArray(chatbot.documentos) ? chatbot.documentos : [];
+                    const isExpanded = catalogExpandedChatbotId === chatbot.id;
 
                     return (
                       <div
                         key={chatbot.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => void selectChatbot(chatbot)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void selectChatbot(chatbot); }}
-                        className={`chatbot-admin-library-card ${isSelected ? 'chatbot-admin-library-card--selected' : ''} ${!chatbotIsActive ? 'chatbot-admin-library-card--inactive' : ''}`}
+                        className={`chatbot-admin-library-card ${isExpanded ? 'chatbot-admin-library-card--selected' : ''} ${!chatbotIsActive ? 'chatbot-admin-library-card--inactive' : ''}`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3 min-w-0">
-                            <div className={`chatbot-admin-library-card__icon ${getChatbotLibraryIconClass(chatbot.tipo)}`}>
-                              <Bot className="w-5 h-5" />
-                            </div>
-                            <div className="min-w-0 text-left">
-                              <div className="chatbot-admin-library-card__title">{chatbot.nombre}</div>
-                              <div className="chatbot-admin-library-card__subtitle">{chatbot.model_name || 'Modelo por defecto'}</div>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <span className={`chatbot-admin-badge ${getChatbotTypeBadgeClass(chatbot.tipo)}`}>
-                              {getChatbotTypeLabel(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
-                            </span>
-                            <span className="chatbot-admin-badge chatbot-admin-badge--slate">
-                              {getChatbotUsageContextLabel(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
-                            </span>
-                            <span className={`chatbot-admin-badge ${chatbotIsActive ? 'chatbot-admin-badge--green' : 'chatbot-admin-badge--slate'}`}>
-                              {chatbotIsActive ? 'Activo' : 'Inactivo'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <p className="chatbot-admin-library-card__description text-left">
-                          {chatbot.descripcion?.trim() || 'Sin descripción.'}
-                        </p>
-
-                        <p className="chatbot-admin-library-card__subtitle text-left mt-2">
-                          {getChatbotVisibilityHint(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
-                        </p>
-
-                        <div className="chatbot-admin-library-card__meta">
-                          <div>
-                            <span className="chatbot-admin-library-card__meta-label">Documentos</span>
-                            <span className="chatbot-admin-library-card__meta-value">{documentCount}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => void handleToggleEstado(chatbot, e)}
-                            title={chatbotIsActive ? 'Deshabilitar chatbot' : 'Habilitar chatbot'}
-                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                              chatbotIsActive
-                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                            }`}
-                          >
-                            {chatbotIsActive
-                              ? <><ToggleRight className="w-4 h-4" /><span>Deshabilitar</span></>
-                              : <><ToggleLeft className="w-4 h-4" /><span>Habilitar</span></>
+                        <button
+                          type="button"
+                          className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left hover:bg-slate-50/80"
+                          aria-expanded={isExpanded}
+                          aria-controls={`chatbot-catalog-detail-${chatbot.id}`}
+                          id={`chatbot-catalog-row-${chatbot.id}`}
+                          onClick={() => void toggleCatalogDetail(chatbot)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              void toggleCatalogDetail(chatbot);
                             }
-                          </button>
-                        </div>
+                          }}
+                        >
+                          <span className="inline-flex shrink-0 text-slate-500" aria-hidden>
+                            {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                          </span>
+                          <span className="chatbot-admin-library-card__title truncate min-w-0 flex-1">{chatbot.nombre}</span>
+                          <span
+                            className={`shrink-0 text-[0.65rem] font-bold uppercase tracking-wide ${chatbotIsActive ? 'text-emerald-700' : 'text-slate-500'}`}
+                          >
+                            {chatbotIsActive ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </button>
+
+                        {isExpanded ? (
+                          <div
+                            id={`chatbot-catalog-detail-${chatbot.id}`}
+                            role="region"
+                            aria-labelledby={`chatbot-catalog-row-${chatbot.id}`}
+                            className="border-t border-slate-100 px-4 pb-4"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3 pt-3">
+                              <div className="flex min-w-0 items-start gap-3">
+                                <div className={`chatbot-admin-library-card__icon shrink-0 ${getChatbotLibraryIconClass(chatbot.tipo)}`}>
+                                  <Bot className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0 text-left">
+                                  <div className="chatbot-admin-library-card__subtitle">{chatbot.model_name || 'Modelo por defecto'}</div>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap justify-end gap-2">
+                                <span className={`chatbot-admin-badge ${getChatbotTypeBadgeClass(chatbot.tipo)}`}>
+                                  {getChatbotTypeLabel(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
+                                </span>
+                                <span className="chatbot-admin-badge chatbot-admin-badge--slate">
+                                  {getChatbotUsageContextLabel(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
+                                </span>
+                                <span className={`chatbot-admin-badge ${chatbotIsActive ? 'chatbot-admin-badge--green' : 'chatbot-admin-badge--slate'}`}>
+                                  {chatbotIsActive ? 'Activo' : 'Inactivo'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <p className="chatbot-admin-library-card__description mt-3 text-left">
+                              {chatbot.descripcion?.trim() || 'Sin descripción.'}
+                            </p>
+
+                            <p className="chatbot-admin-library-card__subtitle mt-2 text-left">
+                              {getChatbotVisibilityHint(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
+                            </p>
+
+                            <div
+                              className="mt-3 rounded-lg border px-4 py-2.5 text-left sm:px-5"
+                              style={{ borderColor: '#e2e8f0', background: 'rgba(248,250,252,0.92)' }}
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              role="presentation"
+                            >
+                              <div className="app-form-summary-label" style={{ marginBottom: '0.35rem' }}>Base documental cargada</div>
+                              {docList.length === 0 ? (
+                                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Sin PDFs asociados aún.</p>
+                              ) : (
+                                <ul className="max-h-48 space-y-3 overflow-y-auto text-left text-sm px-0.5">
+                                  {docList.map((d) => (
+                                    <li
+                                      key={d.id}
+                                      className="flex items-start gap-3 rounded-lg border bg-white py-2.5 pl-5 pr-4 sm:items-center sm:gap-4 sm:pl-6 sm:pr-5"
+                                      style={{ borderColor: '#e2e8f0' }}
+                                    >
+                                      <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1a56db] sm:mt-0" aria-hidden />
+                                      <div className="min-w-0 flex-1 pr-1">
+                                        <div
+                                          className="break-words text-sm font-medium leading-snug text-[#1e293b]"
+                                          title={d.nombre_original || d.nombre_archivo}
+                                        >
+                                          {d.nombre_original || d.nombre_archivo || `Documento #${d.id}`}
+                                        </div>
+                                        <div className="mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                                          {formatBytes(d.tamano_bytes)}
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="app-btn app-primary-btn chatbot-admin-catalog-download-btn ml-2 shrink-0 self-center sm:ml-3"
+                                        disabled={isDownloadingPdfs}
+                                        title="Guardar una copia del PDF en tu equipo"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void (async () => {
+                                            setIsDownloadingPdfs(true);
+                                            try {
+                                              await downloadChatbotPdfDocument(
+                                                chatbot.id,
+                                                d,
+                                                resolveAsignaturaForCatalogChatbot(chatbot),
+                                              );
+                                              setStatusMessage(`Descargado: ${d.nombre_original || d.nombre_archivo || 'PDF'}.`);
+                                            } catch (error) {
+                                              console.error(error);
+                                              setStatusMessage(error instanceof Error ? error.message : 'Error al descargar.');
+                                            } finally {
+                                              setIsDownloadingPdfs(false);
+                                            }
+                                          })();
+                                        }}
+                                      >
+                                        <Download aria-hidden />
+                                        Descargar PDF
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+
+                            <div
+                              className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3"
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              role="presentation"
+                            >
+                              <button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={(e) => handleOpenEditFromList(chatbot, e)}>
+                                <Pencil className="w-3.5 h-3.5" />
+                                Editar
+                              </button>
+                              {!chatbotIsActive ? (
+                                <button
+                                  type="button"
+                                  className="app-btn app-btn-success app-btn-sm"
+                                  onClick={(e) => void handleSetChatbotEstado(chatbot, true, e)}
+                                >
+                                  Habilitar
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="app-btn app-btn-danger app-btn-sm"
+                                  onClick={(e) => void handleSetChatbotEstado(chatbot, false, e)}
+                                >
+                                  Inhabilitar
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -1318,24 +1464,152 @@ export function ChatbotManagementScreen({
               )}
             </section>
 
-            <div className="chatbot-admin-secondary-grid">
-              <section ref={documentSectionRef} className="app-panel p-6 chatbot-admin-lower-panel">
-                <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
-                  <div className="flex items-start gap-3">
-                    <div className="chatbot-admin-tone-icon chatbot-admin-tone-icon--green">
-                      <FileText className="w-5 h-5" />
+          <aside className="chatbot-admin-sidebar chatbot-admin-probador-slot">
+            <div className="chatbot-admin-sidebar__stack">
+              {statusMessage ? (
+                <div className="chatbot-admin-status-banner">
+                  {statusMessage}
+                </div>
+              ) : null}
+
+              <section className="app-panel overflow-hidden chatbot-admin-chat-panel">
+                <div className="chatbot-admin-chat-head chatbot-admin-chat-head--plain">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center rounded-xl shrink-0" style={{ width: '2.5rem', height: '2.5rem', background: '#dbeafe' }}>
+                      <MessageCircle className="w-4 h-4" style={{ color: '#1a56db' }} />
                     </div>
                     <div>
-                      <h3 className="chatbot-admin-section-title">Base documental</h3>
-                      <p className="chatbot-admin-section-description">PDFs asociados.</p>
+                      <h3 className="app-section-title" style={{ fontSize: '1.05rem' }}>Probador</h3>
+                      <p className="app-section-description">
+                        {selectedChatbotId ? (
+                          <>
+                            En estos momentos vas a probar el chatbot de:{' '}
+                            <strong>{form.nombre_chatbot?.trim() || `Chatbot #${selectedChatbotId}`}</strong>
+                          </>
+                        ) : (
+                          <>
+                            Despliega un chatbot en el catálogo y elígelo para aparecer aquí el nombre correspondiente antes de iniciar una prueba.
+                          </>
+                        )}
+                      </p>
                     </div>
                   </div>
-                  <button onClick={() => void handleReloadDocuments()} disabled={!selectedChatbotId || isReloading} className="app-btn app-btn-secondary px-4 py-3 text-slate-700 disabled:opacity-50">
-                    <RefreshCw className={`w-4 h-4 ${isReloading ? 'animate-spin' : ''}`} />
-                    Recargar
-                  </button>
                 </div>
 
+                <div className="chatbot-admin-chat-panel__body p-6">
+                  <div className="chatbot-admin-chat-shell">
+                    <div className={`chatbot-admin-chat-messages ${messages.length === 0 ? 'chatbot-admin-chat-messages--empty' : ''}`}>
+                      {messages.length === 0 ? (
+                        <div className="chatbot-admin-empty-state chatbot-admin-empty-state--compact">
+                          <Bot className="w-12 h-12 text-slate-300" aria-hidden />
+                          <p className="text-center text-slate-600 max-w-[18rem] mx-auto leading-relaxed">
+                            {selectedChatbotId ? 'Las respuestas del asistente aparecerán aquí.' : 'Selecciona un chatbot en el catálogo para iniciar una prueba.'}
+                          </p>
+                        </div>
+                      ) : (
+                        messages.map((message, index) => (
+                          <div key={index} className="chatbot-admin-transcript-row">
+                            <div className="chatbot-admin-transcript-row__meta">
+                              <span className={`chatbot-admin-transcript-row__tag ${message.isBot ? 'chatbot-admin-transcript-row__tag--bot' : 'chatbot-admin-transcript-row__tag--user'}`}>
+                                {message.isBot ? 'Chatbot' : 'Usuario'}
+                              </span>
+                            </div>
+                            <div className={`chatbot-admin-message ${message.isBot ? 'chatbot-admin-message--bot' : 'chatbot-admin-message--user'}`}>
+                              {message.isBot ? (
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{preprocessForMarkdown(String(message.text || ''))}</ReactMarkdown>
+                              ) : (
+                                message.text || (message.isBot && isAsking ? 'Pensando respuesta…' : '')
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="chatbot-admin-chat-shell__footer mt-4">
+                      <div className="chatbot-admin-chat-input-row">
+                        <input
+                          id="chatbot-probador-input"
+                          value={inputValue}
+                          onChange={(event) => setInputValue(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              void handleAskQuestion();
+                            }
+                          }}
+                          disabled={isAsking || !selectedChatbotId}
+                          placeholder={
+                            selectedChatbotId
+                              ? 'Escribe una pregunta y pulsa Enter o Enviar'
+                              : 'Primero elige un chatbot en el catálogo…'
+                          }
+                          className="chatbot-admin-chat-input"
+                          autoComplete="off"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleAskQuestion()}
+                          disabled={isAsking || !selectedChatbotId || !inputValue.trim()}
+                          className="app-btn app-primary-btn px-5 py-3 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isAsking ? (
+                            <>
+                              <Loader className="w-4 h-4 animate-spin" />
+                              <span className="hidden sm:inline">Esperando…</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4" />
+                              Enviar
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </aside>
+
+            <section ref={documentSectionRef} className="app-panel chatbot-admin-docs-panel chatbot-admin-docs-panel--compact chatbot-admin-lower-panel">
+              <div className="chatbot-admin-docs-head flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100">
+                    <FileText className="h-4 w-4" style={{ color: '#1a56db' }} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="app-section-title mb-0.5" style={{ fontSize: '1.05rem' }}>Base documental</h3>
+                    <p className="app-section-description mb-0">
+                      {selectedChatbotId ? (
+                        <>
+                          PDFs para{' '}
+                          <strong className="text-slate-900">{form.nombre_chatbot?.trim() || `#${selectedChatbotId}`}</strong>
+                          {' '}· máximo 2500 KB por archivo
+                        </>
+                      ) : (
+                        <>
+                          Primero{' '}
+                          <strong className="text-slate-800">despliega un chatbot</strong> en la biblioteca para subir PDFs aquí.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => void handleReloadDocuments()} disabled={!selectedChatbotId || isReloading} className="app-btn app-btn-secondary shrink-0 px-3 py-2 text-sm text-slate-700 disabled:opacity-50">
+                  <RefreshCw className={`h-4 w-4 ${isReloading ? 'animate-spin' : ''}`} />
+                  Recargar
+                </button>
+              </div>
+
+              {!selectedChatbotId ? (
+                <div className="chatbot-admin-empty-state py-8">
+                  <FileText className="w-10 h-10 text-slate-300" aria-hidden />
+                  <p className="max-w-md text-center text-slate-600 leading-relaxed">No hay un chatbot en foco. Abre uno en «Biblioteca de chatbots» y vuelve a esta sección.</p>
+                </div>
+              ) : (
+                <>
                 <input
                   ref={uploadInputRef}
                   id="chatbot-pdf-upload"
@@ -1360,254 +1634,92 @@ export function ChatbotManagementScreen({
                 />
 
                 <div className="app-form-stack">
-                  <div className="chatbot-admin-overview-card">
-                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-4 items-start">
-                      <div className="min-w-0">
-                        <div className="app-form-summary-label">Destino documental</div>
-                        <div className="app-form-summary-value">{selectedChatbotId ? (form.nombre_chatbot || `#${selectedChatbotId}`) : 'Guarda o selecciona un chatbot'}</div>
-                        <div className="app-form-summary-help">{selectedChatbotId ? 'Se cargará aquí.' : 'Guárdalo antes de cargar.'}</div>
-                      </div>
-                      <div className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${selectedChatbotId ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {selectedChatbotId ? 'Listo para cargar' : 'Pendiente de guardar'}
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="chatbot-admin-upload-band">
                     <div className="chatbot-admin-upload-band__summary">
-                      <div>
-                        <div className="app-form-summary-label">Archivo seleccionado <span className="text-slate-400 font-normal">(máx. 2500 KB)</span></div>
-                        <div className="chatbot-admin-upload-band__filename">
+                      <div className="min-w-0">
+                        <div className="app-form-summary-label leading-tight">Archivo <span className="font-normal text-slate-400">(máx. 2500 KB)</span></div>
+                        <div className="chatbot-admin-upload-band__filename leading-snug">
                           {selectedFile ? `${selectedFile.name} · ${(selectedFile.size / 1024).toFixed(0)} KB` : 'Ningún PDF seleccionado'}
                         </div>
                       </div>
-                      <div className="chatbot-admin-upload-band__status">{selectedFile ? 'Listo para confirmar' : 'Sin selección'}</div>
+                      <div className="chatbot-admin-upload-band__status shrink-0">{selectedFile ? 'Listo' : '—'}</div>
                     </div>
 
                     {pdfSizeError && (
-                      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                         <span className="mt-0.5 shrink-0">⚠️</span>
                         <span>{pdfSizeError}</span>
                       </div>
                     )}
 
                     <div className="chatbot-admin-upload-band__actions">
-                      <button onClick={openPdfPicker} className="app-btn app-primary-btn h-14 justify-center text-sm font-semibold">
+                      <button type="button" onClick={openPdfPicker} className="app-btn app-primary-btn min-h-0 justify-center py-2.5 text-xs font-semibold sm:text-sm">
                         Seleccionar PDF
                       </button>
-                      <button onClick={() => void handleUploadDocument()} disabled={!canConfirmPdf} className="app-btn app-btn-success h-14 justify-center text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                      <button type="button" onClick={() => void handleUploadDocument()} disabled={!canConfirmPdf} className="app-btn app-btn-success min-h-0 justify-center py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm">
                         {isUploading ? 'Cargando...' : 'Cargar PDF'}
                       </button>
-                      <button onClick={() => { setSelectedFile(null); setPdfSizeError(''); }} disabled={!canCancelPdf} className="app-btn chatbot-admin-upload-band__cancel h-14 justify-center text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                      <button type="button" onClick={() => { setSelectedFile(null); setPdfSizeError(''); }} disabled={!canCancelPdf} className="app-btn chatbot-admin-upload-band__cancel min-h-0 justify-center py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm">
                         Cancelar PDF
                       </button>
                     </div>
 
-                    <div className="chatbot-admin-document-list space-y-3 max-h-72 overflow-y-auto pr-1">
+                    <div className="chatbot-admin-document-list space-y-2 overflow-y-auto pr-0.5">
                       {documents.length === 0 ? (
                         <div className="chatbot-admin-empty-inline">No hay documentos asociados todavía.</div>
                       ) : (
                         documents.map((document) => (
                           <div key={document.id} className="chatbot-admin-document-item">
-                            <div className="min-w-0">
-                              <p className="chatbot-admin-document-item__title">{document.nombre_original || document.nombre_archivo}</p>
+                            <div className="min-w-0 flex-1 pr-2">
+                              <p className="chatbot-admin-document-item__title mb-0">{document.nombre_original || document.nombre_archivo}</p>
                               <p className="chatbot-admin-document-item__meta">{formatBytes(document.tamano_bytes)}</p>
                             </div>
-                            <button onClick={() => void handleDeleteDocument(document.id)} className="app-btn-icon inline-flex items-center justify-center rounded-xl text-red-600 hover:bg-red-50" title="Eliminar documento">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="app-panel p-6 chatbot-admin-lower-panel">
-                <div className="flex items-start gap-3 mb-5">
-                  <div className="chatbot-admin-tone-icon chatbot-admin-tone-icon--blue">
-                    <Database className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="chatbot-admin-section-title">Rendimiento y estado</h3>
-                    <p className="chatbot-admin-section-description">Estado técnico del chatbot.</p>
-                  </div>
-                </div>
-
-                <div className="app-form-stack">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="chatbot-admin-overview-card">
-                      <div className="app-form-summary-label">Proveedor</div>
-                      <div className="app-form-summary-value">{statsProvider}</div>
-                    </div>
-                    <div className="chatbot-admin-overview-card">
-                      <div className="app-form-summary-label">Modelo</div>
-                      <div className="app-form-summary-value">{statsModel}</div>
-                    </div>
-                    <div className="chatbot-admin-overview-card">
-                      <div className="app-form-summary-label">Documentos</div>
-                      <div className="app-form-summary-value">{statsDocuments}</div>
-                    </div>
-                    <div className="chatbot-admin-overview-card">
-                      <div className="app-form-summary-label">Chunks</div>
-                      <div className="app-form-summary-value">{statsChunks}</div>
-                    </div>
-                  </div>
-
-                  <div className="app-form-note chatbot-admin-note-card">
-                    <div className="app-form-summary-label">Estado del índice</div>
-                    <div className="text-sm text-slate-600 mt-2">{statsMessage}</div>
-                  </div>
-                </div>
-
-                <div className="app-form-note chatbot-admin-note-card chatbot-admin-note-card--spaced">
-                  <div className="app-form-summary-label">Sugerencia base</div>
-                  <div className="text-sm text-slate-600 mt-2">TopK 1 y contexto corto suelen funcionar mejor.</div>
-                </div>
-              </section>
-            </div>
-          </section>
-
-          <aside className="chatbot-admin-sidebar">
-            <div className="chatbot-admin-sidebar__stack">
-              {statusMessage ? (
-                <div className="chatbot-admin-status-banner">
-                  {statusMessage}
-                </div>
-              ) : null}
-
-              <section className="app-panel p-6">
-                <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
-                  <div>
-                    <div className="chatbot-admin-section-kicker">Vista rápida</div>
-                    <h3 className="chatbot-admin-section-title">Resumen del chatbot</h3>
-                    <p className="chatbot-admin-section-description">Contexto y estado.</p>
-                  </div>
-                  {!isFormVisible && selectedChatbotId ? (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button onClick={handleEditSelected} className="app-btn app-btn-secondary px-4 py-3">
-                        Editar chatbot
-                      </button>
-                      <button
-                        onClick={(e) => { if (selectedChatbot) void handleToggleEstado(selectedChatbot, e); }}
-                        className={`app-btn inline-flex items-center gap-2 px-4 py-3 font-medium transition-colors ${
-                          selectedChatbotIsActive
-                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                            : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                        }`}
-                      >
-                        {selectedChatbotIsActive
-                          ? <><ToggleRight className="w-4 h-4" /><span>Deshabilitar</span></>
-                          : <><ToggleLeft className="w-4 h-4" /><span>Habilitar</span></>
-                        }
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="chatbot-admin-sidebar-summary">
-                  <div className="chatbot-admin-overview-card chatbot-admin-overview-card--primary">
-                    <div className="chatbot-admin-overview-card__label">Asistente activo en foco</div>
-                    <div className="chatbot-admin-overview-card__title">
-                      {selectedChatbotId ? form.nombre_chatbot || `Chatbot #${selectedChatbotId}` : 'Selecciona o crea un chatbot'}
-                    </div>
-                    <p className="chatbot-admin-overview-card__text">{selectedChatbotDescription}</p>
-                    <div className="chatbot-admin-pill-row">
-                      <span className={`chatbot-admin-pill ${getChatbotTypePillClass(form.tipo)}`}>
-                        {getChatbotTypeLabel(form.tipo, isDocenteMode ? 'docente' : 'admin')}
-                      </span>
-                      <span className="chatbot-admin-pill chatbot-admin-pill--slate">
-                        {getChatbotUsageContextLabel(form.tipo, isDocenteMode ? 'docente' : 'admin')}
-                      </span>
-                      <span className={`chatbot-admin-pill ${selectedChatbotId && selectedChatbotIsActive ? 'chatbot-admin-pill--green' : 'chatbot-admin-pill--slate'}`}>
-                        {selectedChatbotId ? (selectedChatbotIsActive ? 'Disponible' : 'Inactivo') : 'Aun sin guardar'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="chatbot-admin-overview-stack">
-                    <div className="chatbot-admin-overview-card">
-                      <div className="chatbot-admin-overview-card__label">Asignación académica</div>
-                      <div className="chatbot-admin-overview-card__text">{selectedChatbotScope}</div>
-                    </div>
-                    <div className="chatbot-admin-overview-card">
-                      <div className="chatbot-admin-overview-card__label">Estado de preparación</div>
-                      <div className="chatbot-admin-overview-card__text">{selectedChatbotReadiness}</div>
-                    </div>
-                    <p className="chatbot-admin-overview-card__text">{getChatbotVisibilityHint(form.tipo, isDocenteMode ? 'docente' : 'admin')}</p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="app-panel overflow-hidden chatbot-admin-chat-panel">
-                <div className="chatbot-admin-chat-head chatbot-admin-chat-head--plain">
-                  <div className="flex items-center gap-3">
-                    <div className="chatbot-admin-tone-icon chatbot-admin-tone-icon--blue">
-                      <MessageCircle className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="chatbot-admin-section-title">Probador</h3>
-                      <p className="chatbot-admin-section-description">Prueba rápida.</p>
-                    </div>
-                  </div>
-                  <div className="chatbot-admin-chat-pill chatbot-admin-chat-pill--plain">
-                    {selectedChatbotId ? 'Listo para probar' : 'Selecciona un chatbot'}
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  <div className="chatbot-admin-chat-shell">
-                    <div className={`chatbot-admin-chat-messages ${messages.length === 0 ? 'chatbot-admin-chat-messages--empty' : ''}`}>
-                      {messages.length === 0 ? (
-                        <div className="chatbot-admin-empty-state chatbot-admin-empty-state--compact">
-                          <Bot className="w-12 h-12 text-slate-300" />
-                          <p>Seleccione un chatbot y registre una consulta de prueba.</p>
-                        </div>
-                      ) : (
-                        messages.map((message, index) => (
-                          <div key={index} className="chatbot-admin-transcript-row">
-                            <div className="chatbot-admin-transcript-row__meta">
-                              <span className={`chatbot-admin-transcript-row__tag ${message.isBot ? 'chatbot-admin-transcript-row__tag--bot' : 'chatbot-admin-transcript-row__tag--user'}`}>
-                                {message.isBot ? 'Chatbot' : 'Usuario'}
-                              </span>
-                            </div>
-                            <div className={`chatbot-admin-message ${message.isBot ? 'chatbot-admin-message--bot' : 'chatbot-admin-message--user'}`}>
-                              {message.isBot ? (
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{preprocessForMarkdown(String(message.text || ''))}</ReactMarkdown>
-                              ) : (
-                                message.text || (message.isBot && isAsking ? 'Procesando respuesta...' : '')
-                              )}
+                            <div className="chatbot-admin-document-item__actions">
+                              <button
+                                type="button"
+                                className="chatbot-admin-doc-icon-btn chatbot-admin-doc-icon-btn--download"
+                                disabled={isDownloadingPdfs}
+                                title="Descargar PDF"
+                                aria-label="Descargar PDF"
+                                onClick={() => void (async () => {
+                                  setIsDownloadingPdfs(true);
+                                  try {
+                                    if (!selectedChatbotId) return;
+                                    await downloadChatbotPdfDocument(
+                                      selectedChatbotId,
+                                      document,
+                                      resolveAsignaturaIdForDocumentsApi(),
+                                    );
+                                    setStatusMessage(`Descargado: ${document.nombre_original || document.nombre_archivo || 'PDF'}.`);
+                                  } catch (error) {
+                                    console.error(error);
+                                    setStatusMessage(error instanceof Error ? error.message : 'Error al descargar.');
+                                  } finally {
+                                    setIsDownloadingPdfs(false);
+                                  }
+                                })()}
+                              >
+                                <Download aria-hidden strokeWidth={2.25} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteDocument(document.id)}
+                                className="chatbot-admin-doc-icon-btn chatbot-admin-doc-icon-btn--danger"
+                                title="Quitar este PDF del chatbot"
+                                aria-label="Eliminar PDF"
+                              >
+                                <Trash2 aria-hidden strokeWidth={2.25} />
+                              </button>
                             </div>
                           </div>
                         ))
                       )}
                     </div>
-
-                    <div className="chatbot-admin-chat-input-row">
-                      <input
-                        value={inputValue}
-                        onChange={(event) => setInputValue(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault();
-                            void handleAskQuestion();
-                          }
-                        }}
-                        disabled={isAsking || !selectedChatbotId}
-                        placeholder={selectedChatbotId ? 'Registrar consulta de prueba...' : 'Se requiere crear o seleccionar un chatbot'}
-                        className="chatbot-admin-chat-input"
-                      />
-                      <button onClick={() => void handleAskQuestion()} disabled={isAsking || !selectedChatbotId || !inputValue.trim()} className="app-btn app-primary-btn px-5 py-3 disabled:opacity-50 disabled:cursor-not-allowed">
-                        <Send className="w-4 h-4" />
-                        Enviar
-                      </button>
-                    </div>
                   </div>
                 </div>
-              </section>
-            </div>
-          </aside>
+                </>
+              )}
+            </section>
         </div>
       </main>
       </div>
@@ -1854,32 +1966,6 @@ export function ChatbotManagementScreen({
                 </div>
 
                 <aside className="app-form-aside app-form-stack md:self-start">
-                  <section className="app-form-section app-form-section--accent">
-                    <h4 className="app-form-section-title">Resumen del chatbot</h4>
-                    <div className="mt-4 space-y-3 text-sm">
-                      <div className="app-form-summary-card">
-                        <div className="app-form-summary-label">Nombre</div>
-                        <div className="app-form-summary-value">{form.nombre_chatbot.trim() || 'Sin nombre definido'}</div>
-                        <div className="app-form-summary-help">{isGeneralType(form.tipo) ? (isDocenteMode ? 'Chatbot general del asignatura' : 'Chatbot transversal') : 'Chatbot de miniproyecto'}</div>
-                      </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                        <div className="app-form-summary-card">
-                          <div className="app-form-summary-label">Asignatura</div>
-                          <div className="app-form-summary-value">{isRoleScopedGeneralType(form.tipo) ? 'No aplica' : selectedAsignatura?.nombre || 'Pendiente'}</div>
-                        </div>
-                        <div className="app-form-summary-card">
-                          <div className="app-form-summary-label">Miniproyecto</div>
-                          <div className="app-form-summary-value">{form.tipo === 'MINIPROYECTO' ? (selectedMiniproyecto ? getMiniproyectoLabel(selectedMiniproyecto) : 'Pendiente') : 'No aplica'}</div>
-                        </div>
-                      </div>
-                      <div className="app-form-note">
-                        <div className="app-form-summary-label">Estado del formulario</div>
-                        <div className="app-form-summary-value">{selectedChatbotId ? 'Editando configuración existente' : 'Preparando nuevo chatbot'}</div>
-                        <div className="app-form-summary-help">Avance del formulario: {formCompletion}/{isGeneralType(form.tipo) ? (isDocenteMode ? 6 : 5) : 6} campos clave completos.</div>
-                      </div>
-                    </div>
-                  </section>
-
                   <section className="app-form-section">
                     <h4 className="app-form-section-title">Antes de guardar</h4>
                     <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
@@ -1919,7 +2005,7 @@ export function ChatbotManagementScreen({
                 type="button"
                 onClick={() => void handleSave()}
                 disabled={isSaving}
-                className="app-btn app-btn-success rounded-xl px-6 py-3 text-white disabled:opacity-50"
+                className="app-btn app-primary-btn px-6 py-3 disabled:opacity-50"
               >
                 {isSaving ? (
                   <>

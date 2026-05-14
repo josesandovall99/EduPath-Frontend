@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { BarChart3, BookOpen, Bot, ChevronRight, ClipboardList, Loader2, LogOut, Search } from 'lucide-react';
+import { BarChart3, BookOpen, ChevronRight, ClipboardList, Loader2, LogOut, Search } from 'lucide-react';
 import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 import { ChatbotButton } from './ChatbotButton';
@@ -155,6 +155,7 @@ export function DocenteDashboard({ onLogout, docente }: DocenteDashboardProps) {
           onGoToContenidos={() => navigateTo('content-management')}
           onGoToMiniproyectos={() => navigateTo('miniproyectos')}
           onGoToEjercicios={() => navigateTo('ejercicios')}
+          onGoToChatbot={() => navigateTo('chatbot')}
         />
       </Suspense>
     );
@@ -389,11 +390,10 @@ export function DocenteDashboard({ onLogout, docente }: DocenteDashboardProps) {
               <p className="app-section-description">Herramientas de seguimiento e informes académicos.</p>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.875rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.875rem' }}>
             {[
               { label: 'Generación de Informes', desc: 'Consulta y exportación de informes de progreso.', icon: BarChart3, action: () => navigateTo('reports') },
               { label: 'Miniproyectos', desc: 'Gestión de miniproyectos y actividades prácticas.', icon: ClipboardList, action: () => navigateTo('miniproyectos') },
-              { label: 'Gestión del Chatbot', desc: 'Administración de documentos y base de conocimiento.', icon: Bot, action: () => navigateTo('chatbot') },
             ].map(item => {
               const Icon = item.icon;
               return (

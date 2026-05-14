@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  Bot,
   ClipboardList,
   FileText,
   Layers,
@@ -36,6 +37,8 @@ interface AsignaturaDashboardScreenProps {
   onGoToMiniproyectos: () => void;
   /** Lleva a gestión de ejercicios filtrado por asignatura. */
   onGoToEjercicios: () => void;
+  /** Docente: gestión del chatbot acotada a esta asignatura. Si no se pasa, no se muestra el acceso. */
+  onGoToChatbot?: () => void;
 }
 
 interface AsignaturaStats {
@@ -65,6 +68,7 @@ export function AsignaturaDashboardScreen({
   onGoToContenidos,
   onGoToMiniproyectos,
   onGoToEjercicios,
+  onGoToChatbot,
 }: AsignaturaDashboardScreenProps) {
   const [stats, setStats] = useState<AsignaturaStats>(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -130,6 +134,9 @@ export function AsignaturaDashboardScreen({
     { label: 'Contenidos',       desc: 'Videos, documentos y recursos de la asignatura.',    icon: FileText,      action: onGoToContenidos },
     { label: 'Ejercicios',       desc: 'Actividades evaluativas asociadas.',                 icon: BookOpen,      action: onGoToEjercicios },
     { label: 'Miniproyectos',    desc: 'Proyectos prácticos de la asignatura.',              icon: ClipboardList, action: onGoToMiniproyectos },
+    ...(onGoToChatbot
+      ? [{ label: 'Chatbot', desc: 'Documentos y base de conocimiento de esta asignatura.', icon: Bot, action: onGoToChatbot } as const]
+      : []),
   ];
 
   return (
@@ -182,7 +189,7 @@ export function AsignaturaDashboardScreen({
               <p className="app-section-description">Selecciona un módulo para gestionarlo.</p>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', gridAutoRows: '1fr' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', gridAutoRows: '1fr' }}>
             {accesos.map((a) => {
               const Icon = a.icon;
               return (

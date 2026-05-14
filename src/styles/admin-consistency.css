@@ -3651,15 +3651,92 @@
   gap: 1rem;
 }
 
-.chatbot-admin-workspace {
+/* Gestión de chatbots: catálogo arriba a ancho completo; debajo probador (ancho flexible) | base documental (columna estrecha). */
+.chatbot-admin-workspace.chatbot-admin-workspace--compact {
   display: grid;
-  grid-template-columns: minmax(0, 1.28fr) minmax(420px, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: minmax(0, 0.93fr) minmax(305px, 400px);
+  grid-template-rows: auto auto;
+  gap: 1rem 1.125rem;
   align-items: start;
 }
 
-.chatbot-admin-primary-column {
+.chatbot-admin-workspace--compact .chatbot-admin-catalog-panel {
+  grid-column: 1 / -1;
+  grid-row: 1;
   min-width: 0;
+}
+
+.chatbot-admin-workspace--compact .chatbot-admin-probador-slot {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: start;
+  min-width: 0;
+}
+
+.chatbot-admin-workspace--compact .chatbot-admin-docs-panel {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+}
+
+.chatbot-admin-docs-panel.chatbot-admin-docs-panel--compact {
+  padding: 1.05rem 1.2rem;
+}
+
+.chatbot-admin-docs-panel--compact .chatbot-admin-docs-head {
+  margin-bottom: 0.65rem;
+}
+
+.chatbot-admin-docs-panel--compact .app-section-description {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.chatbot-admin-docs-panel--compact .app-form-stack {
+  gap: 0.6rem;
+}
+
+.chatbot-admin-docs-panel--compact .chatbot-admin-upload-band {
+  padding: 0.7rem;
+  gap: 0.6rem;
+}
+
+.chatbot-admin-docs-panel--compact .chatbot-admin-upload-band__summary {
+  padding: 0.55rem 0.8rem;
+  align-items: center;
+}
+
+.chatbot-admin-docs-panel--compact .chatbot-admin-upload-band__filename {
+  margin-top: 0.2rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.chatbot-admin-docs-panel--compact .chatbot-admin-upload-band__status {
+  font-size: 0.72rem;
+}
+
+.chatbot-admin-docs-panel--compact .chatbot-admin-upload-band__actions {
+  gap: 0.4rem;
+}
+
+.chatbot-admin-docs-panel--compact .chatbot-admin-document-list {
+  max-height: min(10rem, 24vh);
+}
+
+.chatbot-admin-docs-panel--compact > .chatbot-admin-empty-state {
+  min-height: 9rem;
+  padding: 1.35rem 1rem;
+}
+
+.chatbot-admin-docs-panel--compact .chatbot-admin-empty-inline {
+  min-height: 4.75rem;
+  padding: 0.75rem;
+}
+
+.chatbot-admin-docs-panel--compact .chatbot-admin-document-item {
+  padding: 0.62rem 0.78rem;
+  gap: 0.55rem;
 }
 
 .chatbot-admin-secondary-grid {
@@ -3672,11 +3749,10 @@
 .chatbot-admin-lower-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
 }
 
-.chatbot-admin-lower-panel .app-form-stack {
-  flex: 1;
+.chatbot-admin-docs-panel.chatbot-admin-lower-panel .app-form-stack {
+  flex: 0 1 auto;
 }
 
 .chatbot-admin-sidebar {
@@ -3684,11 +3760,27 @@
 }
 
 .chatbot-admin-sidebar__stack {
-  position: sticky;
-  top: 1.2rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 0.75rem;
+}
+
+.chatbot-admin-sidebar__stack > .chatbot-admin-status-banner {
+  flex-shrink: 0;
+}
+
+.chatbot-admin-chat-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.chatbot-admin-chat-panel__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.chatbot-admin-chat-panel > .chatbot-admin-chat-head {
+  flex-shrink: 0;
 }
 
 .chatbot-admin-sidebar-summary {
@@ -3747,6 +3839,40 @@
 .chatbot-admin-stat-card--amber .chatbot-admin-stat-card__icon {
   background: #ffedd5;
   color: #c2410c;
+}
+
+/* Descargar PDF en «Base documental cargada» del catálogo: anula min-height/padding de .app-btn */
+.app-btn.app-primary-btn.chatbot-admin-catalog-download-btn {
+  min-height: 0;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  gap: 0.3rem;
+  line-height: 1.15;
+  box-shadow: 0 3px 10px rgba(74, 144, 226, 0.2);
+}
+
+.app-btn.app-primary-btn.chatbot-admin-catalog-download-btn:hover {
+  box-shadow: 0 4px 14px rgba(74, 144, 226, 0.26);
+}
+
+.app-btn.app-primary-btn.chatbot-admin-catalog-download-btn:disabled {
+  box-shadow: none;
+}
+
+@media (min-width: 640px) {
+  .app-btn.app-primary-btn.chatbot-admin-catalog-download-btn {
+    font-size: 0.74rem;
+    padding: 0.34rem 0.65rem;
+  }
+}
+
+.app-btn.app-primary-btn.chatbot-admin-catalog-download-btn svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
 }
 
 .chatbot-admin-panel-head,
@@ -4082,6 +4208,70 @@
   box-shadow: 0 6px 14px rgba(148, 163, 184, 0.06);
 }
 
+/* Acciones descargar / eliminar en filas de PDF (iconos alineados al pixel) */
+.chatbot-admin-document-item__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.chatbot-admin-doc-icon-btn {
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  width: 2.375rem;
+  height: 2.375rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  line-height: 0;
+  vertical-align: middle;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chatbot-admin-doc-icon-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(26, 86, 219, 0.45);
+}
+
+.chatbot-admin-doc-icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.chatbot-admin-doc-icon-btn svg {
+  width: 1.0625rem;
+  height: 1.0625rem;
+  flex-shrink: 0;
+}
+
+.chatbot-admin-doc-icon-btn--download {
+  color: #1a56db;
+}
+
+.chatbot-admin-doc-icon-btn--download:hover:not(:disabled) {
+  background: rgba(239, 246, 255, 0.95);
+}
+
+.chatbot-admin-doc-icon-btn--danger {
+  color: #dc2626;
+}
+
+.chatbot-admin-doc-icon-btn--danger:hover {
+  background: rgba(254, 242, 242, 0.96);
+}
+
+.chatbot-admin-doc-icon-btn--danger:focus-visible {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(248, 113, 113, 0.55);
+}
+
 .chatbot-admin-chat-head {
   display: flex;
   align-items: center;
@@ -4125,21 +4315,24 @@
   background: #fff;
 }
 
+.chatbot-admin-chat-shell__footer {
+  flex-shrink: 0;
+}
+
 .chatbot-admin-chat-messages {
   display: flex;
   flex-direction: column;
-  flex: 1;
   gap: 0.95rem;
-  min-height: 18rem;
-  max-height: 24rem;
+  min-height: 8.5rem;
+  max-height: 13.5rem;
   overflow-y: auto;
-  padding: 1.2rem;
+  padding: 1rem 1.1rem;
   background: linear-gradient(180deg, rgba(250, 250, 250, 0.95) 0%, rgba(248, 250, 252, 0.92) 100%);
 }
 
 .chatbot-admin-chat-messages--empty {
   justify-content: center;
-  min-height: 16rem;
+  min-height: 8.5rem;
 }
 
 .chatbot-admin-transcript-row {
@@ -4217,7 +4410,17 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .chatbot-admin-workspace,
+  .chatbot-admin-workspace.chatbot-admin-workspace--compact {
+    grid-template-columns: 1fr;
+  }
+
+  .chatbot-admin-workspace--compact .chatbot-admin-catalog-panel,
+  .chatbot-admin-workspace--compact .chatbot-admin-docs-panel,
+  .chatbot-admin-workspace--compact .chatbot-admin-probador-slot {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
   .chatbot-admin-secondary-grid {
     grid-template-columns: 1fr;
   }
