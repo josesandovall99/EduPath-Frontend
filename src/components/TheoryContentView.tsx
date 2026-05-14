@@ -1,5 +1,25 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Play, FileText, CheckCircle2, BookOpen, ChevronDown, ChevronRight, Loader, Lock } from 'lucide-react';
+import {
+  ArrowLeft,
+  Play,
+  FileText,
+  CheckCircle2,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Loader,
+  Lock,
+  Archive,
+  ExternalLink,
+  FileMusic,
+  FileSpreadsheet,
+  FileVideo,
+  Globe,
+  Image,
+  Presentation,
+  ScrollText,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { ProgrammingContentView } from './ProgrammingContentView';
 import { UMLDiagramView } from './UMLDiagramView';
@@ -9,7 +29,6 @@ import { OrderingExercise } from './OrderingExercise';
 import { MatchingExercise } from './MatchingExercise';
 import { API_BASE_URL } from '../utils/constants';
 import { cachedFetch } from '../utils/fetchCache';
-
 // Estilos para renderizado de HTML
 const htmlContentStyles = `
   .html-content p {
@@ -115,6 +134,105 @@ const htmlContentStyles = `
     font-weight: 600;
   }
 `;
+
+/** Icono del botón "Abrir recurso" según extensión (si hay), dominio u OneDrive/SharePoint (`:b:` ≈ PDF, etc.). */
+function getResourceUrlIcon(rawUrl: string): LucideIcon {
+  const url = rawUrl.trim();
+  if (!url) return FileText;
+
+  let decoded = url;
+  try {
+    decoded = decodeURIComponent(url.replace(/\+/g, ' '));
+  } catch {
+    decoded = url;
+  }
+
+  const spToken = url.match(/\/:([bwxpuv]):\//i)?.[1]?.toLowerCase()
+    ?? decoded.match(/\/:([bwxpuv]):\//i)?.[1]?.toLowerCase();
+  switch (spToken) {
+    case 'b':
+      return ScrollText; // PDF en enlaces típicos de SharePoint / OneDrive
+    case 'w':
+      return FileText;
+    case 'x':
+      return FileSpreadsheet;
+    case 'p':
+      return Presentation;
+    case 'v':
+      return FileVideo;
+    case 'u':
+      return Globe;
+    default:
+      break;
+  }
+
+  let pathname = '';
+  let host = '';
+  try {
+    const u = new URL(url.includes('://') ? url : `https://${url}`);
+    host = u.hostname.toLowerCase();
+    pathname = `${u.pathname}${u.search}`.toLowerCase();
+  } catch {
+    pathname = url.toLowerCase();
+  }
+
+  if (host.includes('youtube.') || host === 'youtu.be') return Play;
+  if (host.includes('vimeo.com')) return FileVideo;
+
+  const extMatch = pathname.match(/\.([a-z0-9]{1,8})(?:[#?]|$)/);
+  const ext = extMatch?.[1];
+
+  switch (ext) {
+    case 'pdf':
+      return ScrollText;
+    case 'doc':
+    case 'docx':
+    case 'odt':
+    case 'rtf':
+      return FileText;
+    case 'xls':
+    case 'xlsx':
+    case 'csv':
+      return FileSpreadsheet;
+    case 'ppt':
+    case 'pptx':
+      return Presentation;
+    case 'zip':
+    case 'rar':
+    case '7z':
+      return Archive;
+    case 'png':
+    case 'jpg':
+    case 'jpeg':
+    case 'gif':
+    case 'webp':
+    case 'svg':
+    case 'bmp':
+    case 'ico':
+      return Image;
+    case 'mp4':
+    case 'webm':
+    case 'mov':
+    case 'avi':
+    case 'mkv':
+      return FileVideo;
+    case 'mp3':
+    case 'wav':
+    case 'flac':
+    case 'aac':
+      return FileMusic;
+    case 'html':
+    case 'htm':
+      return Globe;
+    case 'txt':
+      return FileText;
+    default:
+      break;
+  }
+
+  if (pathname.includes('.pdf')) return ScrollText;
+  return ExternalLink;
+}
 
 interface Module {
   id: string;
@@ -1105,25 +1223,73 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] flex">
-      {/* Left Sidebar - Course Modules */}
-      <div className="w-80 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto shadow-sm">
-        {/* Sidebar Header — alineado en altura con el header derecho (px-8 py-4 + ícono 48x48) */}
-        <div
-          className="px-6 py-4 border-b text-white shadow-sm"
-          style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)', borderColor: 'rgba(255,255,255,0.1)' }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1.5 shadow-md" style={{ boxShadow: '0 0 0 3px rgba(255,255,255,0.2)' }}>
-              <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
+    <div className="min-h-screen bg-[#F2F2F2] flex flex-col">
+      {/* Barra superior: mismo estilo que el header global; ocupa todo el ancho */}
+      <header className="app-header shrink-0">
+        <div className="px-8 py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <button type="button" onClick={onHome} title="Ir al panel principal" className="app-brand-icon">
+                <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
+              </button>
+              <div>
+                <h1>{subjectName}</h1>
+                <p className="text-sm">{content.title}</p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-base leading-tight">Módulos del Curso</p>
-              <p className="text-white/80 text-xs">Navega entre subtemas</p>
-            </div>
+
+            {(() => {
+              const pct = Math.round(Math.min(100, Math.max(0, currentProgress)));
+              return (
+                <div className="flex min-w-0 flex-1 shrink-0 items-center justify-end pl-4 md:pl-8">
+                  {/* Ancho con style inline: las clases w-[clamp(...)] a veces no compilan bien por las comas */}
+                  <div
+                    className="flex max-w-full shrink-0 flex-col gap-1 py-0.5"
+                    style={{
+                      width: 'clamp(13.5rem, 28vw, 21.25rem)',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    <div className="flex w-full min-w-0 items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate text-xs font-medium text-white/90">Progreso</span>
+                      <span className="shrink-0 text-xs font-semibold tabular-nums tracking-tight text-[#eef2ff]">
+                        {pct}%
+                      </span>
+                    </div>
+                    <div
+                      className="relative h-2 w-full overflow-hidden rounded-full border border-white shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
+                      style={{ backgroundColor: '#cfd6e2' }}
+                      role="progressbar"
+                      aria-valuenow={pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuetext={`${pct} por ciento completado`}
+                      aria-label="Progreso de la asignatura"
+                    >
+                      <div
+                        className="h-full transition-[width] duration-500 ease-out"
+                        style={{
+                          width: `${pct}%`,
+                          minWidth: pct > 0 && pct < 100 ? '8px' : 0,
+                          backgroundColor: '#aeb6c4',
+                          backgroundImage:
+                            'linear-gradient(180deg, #b8bfcc 0%, #a3aab8 52%, #8f96a6 100%)',
+                          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
+                          borderRadius: pct >= 100 ? '9999px' : '9999px 0 0 9999px',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
+      </header>
 
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {/* Left Sidebar - Course Modules */}
+      <div className="w-80 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto shadow-sm min-h-0">
         {/* Modules List */}
         <div className="p-3">
           {modules.map((module, idx) => {
@@ -1278,35 +1444,9 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       </div>
 
       {/* Right Content Asignatura */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="app-header">
-          <div className="px-8 py-4">
-            <div className="app-page-header">
-              <div className="app-brand-block">
-                <button type="button" onClick={onHome} title="Ir al panel principal" className="app-brand-icon">
-                  <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
-                </button>
-                <div>
-                  <h1>{subjectName}</h1>
-                  <p className="text-sm">{content.title}</p>
-                </div>
-              </div>
-
-              {/* Progress */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm" style={{ color: 'rgba(255,255,255,0.8)' }}>Progreso:</span>
-                <span className="font-bold text-white text-base">{`${currentProgress}%`}</span>
-                <div className="w-28 h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.25)' }}>
-                  <div className="h-full rounded-full bg-white" style={{ width: `${currentProgress}%` }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#F2F2F2] p-8">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#F2F2F2] p-8">
           <div className="mx-auto w-full max-w-[1500px]">
             <button onClick={onBack} className="app-back-button mb-6">
               <ArrowLeft className="w-4 h-4" />
@@ -1463,16 +1603,18 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                       {/* Mostrar imagen si la URL es una imagen */}
                       {selectedContentData.url && (selectedContentData.url.includes('jpg') || selectedContentData.url.includes('jpeg') || selectedContentData.url.includes('png') || selectedContentData.url.includes('gif') || selectedContentData.url.includes('webp')) && (
                         <div className="mb-6 rounded-xl overflow-hidden shadow-md">
-                          <img 
+                          <img
                             src={selectedContentData.url}
                             alt={selectedContentData.title}
                             className="w-full h-auto max-h-96 object-cover"
+                            draggable={false}
                           />
                         </div>
                       )}
 
                       {selectedContentData.descripcion && (
                         <div
+                          role="presentation"
                           className="quill-render mb-6"
                           dangerouslySetInnerHTML={{ __html: selectedContentData.descripcion }}
                         />
@@ -1489,28 +1631,22 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                           <p className="text-gray-700 text-sm mb-3">
                             <strong>Recurso disponible:</strong>
                           </p>
-                          <div className="flex gap-3 flex-wrap">
-                            <a 
-                              href={selectedContentData.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-all hover:shadow-md"
-                              style={{ backgroundColor: subjectColor }}
-                            >
-                              <FileText className="w-4 h-4" />
-                              Abrir recurso
-                            </a>
-                            <a 
-                              href={selectedContentData.url}
-                              download
-                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all hover:shadow-md"
-                              style={{ borderColor: subjectColor, color: subjectColor }}
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                              </svg>
-                              Descargar
-                            </a>
+                          <div className="flex flex-wrap gap-3">
+                            {(() => {
+                              const Ico = getResourceUrlIcon(selectedContentData.url ?? '');
+                              return (
+                                <a
+                                  href={selectedContentData.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-all hover:shadow-md"
+                                  style={{ backgroundColor: subjectColor }}
+                                >
+                                  <Ico className="h-4 w-4 shrink-0" aria-hidden />
+                                  Abrir recurso
+                                </a>
+                              );
+                            })()}
                           </div>
                           <p className="text-gray-600 text-xs mt-3 break-all">{selectedContentData.url}</p>
                         </div>
@@ -1523,6 +1659,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
