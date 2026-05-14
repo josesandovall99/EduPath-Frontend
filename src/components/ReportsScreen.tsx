@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useArea } from '../context/AreaContext';
 
 import { ArrowLeft, Download, Filter, X, User, Calendar, Activity, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, BarChart3, Award, AlertTriangle, Eye } from 'lucide-react';
@@ -656,6 +656,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   const [exportAllAsignaturas, setExportAllAsignaturas] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [studentSortOrder, setStudentSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [activitySubjectFilter, setActivitySubjectFilter] = useState<string>('all');
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
 
   // Cerrar menú exportar al hacer clic fuera
   useEffect(() => {
@@ -1531,14 +1533,222 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
   const handleExport = () => {
-
     if (activeTab === 'content-views' && rankingLoading) return;
-
+    if (activeTab === 'activity') { printAsignaturaReport(); return; }
     downloadPdf(activeTab);
-
   };
 
 
+
+  // Genera informe "Por asignatura" — mismo diseño que el informe por estudiante
+  const printAsignaturaReport = () => {
+    const fecha = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const asigsFiltradas = activitySubjectFilter === 'all'
+      ? subjectProgressData
+      : subjectProgressData.filter(s => s.name === activitySubjectFilter);
+
+    const tituloFiltro = activitySubjectFilter === 'all' ? 'Todas las asignaturas' : activitySubjectFilter;
+
+    const avgGeneral = asigsFiltradas.length
+      ? asigsFiltradas.reduce((sum, s) => sum + (s.progress || 0), 0) / asigsFiltradas.length : 0;
+
+    const matchSubject = (student: StudentProgress, subj: typeof subjectProgressData[0]) => {
+      if (subj.asignaturaId) {
+        const byId = student.subjects.find(s => String(s.asignaturaId ?? '') === String(subj.asignaturaId));
+        if (byId) return byId;
+      }
+      return student.subjects.find(s => s.name === subj.name);
+    };
+
+    // ── Tarjetas — idéntico al informe por estudiante ─────────────────────────
+    const subjectCardsHTML = asigsFiltradas.map(subj => {
+      const totalContent   = activityTabStudents.reduce((sum, st) => sum + (matchSubject(st, subj)?.contentViewed || 0), 0);
+      const totalExercises = activityTabStudents.reduce((sum, st) => sum + (matchSubject(st, subj)?.exercisesCompleted || 0), 0);
+      const totalProjects  = activityTabStudents.reduce((sum, st) => sum + (matchSubject(st, subj)?.miniprojectsSubmitted || 0), 0);
+      const avg = subj.progress || 0;
+      return `
+        <div style="border:1.5px solid #bfd3f5;border-radius:8px;padding:12px;display:flex;flex-direction:column;">
+          <div style="font-size:10px;font-weight:800;color:#111;text-transform:uppercase;letter-spacing:.04em;line-height:1.35;min-height:30px;">${subj.name}</div>
+          <div style="margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:9px;color:#666;">Progreso</span>
+              <span style="font-size:13px;font-weight:800;color:#111;">${Math.round(avg)}%</span>
+            </div>
+            <div style="height:5px;background:#e2e8f0;border-radius:999px;overflow:hidden;">
+              <div style="width:${Math.min(avg,100)}%;height:100%;background:${subj.color||'#1a56db'};border-radius:999px;"></div>
+            </div>
+          </div>
+          <div style="display:flex;margin-top:10px;">
+            <div style="flex:1;text-align:center;"><div style="font-size:15px;font-weight:800;color:#111;">${totalContent}</div><div style="font-size:9px;color:#666;margin-top:2px;">Contenidos</div></div>
+            <div style="flex:1;text-align:center;"><div style="font-size:15px;font-weight:800;color:#111;">${totalExercises}</div><div style="font-size:9px;color:#666;margin-top:2px;">Ejercicios</div></div>
+            <div style="flex:1;text-align:center;"><div style="font-size:15px;font-weight:800;color:#111;">${totalProjects}</div><div style="font-size:9px;color:#666;margin-top:2px;">Proyectos</div></div>
+          </div>
+        </div>`;
+    }).join('');
+
+    // ── Secciones por asignatura con tabla de estudiantes ────────────────────
+    const detailHTML = asigsFiltradas.map(subj => {
+      const topicSet = new Set<string>(); const subtopicSet = new Set<string>();
+      activityTabStudents.forEach(st => {
+        const s = matchSubject(st, subj);
+        if (s?.topics) s.topics.forEach(t => {
+          topicSet.add(t.name);
+          (t.subtopics||[]).forEach(st2 => subtopicSet.add(`${t.name}::${st2.name}`));
+        });
+      });
+      const totalTemas = topicSet.size; const totalSubtemas = subtopicSet.size;
+      const avg = subj.progress || 0;
+
+      const rows = activityTabStudents.map(st => {
+        const s = matchSubject(st, subj);
+        if (!s) return '';
+        const temasV    = s.topics ? s.topics.filter(t => t.progress > 0).length : 0;
+        const subtemasV = s.topics ? s.topics.reduce((n,t) => n+(t.subtopics||[]).filter(st2=>st2.progress>0).length,0) : 0;
+        const prog = Math.round(s.progress || 0);
+        const barColor = subj.color || '#1a56db';
+        return `<tr>
+          <td style="width:11%;padding:5px 6px;font-family:monospace;font-size:9.5px;color:#64748b;word-break:break-all;">${st.codigo??'—'}</td>
+          <td style="width:22%;padding:5px 6px;font-size:10px;color:#1e293b;word-break:break-word;">${st.name}</td>
+          <td style="width:8%;padding:5px 6px;text-align:center;font-size:10px;font-weight:700;color:${temasV>0?'#1a56db':'#94a3b8'};">${temasV}/${totalTemas}</td>
+          <td style="width:9%;padding:5px 6px;text-align:center;font-size:10px;font-weight:700;color:${subtemasV>0?'#1a56db':'#94a3b8'};">${subtemasV}/${totalSubtemas}</td>
+          <td style="width:9%;padding:5px 6px;text-align:center;font-size:10px;color:#475569;">${s.contentViewed||0}</td>
+          <td style="width:9%;padding:5px 6px;text-align:center;font-size:10px;color:#475569;">${s.exercisesCompleted||0}</td>
+          <td style="width:11%;padding:5px 6px;text-align:center;font-size:10px;color:#475569;">${s.miniprojectsSubmitted||0}</td>
+          <td style="width:21%;padding:5px 6px;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <div style="flex:1;height:5px;background:#e2e8f0;border-radius:999px;overflow:hidden;">
+                <div style="width:${Math.min(prog,100)}%;height:100%;background:${barColor};border-radius:999px;"></div>
+              </div>
+              <span style="font-size:9.5px;font-weight:700;color:#1e293b;white-space:nowrap;">${prog}%</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+      return `
+        <div style="margin-bottom:24px;page-break-inside:avoid;break-inside:avoid;">
+          <div style="display:flex;align-items:center;gap:8px;padding-bottom:6px;border-bottom:1.5px solid #1a56db;margin-bottom:8px;break-after:avoid;page-break-after:avoid;">
+            <span style="font-size:11px;font-weight:800;color:#1a56db;text-transform:uppercase;letter-spacing:.06em;">${subj.name}</span>
+            <span style="margin-left:auto;font-size:10px;font-weight:700;color:#fff;background:#1a56db;padding:1px 8px;border-radius:999px;">${Math.round(avg)}%</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+            <colgroup>
+              <col style="width:11%"/><col style="width:22%"/>
+              <col style="width:8%"/><col style="width:9%"/>
+              <col style="width:9%"/><col style="width:9%"/>
+              <col style="width:11%"/><col style="width:21%"/>
+            </colgroup>
+            <thead>
+              <tr style="background:#EFF6FF;border-bottom:1.5px solid #1a56db;">
+                <th style="padding:6px;text-align:left;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Código</th>
+                <th style="padding:6px;text-align:left;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Estudiante</th>
+                <th style="padding:6px;text-align:center;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Temas</th>
+                <th style="padding:6px;text-align:center;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Subtemas</th>
+                <th style="padding:6px;text-align:center;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Cont.</th>
+                <th style="padding:6px;text-align:center;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Ejerc.</th>
+                <th style="padding:6px;text-align:center;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Miniproyectos</th>
+                <th style="padding:6px;text-align:left;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Progreso</th>
+              </tr>
+            </thead>
+            <tbody style="border-bottom:1px solid #e2e8f0;">
+              ${rows||`<tr><td colspan="8" style="padding:10px;color:#94a3b8;text-align:center;font-size:10px;">Sin estudiantes</td></tr>`}
+            </tbody>
+          </table>
+        </div>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Informe por Asignatura — EduPath</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',Arial,sans-serif;color:#1e3a5f;font-size:12px;background:#fff;
+         -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .doc-wrap{width:100%;border-collapse:collapse;}
+    /* thead con display:table-header-group → el navegador lo repite en CADA página al imprimir */
+    .doc-head{display:table-header-group;}
+    .doc-body{display:table-row-group;}
+    @media print{
+      @page{margin:14mm 14mm 12mm 14mm;size:A4;}
+      .no-break{page-break-inside:avoid;break-inside:avoid;}
+    }
+  </style>
+</head>
+<body>
+<table class="doc-wrap">
+
+  <!-- ── Cabecera que se repite en cada página ── -->
+  <thead class="doc-head">
+    <tr>
+      <th style="border:none;padding:0;font-weight:normal;">
+        <div style="display:flex;align-items:center;justify-content:flex-end;
+                    padding:7px 10px 7px 0;background:#fff;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+            <img src="${logoImage}" alt="Ingeniería de Sistemas UDES"
+                 style="width:50px;height:50px;object-fit:contain;border-radius:50%;
+                        border:1.5px solid #bfd3f5;background:#f0f6ff;" />
+            <span style="font-size:7px;color:#64748b;text-align:center;line-height:1.3;">
+              Ing. de Sistemas<br/>UDES
+            </span>
+          </div>
+        </div>
+      </th>
+    </tr>
+  </thead>
+
+  <!-- ── Contenido del informe ── -->
+  <tbody class="doc-body">
+    <tr>
+      <td style="border:none;padding:16px 14px 20px;vertical-align:top;">
+
+        <!-- Encabezado del informe -->
+        <div style="padding-bottom:14px;border-bottom:2px solid #1a56db;margin-bottom:16px;">
+          <div style="font-size:18px;font-weight:800;color:#1a56db;line-height:1.2;">Informe de Desempeño por Asignatura</div>
+          <div style="font-size:12px;font-weight:600;color:#1e3a5f;margin-top:3px;">${tituloFiltro}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:3px;">EduPath · Ingeniería de Sistemas UDES · ${fecha}</div>
+          <div style="display:flex;align-items:center;gap:20px;margin-top:10px;flex-wrap:wrap;">
+            <div style="font-size:12px;font-weight:600;color:#1e3a5f;">${activityTabStudents.length} estudiante(s) · ${asigsFiltradas.length} asignatura(s)</div>
+            <div style="margin-left:auto;text-align:right;">
+              <div style="font-size:20px;font-weight:800;color:#1a56db;">${Math.round(avgGeneral)}%</div>
+              <div style="font-size:9px;color:#64748b;">Progreso promedio</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjetas de asignaturas -->
+        <div style="display:grid;grid-template-columns:repeat(${Math.min(asigsFiltradas.length,4)},1fr);gap:10px;margin-bottom:18px;align-items:stretch;">
+          ${subjectCardsHTML}
+        </div>
+
+        <!-- Detalle por estudiante -->
+        <div style="font-size:12px;font-weight:700;color:#1e3a5f;margin-bottom:10px;padding-bottom:4px;border-bottom:1px solid #e2e8f0;">
+          Detalle por Estudiante
+        </div>
+        ${detailHTML}
+
+      </td>
+    </tr>
+  </tbody>
+
+</table>
+</body>
+</html>`;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;visibility:hidden;';
+    document.body.appendChild(iframe);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) { document.body.removeChild(iframe); return; }
+    iframeDoc.open(); iframeDoc.write(html); iframeDoc.close();
+    setTimeout(() => {
+      try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch(e) { /* ignore */ }
+      setTimeout(() => { try { document.body.removeChild(iframe); } catch(e) { /* ok */ } }, 2000);
+    }, 500);
+    setTimeout(() => { try { document.body.removeChild(iframe); } catch(e) { /* ok */ } }, 60000);
+  };
 
   // Genera PDF limpio desde los datos — sin capturar DOM con estilos de UI
   const printStudentReport = () => {
@@ -1622,55 +1832,74 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     *{box-sizing:border-box;margin:0;padding:0;}
     body{font-family:'Segoe UI',Arial,sans-serif;color:#1e3a5f;font-size:13px;background:#fff;
          -webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    /* Contenido: padding-right reserva columna del logo */
-    .doc{padding:0 80px 0 0;}
-    /* Logo fijo: valores negativos lo colocan en el margen @page superior */
-    /* @page top=88px → logo a -74px = físicamente top:14px de la hoja */
-    .page-logo img{width:60px;height:60px;object-fit:contain;border-radius:50%;border:1.5px solid #bfd3f5;}
-    /* Línea superior: top:-8px = físicamente top:80px (dentro del margen superior) */
-    /* Línea inferior: bottom:-20px = físicamente 8px del borde inferior */
-    /* Bordes laterales */
+    .doc-wrap{width:100%;border-collapse:collapse;}
+    .doc-head{display:table-header-group;}
+    .doc-body{display:table-row-group;}
     @media print{
-      @page{margin:88px 20px 30px 20px;size:A4;}
-      /* Mismas reglas — los valores negativos se calculan sobre los márgenes @page */
+      @page{margin:14mm 14mm 12mm 14mm;size:A4;}
+      .no-break{page-break-inside:avoid;break-inside:avoid;}
     }
   </style>
 </head>
 <body>
-  <!-- Logo sutil + bordes fijos en TODAS las páginas -->
+<table class="doc-wrap">
 
-  <!-- Encabezado del informe -->
-  <div style="padding-bottom:14px;border-bottom:2px solid #1a56db;margin-bottom:16px;">
-    <div style="min-width:0;">
-      <div style="font-size:18px;font-weight:800;color:#1a56db;line-height:1.2;">Informe de Progreso Académico</div>
-      <div style="font-size:12px;font-weight:600;color:#1e3a5f;margin-top:3px;">${isAllSubjects ? 'Todas las asignaturas' : selectedArea}</div>
-      <div style="font-size:10px;color:#64748b;margin-top:3px;">EduPath · Ingeniería de Sistemas UDES · ${fecha}</div>
-      <div style="display:flex;align-items:center;gap:20px;margin-top:10px;flex-wrap:wrap;">
-        <div>
-          <div style="font-size:13px;font-weight:700;color:#1e3a5f;">${student.name}</div>
-          <div style="font-size:11px;color:#64748b;">${student.email}</div>
+  <!-- Logo que se repite en cada página -->
+  <thead class="doc-head">
+    <tr>
+      <th style="border:none;padding:0;font-weight:normal;">
+        <div style="display:flex;align-items:center;justify-content:flex-end;padding:7px 10px 7px 0;background:#fff;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+            <img src="${logoImage}" alt="Ingeniería de Sistemas UDES"
+                 style="width:50px;height:50px;object-fit:contain;border-radius:50%;
+                        border:1.5px solid #bfd3f5;background:#f0f6ff;" />
+            <span style="font-size:7px;color:#64748b;text-align:center;line-height:1.3;">
+              Ing. de Sistemas<br/>UDES
+            </span>
+          </div>
         </div>
-        ${isAllSubjects ? `<div style="margin-left:auto;text-align:right;">
-          <div style="font-size:20px;font-weight:800;color:#1a56db;">${Math.round(avgGeneral)}%</div>
-          <div style="font-size:9px;color:#64748b;">Progreso general</div>
-        </div>` : `<div style="margin-left:auto;text-align:right;">
-          <div style="font-size:20px;font-weight:800;color:#1a56db;">${Math.round(subjectsToShow[0]?.progress || 0)}%</div>
-          <div style="font-size:9px;color:#64748b;">Progreso en la asignatura</div>
-        </div>`}
-      </div>
-    </div>
-  </div>
+      </th>
+    </tr>
+  </thead>
 
-  <!-- Tarjetas resumen -->
-  <div style="display:grid;grid-template-columns:repeat(${Math.min(subjectsToShow.length,4)},1fr);gap:10px;margin-bottom:18px;align-items:stretch;">
-    ${subjectCardsHTML}
-  </div>
+  <tbody class="doc-body">
+    <tr>
+      <td style="border:none;padding:16px 14px 20px;vertical-align:top;">
 
-  <!-- Detalle temas/subtemas -->
-  <div style="font-size:12px;font-weight:700;color:#1e3a5f;margin-bottom:10px;padding-bottom:4px;border-bottom:1px solid #e2e8f0;">Detalle por Tema y Subtema</div>
-  ${detailHTML}
+        <!-- Encabezado del informe -->
+        <div style="padding-bottom:14px;border-bottom:2px solid #1a56db;margin-bottom:16px;">
+          <div style="font-size:18px;font-weight:800;color:#1a56db;line-height:1.2;">Informe de Progreso Académico</div>
+          <div style="font-size:12px;font-weight:600;color:#1e3a5f;margin-top:3px;">${isAllSubjects ? 'Todas las asignaturas' : selectedArea}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:3px;">EduPath · Ingeniería de Sistemas UDES · ${fecha}</div>
+          <div style="display:flex;align-items:center;gap:20px;margin-top:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:13px;font-weight:700;color:#1e3a5f;">${student.name}</div>
+              <div style="font-size:11px;color:#64748b;">${student.email}</div>
+            </div>
+            ${isAllSubjects ? `<div style="margin-left:auto;text-align:right;">
+              <div style="font-size:20px;font-weight:800;color:#1a56db;">${Math.round(avgGeneral)}%</div>
+              <div style="font-size:9px;color:#64748b;">Progreso general</div>
+            </div>` : `<div style="margin-left:auto;text-align:right;">
+              <div style="font-size:20px;font-weight:800;color:#1a56db;">${Math.round(subjectsToShow[0]?.progress || 0)}%</div>
+              <div style="font-size:9px;color:#64748b;">Progreso en la asignatura</div>
+            </div>`}
+          </div>
+        </div>
 
-  </div><!-- /doc -->
+        <!-- Tarjetas resumen -->
+        <div style="display:grid;grid-template-columns:repeat(${Math.min(subjectsToShow.length,4)},1fr);gap:10px;margin-bottom:18px;align-items:stretch;">
+          ${subjectCardsHTML}
+        </div>
+
+        <!-- Detalle temas/subtemas -->
+        <div style="font-size:12px;font-weight:700;color:#1e3a5f;margin-bottom:10px;padding-bottom:4px;border-bottom:1px solid #e2e8f0;">Detalle por Tema y Subtema</div>
+        ${detailHTML}
+
+      </td>
+    </tr>
+  </tbody>
+
+</table>
 </body>
 </html>`;
 
@@ -1745,6 +1974,16 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       }
 
+      // Filtros del tab "Por asignatura"
+      if (type === 'activity') {
+        if (appliedFilters.student !== 'all') {
+          params.append('estudiante_id', appliedFilters.student);
+        }
+        if (activitySubjectFilter !== 'all') {
+          params.append('asignatura_nombre', activitySubjectFilter);
+        }
+      }
+
       if (type === 'content-views' && !isDocenteMode && rankingAsignaturaFilter !== 'all') {
 
         params.append('asignatura_id', rankingAsignaturaFilter);
@@ -1797,43 +2036,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       const url = window.URL.createObjectURL(blob);
 
-      const printWindow = window.open(url, '_blank');
-
-
-
-      if (printWindow) {
-
-        const onReady = () => {
-
-          printWindow.focus();
-
-          printWindow.print();
-
-        };
-
-        printWindow.addEventListener('load', onReady);
-
-      } else {
-
-        const link = document.createElement('a');
-
-        link.href = url;
-
-        const nombreES: Record<string, string> = { student: 'estudiante', date: 'fecha', activity: 'actividad', failures: 'fallos', 'content-views': 'contenidos-vistos' };
-
-        link.download = `reporte_${nombreES[type] ?? type}.pdf`;
-
-        document.body.appendChild(link);
-
-        link.click();
-
-        link.remove();
-
-      }
-
-
-
-      window.URL.revokeObjectURL(url);
+      setPdfPreviewUrl(url);
 
     } catch (error) {
 
@@ -2299,7 +2502,28 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   const subjectProgressData = getSubjectProgressData(activityTabStudents, asignaturasCatalog);
 
+  const filteredSubjectProgressData = activitySubjectFilter === 'all'
+    ? subjectProgressData
+    : subjectProgressData.filter(s => s.name === activitySubjectFilter);
 
+  const filteredActivityData = activitySubjectFilter === 'all'
+    ? activityData
+    : (() => {
+        const counts = [
+          { name: 'Contenidos Visualizados', value: 0 },
+          { name: 'Ejercicios Completados', value: 0 },
+          { name: 'Miniproyectos Entregados', value: 0 }
+        ];
+        activityTabStudents.forEach(student => {
+          const subj = student.subjects.find(s => s.name === activitySubjectFilter);
+          if (subj) {
+            counts[0].value += subj.contentViewed;
+            counts[1].value += subj.exercisesCompleted;
+            counts[2].value += subj.miniprojectsSubmitted;
+          }
+        });
+        return counts;
+      })();
 
   const failuresTotals = failuresData?.totals || { intentos: 0, fallos: 0, aciertos: 0 };
 
@@ -2509,7 +2733,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       : activeTab === 'activity'
 
-        ? 'Desempeño por actividad'
+        ? 'Desempeño por asignatura'
 
         : activeTab === 'content-views'
 
@@ -2565,9 +2789,28 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
 
+  const nombreES: Record<string, string> = { student: 'estudiante', date: 'fecha', activity: 'asignatura', failures: 'fallos', 'content-views': 'contenidos-vistos' };
+
   return (
 
     <div className="app-shell">
+
+      {/* ── Visor PDF nativo del navegador ── */}
+      {pdfPreviewUrl && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000 }}>
+          {/* Botón cerrar flotante — sin interferir con el visor nativo */}
+          <button
+            onClick={() => { window.URL.revokeObjectURL(pdfPreviewUrl); setPdfPreviewUrl(null); }}
+            style={{ position: 'absolute', top: 12, right: 16, zIndex: 10001, background: '#1a56db', color: '#fff', border: 'none', borderRadius: '50%', width: 36, height: 36, fontSize: 18, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>
+            ✕
+          </button>
+          <iframe
+            src={pdfPreviewUrl}
+            style={{ width: '100%', height: '100%', border: 'none' }}
+            title="Informe PDF"
+          />
+        </div>
+      )}
 
       {/* Header */}
       <header className="app-header">
@@ -2680,7 +2923,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             { key: 'student', label: 'Por estudiante', icon: User },
             ...(!isDocenteMode ? [
               { key: 'date', label: 'Por fecha', icon: Calendar },
-              { key: 'activity', label: 'Por actividad', icon: Activity },
+              { key: 'activity', label: 'Por asignatura', icon: Activity },
             ] : []),
             { key: 'failures', label: 'Fallos', icon: AlertTriangle },
             { key: 'content-views', label: 'Más vistos', icon: Eye },
@@ -2808,39 +3051,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
 
-            {activeTab === 'activity' && (
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-
-                <div className="app-form-field">
-
-                  <label className="app-form-label">Tipo de Actividad</label>
-
-                  <select 
-
-                    value={filters.activityType}
-
-                    onChange={(e) => setFilters({...filters, activityType: e.target.value})}
-
-                    className="app-form-select"
-
-                  >
-
-                    <option value="all">Todas</option>
-
-                    <option value="content">Contenidos</option>
-
-                    <option value="exercise">Ejercicios</option>
-
-                    <option value="miniproject">Miniproyectos</option>
-
-                  </select>
-
-                </div>
-
-              </div>
-
-            )}
 
 
 
@@ -3688,189 +3898,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
           <div className="space-y-6">
 
-            {/* Resumen de actividades */}
 
-            <div className="app-metric-grid">
 
-              <div className="app-metric-card">
-
-                <div className="app-metric-icon" style={{ background: "#dbeafe", color: "#1a56db" }}>
-
-                  <Activity className="w-5 h-5" />
-
-                </div>
-
-                <div>
-
-                  <div className="app-metric-value">{activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0)}</div>
-
-                  <div className="app-metric-label">Contenidos visualizados</div>
-
-                  <div className="mt-1 text-xs text-slate-500">Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.contentViewed, 0), 0) / activityTabStudents.length) : 0} por estudiante.</div>
-
-                </div>
-
-              </div>
-
-
-
-              <div className="app-metric-card">
-
-                <div className="app-metric-icon" style={{ background: "#dbeafe", color: "#1a56db" }}>
-
-                  <CheckCircle2 className="w-5 h-5" />
-
-                </div>
-
-                <div>
-
-                  <div className="app-metric-value">{activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0)}</div>
-
-                  <div className="app-metric-label">Ejercicios completados</div>
-
-                  <div className="mt-1 text-xs text-slate-500">Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.exercisesCompleted, 0), 0) / activityTabStudents.length) : 0} por estudiante.</div>
-
-                </div>
-
-              </div>
-
-
-
-              <div className="app-metric-card">
-
-                <div className="app-metric-icon" style={{ background: "#dbeafe", color: "#1a56db" }}>
-
-                  <Award className="w-5 h-5" />
-
-                </div>
-
-                <div>
-
-                  <div className="app-metric-value">{activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0)}</div>
-
-                  <div className="app-metric-label">Miniproyectos entregados</div>
-
-                  <div className="mt-1 text-xs text-slate-500">Promedio: {activityTabStudents.length ? Math.round(activityTabStudents.reduce((sum, s) => sum + s.subjects.reduce((acc, subj) => acc + subj.miniprojectsSubmitted, 0), 0) / activityTabStudents.length) : 0} por estudiante.</div>
-
-                </div>
-
-              </div>
-
-            </div>
-
-
-
-            {/* Gráficas de actividades */}
-
-            <div className="grid grid-cols-2 gap-6">
-
-              <div className="bg-white rounded-xl shadow-md p-6">
-
-                <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
-
-                  <BarChart3 className="w-5 h-5 text-[#F5A97F]" />
-
-                  Distribución de Actividades
-
-                </h3>
-
-                <ResponsiveContainer width="100%" height={300}>
-
-                  <PieChart>
-
-                    <Pie
-
-                      data={activityData}
-
-                      dataKey="value"
-
-                      nameKey="name"
-
-                      cx="50%"
-
-                      cy="50%"
-
-                      outerRadius={100}
-
-                      label={(entry) => `${entry.value}`}
-
-                    >
-
-                      <Cell fill="#4A90E2" />
-
-                      <Cell fill="#7ED6A7" />
-
-                      <Cell fill="#F5A97F" />
-
-                    </Pie>
-
-                    <Tooltip />
-
-                    <Legend />
-
-                  </PieChart>
-
-                </ResponsiveContainer>
-
-              </div>
-
-
-
-              <div className="bg-white rounded-xl shadow-md p-6">
-
-                <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2">
-
-                  <TrendingUp className="w-5 h-5 text-[#F5A97F]" />
-
-                  Progreso por Materia
-
-                </h3>
-
-                <ResponsiveContainer width="100%" height={300}>
-
-                  <BarChart data={subjectProgressData} layout="vertical" margin={{ top: 8, right: 24, left: 24, bottom: 8 }}>
-
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-
-                    <XAxis type="number" tick={{ fontSize: 11 }} domain={[0, 100]} />
-
-                    <YAxis type="category" dataKey="shortName" width={160} tick={{ fontSize: 11 }} />
-
-                    <Tooltip
-
-                      formatter={(value: number) => [`${formatPercent(value)}%`, 'Progreso']}
-
-                      labelFormatter={(_, payload) => {
-
-                        if (Array.isArray(payload) && payload.length > 0) {
-
-                          return payload[0]?.payload?.name || 'Asignatura';
-
-                        }
-
-                        return 'Asignatura';
-
-                      }}
-
-                    />
-
-                    <Bar dataKey="progress" radius={[0, 8, 8, 0]}>
-
-                      {subjectProgressData.map((entry, index) => (
-
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-
-                      ))}
-
-                    </Bar>
-
-                  </BarChart>
-
-                </ResponsiveContainer>
-
-              </div>
-
-            </div>
 
 
 
@@ -3880,10 +3909,10 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Desempeño por actividad</p>
-                  <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Análisis de completitud, volumen de uso y calificación estimada.</p>
+                  <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Desempeño por asignatura</p>
+                  <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Cobertura de temas, subtemas y actividades por estudiante.</p>
                 </div>
-                <button onClick={() => downloadPdf('activity')}
+                <button onClick={() => printAsignaturaReport()}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                   <Download className="w-3.5 h-3.5" />
                   Exportar PDF
@@ -3894,272 +3923,263 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               <div className="app-table-card__body">
 
-                {subjectProgressData.map((subject) => {
-
-                  const subjectName = subject.name;
-
-                  const color = subject.color;
-
-                  const subjectasignaturaId = subject.asignaturaId;
-
-
-
-                  const findMatchingSubject = (student: StudentProgress) => {
-
-                    const matchByasignaturaId = subjectasignaturaId
-
-                      ? student.subjects.find((subj) => String(subj.asignaturaId ?? '') === String(subjectasignaturaId))
-
-                      : undefined;
-
-                    return matchByasignaturaId || student.subjects.find((subj) => subj.name === subjectName);
-
-                  };
-
-
-
-                  const totalContent = activityTabStudents.reduce((sum, s) => {
-
-                    const subj = findMatchingSubject(s);
-
-                    return sum + (subj?.contentViewed || 0);
-
-                  }, 0);
-
-
-
-                  const totalExercises = activityTabStudents.reduce((sum, s) => {
-
-                    const subj = findMatchingSubject(s);
-
-                    return sum + (subj?.exercisesCompleted || 0);
-
-                  }, 0);
-
-
-
-                  const totalProjects = activityTabStudents.reduce((sum, s) => {
-
-                    const subj = findMatchingSubject(s);
-
-                    return sum + (subj?.miniprojectsSubmitted || 0);
-
-                  }, 0);
-
-
-
-                  let avgProgress = 0;
-
-                  let count = 0;
-
-                  activityTabStudents.forEach((s) => {
-
-                    const subj = findMatchingSubject(s);
-
-                    if (subj) {
-
-                      avgProgress += subj.progress || 0;
-
-                      count += 1;
-
-                    }
-
-                  });
-
-                  avgProgress = count ? avgProgress / count : 0;
-
-
-
-                  return (
-
-                    <div key={subjectName} className="mb-8 last:mb-0 border-b border-gray-200 last:border-0 pb-8 last:pb-0">
-
-                      <div className="flex items-center gap-3 mb-4">
-
-                        <div 
-
-                          className="w-4 h-4 rounded-full"
-
-                          style={{ backgroundColor: color }}
-
-                        />
-
-                        <h4 className="text-[#3A4A5B] text-lg">{subjectName}</h4>
-
-                      </div>
-
-
-
-                      <div className="grid grid-cols-4 gap-4 mb-4">
-
-                        <div className="bg-gray-50 rounded-lg p-4">
-
-                          <div className="text-sm text-gray-600 mb-1">Progreso Promedio</div>
-
-                          <div className="flex items-center gap-2">
-
-                            <div className="text-2xl text-[#3A4A5B]">{formatPercent(avgProgress)}%</div>
-
-                            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-
-                              <div 
-
-                                className="h-full rounded-full"
-
-                                style={{ 
-
-                                  width: `${avgProgress}%`,
-
-                                  backgroundColor: color
-
-                                }}
-
-                              />
-
+                {/* ── Filtro de asignatura ── */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer', fontWeight: 500, userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={activitySubjectFilter === 'all'}
+                      onChange={e => setActivitySubjectFilter(e.target.checked ? 'all' : (subjectProgressData[0]?.name ?? 'all'))}
+                      style={{ accentColor: '#1a56db', width: 15, height: 15, cursor: 'pointer' }}
+                    />
+                    Seleccionar todas las asignaturas
+                  </label>
+                  {activitySubjectFilter !== 'all' && (
+                    <span style={{
+                      fontSize: 11, color: '#1a56db', background: '#dbeafe',
+                      padding: '4px 12px', borderRadius: 999, fontWeight: 600,
+                      maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      Filtrando: {activitySubjectFilter}
+                    </span>
+                  )}
+                </div>
+
+                {/* ── Grid de tarjetas — 4 columnas, clicables ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+                  {subjectProgressData.map((subject) => {
+                    const subjectName = subject.name;
+                    const color = subject.color;
+                    const subjectasignaturaId = subject.asignaturaId;
+                    const findMatch = (student: StudentProgress) => {
+                      const byId = subjectasignaturaId
+                        ? student.subjects.find(s => String(s.asignaturaId ?? '') === String(subjectasignaturaId))
+                        : undefined;
+                      return byId || student.subjects.find(s => s.name === subjectName);
+                    };
+                    const totalContent  = activityTabStudents.reduce((sum, s) => sum + (findMatch(s)?.contentViewed       || 0), 0);
+                    const totalExercises= activityTabStudents.reduce((sum, s) => sum + (findMatch(s)?.exercisesCompleted  || 0), 0);
+                    const totalProjects = activityTabStudents.reduce((sum, s) => sum + (findMatch(s)?.miniprojectsSubmitted|| 0), 0);
+                    let avgProg = 0, cnt = 0;
+                    activityTabStudents.forEach(s => { const subj = findMatch(s); if (subj) { avgProg += subj.progress || 0; cnt++; } });
+                    avgProg = cnt ? avgProg / cnt : 0;
+                    const isSelected = activitySubjectFilter === subjectName;
+
+                    return (
+                      <div key={subjectName}
+                        onClick={() => setActivitySubjectFilter(isSelected ? 'all' : subjectName)}
+                        style={{
+                          background: '#ffffff',
+                          border: isSelected ? '2px solid #1a56db' : '1.5px solid #e2e8f0',
+                          borderRadius: 14,
+                          padding: '18px 16px 16px',
+                          cursor: 'pointer',
+                          boxShadow: isSelected
+                            ? '0 0 0 3px rgba(26,86,219,0.10)'
+                            : '0 1px 3px rgba(0,0,0,0.06)',
+                          transition: 'border-color 0.15s, box-shadow 0.15s',
+                          display: 'flex',
+                          flexDirection: 'column',
+                        }}>
+
+                        {/* Nombre — minHeight fija la simetría vertical */}
+                        <div style={{
+                          fontWeight: 700,
+                          color: '#1e293b',
+                          fontSize: 13,
+                          lineHeight: 1.4,
+                          minHeight: 54,        /* espacio para hasta 3 líneas */
+                          marginBottom: 10,
+                        }}>
+                          {subjectName}
+                        </div>
+
+                        {/* Progreso */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                          <span style={{ fontSize: 12, color: '#64748b' }}>Progreso</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>{formatPercent(avgProg)}%</span>
+                        </div>
+                        <div style={{ height: 7, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden', marginBottom: 18 }}>
+                          <div style={{ height: 7, width: `${avgProg}%`, background: color, borderRadius: 999 }} />
+                        </div>
+
+                        {/* Contadores */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', textAlign: 'center' }}>
+                          {[
+                            { label: 'Contenidos', value: totalContent  },
+                            { label: 'Ejercicios',  value: totalExercises},
+                            { label: 'Proyectos',   value: totalProjects },
+                          ].map(({ label, value }) => (
+                            <div key={label}>
+                              <div style={{ fontSize: 24, fontWeight: 700, color: '#1e293b', lineHeight: 1 }}>{value}</div>
+                              <div style={{ fontSize: 11, color: '#1a56db', fontWeight: 500, marginTop: 5 }}>{label}</div>
                             </div>
-
-                          </div>
-
-                        </div>
-
-
-
-                        <div className="bg-gray-50 rounded-lg p-4">
-
-                          <div className="text-sm text-gray-600 mb-1">Contenidos Visualizados</div>
-
-                          <div className="text-2xl text-[#3A4A5B]">{totalContent}</div>
-
-                          <div className="text-xs text-gray-500 mt-1">
-
-                            {activityTabStudents.length ? Math.round(totalContent / activityTabStudents.length) : 0} por estudiante
-
-                          </div>
-
-                        </div>
-
-
-
-                        <div className="bg-gray-50 rounded-lg p-4">
-
-                          <div className="text-sm text-gray-600 mb-1">Ejercicios Completados</div>
-
-                          <div className="text-2xl text-[#3A4A5B]">{totalExercises}</div>
-
-                          <div className="text-xs text-gray-500 mt-1">
-
-                            {activityTabStudents.length ? Math.round(totalExercises / activityTabStudents.length) : 0} por estudiante
-
-                          </div>
-
-                        </div>
-
-
-
-                        <div className="bg-gray-50 rounded-lg p-4">
-
-                          <div className="text-sm text-gray-600 mb-1">Miniproyectos Entregados</div>
-
-                          <div className="text-2xl text-[#3A4A5B]">{totalProjects}</div>
-
-                          <div className="text-xs text-gray-500 mt-1">
-
-                            {activityTabStudents.length ? Math.round(totalProjects / activityTabStudents.length) : 0} por estudiante
-
-                          </div>
-
+                          ))}
                         </div>
 
                       </div>
+                    );
+                  })}
+                </div>
 
+                {/* ── Gráficas — se filtran según selección ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
+                  <div style={{ background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+                    <h3 style={{ color: '#3A4A5B', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
+                      <BarChart3 style={{ width: 18, height: 18, color: '#F5A97F' }} />
+                      Distribución de Actividades
+                    </h3>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <PieChart margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
+                        <Pie
+                          data={filteredActivityData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="44%"
+                          outerRadius={88}
+                          innerRadius={0}
+                          label={({ cx, cy, midAngle, outerRadius: or, value }) => {
+                            if (!value) return null;
+                            const RADIAN = Math.PI / 180;
+                            const r = or + 18;
+                            const x = cx + r * Math.cos(-midAngle * RADIAN);
+                            const y = cy + r * Math.sin(-midAngle * RADIAN);
+                            return (
+                              <text x={x} y={y} fill="#374151" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={600}>
+                                {value}
+                              </text>
+                            );
+                          }}
+                          labelLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
+                        >
+                          <Cell fill="#4A90E2" />
+                          <Cell fill="#7ED6A7" />
+                          <Cell fill="#F5A97F" />
+                        </Pie>
+                        <Tooltip formatter={(v: number, name: string) => [v, name]} />
+                        <Legend verticalAlign="bottom" height={52} wrapperStyle={{ paddingTop: 14, fontSize: 12 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div style={{ background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+                    <h3 style={{ color: '#3A4A5B', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
+                      <TrendingUp style={{ width: 18, height: 18, color: '#F5A97F' }} />
+                      Progreso por Materia
+                    </h3>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={filteredSubjectProgressData} layout="vertical" margin={{ top: 8, right: 32, left: 24, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis
+                          type="number"
+                          tick={{ fontSize: 11 }}
+                          domain={[0, 100]}
+                          ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+                          tickFormatter={(v) => `${v}`}
+                        />
+                        <YAxis type="category" dataKey="shortName" width={160} tick={{ fontSize: 11 }} />
+                        <Tooltip
+                          formatter={(value: number) => [`${formatPercent(value)}%`, 'Progreso']}
+                          labelFormatter={(_, payload) => Array.isArray(payload) && payload.length > 0 ? payload[0]?.payload?.name || 'Asignatura' : 'Asignatura'}
+                        />
+                        <Bar dataKey="progress" radius={[0, 8, 8, 0]}>
+                          {filteredSubjectProgressData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
 
-
-                      <div className="overflow-x-auto">
-
-                        <table className="app-data-table">
-
-                          <thead>
-
-                            <tr>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Contenidos</th>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Ejercicios</th>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Miniproyectos</th>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Progreso</th>
-
-                            </tr>
-
-                          </thead>
-
-                          <tbody>
-
-                            {activityTabStudents.map((student) => {
-
-                              const subject = student.subjects.find(s => s.name === subjectName);
-
-                              if (!subject) return null;
-
-                              return (
-                                <tr key={student.id} className="hover:bg-gray-50 transition-colors">
-
-                                  <td className="px-4 py-3 text-[#3A4A5B] text-sm">{student.name}</td>
-
-                                  <td className="px-4 py-3 text-gray-600 text-sm">{subject.contentViewed}</td>
-
-                                  <td className="px-4 py-3 text-gray-600 text-sm">{subject.exercisesCompleted}</td>
-
-                                  <td className="px-4 py-3 text-gray-600 text-sm">{subject.miniprojectsSubmitted}</td>
-
-                                  <td className="px-4 py-3">
-
-                                    <div className="flex items-center gap-2">
-
-                                      <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-
-                                        <div 
-
-                                          className="h-full rounded-full"
-
-                                          style={{ 
-
-                                            width: `${subject.progress}%`,
-
-                                            backgroundColor: color
-
-                                          }}
-
-                                        />
-
-                                      </div>
-
-                                      <span className="text-sm text-gray-600">{formatPercent(subject.progress)}%</span>
-
-                                    </div>
-
-                                  </td>
-
+                {/* ── Tablas detalladas — solo asignaturas filtradas ── */}
+                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+                  {subjectProgressData
+                    .filter(s => activitySubjectFilter === 'all' || s.name === activitySubjectFilter)
+                    .map((subject) => {
+                      const subjectName = subject.name;
+                      const color = subject.color;
+                      const subjectasignaturaId = subject.asignaturaId;
+                      const findMatchingSubject = (student: StudentProgress) => {
+                        const byId = subjectasignaturaId
+                          ? student.subjects.find(s => String(s.asignaturaId ?? '') === String(subjectasignaturaId))
+                          : undefined;
+                        return byId || student.subjects.find(s => s.name === subjectName);
+                      };
+                      const topicNames = new Set<string>();
+                      const subtopicKeys = new Set<string>();
+                      activityTabStudents.forEach(s => {
+                        const subj = findMatchingSubject(s);
+                        if (subj) {
+                          subj.topics.forEach(t => {
+                            topicNames.add(t.name);
+                            t.subtopics.forEach(st => subtopicKeys.add(`${t.name}::${st.name}`));
+                          });
+                        }
+                      });
+                      const totalTemasCount = topicNames.size;
+                      const totalSubtemasCount = subtopicKeys.size;
+                      return (
+                        <div key={subjectName} className="mb-8 last:mb-0 border-b border-gray-200 last:border-0 pb-8 last:pb-0">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                            <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: color }} />
+                            <span style={{ fontWeight: 700, color: '#3A4A5B', fontSize: 14 }}>{subjectName}</span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="app-data-table">
+                              <thead>
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Código</th>
+                                  <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
+                                  <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Temas</th>
+                                  <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Subtemas</th>
+                                  <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Contenidos</th>
+                                  <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Ejercicios</th>
+                                  <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Miniproyectos</th>
+                                  <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Progreso</th>
                                 </tr>
-
-                              );
-
-                            })}
-
-                          </tbody>
-
-                        </table>
-
-                      </div>
-
-                    </div>
-
-                  );
-
-                })}
+                              </thead>
+                              <tbody>
+                                {activityTabStudents.map((student) => {
+                                  const subj = findMatchingSubject(student);
+                                  if (!subj) return null;
+                                  const temasVistos = subj.topics.filter(t => t.progress > 0).length;
+                                  const subtemasVistos = subj.topics.reduce((sum, t) => sum + t.subtopics.filter(st => st.progress > 0).length, 0);
+                                  return (
+                                    <tr key={student.id} className="hover:bg-gray-50 transition-colors">
+                                      <td className="px-4 py-3 text-gray-500 text-sm font-mono">{student.codigo ?? '—'}</td>
+                                      <td className="px-4 py-3 text-[#3A4A5B] text-sm">{student.name}</td>
+                                      <td className="px-4 py-3 text-sm">
+                                        <span style={{ fontWeight: 600, color: temasVistos > 0 ? '#1a56db' : '#9ca3af' }}>
+                                          {temasVistos}/{totalTemasCount}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 text-sm">
+                                        <span style={{ fontWeight: 600, color: subtemasVistos > 0 ? '#1a56db' : '#9ca3af' }}>
+                                          {subtemasVistos}/{totalSubtemasCount}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 text-gray-600 text-sm">{subj.contentViewed}</td>
+                                      <td className="px-4 py-3 text-gray-600 text-sm">{subj.exercisesCompleted}</td>
+                                      <td className="px-4 py-3 text-gray-600 text-sm">{subj.miniprojectsSubmitted}</td>
+                                      <td className="px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                            <div className="h-full rounded-full" style={{ width: `${subj.progress}%`, backgroundColor: color }} />
+                                          </div>
+                                          <span className="text-sm text-gray-600">{formatPercent(subj.progress)}%</span>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
 
               </div>
 
@@ -5456,4 +5476,5 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   );
 
 }
+
 
