@@ -144,8 +144,8 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
                   </button>
                 </div>
 
-                {/* Requisitos */}
-                {newPassword && (
+                {/* Requisitos — siempre visibles */}
+                {true && (
                   <div style={{ marginTop: 10, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
                     <p style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Requisitos</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
