@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
+
+const logoUdes = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 
 interface ChangePasswordScreenProps {
   onComplete: () => void;
@@ -18,208 +20,211 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
   const [error, setError] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // 1. Definimos las reglas
   const passwordRequirements = [
-    { label: 'Mínimo 8 caracteres', met: newPassword.length >= 8 },
-    { label: 'Al menos una letra mayúscula', met: /[A-Z]/.test(newPassword) },
-    { label: 'Al menos una letra minúscula', met: /[a-z]/.test(newPassword) },
-    { label: 'Al menos un número', met: /\d/.test(newPassword) }
+    { label: 'Mínimo 8 caracteres',       met: newPassword.length >= 8 },
+    { label: 'Al menos una mayúscula',     met: /[A-Z]/.test(newPassword) },
+    { label: 'Al menos una minúscula',     met: /[a-z]/.test(newPassword) },
+    { label: 'Al menos un número',         met: /\d/.test(newPassword) },
   ];
 
-  const allRequirementsMet = passwordRequirements.every(req => req.met);
+  const allRequirementsMet = passwordRequirements.every(r => r.met);
   const passwordsMatch = newPassword === confirmPassword && newPassword !== '';
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
     if (!allRequirementsMet || !passwordsMatch) return;
-
     setLoading(true);
     try {
-      // Nota: Asegúrate de que el puerto sea el correcto (4000 para backend)
       const response = await fetch(`${API_BASE_URL}/persona/cambiar-password-inicial`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          nuevaContraseña: newPassword
-        }),
+        body: JSON.stringify({ nuevaContraseña: newPassword }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.mensaje || 'Error al actualizar la contraseña');
-      }
-
+      if (!response.ok) throw new Error(data.mensaje || 'Error al actualizar la contraseña');
       setSuccess(true);
-      setTimeout(() => {
-        onComplete();
-      }, 2000);
-
+      setTimeout(() => onComplete(), 2000);
     } catch (err: any) {
-      setError(err?.message || String(err) || 'Ocurrió un error inesperado');
+      setError(err?.message || 'Ocurrió un error inesperado');
     } finally {
       setLoading(false);
     }
   };
 
+  const roleLabel = userRole === 'docente' ? 'docente' : userRole === 'admin' ? 'administrativo' : 'estudiante';
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#4A90E2] via-[#5B9FED] to-[#7ED6A7] p-8">
-      <div className="w-full max-w-md mx-auto"> {/* Card más estrecho para coincidir con el diseño */}
+    <div
+      className="min-h-screen flex flex-col items-center justify-center"
+      style={{ background: 'radial-gradient(ellipse at center, #1e3a5f 0%, #16294a 50%, #0d1e36 100%)' }}
+    >
+      {/* Card dos mitades — igual al login */}
+      <div
+        className="flex rounded-2xl overflow-hidden shadow-2xl"
+        style={{ width: '780px', maxWidth: '95vw', minHeight: '480px' }}
+      >
+        {/* ── Panel izquierdo: marca ── */}
+        <div
+          className="relative flex flex-col items-center justify-center gap-5"
+          style={{ width: '50%', background: 'linear-gradient(160deg, #1a56db 0%, #1e429f 40%, #1a3a7c 70%, #142d61 100%)' }}
+        >
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div style={{ position: 'absolute', width: '260px', height: '260px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.08)', top: '-60px', left: '-60px' }} />
+            <div style={{ position: 'absolute', width: '180px', height: '180px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)', bottom: '-40px', right: '-40px' }} />
+          </div>
 
-        {/* Header */}
-        <div className="mb-8 text-center">
-             {/* Asegúrate que la imagen cargue, si no pon un placeholder */}
-            <div className="w-24 h-24 mx-auto mb-4 bg-white rounded-2xl shadow-lg flex items-center justify-center p-4">
-             <Lock className="h-8 w-8 text-[#4A90E2]" />
-            </div>
-            
-          <h1 className="text-white mb-2 text-3xl font-bold">
-            {isFirstLogin ? 'Cambio de Contraseña' : 'Actualizar Contraseña'}
-          </h1>
-          <p className="text-white/90">
-            {isFirstLogin
-              ? userRole === 'docente'
-                ? 'Actualización de clave requerida para acceso docente.'
-                : userRole === 'admin'
-                  ? 'Actualización de clave requerida para acceso administrativo.'
-                : 'Actualización de clave requerida para el primer acceso.'
-              : 'Gestión de seguridad de la cuenta.'}
-          </p>
-        </div>
+          <div
+            className="flex items-center justify-center"
+            style={{ width: '130px', height: '130px', background: '#ffffff', borderRadius: '50%', boxShadow: '0 0 0 8px rgba(255,255,255,0.25), 0 4px 20px rgba(0,0,0,0.3)', padding: '8px' }}
+          >
+            <img src={logoUdes} alt="EduPath" style={{ width: '110px', height: '110px', objectFit: 'contain' }} />
+          </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-
-          {isFirstLogin && (
-            <div className="bg-blue-50 border-b border-blue-100 p-4 flex gap-3">
-              <AlertCircle className="w-5 h-5 text-blue-500 shrink-0" />
-              <p className="text-sm text-blue-700">
-                <strong>Importante:</strong> Registrar una contraseña segura y de fácil recordación.
+          <div className="text-center px-6">
+            <h1 className="text-white font-bold" style={{ fontSize: '32px', letterSpacing: '1px' }}>EduPath</h1>
+            <p className="text-white/80 text-sm mt-1">Aplicación de Apoyo Académico</p>
+            <div style={{ marginTop: 20, background: 'rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px' }}>
+              <p className="text-white/90 text-xs leading-relaxed">
+                {isFirstLogin
+                  ? `Actualización de clave requerida para acceso ${roleLabel}.`
+                  : 'Gestión de seguridad de la cuenta.'}
               </p>
             </div>
-          )}
+          </div>
+        </div>
 
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        {/* ── Panel derecho: formulario ── */}
+        <div
+          className="flex flex-col justify-between"
+          style={{ width: '50%', background: '#f0f5ff', padding: '36px 32px 24px' }}
+        >
+          <div>
+            <h2 className="font-bold mb-5" style={{ fontSize: '22px', color: '#1e3a5f' }}>
+              {isFirstLogin ? 'Nueva contraseña' : 'Actualizar contraseña'}
+            </h2>
 
-            {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 text-sm border border-red-100">
-                <AlertCircle className="w-4 h-4" />
-                {error}
+            {/* Success */}
+            {success && (
+              <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <CheckCircle style={{ width: 18, height: 18, color: '#16a34a', flexShrink: 0 }} />
+                <p style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>¡Contraseña actualizada! Redirigiendo…</p>
               </div>
             )}
 
-        {/* Nueva contraseña */}
+            {/* Error */}
+            {error && (
+              <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <AlertCircle style={{ width: 16, height: 16, color: '#dc2626', flexShrink: 0 }} />
+                <p style={{ fontSize: 13, color: '#dc2626' }}>{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Nueva contraseña */}
               <div>
-                <label className="block text-[#3A4A5B] font-medium mb-2 text-sm">Nueva contraseña</label>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#1e3a5f', marginBottom: 6 }}>
+                  Nueva contraseña
+                </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Lock className="absolute top-1/2 -translate-y-1/2 w-5 h-5" style={{ left: '14px', color: '#4a7ac8' }} />
                   <input
                     type={showNew ? 'text' : 'password'}
                     autoComplete="new-password"
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Registrar contraseña"
-                    className="w-full appearance-none border border-gray-300 rounded-lg p-3 pl-11 pr-14 bg-white focus:outline-none focus:ring-2 focus:ring-[#4A90E2] transition-all placeholder:text-gray-300"
-                    required
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Ingresa tu nueva contraseña"
+                    className="w-full appearance-none rounded-lg py-3 pl-11 pr-12 outline-none transition-all"
+                    style={{ background: '#fff', border: '1.5px solid #bfd3f5', color: '#1e3a5f', fontSize: '14px' }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowNew(!showNew)}
-                    className="z-10 text-gray-400 hover:text-gray-600"
-                    style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}
-                  >
-                    {showNew ? <EyeOff size={22} /> : <Eye size={22} />}
+                  <button type="button" onClick={() => setShowNew(!showNew)}
+                    className="absolute top-1/2 -translate-y-1/2" style={{ right: '14px', color: '#6b8fc8', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
 
-                {/* Requisitos (Lógica Source 1 con Estilo Source 2) [cite: 25, 69] */}
-                <div className="mt-4 space-y-3 bg-gray-50 p-5 rounded-xl">
-                  <p className="text-xs text-[#3A4A5B] font-semibold mb-1">Requisitos de contraseña:</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {passwordRequirements.map((req, index) => (
-                      <div key={index} className="flex items-center gap-2 text-sm">
-                        {req.met ? (
-                          <CheckCircle className="w-5 h-5 text-[#7ED6A7]" />
-                        ) : (
-                          <div className="w-5 h-5 border-2 border-gray-200 rounded-full" />
-                        )}
-                        <span className={req.met ? 'text-[#7ED6A7]' : 'text-gray-400'}>{req.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Confirmar contraseña - Ahora con Ojo y Candado */}
-              <div>
-                <label className="block text-[#3A4A5B] font-medium mb-2 text-sm">Confirmar nueva contraseña</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type={showConfirm ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirmar contraseña"
-                    className={`w-full appearance-none border rounded-lg p-3 pl-11 pr-14 bg-white outline-none transition-all ${
-                        passwordsMatch && confirmPassword 
-                        ? 'border-[#7ED6A7] focus:ring-2 focus:ring-[#7ED6A7]' 
-                        : 'border-gray-300 focus:ring-2 focus:ring-[#4A90E2]'
-                    } placeholder:text-gray-300`}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    className="z-10 text-gray-400 hover:text-gray-600"
-                    style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}
-                  >
-                    {showConfirm ? <EyeOff size={22} /> : <Eye size={22} />}
-                  </button>
-                </div>
-                
-                {confirmPassword && !passwordsMatch && (
-                  <div className="mt-2 flex items-center gap-2 text-red-500">
-                    <AlertCircle className="w-4 h-4" />
-                    <span className="text-xs font-medium">Las contraseñas registradas no coinciden</span>
+                {/* Requisitos */}
+                {newPassword && (
+                  <div style={{ marginTop: 10, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Requisitos</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      {passwordRequirements.map((req, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {req.met
+                            ? <CheckCircle style={{ width: 14, height: 14, color: '#16a34a', flexShrink: 0 }} />
+                            : <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #e2e8f0', flexShrink: 0 }} />
+                          }
+                          <span style={{ fontSize: 11, color: req.met ? '#16a34a' : '#94a3b8' }}>{req.label}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Botón con el color de la imagen [cite: 89] */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading || !allRequirementsMet || !passwordsMatch}
-                  className={`w-full py-4 rounded-lg text-white font-medium text-lg shadow-md transition-all flex items-center justify-center gap-2 ${
-                    loading || !allRequirementsMet || !passwordsMatch
-                      ? 'bg-[#F5A97F] cursor-not-allowed shadow-none' 
-                      : 'bg-[#F5A97F] hover:bg-[#F39759] hover:shadow-lg'
-                  }`}
-                >
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <Lock className="w-5 h-5" />
-                      <span>Confirmar cambio de contraseña</span>
-                    </>
-                  )}
-                </button>
+              {/* Confirmar contraseña */}
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#1e3a5f', marginBottom: 6 }}>
+                  Confirmar contraseña
+                </label>
+                <div className="relative">
+                  <Lock className="absolute top-1/2 -translate-y-1/2 w-5 h-5" style={{ left: '14px', color: '#4a7ac8' }} />
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="Confirma tu nueva contraseña"
+                    className="w-full appearance-none rounded-lg py-3 pl-11 pr-12 outline-none transition-all"
+                    style={{
+                      background: '#fff',
+                      border: `1.5px solid ${confirmPassword && !passwordsMatch ? '#fca5a5' : passwordsMatch ? '#86efac' : '#bfd3f5'}`,
+                      color: '#1e3a5f', fontSize: '14px',
+                    }}
+                  />
+                  <button type="button" onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute top-1/2 -translate-y-1/2" style={{ right: '14px', color: '#6b8fc8', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {confirmPassword && !passwordsMatch && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                    <AlertCircle style={{ width: 13, height: 13, color: '#dc2626' }} />
+                    <span style={{ fontSize: 11, color: '#dc2626' }}>Las contraseñas no coinciden</span>
+                  </div>
+                )}
               </div>
-          </form>
-        </div>
 
-        {/* Footer simple */}
-        {!success && (
-          <div className="mt-6 text-center">
-             <p className="text-white/60 text-xs">EduPath © 2024</p>
+              {/* Botón */}
+              <button
+                type="submit"
+                disabled={loading || !allRequirementsMet || !passwordsMatch || success}
+                style={{
+                  width: '100%', padding: '12px', borderRadius: 8, border: 'none', cursor: loading || !allRequirementsMet || !passwordsMatch ? 'not-allowed' : 'pointer',
+                  background: loading || !allRequirementsMet || !passwordsMatch ? '#93c5fd' : 'linear-gradient(135deg, #1a56db, #142d61)',
+                  color: '#fff', fontWeight: 700, fontSize: '14px', letterSpacing: '1px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  transition: 'opacity 0.15s',
+                }}
+              >
+                {loading
+                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Guardando…</>
+                  : <><Lock style={{ width: 16, height: 16 }} />CONFIRMAR CAMBIO</>
+                }
+              </button>
+            </form>
           </div>
-        )}
+
+          {/* Footer */}
+          <div style={{ borderTop: '1px solid #bfd3f5', paddingTop: '14px', marginTop: '20px', textAlign: 'center' }}>
+            <p style={{ fontSize: '11px', color: '#3a5a8a' }}>
+              Desarrollado por <span style={{ fontWeight: 600 }}>Edgar Parada, José Sandoval, Cristian Estrada</span>
+            </p>
+            <p style={{ fontSize: '11px', color: '#6b8fc8', marginTop: 2 }}>
+              © {new Date().getFullYear()} EduPath — Todos los derechos reservados
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -650,6 +650,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   const [rankingLoading, setRankingLoading] = useState(false);
 
   const [rankingAsignaturaFilter, setRankingAsignaturaFilter] = useState<string>('all');
+  const [rankingMode, setRankingMode] = useState<'top' | 'bottom'>('top');
 
   const [selectedAreaByStudent, setSelectedAreaByStudent] = useState<{[studentId: string]: string}>({});
   const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
@@ -1402,7 +1403,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         if (asignaturaIdToUse) params.append('asignatura_id', asignaturaIdToUse);
 
-        params.append('limit', '10');
+        params.append('limit', '5');
+        if (rankingMode === 'bottom') params.append('order', 'asc');
 
         const response = await api.get(`/progresos/ranking-visualizaciones?${params.toString()}`);
 
@@ -1424,7 +1426,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     loadRanking();
 
-  }, [activeTab, effectiveAsignaturaId, rankingAsignaturaFilter]);
+  }, [activeTab, effectiveAsignaturaId, rankingAsignaturaFilter, rankingMode]);
 
 
 
@@ -1640,15 +1642,15 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
               <col style="width:11%"/><col style="width:21%"/>
             </colgroup>
             <thead>
-              <tr style="background:#EFF6FF;border-bottom:1.5px solid #1a56db;">
-                <th style="padding:6px;text-align:left;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Código</th>
-                <th style="padding:6px;text-align:left;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Estudiante</th>
-                <th style="padding:6px;text-align:center;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Temas</th>
-                <th style="padding:6px;text-align:center;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Subtemas</th>
-                <th style="padding:6px;text-align:center;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Cont.</th>
-                <th style="padding:6px;text-align:center;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Ejerc.</th>
-                <th style="padding:6px;text-align:center;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Miniproyectos</th>
-                <th style="padding:6px;text-align:left;font-size:8px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.05em;">Progreso</th>
+              <tr>
+                <th style="padding:8px 10px;text-align:left;font-size:8px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.05em;background:#1a56db;">Código</th>
+                <th style="padding:8px 10px;text-align:left;font-size:8px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.05em;background:#1a56db;">Estudiante</th>
+                <th style="padding:8px 10px;text-align:center;font-size:8px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.05em;background:#1a56db;">Temas</th>
+                <th style="padding:8px 10px;text-align:center;font-size:8px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.05em;background:#1a56db;">Subtemas</th>
+                <th style="padding:8px 10px;text-align:center;font-size:8px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.05em;background:#1a56db;">Cont.</th>
+                <th style="padding:8px 10px;text-align:center;font-size:8px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.05em;background:#1a56db;">Ejerc.</th>
+                <th style="padding:8px 10px;text-align:center;font-size:8px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.05em;background:#1a56db;">Miniproyectos</th>
+                <th style="padding:8px 10px;text-align:left;font-size:8px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.05em;background:#1a56db;">Progreso</th>
               </tr>
             </thead>
             <tbody style="border-bottom:1px solid #e2e8f0;">
@@ -1733,6 +1735,183 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
     </tr>
   </tbody>
 
+</table>
+</body>
+</html>`;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;visibility:hidden;';
+    document.body.appendChild(iframe);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) { document.body.removeChild(iframe); return; }
+    iframeDoc.open(); iframeDoc.write(html); iframeDoc.close();
+    setTimeout(() => {
+      try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch(e) { /* ignore */ }
+      setTimeout(() => { try { document.body.removeChild(iframe); } catch(e) { /* ok */ } }, 2000);
+    }, 500);
+    setTimeout(() => { try { document.body.removeChild(iframe); } catch(e) { /* ok */ } }, 60000);
+  };
+
+  // ── Informe "Top vistos / Menos vistos" — mismo diseño que los demás informes ──
+  const printMasVistosReport = () => {
+    if (!rankingData) return;
+
+    const fecha = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+    const isBottom = rankingMode === 'bottom';
+    const filtradoPorAsignatura = isDocenteMode || rankingAsignaturaFilter !== 'all';
+    const asigNombre = filtradoPorAsignatura
+      ? asignaturasCatalog.find(a => String(a.id) === rankingAsignaturaFilter)?.nombre ?? 'Asignatura seleccionada'
+      : 'Todas las asignaturas';
+    const tituloModo = isBottom ? 'Top 5 Menos Vistos' : 'Top 5 Más Vistos';
+
+    const COLORS = ['#7c3aed','#059669','#0891b2','#1a56db'];
+    const tipoLabel: Record<string,string> = { document:'Explicación', activity:'Actividad', video:'Video', teoria:'Teoría', explicacion:'Explicación', actividad:'Actividad' };
+    const badgeStyle: Record<string,string> = { video:'background:#EFF6FF;color:#1a56db', activity:'background:#F0FDF4;color:#059669', actividad:'background:#F0FDF4;color:#059669', document:'background:#FFF7ED;color:#ea580c', explicacion:'background:#FFF7ED;color:#ea580c', teoria:'background:#F5F3FF;color:#7c3aed' };
+    const badge = (tipo: string) => {
+      const k = tipo?.toLowerCase() ?? '';
+      const st = badgeStyle[k] ?? 'background:#F3F4F6;color:#6B7280';
+      return `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;${st};white-space:nowrap;">${tipoLabel[k] ?? tipo}</span>`;
+    };
+    const medal = (idx: number) => isBottom
+      ? idx===0?'🔴':idx===1?'🟠':idx===2?'🟡':String(idx+1)
+      : idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':String(idx+1);
+
+    const buildTable = (titulo: string, color: string, headers: string[], rows: string[]) => `
+      <div style="margin-bottom:24px;page-break-inside:avoid;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+            <span style="font-weight:700;color:#1e293b;font-size:13px;">${titulo}</span>
+          </div>
+          <span style="font-size:10px;color:#94a3b8;">Estudiantes que visualizaron</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              ${headers.map(h=>`<th style="padding:9px 12px;text-align:${h==='#'||h==='Vistas'?'center':'left'};font-size:10px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;background:#1a56db;">${h}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.length ? rows.join('') : `<tr><td colspan="${headers.length}" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">Sin datos</td></tr>`}
+          </tbody>
+        </table>
+      </div>`;
+
+    const makeRow = (cells: string[]) => `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        ${cells.map(c=>`<td style="padding:10px 12px;font-size:12px;color:#475569;">${c}</td>`).join('')}
+      </tr>`;
+
+    // Orden: Asignaturas → Temas → Subtemas → Contenidos
+    const tables = [
+      ...(!filtradoPorAsignatura ? [buildTable(
+        `${tituloModo} · Asignaturas`, COLORS[0],
+        ['#','Asignatura','Vistas'],
+        rankingData.asignaturas.map((it,i) => makeRow([
+          `<span style="text-align:center;display:block;">${medal(i)}</span>`,
+          `<strong style="color:#1e3a5f;">${it.nombre}</strong>`,
+          `<span style="text-align:right;display:block;font-weight:700;color:${COLORS[0]};">${it.vistas} est.</span>`,
+        ]))
+      )] : []),
+      buildTable(
+        `${tituloModo} · Temas`, COLORS[1],
+        ['#','Tema',...(!filtradoPorAsignatura?['Asignatura']:[]),'Vistas'],
+        rankingData.temas.map((it,i) => makeRow([
+          `<span style="text-align:center;display:block;">${medal(i)}</span>`,
+          `<strong style="color:#1e3a5f;">${it.nombre}</strong>`,
+          ...(!filtradoPorAsignatura?[it.asignatura]:[]),
+          `<span style="text-align:right;display:block;font-weight:700;color:${COLORS[1]};">${it.vistas} est.</span>`,
+        ]))
+      ),
+      buildTable(
+        `${tituloModo} · Subtemas`, COLORS[2],
+        ['#','Subtema',filtradoPorAsignatura?'Tema':'Asignatura · Tema','Vistas'],
+        rankingData.subtemas.map((it,i) => makeRow([
+          `<span style="text-align:center;display:block;">${medal(i)}</span>`,
+          `<strong style="color:#1e3a5f;">${it.nombre}</strong>`,
+          filtradoPorAsignatura ? it.tema : `${it.asignatura} · ${it.tema}`,
+          `<span style="text-align:right;display:block;font-weight:700;color:${COLORS[2]};">${it.vistas} est.</span>`,
+        ]))
+      ),
+      buildTable(
+        `${tituloModo} · Contenidos`, COLORS[3],
+        ['#','Contenido',filtradoPorAsignatura?'Tema · Subtema':'Asignatura · Tema · Subtema','Tipo','Vistas'],
+        rankingData.contenidos.map((it,i) => makeRow([
+          `<span style="text-align:center;display:block;">${medal(i)}</span>`,
+          `<strong style="color:#1e3a5f;">${it.nombre}</strong>`,
+          filtradoPorAsignatura ? `${it.tema} · ${it.subtema}` : `${it.asignatura} · ${it.tema} · ${it.subtema}`,
+          badge(it.tipo),
+          `<span style="text-align:right;display:block;font-weight:700;color:${COLORS[3]};">${it.vistas} est.</span>`,
+        ]))
+      ),
+    ];
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>${tituloModo} — EduPath</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',Arial,sans-serif;color:#1e3a5f;font-size:12px;background:#fff;
+         -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .doc-wrap{width:100%;border-collapse:collapse;}
+    .doc-head{display:table-header-group;}
+    .doc-body{display:table-row-group;}
+    @media print{@page{margin:14mm 14mm 12mm 14mm;size:A4;}}
+  </style>
+</head>
+<body>
+<table class="doc-wrap">
+  <thead class="doc-head">
+    <tr><th style="border:none;padding:0;font-weight:normal;">
+      <div style="display:flex;align-items:center;justify-content:flex-end;padding:7px 10px 7px 0;background:#fff;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <img src="${logoImage}" alt="Ingeniería de Sistemas UDES"
+               style="width:50px;height:50px;object-fit:contain;border-radius:50%;border:1.5px solid #bfd3f5;background:#f0f6ff;" />
+          <span style="font-size:7px;color:#64748b;text-align:center;line-height:1.3;">Ing. de Sistemas<br/>UDES</span>
+        </div>
+      </div>
+    </th></tr>
+  </thead>
+  <tbody class="doc-body">
+    <tr><td style="border:none;padding:16px 14px 20px;vertical-align:top;">
+
+      <!-- Encabezado — misma estructura que Por estudiante y Por asignatura -->
+      <div style="padding-bottom:14px;border-bottom:2px solid #1a56db;margin-bottom:16px;">
+        <div style="font-size:18px;font-weight:800;color:#1a56db;line-height:1.2;">${tituloModo}</div>
+        <div style="font-size:12px;font-weight:600;color:#1e3a5f;margin-top:3px;">${asigNombre}</div>
+        <div style="font-size:10px;color:#64748b;margin-top:3px;">EduPath · Ingeniería de Sistemas UDES · ${fecha}</div>
+        <div style="margin-top:8px;text-align:right;">
+          <div style="font-size:10px;color:#64748b;">${isBottom ? 'Contenidos con menos visualizaciones registradas' : 'Contenidos con más visualizaciones registradas'}</div>
+        </div>
+      </div>
+
+      <!-- Tarjetas de resumen — mismo estilo que los demás informes -->
+      ${(() => {
+        const destacados = [
+          { label: isBottom ? 'Contenido menos visto'  : 'Contenido más visto',  item: rankingData.contenidos[0],  color: COLORS[3], sub: rankingData.contenidos[0]  ? (filtradoPorAsignatura ? rankingData.contenidos[0].tema : rankingData.contenidos[0].asignatura)  : null },
+          { label: isBottom ? 'Subtema menos visto'    : 'Subtema más visto',    item: rankingData.subtemas[0],    color: COLORS[2], sub: rankingData.subtemas[0]    ? (filtradoPorAsignatura ? rankingData.subtemas[0].tema  : rankingData.subtemas[0].asignatura)    : null },
+          { label: isBottom ? 'Tema menos visto'       : 'Tema más visto',       item: rankingData.temas[0],       color: COLORS[1], sub: rankingData.temas[0]       ? (filtradoPorAsignatura ? null : rankingData.temas[0].asignatura)       : null },
+          ...(!filtradoPorAsignatura ? [{ label: isBottom ? 'Asignatura menos vista' : 'Asignatura más vista', item: rankingData.asignaturas[0], color: COLORS[0], sub: null }] : []),
+        ];
+        const cols = destacados.length;
+        return `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px;margin-bottom:18px;align-items:stretch;">
+          ${destacados.map(d => `
+            <div style="border:1.5px solid #bfd3f5;border-radius:8px;padding:12px;display:flex;flex-direction:column;">
+              <div style="font-size:9px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">${d.label}</div>
+              ${d.item ? `
+                <div style="font-size:12px;font-weight:700;color:#1e293b;line-height:1.35;flex:1;">${d.item.nombre}</div>
+                ${d.sub ? `<div style="font-size:9px;color:#94a3b8;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d.sub}</div>` : ''}` : `<div style="font-size:11px;color:#94a3b8;font-style:italic;flex:1;">Sin datos</div>`}
+            </div>`).join('')}
+        </div>`;
+      })()}
+
+      <!-- Tablas de detalle -->
+      ${tables.join('')}
+
+    </td></tr>
+  </tbody>
 </table>
 </body>
 </html>`;
@@ -3154,7 +3333,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                   <div>
                     <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Selecciona un estudiante</p>
                     <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>
-                      {studentTabStudents.length} resultados — ordenados por progreso {studentSortOrder === 'asc' ? '↑ menor a mayor' : '↓ mayor a menor'}
+                      {studentTabStudents.filter(s => { const q = studentSearch.trim().toLowerCase(); return !q || s.name.toLowerCase().includes(q) || (s.codigo ?? '').toLowerCase().includes(q); }).length} resultados — ordenados por progreso {studentSortOrder === 'asc' ? '↑ menor a mayor' : '↓ mayor a menor'}
                     </p>
                   </div>
                   <button type="button"
@@ -3164,7 +3343,25 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                   </button>
                 </div>
                 <div className="app-table-card__body" style={{ padding: 0 }}>
-                  {[...studentTabStudents].sort((a, b) => {
+                  {/* Cabecera de columnas */}
+                  <div style={{ display: 'flex', alignItems: 'center', padding: '8px 18px', background: '#EFF6FF', borderBottom: '1.5px solid #1a56db' }}>
+                    <div style={{ width: '36px', flexShrink: 0, marginRight: '14px' }} />
+                    <div style={{ width: '130px', flexShrink: 0 }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#1a56db', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Código</span>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#1a56db', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Estudiante</span>
+                    </div>
+                    <div style={{ width: '160px', textAlign: 'right' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#1a56db', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progreso</span>
+                    </div>
+                  </div>
+
+                  {[...studentTabStudents].filter(student => {
+                    const q = studentSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return student.name.toLowerCase().includes(q) || (student.codigo ?? '').toLowerCase().includes(q);
+                  }).sort((a, b) => {
                     const avgA = a.subjects.length ? a.subjects.reduce((acc, s) => acc + s.progress, 0) / a.subjects.length : 0;
                     const avgB = b.subjects.length ? b.subjects.reduce((acc, s) => acc + s.progress, 0) / b.subjects.length : 0;
                     return studentSortOrder === 'asc' ? avgA - avgB : avgB - avgA;
@@ -3177,22 +3374,27 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                       <button key={student.id} type="button"
                         onClick={() => setDetailStudentId(String(student.id))}
                         className="w-full text-left"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px',
+                        style={{ display: 'flex', alignItems: 'center', padding: '12px 18px',
                           borderBottom: idx < studentTabStudents.length - 1 ? '1px solid #e2e8f0' : 'none',
                           background: 'transparent', border: 'none', cursor: 'pointer',
-                          transition: 'background 0.15s' }}
+                          transition: 'background 0.15s', width: '100%' }}
                         onMouseEnter={e => (e.currentTarget.style.background = '#f0f5ff')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#1a56db', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>
-                            {initials}
-                          </div>
-                          <div>
-                            <p style={{ fontWeight: 600, fontSize: '14px', color: '#1e3a5f' }}>{student.name}</p>
-                            <p style={{ fontSize: '12px', color: '#94a3b8' }}>{student.email}</p>
-                          </div>
+                        {/* Avatar */}
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#1a56db', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, flexShrink: 0, marginRight: '14px' }}>
+                          {initials}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {/* Código */}
+                        <div style={{ width: '130px', flexShrink: 0 }}>
+                          <p style={{ fontSize: '13px', fontFamily: 'monospace', color: '#3A4A5B', fontWeight: 500 }}>{student.codigo ?? '—'}</p>
+                        </div>
+                        {/* Nombre */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontWeight: 600, fontSize: '14px', color: '#1e3a5f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{student.name}</p>
+                          <p style={{ fontSize: '12px', color: '#94a3b8' }}>{student.email}</p>
+                        </div>
+                        {/* Progreso */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                           <div style={{ width: '100px', height: '6px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
                             <div style={{ width: `${Math.min(avg, 100)}%`, height: '100%', background: '#1a56db', borderRadius: '999px' }} />
                           </div>
@@ -5191,279 +5393,200 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         )}
 
-        {/* Tab 5: Contenidos más vistos — Podios + Rankings */}
+        {/* Tab 5: Contenidos más vistos */}
         {activeTab === 'content-views' && (
-          <div>
-            {/* Header con exportar */}
-            <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Contenidos más vistos</p>
-                <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Ranking de visualizaciones por contenido, subtema, tema y asignatura.</p>
-              </div>
-              <button onClick={() => downloadPdf('content-views')}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                <Download className="w-3.5 h-3.5" />
-                Exportar PDF
-              </button>
-            </div>
-            {/* Filtro de asignatura — solo admin */}
-            {!isDocenteMode && (
-              <div className="mb-4 flex items-center rounded-xl border border-[#E5E7EB] bg-white shadow-sm overflow-hidden">
-                {/* Etiqueta */}
-                <div className="flex items-center gap-2.5 px-4 py-3 border-r border-[#E5E7EB] shrink-0">
-                  <Filter className="w-4 h-4 text-[#9CA3AF]" />
-                  <span className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider whitespace-nowrap">
-                    Asignatura
-                  </span>
+          <div className="space-y-6">
+            {/* Header con toggle + exportar */}
+            <div className="app-table-card">
+              <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Contenidos más vistos</p>
+                  <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>
+                    Ranking de visualizaciones por contenido, subtema, tema y asignatura.
+                  </p>
                 </div>
-
-                {/* Selector */}
-                <div className="flex-1 bg-[#F9FAFB] px-4 py-3">
-                  <select
-                    value={rankingAsignaturaFilter}
-                    onChange={e => setRankingAsignaturaFilter(e.target.value)}
-                    className="w-full bg-transparent text-sm text-[#3A4A5B] outline-none cursor-pointer"
-                  >
-                    <option value="all">Todas las asignaturas</option>
-                    {asignaturasCatalog.map(a => (
-                      <option key={a.id} value={String(a.id)}>{a.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Botón limpiar */}
-                {rankingAsignaturaFilter !== 'all' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {/* Botón flip único — top / bottom */}
                   <button
-                    onClick={() => setRankingAsignaturaFilter('all')}
-                    className="flex items-center gap-1.5 px-4 py-3 border-l border-[#E5E7EB] text-xs text-[#6B7280] hover:bg-[#F3F4F6] transition-colors shrink-0"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Limpiar</span>
+                    onClick={() => setRankingMode(m => m === 'top' ? 'bottom' : 'top')}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '6px 14px', borderRadius: 8,
+                      background: 'rgba(255,255,255,0.18)',
+                      color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.4)',
+                      cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                      transition: 'background 0.2s, border-color 0.2s',
+                    }}>
+                    <span style={{ transition: 'transform 0.3s', display: 'inline-block', transform: rankingMode === 'bottom' ? 'rotate(180deg)' : 'rotate(0deg)' }}>↑</span>
+                    {rankingMode === 'top' ? 'Top 5 más vistos' : 'Top 5 menos vistos'}
                   </button>
-                )}
+                  <button onClick={() => printMasVistosReport()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                    <Download className="w-3.5 h-3.5" />
+                    Exportar PDF
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            {/* ── Tarjetas de asignatura — filtro visual ── */}
+            {!isDocenteMode && (
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(asignaturasCatalog.length + 1, 5)}, 1fr)`, gap: 12 }}>
+                {/* Tarjeta "Todas" */}
+                {(() => {
+                  const active = rankingAsignaturaFilter === 'all';
+                  return (
+                    <div onClick={() => setRankingAsignaturaFilter('all')} style={{
+                      background: '#fff', border: active ? '2px solid #1a56db' : '1.5px solid #e2e8f0',
+                      borderRadius: 14, padding: '14px 16px', cursor: 'pointer',
+                      boxShadow: active ? '0 0 0 3px rgba(26,86,219,0.10)' : '0 1px 3px rgba(0,0,0,0.06)',
+                      transition: 'border-color 0.15s, box-shadow 0.15s',
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 13, marginBottom: 10, minHeight: 36 }}>Todas las asignaturas</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b', marginBottom: 4 }}>
+                        <span>Asignaturas</span><span style={{ fontWeight: 700, color: '#1a56db' }}>{asignaturasCatalog.length}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+                {/* Tarjeta por asignatura */}
+                {asignaturasCatalog.map((a, idx) => {
+                  const active = rankingAsignaturaFilter === String(a.id);
+                  const subjectColors = ['#4A90E2','#7ED6A7','#F5A97F','#A78BFA'];
+                  const color = subjectColors[idx % subjectColors.length];
+                  return (
+                    <div key={a.id} onClick={() => setRankingAsignaturaFilter(String(a.id))} style={{
+                      background: '#fff', border: active ? `2px solid #1a56db` : '1.5px solid #e2e8f0',
+                      borderRadius: 14, padding: '14px 16px', cursor: 'pointer',
+                      boxShadow: active ? '0 0 0 3px rgba(26,86,219,0.10)' : '0 1px 3px rgba(0,0,0,0.06)',
+                      transition: 'border-color 0.15s, box-shadow 0.15s',
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 12, lineHeight: 1.35, minHeight: 36, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{a.nombre}</div>
+                      <div style={{ height: 5, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
+                        <div style={{ height: 5, width: active ? '100%' : '0%', background: color, borderRadius: 999, transition: 'width 0.3s ease' }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
             {rankingLoading && (
-              <div className="app-panel flex items-center justify-center py-16">
+              <div className="app-table-card p-10 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3 text-[#3A4A5B]">
-                  <div className="w-8 h-8 border-2 border-[#4A90E2] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-8 h-8 border-2 border-[#1a56db] border-t-transparent rounded-full animate-spin" />
                   <span className="text-sm">Cargando ranking...</span>
                 </div>
               </div>
             )}
 
             {!rankingLoading && !rankingData && (
-              <div className="app-panel flex flex-col items-center justify-center py-16 gap-3 text-[#3A4A5B]">
+              <div className="app-table-card flex flex-col items-center justify-center py-16 gap-3 text-[#3A4A5B]">
                 <Eye className="w-12 h-12 opacity-30" />
                 <p className="text-sm">No hay datos de visualización registrados aún.</p>
               </div>
             )}
 
+
             {!rankingLoading && rankingData && (() => {
-              const top = {
-                contenido:  rankingData.contenidos[0]  ?? null,
-                subtema:    rankingData.subtemas[0]    ?? null,
-                tema:       rankingData.temas[0]       ?? null,
-                asignatura: rankingData.asignaturas[0] ?? null,
-              };
-
-              const podiosTodos = [
-                { label: 'Contenido más visto',  icon: <Award      className="w-4 h-4 text-[#4A90E2]" />, color: '#4A90E2', nombre: top.contenido?.nombre,    sub: top.contenido  ? `${top.contenido.asignatura} · ${top.contenido.tema}`  : null, vistas: top.contenido?.vistas  ?? 0 },
-                { label: 'Subtema más visto',    icon: <Clock      className="w-4 h-4 text-[#F5A97F]" />, color: '#F5A97F', nombre: top.subtema?.nombre,     sub: top.subtema   ? `${top.subtema.asignatura} · ${top.subtema.tema}`        : null, vistas: top.subtema?.vistas    ?? 0 },
-                { label: 'Tema más visto',       icon: <TrendingUp className="w-4 h-4 text-[#7ED6A7]" />, color: '#7ED6A7', nombre: top.tema?.nombre,        sub: top.tema      ? top.tema.asignatura                                     : null, vistas: top.tema?.vistas       ?? 0 },
-                { label: 'Asignatura más vista', icon: <BarChart3  className="w-4 h-4 text-[#A78BFA]" />, color: '#A78BFA', nombre: top.asignatura?.nombre,  sub: null,                                                                          vistas: top.asignatura?.vistas ?? 0 },
-              ];
-
+              const isBottom = rankingMode === 'bottom';
               const filtradoPorAsignatura = isDocenteMode || rankingAsignaturaFilter !== 'all';
+              const pfx = isBottom ? 'Menos vistos' : 'Top 5';
+              const COLORS = ['#1a56db','#0891b2','#059669','#7c3aed'];
+              const tipoLabel: Record<string,string> = { document:'Explicación', activity:'Actividad', video:'Video', teoria:'Teoría', explicacion:'Explicación', actividad:'Actividad' };
+              const badgeColors: Record<string,{bg:string;text:string}> = { video:{bg:'#EFF6FF',text:'#1a56db'}, activity:{bg:'#F0FDF4',text:'#059669'}, actividad:{bg:'#F0FDF4',text:'#059669'}, document:{bg:'#FFF7ED',text:'#ea580c'}, explicacion:{bg:'#FFF7ED',text:'#ea580c'}, teoria:{bg:'#F5F3FF',text:'#7c3aed'} };
+              const getBadge = (tipo: string) => {
+                const key = tipo?.toLowerCase() ?? '';
+                const s = badgeColors[key] ?? {bg:'#F3F4F6',text:'#6B7280'};
+                const label = tipoLabel[key] ?? tipo;
+                return <span style={{fontSize:10,fontWeight:600,padding:'2px 10px',borderRadius:999,background:s.bg,color:s.text,whiteSpace:'nowrap'}}>{label}</span>;
+              };
+              const hoverBg = ['#EFF6FF','#ECFEFF','#F0FDF4','#FAF5FF'];
+              // Iconos para top (medallas) vs bottom (alertas inversas)
+              const topIcon    = (idx: number) => idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':<span style={{fontSize:11,color:'#94a3b8',fontWeight:500}}>{idx+1}</span>;
+              const bottomIcon = (idx: number) => idx===0
+                ? <span title="Menos visto" style={{fontSize:15}}>🔴</span>
+                : idx===1 ? <span title="2° menos visto" style={{fontSize:15}}>🟠</span>
+                : idx===2 ? <span title="3° menos visto" style={{fontSize:15}}>🟡</span>
+                : <span style={{fontSize:11,color:'#94a3b8',fontWeight:500}}>{idx+1}</span>;
 
-              const podios = filtradoPorAsignatura
-                ? podiosTodos.filter(p => p.label !== 'Asignatura más vista')
-                : podiosTodos;
-
-              const rankings = [
-                {
-                  titulo: 'Top Contenidos',
-                  icon: <Award className="w-4 h-4" />,
-                  color: '#4A90E2',
-                  items: rankingData.contenidos,
-                  sublabel: (it: any) => filtradoPorAsignatura ? `${it.tema}  ·  ${it.subtema}` : `${it.asignatura}  ·  ${it.tema}  ·  ${it.subtema}`,
-                  badge: (it: any) => it.tipo,
-                },
-                {
-                  titulo: 'Top Subtemas',
-                  icon: <Clock className="w-4 h-4" />,
-                  color: '#F5A97F',
-                  items: rankingData.subtemas,
-                  sublabel: (it: any) => filtradoPorAsignatura ? it.tema : `${it.asignatura}  ·  ${it.tema}`,
-                  badge: null,
-                },
-                {
-                  titulo: 'Top Temas',
-                  icon: <TrendingUp className="w-4 h-4" />,
-                  color: '#7ED6A7',
-                  items: rankingData.temas,
-                  sublabel: (it: any) => filtradoPorAsignatura ? null : it.asignatura,
-                  badge: null,
-                },
-                ...(!filtradoPorAsignatura ? [{
-                  titulo: 'Top Asignaturas',
-                  icon: <BarChart3 className="w-4 h-4" />,
-                  color: '#A78BFA',
-                  items: rankingData.asignaturas,
-                  sublabel: null,
-                  badge: null,
-                }] : []),
+              const makeTr = (it: any, idx: number, color: string, hbg: string, cells: React.ReactNode[]) => (
+                <tr key={it.id} style={{background:'#fff',transition:'background 0.15s',borderBottom:'1px solid #f1f5f9'}}
+                  onMouseEnter={e=>(e.currentTarget.style.background=hbg)} onMouseLeave={e=>(e.currentTarget.style.background='#fff')}>
+                  <td style={{padding:'13px 16px',textAlign:'center',fontSize:13,color:'#94a3b8',fontWeight:500,width:42}}>
+                    {isBottom ? bottomIcon(idx) : topIcon(idx)}
+                  </td>
+                  {cells}
+                  <td style={{padding:'13px 16px',textAlign:'right',whiteSpace:'nowrap'}}>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:5,fontWeight:700,color,fontSize:14}}>
+                      <Eye className="w-3.5 h-3.5" style={{opacity:0.5}}/>
+                      {it.vistas}
+                      <span style={{fontSize:10,fontWeight:400,color:'#94a3b8'}}>est.</span>
+                    </span>
+                  </td>
+                </tr>
+              );
+              // Orden: Asignaturas → Temas → Subtemas → Contenidos
+              const categories = [
+                ...(!filtradoPorAsignatura?[{ titulo:`${pfx} · Asignaturas`, color:COLORS[3], hbg:hoverBg[3], items:rankingData.asignaturas,
+                  headers:['#','Asignatura','Vistas'],
+                  rows:(it:any,idx:number)=>makeTr(it,idx,COLORS[3],hoverBg[3],[<td key="n" style={{padding:'13px 16px',fontSize:13,fontWeight:600,color:'#1e3a5f'}}>{it.nombre}</td>]),
+                }]:[]),
+                { titulo:`${pfx} · Temas`, color:COLORS[2], hbg:hoverBg[2], items:rankingData.temas,
+                  headers:['#','Tema',...(!filtradoPorAsignatura?['Asignatura']:[]),'Vistas'],
+                  rows:(it:any,idx:number)=>makeTr(it,idx,COLORS[2],hoverBg[2],[
+                    <td key="n" style={{padding:'13px 16px',fontSize:13,fontWeight:600,color:'#1e3a5f'}}>{it.nombre}</td>,
+                    ...(!filtradoPorAsignatura?[<td key="a" style={{padding:'13px 16px',fontSize:12,color:'#64748b'}}>{it.asignatura}</td>]:[]),
+                  ])},
+                { titulo:`${pfx} · Subtemas`, color:COLORS[1], hbg:hoverBg[1], items:rankingData.subtemas,
+                  headers:['#','Subtema', filtradoPorAsignatura?'Tema':'Asignatura · Tema','Vistas'],
+                  rows:(it:any,idx:number)=>makeTr(it,idx,COLORS[1],hoverBg[1],[
+                    <td key="n" style={{padding:'13px 16px',fontSize:13,fontWeight:600,color:'#1e3a5f'}}>{it.nombre}</td>,
+                    <td key="s" style={{padding:'13px 16px',fontSize:12,color:'#64748b'}}>{filtradoPorAsignatura?it.tema:`${it.asignatura} · ${it.tema}`}</td>,
+                  ])},
+                { titulo:`${pfx} · Contenidos`, color:COLORS[0], hbg:hoverBg[0], items:rankingData.contenidos,
+                  headers:['#','Contenido', filtradoPorAsignatura?'Tema · Subtema':'Asignatura · Tema · Subtema','Tipo','Vistas'],
+                  rows:(it:any,idx:number)=>makeTr(it,idx,COLORS[0],hoverBg[0],[
+                    <td key="n" style={{padding:'13px 16px',fontSize:13,fontWeight:600,color:'#1e3a5f'}}>{it.nombre}</td>,
+                    <td key="s" style={{padding:'13px 16px',fontSize:12,color:'#64748b'}}>{filtradoPorAsignatura?`${it.tema} · ${it.subtema}`:`${it.asignatura} · ${it.tema} · ${it.subtema}`}</td>,
+                    <td key="b" style={{padding:'13px 16px'}}>{getBadge(it.tipo)}</td>,
+                  ])},
               ];
-
               return (
-                <>
-                  {/* Podios */}
-                  <div className={`grid gap-4 mb-6 ${filtradoPorAsignatura ? 'grid-cols-3' : 'grid-cols-4'}`}>
-                    {podios.map((p) => (
-                      <div
-                        key={p.label}
-                        className="flex flex-col gap-4 rounded-2xl p-5 bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
-                        style={{ border: `1px solid ${p.color}28` }}
-                      >
-                        {/* Ícono + etiqueta */}
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                            style={{ backgroundColor: `${p.color}1A` }}
-                          >
-                            {p.icon}
-                          </div>
-                          <span className="text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-widest leading-none">
-                            {p.label}
-                          </span>
+                <div style={{display:'flex',flexDirection:'column',gap:24}}>
+                  {categories.map(cat=>(
+                    <div key={cat.titulo} className="app-table-card" style={{overflow:'hidden'}}>
+                      {/* Cabecera de sección — minimalista */}
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px 12px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:10}}>
+                          <div style={{width:8,height:8,borderRadius:'50%',background:cat.color,flexShrink:0}}/>
+                          <span style={{fontWeight:700,color:'#1e293b',fontSize:14,letterSpacing:'0.01em'}}>{cat.titulo}</span>
                         </div>
-
-                        {/* Valor principal */}
-                        {p.nombre ? (
-                          <>
-                            <div className="flex-1 min-h-0">
-                              <p className="text-base font-bold text-[#1E3A5F] leading-snug line-clamp-2 mb-1">
-                                {p.nombre}
-                              </p>
-                              {p.sub && (
-                                <p className="text-xs text-[#9CA3AF] truncate">{p.sub}</p>
-                              )}
-                            </div>
-
-                            {/* Contador — sin borde, solo espaciado */}
-                            <div className="flex items-center gap-1.5 mt-auto">
-                              <Eye className="w-3.5 h-3.5" style={{ color: p.color }} />
-                              <span className="text-xl font-extrabold" style={{ color: p.color }}>
-                                {p.vistas}
-                              </span>
-                              <span className="text-xs text-[#9CA3AF]">estudiantes</span>
-                            </div>
-                          </>
-                        ) : (
-                          <p className="text-xs text-[#9CA3AF] italic">Sin datos</p>
-                        )}
+                        <div style={{display:'flex',alignItems:'center',gap:4,color:'#94a3b8',fontSize:11}}>
+                          <Eye className="w-3 h-3"/>
+                          <span>Estudiantes que visualizaron</span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Rankings */}
-                  {(() => {
-                    const badgeStyle: Record<string, { bg: string; text: string }> = {
-                      video:    { bg: '#EFF6FF', text: '#3B82F6' },
-                      activity: { bg: '#F0FDF4', text: '#16A34A' },
-                      document: { bg: '#FFF7ED', text: '#EA580C' },
-                      teoria:   { bg: '#F5F3FF', text: '#7C3AED' },
-                    };
-                    const getBadge = (tipo: string) => {
-                      const style = badgeStyle[tipo?.toLowerCase()] ?? { bg: '#F3F4F6', text: '#6B7280' };
-                      return (
-                        <span
-                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                          style={{ backgroundColor: style.bg, color: style.text }}
-                        >
-                          {tipo}
-                        </span>
-                      );
-                    };
-
-                    return (
-                      <div className={`grid gap-6 ${filtradoPorAsignatura ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                        {rankings.map((ranking) => (
-                          <div key={ranking.titulo} className="bg-white rounded-2xl shadow-sm border border-[#F3F4F6] overflow-hidden">
-
-                            {/* Encabezado del panel */}
-                            <div className="flex items-center justify-between px-5 py-4 border-b border-[#F3F4F6]">
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="w-7 h-7 rounded-full flex items-center justify-center"
-                                  style={{ backgroundColor: `${ranking.color}1A` }}
-                                >
-                                  <span style={{ color: ranking.color }}>{ranking.icon}</span>
-                                </div>
-                                <h4 className="font-bold text-[#1E3A5F] text-sm">{ranking.titulo}</h4>
-                              </div>
-                              <div className="flex items-center gap-1 text-[#9CA3AF]">
-                                <Eye className="w-3.5 h-3.5" />
-                                <span className="text-xs">Vistas</span>
-                              </div>
-                            </div>
-
-                            {/* Lista */}
-                            <div>
-                              {ranking.items.length === 0 && (
-                                <p className="text-xs text-[#9CA3AF] italic text-center py-8">Sin datos</p>
-                              )}
-                              {ranking.items.map((item: any, idx: number) => {
-                                const isLast = idx === ranking.items.length - 1;
-                                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
-                                return (
-                                  <div
-                                    key={item.id}
-                                    className={`flex items-center gap-3 px-5 py-3 hover:bg-[#FAFAFA] transition-colors ${!isLast ? 'border-b border-gray-100' : ''}`}
-                                  >
-                                    {/* Columna rango — ancho fijo */}
-                                    <div className="w-6 shrink-0 flex items-center justify-center">
-                                      {medal ? (
-                                        <span className="text-base leading-none">{medal}</span>
-                                      ) : (
-                                        <span className="text-xs font-semibold text-[#9CA3AF]">{idx + 1}</span>
-                                      )}
-                                    </div>
-
-                                    {/* Columna texto — flex-1 */}
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-semibold text-[#1E3A5F] truncate leading-snug">
-                                        {item.nombre}
-                                      </p>
-                                      {ranking.sublabel && ranking.sublabel(item) && (
-                                        <p className="text-xs text-[#9CA3AF] truncate mt-0.5">
-                                          {ranking.sublabel(item)}
-                                        </p>
-                                      )}
-                                    </div>
-
-                                    {/* Columna derecha — badge + vistas */}
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      {ranking.badge && getBadge(ranking.badge(item))}
-                                      <div className="flex items-center gap-1">
-                                        <Eye className="w-3.5 h-3.5 text-[#9CA3AF]" />
-                                        <span className="text-sm font-bold" style={{ color: ranking.color }}>
-                                          {item.vistas}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-
-                </>
+                      <table style={{width:'100%',borderCollapse:'collapse'}}>
+                        <thead>
+                          <tr style={{background:'#1a56db'}}>
+                            {cat.headers.map(h=>(
+                              <th key={h} style={{padding:'10px 16px',textAlign:h==='Vistas'||h==='#'?'center':'left',fontSize:11,fontWeight:700,color:'#fff',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap'}}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cat.items.length===0
+                            ?<tr><td colSpan={cat.headers.length} style={{padding:'24px 16px',textAlign:'center',color:'#94a3b8',fontSize:13}}>Sin datos de visualización</td></tr>
+                            :cat.items.map((it,idx)=>cat.rows(it,idx))
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
               );
             })()}
           </div>

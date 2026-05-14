@@ -116,50 +116,50 @@ export function AdminManagementScreen({ onBack, onHome }: AdminManagementScreenP
       </header>
 
       <main className="app-main">
+
         <button onClick={onBack} className="app-back-button mb-6">
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver al Panel</span>
+          <span>Volver</span>
         </button>
 
-        <section className="app-page-hero mb-8">
-          <div className="app-page-hero__content">
-            <div className="app-page-hero__copy">
-              <div className="app-page-hero__eyebrow">Administración</div>
-              <h2 className="app-page-hero__title">Gestión de administradores</h2>
-              <p className="app-page-hero__description">
-                Registra y gestiona cuentas administrativas.
+        {/* Toolbar */}
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', lineHeight: 1.3 }}>Gestión de administradores</h2>
+            <p style={{ fontSize: 13, color: '#64748b', marginTop: 3 }}>Registra y gestiona cuentas administrativas del sistema.</p>
+          </div>
+          <button onClick={handleOpenCreate}
+            className="flex items-center gap-2 text-white font-bold text-sm px-5 rounded-xl transition-all hover:opacity-90 shrink-0"
+            style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)', height: 40, whiteSpace: 'nowrap' }}>
+            <Plus className="w-4 h-4" />
+            Nuevo administrador
+          </button>
+        </div>
+
+        {/* Mensaje de éxito */}
+        {successMessage && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', padding: '10px 16px', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+            <span>{successMessage}</span>
+            <button onClick={() => setSuccessMessage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a' }}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Info card */}
+        <div className="app-table-card" style={{ padding: '20px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ width: 42, height: 42, borderRadius: '50%', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Plus style={{ width: 18, height: 18, color: '#1a56db' }} />
+            </div>
+            <div>
+              <p style={{ fontWeight: 600, color: '#1e293b', fontSize: 14 }}>Crear cuenta administrativa</p>
+              <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                El sistema generará un código <strong>ADM###</strong> único y enviará las credenciales al correo registrado.
               </p>
             </div>
           </div>
-        </section>
-
-        <section className="app-panel p-6">
-          <div className="app-section-head">
-            <div>
-              <h3 className="app-section-title">Administradores</h3>
-              <p className="app-section-description">Registro de cuentas administrativas del sistema.</p>
-            </div>
-            <button onClick={handleOpenCreate} className="app-btn app-primary-btn px-5 py-3">
-              <Plus className="w-4 h-4" />
-              <span>Nuevo administrador</span>
-            </button>
-          </div>
-
-          {successMessage && (
-            <div className="app-alert app-alert--success mb-6">
-              <p>{successMessage}</p>
-              <button onClick={() => setSuccessMessage(null)} className="text-green-600 hover:text-green-800">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          )}
-
-          <div className="app-soft-card app-context-card">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Acción principal</p>
-            <p className="app-context-card__title">Nuevo administrador</p>
-            <p className="app-context-card__text">Alta de una nueva cuenta administrativa.</p>
-          </div>
-        </section>
+        </div>
 
       </main>
 

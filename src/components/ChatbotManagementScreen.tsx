@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Bot,
@@ -369,6 +369,7 @@ export function ChatbotManagementScreen({
   const [statusMessage, setStatusMessage] = useState('');
   const [pdfSizeError, setPdfSizeError] = useState('');
   const [isDownloadingPdfs, setIsDownloadingPdfs] = useState(false);
+  const [detailTab, setDetailTab] = useState<'config' | 'documentos' | 'probar'>('config');
 
   const requestHeaders = useMemo(() => {
     const authToken = localStorage.getItem('authToken');
@@ -1149,584 +1150,395 @@ export function ChatbotManagementScreen({
       </header>
 
       <main className="app-main">
-        <button onClick={onBack} className="app-back-button mb-3">
+        <button onClick={onBack} className="app-back-button mb-6">
           <ArrowLeft className="w-4 h-4" />
           <span>Volver</span>
         </button>
 
-        <section className="mb-8 app-panel p-6" style={{ border: '1.5px solid #bfd3f5' }}>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="app-section-head" style={{ marginBottom: '0.25rem' }}>
-                <div>
-                  <h2 className="app-section-title">Gestión de chatbots</h2>
-                  <p className="app-section-description">
-                    Administra el catálogo, la base documental en PDF y prueba cada asistente.
-                  </p>
-                </div>
+        {/* ═══════════════════════════════════════════════════
+            VISTA 1 — Lista de chatbots en tarjetas
+        ═══════════════════════════════════════════════════ */}
+        {selectedChatbotId === null && (
+          <>
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center gap-3 mb-6">
+              {/* Filtro tipo */}
+              <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: 40 }}>
+                {([
+                  { key: 'all', label: 'Todos' },
+                  { key: 'GENERAL', label: isDocenteMode ? 'Asignatura' : 'General' },
+                  ...(!isDocenteMode ? [
+                    { key: 'GENERAL_ADMINISTRADOR', label: 'Admin' },
+                    { key: 'GENERAL_DOCENTE', label: 'Docente' },
+                  ] : []),
+                  ...(isDocenteMode ? [{ key: 'MINIPROYECTO', label: 'Miniproyecto' }] : []),
+                ] as const).map((f) => (
+                  <button key={f.key} type="button"
+                    onClick={() => setTypeFilter(f.key as typeof typeFilter)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all"
+                    style={{ background: typeFilter === f.key ? '#1a56db' : 'transparent', color: typeFilter === f.key ? '#fff' : '#4a6fa5' }}>
+                    {f.label}
+                  </button>
+                ))}
               </div>
-            </div>
-            <div className="flex flex-shrink-0 flex-wrap gap-2">
-              <button type="button" onClick={handleCreateNew} className="app-btn app-primary-btn px-5 py-2.5 gap-2">
+
+              {/* Filtro estado */}
+              <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: 40 }}>
+                {([
+                  { key: 'all',      label: `Todos (${totalChatbots})` },
+                  { key: 'active',   label: `Activos (${activeChatbots})` },
+                  { key: 'inactive', label: `Inactivos (${inactiveChatbots})` },
+                ] as const).map((f) => (
+                  <button key={f.key} type="button"
+                    onClick={() => setStateFilter(f.key)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all"
+                    style={{ background: stateFilter === f.key ? '#1a56db' : 'transparent', color: stateFilter === f.key ? '#fff' : '#4a6fa5' }}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Búsqueda */}
+              <div className="flex items-center gap-2 flex-1 min-w-[180px] rounded-xl px-3"
+                style={{ background: '#fff', border: '1.5px solid #bfd3f5', height: 40 }}>
+                <Search className="w-4 h-4 shrink-0" style={{ color: '#4a7ac8' }} />
+                <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Buscar por nombre, tipo o modelo…"
+                  className="flex-1 outline-none text-sm bg-transparent" style={{ color: '#1e3a5f' }} />
+              </div>
+
+              {/* Crear chatbot */}
+              <button type="button" onClick={handleCreateNew}
+                className="flex items-center gap-2 text-white font-bold text-sm px-5 rounded-xl transition-all hover:opacity-90 shrink-0"
+                style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)', height: 40, whiteSpace: 'nowrap' }}>
                 <Plus className="w-4 h-4" />
                 Crear chatbot
               </button>
             </div>
-          </div>
-        </section>
 
-        <section className="app-metric-grid mb-8">
-          <article className="app-metric-card">
-            <div className="app-metric-icon" style={{ background: '#1a56db', color: '#ffffff' }}>
-              <Bot className="w-5 h-5" />
-            </div>
-            <div>
-              <strong className="app-metric-value" style={{ color: '#1a56db' }}>{totalChatbots}</strong>
-              <p className="app-metric-label">Total</p>
-            </div>
-          </article>
-          <article className="app-metric-card">
-            <div className="app-metric-icon" style={{ background: '#1a56db', color: '#ffffff' }}>
-              <Eye className="w-5 h-5" />
-            </div>
-            <div>
-              <strong className="app-metric-value" style={{ color: '#1a56db' }}>{activeChatbots}</strong>
-              <p className="app-metric-label">Activos</p>
-            </div>
-          </article>
-          <article className="app-metric-card">
-            <div className="app-metric-icon" style={{ background: '#1a56db', color: '#ffffff' }}>
-              <MessageCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <strong className="app-metric-value" style={{ color: '#1a56db' }}>{generalChatbots}</strong>
-              <p className="app-metric-label">{isDocenteMode ? 'Generales de asignatura' : 'Generales'}</p>
-            </div>
-          </article>
-          {isDocenteMode ? (
-            <article className="app-metric-card">
-              <div className="app-metric-icon" style={{ background: '#1a56db', color: '#ffffff' }}>
-                <FileText className="w-5 h-5" />
+            {/* Estado / vacío */}
+            {isLoading ? (
+              <div className="app-empty-panel py-16 flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-2 border-[#1a56db] border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-slate-500">Cargando chatbots…</p>
               </div>
-              <div>
-                <strong className="app-metric-value" style={{ color: '#1a56db' }}>{miniproyectoChatbots}</strong>
-                <p className="app-metric-label">Miniproyecto</p>
+            ) : visibleChatbots.length === 0 ? (
+              <div className="app-empty-panel py-16 flex flex-col items-center gap-3">
+                <Bot className="w-12 h-12 text-slate-300" />
+                <p className="text-sm text-slate-500">No hay chatbots que coincidan con los filtros.</p>
               </div>
-            </article>
-          ) : null}
-        </section>
-
-        <div className="chatbot-admin-workspace chatbot-admin-workspace--compact">
-            <section className="app-panel overflow-hidden chatbot-admin-catalog-panel">
-              <div className="chatbot-admin-panel-head">
-                <div>
-                  <div className="app-form-summary-label" style={{ marginBottom: '0.35rem' }}>Catálogo</div>
-                  <h3 className="app-section-title" style={{ fontSize: '1.15rem' }}>Biblioteca de chatbots</h3>
-                  <p className="app-section-description">
-                    Tras aplicar filtros verás solo el nombre de cada chatbot; al pulsar una fila se despliega el detalle, los PDF disponibles desde el catálogo y las acciones de edición o estado.
-                  </p>
-                </div>
-                <div className="chatbot-admin-count-badge">{visibleChatbots.length}</div>
-              </div>
-
-              <div className="chatbot-admin-toolbar">
-                <div className="space-y-3">
-                  <div className="app-filter-row">
-                    <button onClick={() => setTypeFilter('all')} className={`app-filter-chip ${typeFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
-                      <Bot className="w-4 h-4" />
-                      Todos
-                    </button>
-                    <button onClick={() => setTypeFilter('GENERAL')} className={`app-filter-chip ${typeFilter === 'GENERAL' ? 'app-filter-chip--green' : ''}`}>
-                      <MessageCircle className="w-4 h-4" />
-                      {isDocenteMode ? 'General de asignatura' : 'Generales'}
-                    </button>
-                    {!isDocenteMode ? (
-                      <button onClick={() => setTypeFilter('GENERAL_ADMINISTRADOR')} className={`app-filter-chip ${typeFilter === 'GENERAL_ADMINISTRADOR' ? 'app-filter-chip--blue' : ''}`}>
-                        <Bot className="w-4 h-4" />
-                        Admin
-                      </button>
-                    ) : null}
-                    {!isDocenteMode ? (
-                      <button onClick={() => setTypeFilter('GENERAL_DOCENTE')} className={`app-filter-chip ${typeFilter === 'GENERAL_DOCENTE' ? 'app-filter-chip--green' : ''}`}>
-                        <Bot className="w-4 h-4" />
-                        Docente
-                      </button>
-                    ) : null}
-                    {isDocenteMode ? (
-                      <button onClick={() => setTypeFilter('MINIPROYECTO')} className={`app-filter-chip ${typeFilter === 'MINIPROYECTO' ? 'app-filter-chip--amber' : ''}`}>
-                        <FileText className="w-4 h-4" />
-                        Miniproyecto
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <div className="app-filter-row">
-                    <button onClick={() => setStateFilter('all')} className={`app-filter-chip ${stateFilter === 'all' ? 'app-filter-chip--blue' : ''}`}>
-                      Todos
-                    </button>
-                    <button onClick={() => setStateFilter('active')} className={`app-filter-chip ${stateFilter === 'active' ? 'app-filter-chip--green' : ''}`}>
-                      Activos ({activeChatbots})
-                    </button>
-                    <button onClick={() => setStateFilter('inactive')} className={`app-filter-chip ${stateFilter === 'inactive' ? 'app-filter-chip--amber' : ''}`}>
-                      Inactivos ({inactiveChatbots})
-                    </button>
-                  </div>
-                </div>
-
-                <label className="chatbot-admin-search">
-                  <Search className="chatbot-admin-search__icon" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Buscar por nombre, tipo o modelo"
-                    className="chatbot-admin-search__input"
-                  />
-                </label>
-              </div>
-
-              {isLoading ? (
-                <div className="chatbot-admin-empty-state">
-                  <Loader className="w-8 h-8 animate-spin" style={{ color: '#1a56db' }} />
-                  <p>Cargando chatbots...</p>
-                </div>
-              ) : visibleChatbots.length === 0 ? (
-                <div className="chatbot-admin-empty-state">
-                  <Bot className="w-10 h-10 text-slate-300" />
-                  <p>No hay chatbots que coincidan con los filtros activos.</p>
-                </div>
-              ) : (
-                <div className="chatbot-admin-library chatbot-admin-library--accordion">
-                  {visibleChatbots.map((chatbot) => {
-                    const chatbotIsActive = chatbot.estado !== false;
-                    const docList = Array.isArray(chatbot.documentos) ? chatbot.documentos : [];
-                    const isExpanded = catalogExpandedChatbotId === chatbot.id;
-
-                    return (
-                      <div
-                        key={chatbot.id}
-                        className={`chatbot-admin-library-card ${isExpanded ? 'chatbot-admin-library-card--selected' : ''} ${!chatbotIsActive ? 'chatbot-admin-library-card--inactive' : ''}`}
-                      >
-                        <button
-                          type="button"
-                          className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left hover:bg-slate-50/80"
-                          aria-expanded={isExpanded}
-                          aria-controls={`chatbot-catalog-detail-${chatbot.id}`}
-                          id={`chatbot-catalog-row-${chatbot.id}`}
-                          onClick={() => void toggleCatalogDetail(chatbot)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              void toggleCatalogDetail(chatbot);
-                            }
-                          }}
-                        >
-                          <span className="inline-flex shrink-0 text-slate-500" aria-hidden>
-                            {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+            ) : (
+              /* Grid de tarjetas */
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 16 }}>
+                {visibleChatbots.map(chatbot => {
+                  const isActive = chatbot.estado !== false;
+                  const tipoColors: Record<string, string> = { GENERAL: '#059669', GENERAL_ADMINISTRADOR: '#1a56db', GENERAL_DOCENTE: '#7c3aed', MINIPROYECTO: '#d97706' };
+                  const tColor = tipoColors[chatbot.tipo] || '#1a56db';
+                  return (
+                    <button key={chatbot.id} type="button"
+                      onClick={() => { void toggleCatalogDetail(chatbot); setDetailTab('config'); }}
+                      style={{ background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '16px', textAlign: 'left', cursor: 'pointer',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)', transition: 'border-color 0.15s, box-shadow 0.15s', display: 'flex', flexDirection: 'column', gap: 10 }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#1a56db'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 0 3px rgba(26,86,219,0.08)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#e2e8f0'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)'; }}>
+                      {/* Icono + nombre */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${tColor}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Bot style={{ width: 18, height: 18, color: tColor }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', lineHeight: 1.3, marginBottom: 4 }}>{chatbot.nombre}</p>
+                          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: `${tColor}18`, color: tColor }}>
+                            {getChatbotTypeLabel(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
                           </span>
-                          <span className="chatbot-admin-library-card__title truncate min-w-0 flex-1">{chatbot.nombre}</span>
-                          <span
-                            className={`shrink-0 text-[0.65rem] font-bold uppercase tracking-wide ${chatbotIsActive ? 'text-emerald-700' : 'text-slate-500'}`}
-                          >
-                            {chatbotIsActive ? 'Activo' : 'Inactivo'}
-                          </span>
-                        </button>
-
-                        {isExpanded ? (
-                          <div
-                            id={`chatbot-catalog-detail-${chatbot.id}`}
-                            role="region"
-                            aria-labelledby={`chatbot-catalog-row-${chatbot.id}`}
-                            className="border-t border-slate-100 px-4 pb-4"
-                          >
-                            <div className="flex flex-wrap items-start justify-between gap-3 pt-3">
-                              <div className="flex min-w-0 items-start gap-3">
-                                <div className={`chatbot-admin-library-card__icon shrink-0 ${getChatbotLibraryIconClass(chatbot.tipo)}`}>
-                                  <Bot className="w-5 h-5" />
-                                </div>
-                                <div className="min-w-0 text-left">
-                                  <div className="chatbot-admin-library-card__subtitle">{chatbot.model_name || 'Modelo por defecto'}</div>
-                                </div>
-                              </div>
-                              <div className="flex flex-wrap justify-end gap-2">
-                                <span className={`chatbot-admin-badge ${getChatbotTypeBadgeClass(chatbot.tipo)}`}>
-                                  {getChatbotTypeLabel(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
-                                </span>
-                                <span className="chatbot-admin-badge chatbot-admin-badge--slate">
-                                  {getChatbotUsageContextLabel(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
-                                </span>
-                                <span className={`chatbot-admin-badge ${chatbotIsActive ? 'chatbot-admin-badge--green' : 'chatbot-admin-badge--slate'}`}>
-                                  {chatbotIsActive ? 'Activo' : 'Inactivo'}
-                                </span>
-                              </div>
-                            </div>
-
-                            <p className="chatbot-admin-library-card__description mt-3 text-left">
-                              {chatbot.descripcion?.trim() || 'Sin descripción.'}
-                            </p>
-
-                            <p className="chatbot-admin-library-card__subtitle mt-2 text-left">
-                              {getChatbotVisibilityHint(chatbot.tipo, isDocenteMode ? 'docente' : 'admin')}
-                            </p>
-
-                            <div
-                              className="mt-3 rounded-lg border px-4 py-2.5 text-left sm:px-5"
-                              style={{ borderColor: '#e2e8f0', background: 'rgba(248,250,252,0.92)' }}
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => e.stopPropagation()}
-                              role="presentation"
-                            >
-                              <div className="app-form-summary-label" style={{ marginBottom: '0.35rem' }}>Base documental cargada</div>
-                              {docList.length === 0 ? (
-                                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Sin PDFs asociados aún.</p>
-                              ) : (
-                                <ul className="max-h-48 space-y-3 overflow-y-auto text-left text-sm px-0.5">
-                                  {docList.map((d) => (
-                                    <li
-                                      key={d.id}
-                                      className="flex items-start gap-3 rounded-lg border bg-white py-2.5 pl-5 pr-4 sm:items-center sm:gap-4 sm:pl-6 sm:pr-5"
-                                      style={{ borderColor: '#e2e8f0' }}
-                                    >
-                                      <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#1a56db] sm:mt-0" aria-hidden />
-                                      <div className="min-w-0 flex-1 pr-1">
-                                        <div
-                                          className="break-words text-sm font-medium leading-snug text-[#1e293b]"
-                                          title={d.nombre_original || d.nombre_archivo}
-                                        >
-                                          {d.nombre_original || d.nombre_archivo || `Documento #${d.id}`}
-                                        </div>
-                                        <div className="mt-0.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                                          {formatBytes(d.tamano_bytes)}
-                                        </div>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        className="app-btn app-primary-btn chatbot-admin-catalog-download-btn ml-2 shrink-0 self-center sm:ml-3"
-                                        disabled={isDownloadingPdfs}
-                                        title="Guardar una copia del PDF en tu equipo"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          void (async () => {
-                                            setIsDownloadingPdfs(true);
-                                            try {
-                                              await downloadChatbotPdfDocument(
-                                                chatbot.id,
-                                                d,
-                                                resolveAsignaturaForCatalogChatbot(chatbot),
-                                              );
-                                              setStatusMessage(`Descargado: ${d.nombre_original || d.nombre_archivo || 'PDF'}.`);
-                                            } catch (error) {
-                                              console.error(error);
-                                              setStatusMessage(error instanceof Error ? error.message : 'Error al descargar.');
-                                            } finally {
-                                              setIsDownloadingPdfs(false);
-                                            }
-                                          })();
-                                        }}
-                                      >
-                                        <Download aria-hidden />
-                                        Descargar PDF
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                            </div>
-
-                            <div
-                              className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3"
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => e.stopPropagation()}
-                              role="presentation"
-                            >
-                              <button type="button" className="app-btn app-btn-secondary app-btn-sm" onClick={(e) => handleOpenEditFromList(chatbot, e)}>
-                                <Pencil className="w-3.5 h-3.5" />
-                                Editar
-                              </button>
-                              {!chatbotIsActive ? (
-                                <button
-                                  type="button"
-                                  className="app-btn app-btn-success app-btn-sm"
-                                  onClick={(e) => void handleSetChatbotEstado(chatbot, true, e)}
-                                >
-                                  Habilitar
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="app-btn app-btn-danger app-btn-sm"
-                                  onClick={(e) => void handleSetChatbotEstado(chatbot, false, e)}
-                                >
-                                  Inhabilitar
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ) : null}
+                        </div>
+                        {/* Estado badge */}
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, flexShrink: 0,
+                          background: isActive ? '#dcfce7' : '#f1f5f9', color: isActive ? '#16a34a' : '#64748b' }}>
+                          {isActive ? 'Activo' : 'Inactivo'}
+                        </span>
                       </div>
-                    );
-                  })}
+                      {/* Modelo */}
+                      <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                        {chatbot.model_name || 'Modelo por defecto'}
+                        {chatbot.descripcion ? ` · ${chatbot.descripcion.slice(0, 40)}${chatbot.descripcion.length > 40 ? '…' : ''}` : ''}
+                      </p>
+                      {/* Flecha */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <ChevronRight style={{ width: 14, height: 14, color: '#bfd3f5' }} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════
+            VISTA 2 — Detalle del chatbot con pestañas
+        ═══════════════════════════════════════════════════ */}
+        {selectedChatbotId !== null && (() => {
+          const selectedChatbot = chatbots.find(c => c.id === selectedChatbotId);
+          const isActive = selectedChatbot?.estado !== false;
+          const tipoColors: Record<string, string> = { GENERAL: '#059669', GENERAL_ADMINISTRADOR: '#1a56db', GENERAL_DOCENTE: '#7c3aed', MINIPROYECTO: '#d97706' };
+          const tColor = tipoColors[selectedChatbot?.tipo || 'GENERAL'] || '#1a56db';
+          return (
+            <>
+              {/* Cabecera del detalle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+                <button type="button"
+                  onClick={() => { setSelectedChatbotId(null); setCatalogExpandedChatbotId(null); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#1a56db', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}>
+                  <ArrowLeft style={{ width: 15, height: 15 }} />
+                  Chatbots
+                </button>
+                <span style={{ color: '#e2e8f0' }}>›</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: `${tColor}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Bot style={{ width: 16, height: 16, color: tColor }} />
+                  </div>
+                  <span style={{ fontWeight: 700, fontSize: 16, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {form.nombre_chatbot || `Chatbot #${selectedChatbotId}`}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: `${tColor}18`, color: tColor, flexShrink: 0 }}>
+                    {getChatbotTypeLabel(selectedChatbot?.tipo || 'GENERAL', isDocenteMode ? 'docente' : 'admin')}
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, flexShrink: 0,
+                    background: isActive ? '#dcfce7' : '#f1f5f9', color: isActive ? '#16a34a' : '#64748b' }}>
+                    {isActive ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
+                {/* Acciones */}
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button type="button" onClick={handleEditSelected}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: '#dbeafe', color: '#1a56db', border: 'none' }}>
+                    <Pencil style={{ width: 13, height: 13 }} />
+                    Editar
+                  </button>
+                  {selectedChatbot && (
+                    <button type="button"
+                      onClick={e => void handleSetChatbotEstado(selectedChatbot, !isActive, e)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
+                        background: isActive ? '#fee2e2' : '#dcfce7', color: isActive ? '#dc2626' : '#16a34a' }}>
+                      {isActive ? <Eye style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
+                      {isActive ? 'Inhabilitar' : 'Habilitar'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Barra de pestañas */}
+              <div className="flex items-center gap-1 p-1 rounded-xl mb-6" style={{ background: '#e8eef8', width: 'fit-content' }}>
+                {([
+                  { key: 'config',     label: 'Configuración', icon: <Save style={{ width: 13, height: 13 }} /> },
+                  { key: 'documentos', label: 'Documentos',    icon: <FileText style={{ width: 13, height: 13 }} /> },
+                  { key: 'probar',     label: 'Probar',        icon: <MessageCircle style={{ width: 13, height: 13 }} /> },
+                ] as const).map(t => (
+                  <button key={t.key} type="button"
+                    onClick={() => setDetailTab(t.key)}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
+                    style={{ background: detailTab === t.key ? '#1a56db' : 'transparent', color: detailTab === t.key ? '#fff' : '#4a6fa5' }}>
+                    {t.icon}{t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── Tab: Configuración ── */}
+              {detailTab === 'config' && selectedChatbot && (
+                <div className="app-table-card" style={{ padding: '24px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                    {[
+                      { label: 'Tipo', value: getChatbotTypeLabel(selectedChatbot.tipo, isDocenteMode ? 'docente' : 'admin') },
+                      { label: 'Modelo', value: selectedChatbot.model_name || 'Modelo por defecto' },
+                      { label: 'Uso en', value: getChatbotUsageContextLabel(selectedChatbot.tipo, isDocenteMode ? 'docente' : 'admin') },
+                      { label: 'Top-K', value: String(selectedChatbot.top_k ?? 5) },
+                      { label: 'Máx. tokens', value: String(selectedChatbot.max_tokens ?? 512) },
+                      { label: 'Contexto', value: `${selectedChatbot.max_context_chars ?? 4000} chars` },
+                    ].map(item => (
+                      <div key={item.label} style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+                        <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{item.label}</p>
+                        <p style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedChatbot.descripcion && (
+                    <div style={{ marginTop: 16, background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Descripción</p>
+                      <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.6 }}>{selectedChatbot.descripcion}</p>
+                    </div>
+                  )}
+                  {selectedChatbot.prompt_base && (
+                    <div style={{ marginTop: 12, background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Prompt base</p>
+                      <p style={{ fontSize: 12, color: '#475569', fontFamily: 'monospace', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{selectedChatbot.prompt_base}</p>
+                    </div>
+                  )}
                 </div>
               )}
-            </section>
 
-          <aside className="chatbot-admin-sidebar chatbot-admin-probador-slot">
-            <div className="chatbot-admin-sidebar__stack">
-              {statusMessage ? (
-                <div className="chatbot-admin-status-banner">
-                  {statusMessage}
-                </div>
-              ) : null}
-
-              <section className="app-panel overflow-hidden chatbot-admin-chat-panel">
-                <div className="chatbot-admin-chat-head chatbot-admin-chat-head--plain">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center rounded-xl shrink-0" style={{ width: '2.5rem', height: '2.5rem', background: '#dbeafe' }}>
-                      <MessageCircle className="w-4 h-4" style={{ color: '#1a56db' }} />
-                    </div>
+              {/* ── Tab: Documentos ── */}
+              {detailTab === 'documentos' && (
+                <section ref={documentSectionRef} className="app-table-card" style={{ padding: '24px' }}>
+                  <div className="flex items-center justify-between gap-3 mb-5">
                     <div>
-                      <h3 className="app-section-title" style={{ fontSize: '1.05rem' }}>Probador</h3>
-                      <p className="app-section-description">
-                        {selectedChatbotId ? (
-                          <>
-                            En estos momentos vas a probar el chatbot de:{' '}
-                            <strong>{form.nombre_chatbot?.trim() || `Chatbot #${selectedChatbotId}`}</strong>
-                          </>
-                        ) : (
-                          <>
-                            Despliega un chatbot en el catálogo y elígelo para aparecer aquí el nombre correspondiente antes de iniciar una prueba.
-                          </>
-                        )}
+                      <p style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>Base documental</p>
+                      <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                        PDFs de <strong>{form.nombre_chatbot?.trim() || `#${selectedChatbotId}`}</strong> · máx. 2500 KB por archivo
                       </p>
                     </div>
+                    <button type="button" onClick={() => void handleReloadDocuments()} disabled={isReloading}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#475569' }}>
+                      <RefreshCw style={{ width: 13, height: 13 }} className={isReloading ? 'animate-spin' : ''} />
+                      Recargar base
+                    </button>
                   </div>
-                </div>
 
-                <div className="chatbot-admin-chat-panel__body p-6">
-                  <div className="chatbot-admin-chat-shell">
-                    <div className={`chatbot-admin-chat-messages ${messages.length === 0 ? 'chatbot-admin-chat-messages--empty' : ''}`}>
-                      {messages.length === 0 ? (
-                        <div className="chatbot-admin-empty-state chatbot-admin-empty-state--compact">
-                          <Bot className="w-12 h-12 text-slate-300" aria-hidden />
-                          <p className="text-center text-slate-600 max-w-[18rem] mx-auto leading-relaxed">
-                            {selectedChatbotId ? 'Las respuestas del asistente aparecerán aquí.' : 'Selecciona un chatbot en el catálogo para iniciar una prueba.'}
-                          </p>
-                        </div>
-                      ) : (
-                        messages.map((message, index) => (
-                          <div key={index} className="chatbot-admin-transcript-row">
-                            <div className="chatbot-admin-transcript-row__meta">
-                              <span className={`chatbot-admin-transcript-row__tag ${message.isBot ? 'chatbot-admin-transcript-row__tag--bot' : 'chatbot-admin-transcript-row__tag--user'}`}>
-                                {message.isBot ? 'Chatbot' : 'Usuario'}
-                              </span>
-                            </div>
-                            <div className={`chatbot-admin-message ${message.isBot ? 'chatbot-admin-message--bot' : 'chatbot-admin-message--user'}`}>
-                              {message.isBot ? (
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{preprocessForMarkdown(String(message.text || ''))}</ReactMarkdown>
-                              ) : (
-                                message.text || (message.isBot && isAsking ? 'Pensando respuesta…' : '')
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
+                  {statusMessage && (
+                    <div style={{ background: '#EFF6FF', border: '1px solid #bfd3f5', color: '#1a56db', padding: '10px 14px', borderRadius: 8, fontSize: 12, marginBottom: 14 }}>
+                      {statusMessage}
                     </div>
-
-                    <div className="chatbot-admin-chat-shell__footer mt-4">
-                      <div className="chatbot-admin-chat-input-row">
-                        <input
-                          id="chatbot-probador-input"
-                          value={inputValue}
-                          onChange={(event) => setInputValue(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault();
-                              void handleAskQuestion();
-                            }
-                          }}
-                          disabled={isAsking || !selectedChatbotId}
-                          placeholder={
-                            selectedChatbotId
-                              ? 'Escribe una pregunta y pulsa Enter o Enviar'
-                              : 'Primero elige un chatbot en el catálogo…'
-                          }
-                          className="chatbot-admin-chat-input"
-                          autoComplete="off"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => void handleAskQuestion()}
-                          disabled={isAsking || !selectedChatbotId || !inputValue.trim()}
-                          className="app-btn app-primary-btn px-5 py-3 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isAsking ? (
-                            <>
-                              <Loader className="w-4 h-4 animate-spin" />
-                              <span className="hidden sm:inline">Esperando…</span>
-                            </>
-                          ) : (
-                            <>
-                              <Send className="w-4 h-4" />
-                              Enviar
-                            </>
-                          )}
-                        </button>
-                      </div>
+                  )}
+                  {pdfSizeError && (
+                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '10px 14px', borderRadius: 8, fontSize: 12, marginBottom: 14 }}>
+                      {pdfSizeError}
                     </div>
-                  </div>
-                </div>
-              </section>
-            </div>
-          </aside>
+                  )}
 
-            <section ref={documentSectionRef} className="app-panel chatbot-admin-docs-panel chatbot-admin-docs-panel--compact chatbot-admin-lower-panel">
-              <div className="chatbot-admin-docs-head flex items-start justify-between gap-3 flex-wrap">
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100">
-                    <FileText className="h-4 w-4" style={{ color: '#1a56db' }} />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="app-section-title mb-0.5" style={{ fontSize: '1.05rem' }}>Base documental</h3>
-                    <p className="app-section-description mb-0">
-                      {selectedChatbotId ? (
-                        <>
-                          PDFs para{' '}
-                          <strong className="text-slate-900">{form.nombre_chatbot?.trim() || `#${selectedChatbotId}`}</strong>
-                          {' '}· máximo 2500 KB por archivo
-                        </>
-                      ) : (
-                        <>
-                          Primero{' '}
-                          <strong className="text-slate-800">despliega un chatbot</strong> en la biblioteca para subir PDFs aquí.
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <button type="button" onClick={() => void handleReloadDocuments()} disabled={!selectedChatbotId || isReloading} className="app-btn app-btn-secondary shrink-0 px-3 py-2 text-sm text-slate-700 disabled:opacity-50">
-                  <RefreshCw className={`h-4 w-4 ${isReloading ? 'animate-spin' : ''}`} />
-                  Recargar
-                </button>
-              </div>
+                  {/* Selector de archivo */}
+                  <input ref={uploadInputRef} id="chatbot-pdf-upload" type="file" accept=".pdf"
+                    onChange={event => {
+                      const file = event.target.files?.[0] || null;
+                      if (file && file.size > 2500 * 1024) {
+                        setPdfSizeError(`"${file.name}" supera 2500 KB. Selecciona un PDF más pequeño.`);
+                        event.target.value = ''; setSelectedFile(null); return;
+                      }
+                      setPdfSizeError(''); setSelectedFile(file);
+                    }}
+                    className="hidden" hidden aria-hidden tabIndex={-1} style={{ display: 'none' }} />
 
-              {!selectedChatbotId ? (
-                <div className="chatbot-admin-empty-state py-8">
-                  <FileText className="w-10 h-10 text-slate-300" aria-hidden />
-                  <p className="max-w-md text-center text-slate-600 leading-relaxed">No hay un chatbot en foco. Abre uno en «Biblioteca de chatbots» y vuelve a esta sección.</p>
-                </div>
-              ) : (
-                <>
-                <input
-                  ref={uploadInputRef}
-                  id="chatbot-pdf-upload"
-                  type="file"
-                  accept=".pdf"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] || null;
-                    if (file && file.size > 2500 * 1024) {
-                      setPdfSizeError(`El archivo "${file.name}" pesa ${(file.size / 1024).toFixed(0)} KB y supera el límite de 2500 KB. Selecciona un PDF más pequeño.`);
-                      event.target.value = '';
-                      setSelectedFile(null);
-                      return;
-                    }
-                    setPdfSizeError('');
-                    setSelectedFile(file);
-                  }}
-                  className="hidden"
-                  hidden
-                  aria-hidden="true"
-                  tabIndex={-1}
-                  style={{ display: 'none' }}
-                />
-
-                <div className="app-form-stack">
-                  <div className="chatbot-admin-upload-band">
-                    <div className="chatbot-admin-upload-band__summary">
-                      <div className="min-w-0">
-                        <div className="app-form-summary-label leading-tight">Archivo <span className="font-normal text-slate-400">(máx. 2500 KB)</span></div>
-                        <div className="chatbot-admin-upload-band__filename leading-snug">
-                          {selectedFile ? `${selectedFile.name} · ${(selectedFile.size / 1024).toFixed(0)} KB` : 'Ningún PDF seleccionado'}
-                        </div>
-                      </div>
-                      <div className="chatbot-admin-upload-band__status shrink-0">{selectedFile ? 'Listo' : '—'}</div>
-                    </div>
-
-                    {pdfSizeError && (
-                      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                        <span className="mt-0.5 shrink-0">⚠️</span>
-                        <span>{pdfSizeError}</span>
-                      </div>
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                    <button type="button" onClick={() => uploadInputRef.current?.click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: '#dbeafe', color: '#1a56db', border: 'none' }}>
+                      <Plus style={{ width: 14, height: 14 }} />
+                      {selectedFile ? selectedFile.name.slice(0, 24) + (selectedFile.name.length > 24 ? '…' : '') : 'Seleccionar PDF'}
+                    </button>
+                    {selectedFile && (
+                      <button type="button" onClick={() => void handleUploadDocument()} disabled={isUploading}
+                        className="flex items-center gap-2 text-white font-bold text-sm px-4 rounded-xl transition-all hover:opacity-90"
+                        style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)', height: 36, whiteSpace: 'nowrap' }}>
+                        {isUploading ? <><Loader style={{ width: 14, height: 14 }} className="animate-spin" />Subiendo…</> : <><Save style={{ width: 14, height: 14 }} />Subir PDF</>}
+                      </button>
                     )}
+                    {selectedFile && (
+                      <button type="button" onClick={() => { setSelectedFile(null); setPdfSizeError(''); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 10px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: '#f1f5f9', color: '#64748b', border: 'none' }}>
+                        <Trash2 style={{ width: 13, height: 13 }} />
+                      </button>
+                    )}
+                  </div>
 
-                    <div className="chatbot-admin-upload-band__actions">
-                      <button type="button" onClick={openPdfPicker} className="app-btn app-primary-btn min-h-0 justify-center py-2.5 text-xs font-semibold sm:text-sm">
-                        Seleccionar PDF
-                      </button>
-                      <button type="button" onClick={() => void handleUploadDocument()} disabled={!canConfirmPdf} className="app-btn app-btn-success min-h-0 justify-center py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm">
-                        {isUploading ? 'Cargando...' : 'Cargar PDF'}
-                      </button>
-                      <button type="button" onClick={() => { setSelectedFile(null); setPdfSizeError(''); }} disabled={!canCancelPdf} className="app-btn chatbot-admin-upload-band__cancel min-h-0 justify-center py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm">
-                        Cancelar PDF
-                      </button>
+                  {/* Lista de PDFs */}
+                  {documents.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94a3b8', fontSize: 13 }}>
+                      <FileText style={{ width: 32, height: 32, margin: '0 auto 8px', opacity: 0.4 }} />
+                      <p>Aún no hay PDFs en este chatbot.</p>
                     </div>
-
-                    <div className="chatbot-admin-document-list space-y-2 overflow-y-auto pr-0.5">
-                      {documents.length === 0 ? (
-                        <div className="chatbot-admin-empty-inline">No hay documentos asociados todavía.</div>
-                      ) : (
-                        documents.map((document) => (
-                          <div key={document.id} className="chatbot-admin-document-item">
-                            <div className="min-w-0 flex-1 pr-2">
-                              <p className="chatbot-admin-document-item__title mb-0">{document.nombre_original || document.nombre_archivo}</p>
-                              <p className="chatbot-admin-document-item__meta">{formatBytes(document.tamano_bytes)}</p>
-                            </div>
-                            <div className="chatbot-admin-document-item__actions">
-                              <button
-                                type="button"
-                                className="chatbot-admin-doc-icon-btn chatbot-admin-doc-icon-btn--download"
-                                disabled={isDownloadingPdfs}
-                                title="Descargar PDF"
-                                aria-label="Descargar PDF"
-                                onClick={() => void (async () => {
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {documents.map(doc => (
+                        <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                          <FileText style={{ width: 16, height: 16, color: '#1a56db', flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: 13, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {doc.nombre_original || doc.nombre_archivo || `Documento ${doc.id}`}
+                          </span>
+                          <span style={{ fontSize: 11, color: '#64748b', flexShrink: 0 }}>{formatBytes(doc.tamano_bytes)}</span>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button type="button" title="Descargar"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 6, background: '#dbeafe', color: '#1a56db', border: 'none', cursor: 'pointer' }}
+                              onClick={() => void (async () => {
+                                try {
                                   setIsDownloadingPdfs(true);
-                                  try {
-                                    if (!selectedChatbotId) return;
-                                    await downloadChatbotPdfDocument(
-                                      selectedChatbotId,
-                                      document,
-                                      resolveAsignaturaIdForDocumentsApi(),
-                                    );
-                                    setStatusMessage(`Descargado: ${document.nombre_original || document.nombre_archivo || 'PDF'}.`);
-                                  } catch (error) {
-                                    console.error(error);
-                                    setStatusMessage(error instanceof Error ? error.message : 'Error al descargar.');
-                                  } finally {
-                                    setIsDownloadingPdfs(false);
-                                  }
-                                })()}
-                              >
-                                <Download aria-hidden strokeWidth={2.25} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleDeleteDocument(document.id)}
-                                className="chatbot-admin-doc-icon-btn chatbot-admin-doc-icon-btn--danger"
-                                title="Quitar este PDF del chatbot"
-                                aria-label="Eliminar PDF"
-                              >
-                                <Trash2 aria-hidden strokeWidth={2.25} />
-                              </button>
-                            </div>
+                                  const res = await apiFetch(`/chatbots/${selectedChatbotId}/documents/${doc.id}/download`);
+                                  if (!res.ok) throw new Error('No se pudo descargar.');
+                                  const blob = await res.blob();
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url; a.download = doc.nombre_original || doc.nombre_archivo || `documento_${doc.id}.pdf`;
+                                  a.click(); URL.revokeObjectURL(url);
+                                } catch (err) { setStatusMessage(err instanceof Error ? err.message : 'Error al descargar.'); }
+                                finally { setIsDownloadingPdfs(false); }
+                              })()}>
+                              <Download style={{ width: 13, height: 13 }} />
+                            </button>
+                            <button type="button" title="Eliminar" onClick={() => void handleDeleteDocument(doc.id)}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 6, background: '#fee2e2', color: '#dc2626', border: 'none', cursor: 'pointer' }}>
+                              <Trash2 style={{ width: 13, height: 13 }} />
+                            </button>
                           </div>
-                        ))
-                      )}
+                        </div>
+                      ))}
                     </div>
+                  )}
+                </section>
+              )}
+
+              {/* ── Tab: Probar ── */}
+              {detailTab === 'probar' && (
+                <div className="app-table-card" style={{ overflow: 'hidden' }}>
+                  {statusMessage && (
+                    <div style={{ background: '#EFF6FF', borderBottom: '1px solid #bfd3f5', color: '#1a56db', padding: '10px 18px', fontSize: 12 }}>
+                      {statusMessage}
+                    </div>
+                  )}
+                  {/* Mensajes */}
+                  <div style={{ minHeight: 320, maxHeight: 480, overflowY: 'auto', padding: '20px 20px 0' }}>
+                    {messages.length === 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 280, gap: 10 }}>
+                        <Bot style={{ width: 40, height: 40, color: '#bfd3f5' }} />
+                        <p style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', maxWidth: 260 }}>
+                          Escribe una pregunta para probar el chatbot <strong>{form.nombre_chatbot}</strong>.
+                        </p>
+                      </div>
+                    ) : (
+                      messages.map((message, index) => (
+                        <div key={index} style={{ marginBottom: 16 }}>
+                          <p style={{ fontSize: 10, fontWeight: 700, color: message.isBot ? '#1a56db' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                            {message.isBot ? 'Chatbot' : 'Tú'}
+                          </p>
+                          <div style={{ padding: '10px 14px', borderRadius: 10, fontSize: 13, lineHeight: 1.6,
+                            background: message.isBot ? '#EFF6FF' : '#f8fafc',
+                            color: message.isBot ? '#1e293b' : '#475569',
+                            border: `1px solid ${message.isBot ? '#bfd3f5' : '#e2e8f0'}` }}>
+                            {message.isBot
+                              ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{preprocessForMarkdown(String(message.text || ''))}</ReactMarkdown>
+                              : message.text}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {/* Input */}
+                  <div style={{ display: 'flex', gap: 10, padding: '14px 20px', borderTop: '1px solid #e2e8f0' }}>
+                    <input type="text" value={inputValue}
+                      onChange={e => setInputValue(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleAskQuestion(); } }}
+                      disabled={isAsking}
+                      placeholder="Escribe una pregunta y pulsa Enter…"
+                      style={{ flex: 1, padding: '8px 14px', borderRadius: 8, border: '1.5px solid #bfd3f5', fontSize: 13, outline: 'none', color: '#1e293b', background: '#f8fafc' }}
+                      className="flex-1" />
+                    <button type="button" onClick={() => void handleAskQuestion()}
+                      disabled={isAsking || !inputValue.trim()}
+                      className="flex items-center gap-2 text-white font-bold text-sm px-4 rounded-xl transition-all hover:opacity-90 disabled:opacity-50"
+                      style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)', height: 40, whiteSpace: 'nowrap' }}>
+                      {isAsking ? <><Loader style={{ width: 14, height: 14 }} className="animate-spin" />Esperando…</> : <><Send style={{ width: 14, height: 14 }} />Enviar</>}
+                    </button>
                   </div>
                 </div>
-                </>
               )}
-            </section>
-        </div>
+            </>
+          );
+        })()}
       </main>
       </div>
 

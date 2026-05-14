@@ -174,30 +174,30 @@ export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScr
   };
 
   const handleToggleEstado = async (docente: Docente) => {
-    const nombre = docente.persona?.nombre || 'este docente';
     const currentlyActive = isDocenteActive(docente);
-    const actionLabel = currentlyActive ? 'inhabilitar' : 'habilitar';
-
-    if (!window.confirm(`Deseas ${actionLabel} a ${nombre}?`)) {
-      return;
-    }
-
+    const nombre = docente.persona?.nombre || 'este docente';
+    if (!window.confirm(`¿${currentlyActive ? 'Inhabilitar' : 'Habilitar'} a ${nombre}?`)) return;
+    // Actualización optimista inmediata — sin esperar al servidor
+    setDocentes(prev => prev.map(d =>
+      d.id === docente.id
+        ? { ...d, persona: { ...d.persona, estado: !currentlyActive } }
+        : d
+    ));
     try {
       const response = await fetch(`${API_BASE_URL}/docente/${docente.id}/toggle-estado`, {
         method: 'PUT',
         headers: buildAuthHeaders({ Accept: 'application/json' }),
         credentials: 'include'
       });
-
-      if (!response.ok) {
-        throw new Error(`No se pudo ${actionLabel} el docente`);
-      }
-
-      await loadDocentes();
-      setSuccessMessage(`Docente ${currentlyActive ? 'inhabilitado' : 'habilitado'} correctamente.`);
+      if (!response.ok) throw new Error('No se pudo cambiar el estado');
     } catch (err) {
-      console.error('Error toggling docente:', err);
-      setError(err instanceof Error ? err.message : 'Error al cambiar el estado del docente');
+      // Revertir si falla
+      setDocentes(prev => prev.map(d =>
+        d.id === docente.id
+          ? { ...d, persona: { ...d.persona, estado: currentlyActive } }
+          : d
+      ));
+      setError(err instanceof Error ? err.message : 'Error al cambiar el estado');
     }
   };
 
@@ -321,15 +321,34 @@ export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScr
         throw new Error(editingDocente ? 'Error al actualizar docente' : 'Error al crear docente');
       }
 
-      await loadDocentes();
-      handleCloseModal();
-      if (!editingDocente) {
+      if (editingDocente) {
+        // Edición — actualizar solo ese registro en el array local
+        const asignaturaObj = asignaturas.find(a => String(a.id) === formData.asignaturaId);
+        setDocentes(prev => prev.map(d =>
+          d.id === editingDocente.id
+            ? {
+                ...d,
+                especialidad: formData.especialidad.trim(),
+                Asignatura: asignaturaObj ?? d.Asignatura,
+                asignaturaId: Number(formData.asignaturaId),
+                persona: {
+                  ...d.persona,
+                  nombre: formData.nombre.trim(),
+                  email: formData.email.trim(),
+                }
+              }
+            : d
+        ));
+      } else {
+        // Creación — necesitamos el nuevo ID del servidor
+        await loadDocentes();
         setResultModal({
           open: true,
           success: true,
           message: 'Correo enviado con las credenciales del docente.'
         });
       }
+      handleCloseModal();
     } catch (err) {
       console.error('Error saving docente:', err);
       const message = err instanceof Error ? err.message : 'Error al guardar docente';
@@ -368,181 +387,105 @@ export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScr
       </header>
 
       <main className="app-main">
-        <button
-          onClick={onBack}
-          className="app-back-button mb-6"
-        >
+
+        {/* Navegación */}
+        <button onClick={onBack} className="app-back-button mb-6">
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver al Panel</span>
+          <span>Volver</span>
         </button>
 
-        <section className="app-page-hero mb-6">
-          <div className="app-page-hero__content">
-            <div className="app-page-hero__copy">
-              <div className="app-page-hero__eyebrow">Equipo académico</div>
-              <h2 className="app-page-hero__title">Gestión de docentes</h2>
-              <p className="app-page-hero__description">
-                Consulta, filtra y registra docentes.
-              </p>
-            </div>
-
-            <div className="app-hero-metrics">
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Docentes</div>
-                <div className="app-hero-metric__value">{stats.total}</div>
-                <div className="app-hero-metric__help">Registros totales cargados.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Con correo</div>
-                <div className="app-hero-metric__value">{stats.docentesConCorreo}</div>
-                <div className="app-hero-metric__help">Listos para el envío de credenciales.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Asignaturas</div>
-                <div className="app-hero-metric__value">{stats.asignaturasCubiertas}</div>
-                <div className="app-hero-metric__help">Cobertura académica actual.</div>
-              </div>
-              <div className="app-hero-metric">
-                <div className="app-hero-metric__label">Especialidades</div>
-                <div className="app-hero-metric__value">{stats.especialidades}</div>
-                <div className="app-hero-metric__help">Perfiles distintos presentes en el equipo.</div>
-              </div>
-            </div>
+        {/* ── Toolbar: Estado + Búsqueda + Acción ── */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: 40 }}>
+            {([
+              { key: 'all',      label: `Todos (${stats.total})` },
+              { key: 'active',   label: `Activos (${stats.activos})` },
+              { key: 'inactive', label: `Inactivos (${stats.inactivos})` },
+            ] as const).map(s => (
+              <button key={s.key} type="button"
+                onClick={() => setSelectedStateFilter(s.key)}
+                className="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
+                style={{ background: selectedStateFilter === s.key ? '#1a56db' : 'transparent', color: selectedStateFilter === s.key ? '#fff' : '#4a6fa5' }}>
+                {s.label}
+              </button>
+            ))}
           </div>
 
-          <div className="app-hero-layout app-hero-layout--balanced">
-            <div className="app-toolbar-card">
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Equipo docente</p>
-                  <p className="mt-1 text-sm text-slate-600">Filtra por asignatura y estado.</p>
-                </div>
-                <button onClick={handleOpenCreate} className="app-btn app-btn-success">
-                  <Plus className="h-5 w-5" />
-                  <span>Nuevo docente</span>
-                </button>
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="app-soft-card app-soft-card--blue">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Filtrar por asignatura</p>
-                      <p className="mt-1 text-sm text-slate-600">Mantén el foco por asignatura sin cambiar de pantalla.</p>
-                    </div>
-                    <div className="max-w-full truncate rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
-                      {selectedAsignaturaFilter === 'all' ? 'Todas' : asignaturas.find((Asignatura) => String(Asignatura.id) === selectedAsignaturaFilter)?.nombre || 'Asignatura'}
-                    </div>
-                  </div>
-                  <div className="app-filter-row items-start">
-                    <button onClick={() => setSelectedAsignaturaFilter('all')} className={AsignaturaFilterButtonClass(selectedAsignaturaFilter === 'all')}>
-                      Todas las asignaturas
-                    </button>
-                    {visibleasignaturas.map((Asignatura) => {
-                      const isActive = selectedAsignaturaFilter === String(Asignatura.id);
-                      return (
-                        <button key={Asignatura.id} onClick={() => setSelectedAsignaturaFilter(String(Asignatura.id))} className={AsignaturaFilterButtonClass(isActive)}>
-                          {Asignatura.nombre}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="app-soft-card app-soft-card--green">
-                  <div className="mb-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado del registro</p>
-                    <p className="mt-1 text-sm text-slate-600">Alterna entre docentes activos, inactivos o la vista completa.</p>
-                  </div>
-                  <div className="app-filter-row">
-                    <button onClick={() => setSelectedStateFilter('all')} className={stateFilterButtonClass('all', selectedStateFilter === 'all')}>
-                      <Users className="h-4 w-4 shrink-0" />
-                      <span>Todos</span>
-                    </button>
-                    <button onClick={() => setSelectedStateFilter('active')} className={stateFilterButtonClass('active', selectedStateFilter === 'active')}>
-                      <Eye className="h-4 w-4 shrink-0" />
-                      <span>Activos ({stats.activos})</span>
-                    </button>
-                    <button onClick={() => setSelectedStateFilter('inactive')} className={stateFilterButtonClass('inactive', selectedStateFilter === 'inactive')}>
-                      <EyeOff className="h-4 w-4 shrink-0" />
-                      <span>Inactivos ({stats.inactivos})</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="app-sidebar-stack">
-              <div className="app-soft-card app-soft-card--blue">
-                <div className="mb-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Búsqueda rápida</p>
-                  <h3 className="mt-2 text-lg font-semibold text-[#3A4A5B]">Buscar docente</h3>
-                  <p className="mt-1 text-sm text-slate-600">Busca por nombre, correo, código, especialidad o asignatura.</p>
-                </div>
-                <div className="app-toolbar-card__search app-search-field mb-4">
-                  <Search className="app-search-field__icon" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Ej: Ana, Programación o DOC123"
-                    className="app-form-input"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="app-soft-card bg-white/85">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resultados</p>
-                    <p className="mt-2 text-2xl font-semibold text-[#3A4A5B]">{filteredDocentes.length}</p>
-                  </div>
-                  <div className="app-soft-card bg-white/85">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Vista</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-700">{currentViewLabel}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="app-soft-card app-context-card">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Flujo sugerido</p>
-                <p className="app-context-card__title">Orden recomendado</p>
-                <div className="mt-3 space-y-2 text-sm text-slate-600">
-                  <p>1. Filtra por asignatura o estado.</p>
-                  <p>2. Busca el docente por nombre, correo o código.</p>
-                  <p>3. Edita o cambia el estado desde la tabla.</p>
-                </div>
-              </div>
-            </div>
+          <div className="flex items-center gap-2 flex-1 min-w-[200px] rounded-xl px-3"
+            style={{ background: '#fff', border: '1.5px solid #bfd3f5', height: 40 }}>
+            <Search className="w-4 h-4 shrink-0" style={{ color: '#4a7ac8' }} />
+            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Buscar por nombre, correo, código o especialidad…"
+              className="flex-1 outline-none text-sm bg-transparent" style={{ color: '#1e3a5f' }} />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm('')} className="shrink-0" style={{ color: '#94a3b8' }}>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        </section>
 
+          <button onClick={handleOpenCreate}
+            className="flex items-center gap-2 text-white font-bold text-sm px-5 rounded-xl transition-all hover:opacity-90 shrink-0"
+            style={{ background: 'linear-gradient(135deg, #1a56db, #142d61)', height: 40, whiteSpace: 'nowrap' }}>
+            <Plus className="w-4 h-4" />
+            Nuevo docente
+          </button>
+        </div>
+
+        {/* ── 4 tarjetas de asignatura ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(asignaturas.length + 1, 5)}, 1fr)`, gap: 12, marginBottom: 20 }}>
+          {/* Tarjeta "Todas" */}
+          {(() => {
+            const active = selectedAsignaturaFilter === 'all';
+            const count = filteredDocentes.length;
+            return (
+              <button type="button" onClick={() => setSelectedAsignaturaFilter('all')}
+                style={{ background: '#fff', border: active ? '2px solid #1a56db' : '1.5px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', cursor: 'pointer',
+                  boxShadow: active ? '0 0 0 3px rgba(26,86,219,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', transition: 'all 0.15s', textAlign: 'left' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Todas</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: active ? '#1a56db' : '#1e293b', lineHeight: 1 }}>{stats.total}</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>docentes</div>
+              </button>
+            );
+          })()}
+          {asignaturas.map(a => {
+            const active = selectedAsignaturaFilter === String(a.id);
+            const count = docentes.filter(d => String(d.Asignatura?.id ?? d.asignaturaId ?? '') === String(a.id)).length;
+            return (
+              <button key={a.id} type="button" onClick={() => setSelectedAsignaturaFilter(String(a.id))}
+                style={{ background: '#fff', border: active ? '2px solid #1a56db' : '1.5px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', cursor: 'pointer',
+                  boxShadow: active ? '0 0 0 3px rgba(26,86,219,0.10)' : '0 1px 3px rgba(0,0,0,0.06)', transition: 'all 0.15s', textAlign: 'left' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#1e293b', lineHeight: 1.3, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{a.nombre}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: active ? '#1a56db' : '#1e293b', lineHeight: 1 }}>{count}</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>docente(s)</div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Solo error crítico */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="mb-4" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '10px 14px', borderRadius: 8, fontSize: 12 }}>
             {error}
           </div>
         )}
 
-        {successMessage && (
-          <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg">
-            {successMessage}
-          </div>
-        )}
-
+        {/* ── Tabla ── */}
         {loading ? (
           <div className="app-empty-panel py-12">
-            <p className="text-gray-600">Cargando docentes...</p>
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-[#1a56db] border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-500">Cargando docentes…</p>
+            </div>
           </div>
         ) : filteredDocentes.length === 0 ? (
           <div className="app-empty-panel py-12">
-            <p className="text-base text-slate-600">No hay docentes para la vista actual.</p>
-            <p className="mt-2 text-sm text-slate-500">Cambia los filtros o registra un nuevo docente para poblar el listado.</p>
+            <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-500">No hay docentes para los filtros activos.</p>
           </div>
         ) : (
           <div className="app-table-card">
-            <div className="app-table-card__header app-table-card__header--green">
-              <div>
-                <div className="app-table-card__title">Listado docente</div>
-                <p className="app-table-card__description">Consulta el equipo completo, revisa su asignatura asignada y aplica acciones rápidas sobre cada registro.</p>
-              </div>
-            </div>
-            <div className="app-table-card__body p-0">
+            {/* Sin header extra — el thead de la tabla ya tiene el azul */}
             <div className="overflow-x-auto">
               <table className="app-data-table">
                 <thead>
@@ -559,63 +502,59 @@ export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScr
                 <tbody>
                   {filteredDocentes.map((docente) => {
                     const docenteIsActive = isDocenteActive(docente);
-
+                    const codigo = docente.persona?.codigoAcceso || docente.codigoAcceso || '—';
                     return (
-                    <tr
-                      key={docente.id}
-                      className={`transition-colors ${
-                        docenteIsActive ? 'hover:bg-gray-50' : 'bg-slate-50/70 text-slate-500'
-                      }`}
-                    >
-                      <td>
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${docenteIsActive ? 'bg-blue-100' : 'bg-slate-200'}`}>
-                            <Users className={`w-5 h-5 ${docenteIsActive ? 'text-[#4A90E2]' : 'text-slate-500'}`} />
+                      <tr key={docente.id} className={`transition-colors ${docenteIsActive ? 'hover:bg-[#f0f5ff]' : 'opacity-55'}`}>
+                        {/* Nombre */}
+                        <td>
+                          <div className="flex items-center gap-3">
+                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: docenteIsActive ? '#dbeafe' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Users style={{ width: 15, height: 15, color: docenteIsActive ? '#1a56db' : '#94a3b8' }} />
+                            </div>
+                            <span style={{ fontWeight: 600, color: docenteIsActive ? '#1e293b' : '#94a3b8', fontSize: 13 }}>
+                              {docente.persona?.nombre || 'Sin nombre'}
+                            </span>
                           </div>
-                          <div>
-                            <div className={docenteIsActive ? 'text-[#3A4A5B]' : 'text-slate-500'}>{docente.persona?.nombre || 'Sin nombre'}</div>
+                        </td>
+                        {/* Email */}
+                        <td style={{ fontSize: 13, color: '#475569' }}>{docente.persona?.email || '—'}</td>
+                        {/* Especialidad */}
+                        <td style={{ fontSize: 13, color: '#475569' }}>{docente.especialidad || '—'}</td>
+                        {/* Asignatura — sin truncar */}
+                        <td style={{ fontSize: 13, color: '#475569' }}>{docente.Asignatura?.nombre || '—'}</td>
+                        {/* Código — texto plano, sin caja */}
+                        <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#64748b' }} title={codigo}>{codigo}</td>
+                        {/* Estado */}
+                        <td>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+                            background: docenteIsActive ? '#dcfce7' : '#fef9c3',
+                            color: docenteIsActive ? '#16a34a' : '#a16207' }}>
+                            {docenteIsActive ? 'Activo' : 'Inhabilitado'}
+                          </span>
+                        </td>
+                        {/* Acciones — íconos minimalistas */}
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                            <button onClick={() => handleOpenEdit(docente)} title="Editar"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 4, cursor: 'pointer', border: 'none', background: 'transparent', color: '#1a56db', flexShrink: 0, transition: 'background 0.15s' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = '#dbeafe')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                              <Pencil style={{ width: 12, height: 12 }} />
+                            </button>
+                            <button onClick={() => handleToggleEstado(docente)} title={docenteIsActive ? 'Inhabilitar' : 'Habilitar'}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 4, cursor: 'pointer', border: 'none', background: 'transparent', flexShrink: 0, transition: 'background 0.15s',
+                                color: docenteIsActive ? '#dc2626' : '#16a34a' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = docenteIsActive ? '#fee2e2' : '#dcfce7')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                              {docenteIsActive ? <EyeOff style={{ width: 12, height: 12 }} /> : <Eye style={{ width: 12, height: 12 }} />}
+                            </button>
                           </div>
-                        </div>
-                      </td>
-                      <td>{docente.persona?.email || '-'}</td>
-                      <td>{docente.especialidad || '-'}</td>
-                      <td>{docente.Asignatura?.nombre || '-'}</td>
-                      <td>{docente.persona?.codigoAcceso || docente.codigoAcceso || '-'}</td>
-                      <td>
-                        <span
-                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                            docenteIsActive
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}
-                        >
-                          {docenteIsActive ? 'Activo' : 'Inhabilitado'}
-                        </span>
-                      </td>
-                      <td className="text-center">
-                        <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                          <button
-                            onClick={() => handleOpenEdit(docente)}
-                            className="app-btn app-btn-ghost app-btn-icon app-btn-sm"
-                            title="Editar"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleToggleEstado(docente)}
-                            className={`app-btn app-btn-sm ${docenteIsActive ? 'app-btn-secondary' : 'app-btn-success'}`}
-                            title={docenteIsActive ? 'Inhabilitar docente' : 'Habilitar docente'}
-                          >
-                            {docenteIsActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            <span>{docenteIsActive ? 'Inhabilitar' : 'Habilitar'}</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );})}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-            </div>
             </div>
           </div>
         )}
