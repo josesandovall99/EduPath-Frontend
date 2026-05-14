@@ -77,6 +77,13 @@ interface StudentProgress {
 
   codigo?: string;
 
+  /** Período académico al que pertenece esta entrada (ej: '2026-A', '2026-B') */
+  periodo_academico?: string;
+
+  /** true cuando esta entrada es un registro histórico de un período anterior del estudiante.
+   *  Estas entradas aparecen en el informe de cohortes pero NO en la lista individual de estudiantes. */
+  isHistorical?: boolean;
+
   subjects: {
 
     asignaturaId?: string;
@@ -896,9 +903,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             const effectiveasignaturasCatalog = normalizedAsignaturas.length > 0 ? normalizedAsignaturas : currentasignaturasCatalog;
 
-
-
-            const normalizedStudents: StudentProgress[] = resumenData.students.map((student: any) => ({
+            const baseStudents: StudentProgress[] = resumenData.students.map((student: any) => ({
 
               ...student,
 
@@ -906,9 +911,100 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             }));
 
+            if (isDocenteMode) {
 
+              // Modo docente: usar datos pre-calculados tal cual
+              setStudentsData(baseStudents);
 
-            setStudentsData(normalizedStudents);
+              return;
+
+            }
+
+            // Modo admin: enriquecer con entradas históricas.
+            // 1 sola llamada a /periodos-por-estudiante devuelve todos los periodos en un mapa.
+            // Luego solo se hacen llamadas históricas para los estudiantes que realmente las necesitan.
+            let periodosPorEstudiante: Record<string, string[]> = {};
+            try {
+              const pRes = await api.get('/progresos/periodos-por-estudiante');
+              periodosPorEstudiante = pRes.data || {};
+            } catch { /* si falla, ningún estudiante tendrá periodos históricos */ }
+
+            const studentsWithHistorical: StudentProgress[][] = await Promise.all(
+              baseStudents.map(async (st: StudentProgress) => {
+
+                const currentPeriodo = st.periodo_academico ?? '';
+
+                const todosLosPeriodos: string[] = periodosPorEstudiante[String(st.id)] || [];
+
+                const historicalPeriodos = todosLosPeriodos.filter(p => p !== currentPeriodo && p !== '');
+
+                if (historicalPeriodos.length === 0) return [st];
+
+                // Construir entradas históricas (solo datos de asignatura, sin temas/subtemas)
+                const historicalEntries: StudentProgress[] = await Promise.all(
+                  historicalPeriodos.map(async (periodo) => {
+
+                    const historicalSubjects = await Promise.all(
+                      asignaturasList.map(async (asig: any, idx: number) => {
+
+                        try {
+
+                          const r = await api.get(
+                            `/progresos/por-asignatura?asignatura_id=${asig.id}&estudiante_id=${st.id}&periodo=${encodeURIComponent(periodo)}`
+                          );
+
+                          const d = r.data;
+
+                          const cont = d?.progreso?.contenidos || { completados: 0, porcentaje: 0 };
+
+                          const ej   = d?.progreso?.ejercicios  || { completados: 0, porcentaje: 0 };
+
+                          return {
+                            asignaturaId: String(asig.id),
+                            name: asig.nombre || `Asignatura ${asig.id}`,
+                            color: ['#4A90E2', '#7ED6A7', '#F5A97F'][idx % 3],
+                            progress: d?.resumen?.porcentajeTotalAsignatura ?? 0,
+                            contentViewed: cont.completados ?? 0,
+                            exercisesCompleted: ej.completados ?? 0,
+                            miniprojectsSubmitted: d?.miniproyectos?.aprobados ?? 0,
+                            topics: []
+                          };
+
+                        } catch {
+
+                          return {
+                            asignaturaId: String(asig.id),
+                            name: asig.nombre || `Asignatura ${asig.id}`,
+                            color: '#4A90E2',
+                            progress: 0, contentViewed: 0, exercisesCompleted: 0,
+                            miniprojectsSubmitted: 0, topics: []
+                          };
+
+                        }
+
+                      })
+                    );
+
+                    return {
+                      id: `${st.id}-${periodo}`,
+                      name: st.name,
+                      email: st.email,
+                      createdDate: '',
+                      periodo_academico: periodo,
+                      isHistorical: true,
+                      codigo: st.codigo ?? '',
+                      subjects: historicalSubjects
+                    } as StudentProgress;
+
+                  })
+                );
+
+                return [st, ...historicalEntries];
+
+              })
+            );
+
+            setStudentsData(studentsWithHistorical.reduce<StudentProgress[]>((acc, arr) => acc.concat(arr), []));
 
             return;
 
@@ -1059,8 +1155,13 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
         // 3) por cada estudiante, obtener progreso por cada asignatura y construir subjects
+        // Cada estudiante puede generar MÚLTIPLES entradas si tuvo actividad en varios periodos académicos
+        // (ej: cambió de 2026-A a 2026-B → aparece en ambos cohortes en el informe)
 
-        const studentsWithProgress: StudentProgress[] = await Promise.all(students.map(async (st: any) => {
+        const studentsWithProgressNested: StudentProgress[][] = await Promise.all(students.map(async (st: any) => {
+
+          // Guardar las respuestas raw para extraer periodos_activos de cada asignatura
+          const rawResponses: { asignatura: any; raw: any; idx: number }[] = [];
 
           const subjects = await Promise.all(asignaturas.map(async (Asignatura: any, idx: number) => {
 
@@ -1076,6 +1177,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               AsignaturaResumen = res.data;
 
+              rawResponses.push({ asignatura: Asignatura, raw: AsignaturaResumen, idx });
 
             } catch (e) {
 
@@ -1211,9 +1313,10 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
           }));
 
+          // ── Entrada del periodo actual ──────────────────────────────────────
+          const currentPeriodo: string = st.periodo_academico ?? st.persona?.periodo_academico ?? 'Sin periodo';
 
-
-          return {
+          const currentEntry: StudentProgress = {
 
             id: String(st.id),
 
@@ -1223,15 +1326,73 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             createdDate: st.createdAt ? st.createdAt.split('T')[0] : (st.createdDate || ''),
 
-            periodo_academico: st.periodo_academico ?? st.persona?.periodo_academico ?? '',
+            periodo_academico: currentPeriodo,
 
             codigo: st.codigoEstudiantil ?? st.codigo ?? '',
 
             subjects
 
-          } as StudentProgress;
+          };
+
+          // ── Detectar periodos históricos (distintos al actual) ──────────────
+          // periodos_activos viene del backend en cada respuesta de /progresos/por-asignatura
+          const periodosSet = new Set<string>([currentPeriodo]);
+          rawResponses.forEach(({ raw }) => {
+            (raw?.periodos_activos || []).forEach((p: string) => { if (p) periodosSet.add(p); });
+          });
+          const historicalPeriodos = Array.from(periodosSet).filter(p => p !== currentPeriodo);
+
+          // ── Entradas de periodos históricos (sin detalle de temas para no sobrecargar) ──
+          const historicalEntries: StudentProgress[] = await Promise.all(
+            historicalPeriodos.map(async (periodo) => {
+              const historicalSubjects = await Promise.all(asignaturas.map(async (Asignatura: any, idx: number) => {
+                try {
+                  const res = await api.get(
+                    `/progresos/por-asignatura?asignatura_id=${Asignatura.id}&estudiante_id=${st.id}&periodo=${encodeURIComponent(periodo)}`
+                  );
+                  const d = res.data;
+                  const cont = d?.progreso?.contenidos || { completados: 0, porcentaje: 0 };
+                  const ej   = d?.progreso?.ejercicios  || { completados: 0, porcentaje: 0 };
+                  return {
+                    asignaturaId: String(Asignatura.id),
+                    name: Asignatura.nombre || `Asignatura ${Asignatura.id}`,
+                    color: ['#4A90E2', '#7ED6A7', '#F5A97F'][idx % 3],
+                    progress: d?.resumen?.porcentajeTotalAsignatura ?? 0,
+                    contentViewed: cont.completados ?? 0,
+                    exercisesCompleted: ej.completados ?? 0,
+                    miniprojectsSubmitted: d?.miniproyectos?.aprobados ?? 0,
+                    topics: []
+                  };
+                } catch {
+                  return {
+                    asignaturaId: String(Asignatura.id),
+                    name: Asignatura.nombre || `Asignatura ${Asignatura.id}`,
+                    color: '#4A90E2',
+                    progress: 0, contentViewed: 0, exercisesCompleted: 0, miniprojectsSubmitted: 0,
+                    topics: []
+                  };
+                }
+              }));
+              return {
+                id: `${st.id}-${periodo}`,
+                name: st.persona?.nombre || st.nombre || st.name || 'Estudiante',
+                email: st.persona?.email || st.email || st.correo || '',
+                createdDate: '',
+                periodo_academico: periodo,
+                isHistorical: true,
+                codigo: st.codigoEstudiantil ?? st.codigo ?? '',
+                subjects: historicalSubjects
+              } as StudentProgress;
+            })
+          );
+
+          return [currentEntry, ...historicalEntries];
 
         }));
+        // Aplanar array de arrays (reduce es más compatible con TypeScript estricto que .flat() o spread en concat)
+        const studentsWithProgress: StudentProgress[] = studentsWithProgressNested.reduce<StudentProgress[]>(
+          (acc, arr) => acc.concat(arr), []
+        );
 
 
 
@@ -1971,7 +2132,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
             <div style="font-size:9px;color:#666;margin-top:2px;">Ejercicios</div>
           </div>
           <div style="flex:1;text-align:center;">
-            <div style="font-size:15px;font-weight:800;color:#111;">${s.miniprojectsDone ?? 0}</div>
+            <div style="font-size:15px;font-weight:800;color:#111;">${s.miniprojectsSubmitted ?? 0}</div>
             <div style="font-size:9px;color:#666;margin-top:2px;">Proyectos</div>
           </div>
         </div>
@@ -2567,6 +2728,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   const studentTabStudents = baseFilteredStudents.filter(student => {
 
+    // Las entradas históricas solo aplican al informe de cohortes (fecha), no al tab individual
+    if (student.isHistorical) return false;
+
     if (appliedFilters.status !== 'all') {
 
       const hasSubjects = student.subjects.length > 0;
@@ -2624,6 +2788,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
   const activityTabStudents = baseFilteredStudents.filter(student => {
+
+    // Las entradas históricas solo aplican al informe de cohortes, no al tab de actividades
+    if (student.isHistorical) return false;
 
     if (appliedFilters.activityType === 'all') return true;
 
@@ -2886,9 +3053,11 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   const appliedFilterCount = Object.values(appliedFilters).filter((value) => value && value !== 'all').length + (appliedSearch ? 1 : 0);
 
-  const globalAverageProgress = studentsData.length
+  // Excluir entradas históricas del promedio global (solo contar estudiantes reales)
+  const realStudents = studentsData.filter(s => !s.isHistorical);
+  const globalAverageProgress = realStudents.length
 
-    ? studentsData.reduce((sum, student) => {
+    ? realStudents.reduce((sum, student) => {
 
         const average = student.subjects.length
 
@@ -2898,7 +3067,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         return sum + average;
 
-      }, 0) / studentsData.length
+      }, 0) / realStudents.length
 
     : 0;
 
@@ -3029,7 +3198,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         {/* Métricas compactas — top dashboard unificado */}
         <div className="app-metric-grid mb-6">
           {[
-            { label: 'Estudiantes', value: studentsData.length, icon: User },
+            { label: 'Estudiantes', value: studentsData.filter(s => !s.isHistorical).length, icon: User },
             { label: 'Asignaturas', value: asignaturasCatalog.length, icon: BarChart3 },
             { label: 'Avance global', value: `${formatPercent(globalAverageProgress)}%`, icon: TrendingUp },
             { label: reportVisibleLabel, value: reportVisibleCount, icon: Activity },
@@ -3101,8 +3270,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
           {[
             { key: 'student', label: 'Por estudiante', icon: User },
             ...(!isDocenteMode ? [
-              { key: 'date', label: 'Por fecha', icon: Calendar },
-              { key: 'activity', label: 'Por asignatura', icon: Activity },
+              { key: 'date', label: 'Por periodo', icon: Calendar },
+              { key: 'activity', label: 'Por actividad', icon: Activity },
             ] : []),
             { key: 'failures', label: 'Fallos', icon: AlertTriangle },
             { key: 'content-views', label: 'Más vistos', icon: Eye },
@@ -3840,8 +4009,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Análisis por fecha de creación</p>
-                  <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Comparación de cohortes y detección temprana de rezago.</p>
+                  <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Análisis por periodo académico</p>
+                  <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Comparación de cohortes por periodo académico.</p>
                 </div>
                 <button onClick={() => downloadPdf('date')}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
@@ -3914,7 +4083,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                               : 0;
 
-                            const isLagging = avgProgress < 50;
+                            const allZero = student.subjects.every(s => (s.progress || 0) === 0);
+                            const allDone = student.subjects.length > 0 && student.subjects.every(s => (s.progress || 0) >= 100);
 
                             const subject0 = student.subjects[0];
 
@@ -4036,33 +4206,33 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                                 <td className="px-4 py-3">
 
-                                  {isLagging ? (
+                                  {allZero ? (
 
-                                    <span className="flex items-center gap-1 text-[#F5A97F] text-sm">
+                                    <span className="flex items-center gap-1 text-gray-400 text-sm">
 
-                                      <XCircle className="w-4 h-4" />
+                                      <Clock className="w-4 h-4" />
 
-                                      Rezagado
+                                      No iniciado
 
                                     </span>
 
-                                  ) : avgProgress >= 70 ? (
+                                  ) : allDone ? (
 
                                     <span className="flex items-center gap-1 text-[#7ED6A7] text-sm">
 
                                       <CheckCircle2 className="w-4 h-4" />
 
-                                      Al día
+                                      Finalizado
 
                                     </span>
 
                                   ) : (
 
-                                    <span className="flex items-center gap-1 text-gray-500 text-sm">
+                                    <span className="flex items-center gap-1 text-[#4A90E2] text-sm">
 
-                                      <Clock className="w-4 h-4" />
+                                      <Activity className="w-4 h-4" />
 
-                                      Regular
+                                      En progreso
 
                                     </span>
 
