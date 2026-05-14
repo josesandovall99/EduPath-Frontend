@@ -18,6 +18,7 @@ import {
   Image,
   Presentation,
   ScrollText,
+  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
@@ -477,6 +478,9 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   const [loadingEjercicio, setLoadingEjercicio] = useState(false);
   const [subtemasConEstadoProgreso, setSubtemasConEstadoProgreso] = useState<Map<string, any>>(new Map());
   const [contenidosConEstadoProgreso, setContenidosConEstadoProgreso] = useState<Map<string, any>>(new Map());
+  /** Imagen HTML ampliada a pantalla (contenido + descripción Quill); encaja en el viewport sin desbordar. */
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
+  const theoryDescripRef = useRef<HTMLDivElement>(null);
   /** Refs con el último mapa del servidor (el estado de React puede ir atrasado en callbacks de setModules). */
   const subtemasEstadoSrvRef = useRef<Map<string, any>>(new Map());
   const contenidosEstadoSrvRef = useRef<Map<string, any>>(new Map());
@@ -527,6 +531,39 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       document.head.appendChild(styleSheet);
     }
   }, []);
+
+  // Clicks en imágenes incrustadas en la descripción (HTML Quill): abrir vista ampliada
+  useEffect(() => {
+    const el = theoryDescripRef.current;
+    if (!el) return;
+    const handler = (e: MouseEvent) => {
+      if (!(e.target instanceof Element)) return;
+      const img = e.target.closest('img');
+      if (!img || !el.contains(img)) return;
+      e.preventDefault();
+      setLightboxImage({ src: img.currentSrc || img.src, alt: img.getAttribute('alt') ?? '' });
+    };
+    el.addEventListener('click', handler);
+    return () => el.removeEventListener('click', handler);
+  }, [selectedContentData?.descripcion]);
+
+  useEffect(() => {
+    if (!lightboxImage) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [lightboxImage]);
+
+  useEffect(() => {
+    if (!lightboxImage) return;
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxImage(null);
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [lightboxImage]);
 
   // Cargar progreso dinámico del estudiante
   useEffect(() => {
@@ -1606,8 +1643,24 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                           <img
                             src={selectedContentData.url}
                             alt={selectedContentData.title}
-                            className="w-full h-auto max-h-96 object-cover"
+                            className="w-full h-auto max-h-96 object-cover cursor-zoom-in hover:opacity-95 transition-opacity"
                             draggable={false}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`Ampliar imagen: ${selectedContentData.title}`}
+                            onKeyDown={(ev) => {
+                              if (ev.key !== 'Enter' && ev.key !== ' ') return;
+                              ev.preventDefault();
+                              setLightboxImage({
+                                src: selectedContentData.url as string,
+                                alt: selectedContentData.title,
+                              });
+                            }}
+                            onClick={() =>
+                              setLightboxImage({
+                                src: selectedContentData.url as string,
+                                alt: selectedContentData.title,
+                              })}
                           />
                         </div>
                       )}
@@ -1615,7 +1668,8 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                       {selectedContentData.descripcion && (
                         <div
                           role="presentation"
-                          className="quill-render mb-6"
+                          ref={theoryDescripRef}
+                          className="quill-render mb-6 [&_img]:cursor-zoom-in"
                           dangerouslySetInnerHTML={{ __html: selectedContentData.descripcion }}
                         />
                       )}
@@ -1661,6 +1715,39 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
         </div>
       </div>
       </div>
+
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[200] box-border overflow-hidden bg-black/80 p-4 sm:p-8"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Imagen ampliada"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            type="button"
+            className="absolute right-3 top-3 z-[201] rounded-full bg-white/90 p-2 text-gray-800 shadow-lg transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            aria-label="Cerrar vista ampliada"
+            onClick={() => setLightboxImage(null)}
+          >
+            <X className="h-6 w-6" aria-hidden />
+          </button>
+          {/* Contenedor con tamaño acotado al viewport (padding ya descontado); min-h/w-0 evita desborde en flex */}
+          <div className="flex h-full w-full min-h-0 min-w-0 items-center justify-center">
+            <img
+              src={lightboxImage.src}
+              alt={lightboxImage.alt}
+              className="pointer-events-auto block h-auto w-auto max-h-full max-w-full object-contain"
+              style={{
+                maxHeight: 'min(calc(100dvh - 5rem), calc(100vh - 5rem))',
+                maxWidth: 'min(calc(100dvw - 2.5rem), calc(100vw - 2.5rem))',
+              }}
+              draggable={false}
+              onClick={(ev) => ev.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
