@@ -1,5 +1,30 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Play, FileText, CheckCircle2, BookOpen, ChevronDown, ChevronRight, Loader, Lock } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import {
+  ArrowLeft,
+  Play,
+  FileText,
+  CheckCircle2,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Loader,
+  Lock,
+  Archive,
+  ExternalLink,
+  FileMusic,
+  FileSpreadsheet,
+  FileVideo,
+  Globe,
+  Image,
+  Presentation,
+  ScrollText,
+  X,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { ProgrammingContentView } from './ProgrammingContentView';
 import { UMLDiagramView } from './UMLDiagramView';
@@ -9,7 +34,6 @@ import { OrderingExercise } from './OrderingExercise';
 import { MatchingExercise } from './MatchingExercise';
 import { API_BASE_URL } from '../utils/constants';
 import { cachedFetch } from '../utils/fetchCache';
-
 // Estilos para renderizado de HTML
 const htmlContentStyles = `
   .html-content p {
@@ -115,6 +139,111 @@ const htmlContentStyles = `
     font-weight: 600;
   }
 `;
+
+const LIGHTBOX_ZOOM_MAX = 5;
+
+function clampLightboxZoom(scale: number) {
+  return Math.min(LIGHTBOX_ZOOM_MAX, Math.max(1, scale));
+}
+
+/** Icono del botón "Abrir recurso" según extensión (si hay), dominio u OneDrive/SharePoint (`:b:` ≈ PDF, etc.). */
+function getResourceUrlIcon(rawUrl: string): LucideIcon {
+  const url = rawUrl.trim();
+  if (!url) return FileText;
+
+  let decoded = url;
+  try {
+    decoded = decodeURIComponent(url.replace(/\+/g, ' '));
+  } catch {
+    decoded = url;
+  }
+
+  const spToken = url.match(/\/:([bwxpuv]):\//i)?.[1]?.toLowerCase()
+    ?? decoded.match(/\/:([bwxpuv]):\//i)?.[1]?.toLowerCase();
+  switch (spToken) {
+    case 'b':
+      return ScrollText; // PDF en enlaces típicos de SharePoint / OneDrive
+    case 'w':
+      return FileText;
+    case 'x':
+      return FileSpreadsheet;
+    case 'p':
+      return Presentation;
+    case 'v':
+      return FileVideo;
+    case 'u':
+      return Globe;
+    default:
+      break;
+  }
+
+  let pathname = '';
+  let host = '';
+  try {
+    const u = new URL(url.includes('://') ? url : `https://${url}`);
+    host = u.hostname.toLowerCase();
+    pathname = `${u.pathname}${u.search}`.toLowerCase();
+  } catch {
+    pathname = url.toLowerCase();
+  }
+
+  if (host.includes('youtube.') || host === 'youtu.be') return Play;
+  if (host.includes('vimeo.com')) return FileVideo;
+
+  const extMatch = pathname.match(/\.([a-z0-9]{1,8})(?:[#?]|$)/);
+  const ext = extMatch?.[1];
+
+  switch (ext) {
+    case 'pdf':
+      return ScrollText;
+    case 'doc':
+    case 'docx':
+    case 'odt':
+    case 'rtf':
+      return FileText;
+    case 'xls':
+    case 'xlsx':
+    case 'csv':
+      return FileSpreadsheet;
+    case 'ppt':
+    case 'pptx':
+      return Presentation;
+    case 'zip':
+    case 'rar':
+    case '7z':
+      return Archive;
+    case 'png':
+    case 'jpg':
+    case 'jpeg':
+    case 'gif':
+    case 'webp':
+    case 'svg':
+    case 'bmp':
+    case 'ico':
+      return Image;
+    case 'mp4':
+    case 'webm':
+    case 'mov':
+    case 'avi':
+    case 'mkv':
+      return FileVideo;
+    case 'mp3':
+    case 'wav':
+    case 'flac':
+    case 'aac':
+      return FileMusic;
+    case 'html':
+    case 'htm':
+      return Globe;
+    case 'txt':
+      return FileText;
+    default:
+      break;
+  }
+
+  if (pathname.includes('.pdf')) return ScrollText;
+  return ExternalLink;
+}
 
 interface Module {
   id: string;
@@ -359,6 +488,22 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   const [loadingEjercicio, setLoadingEjercicio] = useState(false);
   const [subtemasConEstadoProgreso, setSubtemasConEstadoProgreso] = useState<Map<string, any>>(new Map());
   const [contenidosConEstadoProgreso, setContenidosConEstadoProgreso] = useState<Map<string, any>>(new Map());
+  /** Imagen HTML ampliada a pantalla (contenido + descripción Quill); encaja en el viewport sin desbordar. */
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
+  const [lightboxZoom, setLightboxZoom] = useState(1);
+  const [lightboxPan, setLightboxPan] = useState({ x: 0, y: 0 });
+  const lightboxZoomRef = useRef(1);
+  const lightboxViewportRef = useRef<HTMLDivElement>(null);
+  const lightboxPanDragRef = useRef<{
+    active: boolean;
+    lastX: number;
+    lastY: number;
+  }>({ active: false, lastX: 0, lastY: 0 });
+  const lightboxPointersRef = useRef(new Set<number>());
+  const lightboxPinchRef = useRef<{ startDist: number; startScale: number } | null>(null);
+  const theoryDescripRef = useRef<HTMLDivElement>(null);
+  const lightboxSrcKey = lightboxImage?.src ?? null;
+  lightboxZoomRef.current = lightboxZoom;
   /** Refs con el último mapa del servidor (el estado de React puede ir atrasado en callbacks de setModules). */
   const subtemasEstadoSrvRef = useRef<Map<string, any>>(new Map());
   const contenidosEstadoSrvRef = useRef<Map<string, any>>(new Map());
@@ -409,6 +554,118 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       document.head.appendChild(styleSheet);
     }
   }, []);
+
+  // Clicks en imágenes incrustadas en la descripción (HTML Quill): abrir vista ampliada
+  useEffect(() => {
+    const el = theoryDescripRef.current;
+    if (!el) return;
+    const handler = (e: MouseEvent) => {
+      if (!(e.target instanceof Element)) return;
+      const img = e.target.closest('img');
+      if (!img || !el.contains(img)) return;
+      e.preventDefault();
+      setLightboxImage({ src: img.currentSrc || img.src, alt: img.getAttribute('alt') ?? '' });
+    };
+    el.addEventListener('click', handler);
+    return () => el.removeEventListener('click', handler);
+  }, [selectedContentData?.descripcion]);
+
+  useEffect(() => {
+    lightboxPointersRef.current.clear();
+    lightboxPanDragRef.current.active = false;
+    lightboxPinchRef.current = null;
+    setLightboxZoom(1);
+    setLightboxPan({ x: 0, y: 0 });
+  }, [lightboxSrcKey]);
+
+  useEffect(() => {
+    if (!lightboxImage) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [lightboxImage]);
+
+  useEffect(() => {
+    if (!lightboxImage) return;
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setLightboxImage(null);
+        return;
+      }
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        setLightboxZoom((z) => clampLightboxZoom(z * 1.2));
+      }
+      if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        setLightboxZoom((z) => clampLightboxZoom(z / 1.2));
+      }
+      if (e.key === '0') {
+        e.preventDefault();
+        setLightboxZoom(1);
+        setLightboxPan({ x: 0, y: 0 });
+      }
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [lightboxImage]);
+
+  useEffect(() => {
+    if (lightboxZoom <= 1) setLightboxPan({ x: 0, y: 0 });
+  }, [lightboxZoom]);
+
+  useEffect(() => {
+    if (lightboxSrcKey == null) return;
+    const el = lightboxViewportRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = Math.exp(-e.deltaY * 0.0015);
+      setLightboxZoom((z) => clampLightboxZoom(z * factor));
+    };
+
+    const touchDist = (a: Touch, b: Touch) =>
+      Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        lightboxPinchRef.current = {
+          startDist: touchDist(e.touches[0], e.touches[1]),
+          startScale: lightboxZoomRef.current,
+        };
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !lightboxPinchRef.current) return;
+      e.preventDefault();
+      const p = lightboxPinchRef.current;
+      const d = touchDist(e.touches[0], e.touches[1]);
+      if (p.startDist <= 2) return;
+      setLightboxZoom(clampLightboxZoom((p.startScale * d) / p.startDist));
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) lightboxPinchRef.current = null;
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart);
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    el.addEventListener('touchcancel', onTouchEnd);
+
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [lightboxSrcKey]);
 
   // Cargar progreso dinámico del estudiante
   useEffect(() => {
@@ -1105,25 +1362,73 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] flex">
-      {/* Left Sidebar - Course Modules */}
-      <div className="w-80 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto shadow-sm">
-        {/* Sidebar Header — alineado en altura con el header derecho (px-8 py-4 + ícono 48x48) */}
-        <div
-          className="px-6 py-4 border-b text-white shadow-sm"
-          style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)', borderColor: 'rgba(255,255,255,0.1)' }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1.5 shadow-md" style={{ boxShadow: '0 0 0 3px rgba(255,255,255,0.2)' }}>
-              <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
+    <div className="min-h-screen bg-[#F2F2F2] flex flex-col">
+      {/* Barra superior: mismo estilo que el header global; ocupa todo el ancho */}
+      <header className="app-header shrink-0">
+        <div className="px-8 py-4">
+          <div className="app-page-header">
+            <div className="app-brand-block">
+              <button type="button" onClick={onHome} title="Ir al panel principal" className="app-brand-icon">
+                <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
+              </button>
+              <div>
+                <h1>{subjectName}</h1>
+                <p className="text-sm">{content.title}</p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-base leading-tight">Módulos del Curso</p>
-              <p className="text-white/80 text-xs">Navega entre subtemas</p>
-            </div>
+
+            {(() => {
+              const pct = Math.round(Math.min(100, Math.max(0, currentProgress)));
+              return (
+                <div className="flex min-w-0 flex-1 shrink-0 items-center justify-end pl-4 md:pl-8">
+                  {/* Ancho con style inline: las clases w-[clamp(...)] a veces no compilan bien por las comas */}
+                  <div
+                    className="flex max-w-full shrink-0 flex-col gap-1 py-0.5"
+                    style={{
+                      width: 'clamp(13.5rem, 28vw, 21.25rem)',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    <div className="flex w-full min-w-0 items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate text-xs font-medium text-white/90">Progreso</span>
+                      <span className="shrink-0 text-xs font-semibold tabular-nums tracking-tight text-[#eef2ff]">
+                        {pct}%
+                      </span>
+                    </div>
+                    <div
+                      className="relative h-2 w-full overflow-hidden rounded-full border border-white shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
+                      style={{ backgroundColor: '#cfd6e2' }}
+                      role="progressbar"
+                      aria-valuenow={pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuetext={`${pct} por ciento completado`}
+                      aria-label="Progreso de la asignatura"
+                    >
+                      <div
+                        className="h-full transition-[width] duration-500 ease-out"
+                        style={{
+                          width: `${pct}%`,
+                          minWidth: pct > 0 && pct < 100 ? '8px' : 0,
+                          backgroundColor: '#aeb6c4',
+                          backgroundImage:
+                            'linear-gradient(180deg, #b8bfcc 0%, #a3aab8 52%, #8f96a6 100%)',
+                          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
+                          borderRadius: pct >= 100 ? '9999px' : '9999px 0 0 9999px',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
+      </header>
 
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {/* Left Sidebar - Course Modules */}
+      <div className="w-80 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto shadow-sm min-h-0">
         {/* Modules List */}
         <div className="p-3">
           {modules.map((module, idx) => {
@@ -1278,35 +1583,9 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       </div>
 
       {/* Right Content Asignatura */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="app-header">
-          <div className="px-8 py-4">
-            <div className="app-page-header">
-              <div className="app-brand-block">
-                <button type="button" onClick={onHome} title="Ir al panel principal" className="app-brand-icon">
-                  <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
-                </button>
-                <div>
-                  <h1>{subjectName}</h1>
-                  <p className="text-sm">{content.title}</p>
-                </div>
-              </div>
-
-              {/* Progress */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm" style={{ color: 'rgba(255,255,255,0.8)' }}>Progreso:</span>
-                <span className="font-bold text-white text-base">{`${currentProgress}%`}</span>
-                <div className="w-28 h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.25)' }}>
-                  <div className="h-full rounded-full bg-white" style={{ width: `${currentProgress}%` }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#F2F2F2] p-8">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#F2F2F2] p-8">
           <div className="mx-auto w-full max-w-[1500px]">
             <button onClick={onBack} className="app-back-button mb-6">
               <ArrowLeft className="w-4 h-4" />
@@ -1463,17 +1742,36 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                       {/* Mostrar imagen si la URL es una imagen */}
                       {selectedContentData.url && (selectedContentData.url.includes('jpg') || selectedContentData.url.includes('jpeg') || selectedContentData.url.includes('png') || selectedContentData.url.includes('gif') || selectedContentData.url.includes('webp')) && (
                         <div className="mb-6 rounded-xl overflow-hidden shadow-md">
-                          <img 
+                          <img
                             src={selectedContentData.url}
                             alt={selectedContentData.title}
-                            className="w-full h-auto max-h-96 object-cover"
+                            className="w-full h-auto max-h-96 object-cover cursor-zoom-in hover:opacity-95 transition-opacity"
+                            draggable={false}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`Ampliar imagen: ${selectedContentData.title}`}
+                            onKeyDown={(ev) => {
+                              if (ev.key !== 'Enter' && ev.key !== ' ') return;
+                              ev.preventDefault();
+                              setLightboxImage({
+                                src: selectedContentData.url as string,
+                                alt: selectedContentData.title,
+                              });
+                            }}
+                            onClick={() =>
+                              setLightboxImage({
+                                src: selectedContentData.url as string,
+                                alt: selectedContentData.title,
+                              })}
                           />
                         </div>
                       )}
 
                       {selectedContentData.descripcion && (
                         <div
-                          className="quill-render mb-6"
+                          role="presentation"
+                          ref={theoryDescripRef}
+                          className="quill-render mb-6 [&_img]:cursor-zoom-in"
                           dangerouslySetInnerHTML={{ __html: selectedContentData.descripcion }}
                         />
                       )}
@@ -1489,28 +1787,22 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                           <p className="text-gray-700 text-sm mb-3">
                             <strong>Recurso disponible:</strong>
                           </p>
-                          <div className="flex gap-3 flex-wrap">
-                            <a 
-                              href={selectedContentData.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-all hover:shadow-md"
-                              style={{ backgroundColor: subjectColor }}
-                            >
-                              <FileText className="w-4 h-4" />
-                              Abrir recurso
-                            </a>
-                            <a 
-                              href={selectedContentData.url}
-                              download
-                              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all hover:shadow-md"
-                              style={{ borderColor: subjectColor, color: subjectColor }}
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                              </svg>
-                              Descargar
-                            </a>
+                          <div className="flex flex-wrap gap-3">
+                            {(() => {
+                              const Ico = getResourceUrlIcon(selectedContentData.url ?? '');
+                              return (
+                                <a
+                                  href={selectedContentData.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-all hover:shadow-md"
+                                  style={{ backgroundColor: subjectColor }}
+                                >
+                                  <Ico className="h-4 w-4 shrink-0" aria-hidden />
+                                  Abrir recurso
+                                </a>
+                              );
+                            })()}
                           </div>
                           <p className="text-gray-600 text-xs mt-3 break-all">{selectedContentData.url}</p>
                         </div>
@@ -1524,6 +1816,158 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
           </div>
         </div>
       </div>
+      </div>
+
+      {lightboxImage &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 box-border overflow-hidden p-4 sm:p-8"
+            style={{
+              zIndex: 9999,
+              /* Inline: no dependemos solo del stack de Tailwind; capa bien oscura sobre toda la UI */
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
+              backdropFilter: 'blur(16px) saturate(1.15)',
+              WebkitBackdropFilter: 'blur(16px) saturate(1.15)',
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Imagen ampliada"
+            onClick={() => setLightboxImage(null)}
+          >
+          {/* Área útil + zoom (rueda/pellizco) y panorámica cuando zoom &gt; 1 */}
+          <div
+            ref={lightboxViewportRef}
+            role="presentation"
+            className={`relative z-0 flex h-full w-full min-h-0 min-w-0 select-none items-center justify-center overflow-hidden outline-none touch-none ${
+              lightboxZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              lightboxPointersRef.current.add(e.pointerId);
+              if (lightboxPointersRef.current.size > 1) {
+                lightboxPanDragRef.current.active = false;
+                return;
+              }
+              if (lightboxZoomRef.current <= 1 || lightboxPinchRef.current) return;
+              lightboxPanDragRef.current = {
+                active: true,
+                lastX: e.clientX,
+                lastY: e.clientY,
+              };
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              const drag = lightboxPanDragRef.current;
+              if (!drag.active || lightboxPointersRef.current.size !== 1) return;
+              const dx = e.clientX - drag.lastX;
+              const dy = e.clientY - drag.lastY;
+              drag.lastX = e.clientX;
+              drag.lastY = e.clientY;
+              setLightboxPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+            }}
+            onPointerUp={(e) => {
+              lightboxPointersRef.current.delete(e.pointerId);
+              lightboxPanDragRef.current.active = false;
+              try {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              } catch {
+                /* ignore */
+              }
+            }}
+            onPointerCancel={(e) => {
+              lightboxPointersRef.current.delete(e.pointerId);
+              lightboxPanDragRef.current.active = false;
+              try {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              } catch {
+                /* ignore */
+              }
+            }}
+          >
+            <div
+              className="relative inline-block max-h-full max-w-full"
+              style={{
+                transform: `translate(${lightboxPan.x}px, ${lightboxPan.y}px) scale(${lightboxZoom})`,
+                transformOrigin: 'center center',
+              }}
+            >
+              <button
+                type="button"
+                className="absolute left-2 top-2 z-20 rounded-full bg-white/95 p-2 text-gray-800 shadow-lg transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/50 pointer-events-auto"
+                aria-label="Cerrar vista ampliada"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxImage(null);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
+              >
+                <X className="h-6 w-6" aria-hidden />
+              </button>
+              <img
+                src={lightboxImage.src}
+                alt={lightboxImage.alt}
+                className="pointer-events-none block h-auto w-auto max-h-full max-w-full object-contain"
+                draggable={false}
+                style={{
+                  maxHeight: 'min(calc(100dvh - 5rem), calc(100vh - 5rem))',
+                  maxWidth: 'min(calc(100dvw - 2.5rem), calc(100vw - 2.5rem))',
+                }}
+              />
+            </div>
+          </div>
+
+          <div
+            role="toolbar"
+            aria-label="Controles del visor"
+            className="pointer-events-auto absolute left-1/2 z-[201] flex w-max max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-col items-stretch rounded-3xl border border-white/12 bg-neutral-950/82 px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.55)] backdrop-blur-md sm:max-w-lg sm:px-5"
+            style={{
+              bottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-center gap-1 sm:gap-2">
+              <button
+                type="button"
+                className="rounded-full p-2.5 text-white/95 transition-colors hover:bg-white/12 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                aria-label="Alejar"
+                onClick={() => setLightboxZoom((z) => clampLightboxZoom(z / 1.25))}
+              >
+                <ZoomOut className="h-5 w-5" aria-hidden />
+              </button>
+              <div className="mx-2 min-w-[3.75rem] rounded-full bg-white/8 px-3 py-1.5 text-center text-sm font-semibold tabular-nums text-white sm:mx-3">
+                {Math.round(lightboxZoom * 100)}%
+              </div>
+              <button
+                type="button"
+                className="rounded-full p-2.5 text-white/95 transition-colors hover:bg-white/12 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                aria-label="Acercar"
+                onClick={() => setLightboxZoom((z) => clampLightboxZoom(z * 1.25))}
+              >
+                <ZoomIn className="h-5 w-5" aria-hidden />
+              </button>
+              <span className="mx-2 hidden h-6 w-px shrink-0 bg-white/18 sm:inline" aria-hidden />
+              <button
+                type="button"
+                className="rounded-full p-2.5 text-white/95 transition-colors hover:bg-white/12 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                aria-label="Restablecer zoom y posición"
+                onClick={() => {
+                  setLightboxZoom(1);
+                  setLightboxPan({ x: 0, y: 0 });
+                }}
+              >
+                <RotateCcw className="h-5 w-5" aria-hidden />
+              </button>
+            </div>
+            <p className="mx-auto mt-2.5 max-w-[26rem] border-t border-white/10 pt-2.5 text-center text-[10px] leading-relaxed text-white/65 sm:text-[11px]">
+              Rueda: zoom · Táctil: pellizco · Con zoom: arrastrar · Teclado: + − 0
+            </p>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

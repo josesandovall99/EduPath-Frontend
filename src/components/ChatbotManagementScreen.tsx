@@ -424,6 +424,12 @@ export function ChatbotManagementScreen({
   }, [isDocenteMode, typeFilter]);
 
   useEffect(() => {
+    if (!isDocenteMode && form.tipo === 'MINIPROYECTO') {
+      setForm((prev) => ({ ...prev, tipo: 'GENERAL', miniproyecto_id: '' }));
+    }
+  }, [isDocenteMode, form.tipo]);
+
+  useEffect(() => {
     // No limpiar campos automáticamente si el usuario está editando un chatbot existente.
     if (form.id !== null) return;
     if (isGeneralType(form.tipo) && form.miniproyecto_id) {
@@ -1792,10 +1798,9 @@ export function ChatbotManagementScreen({
                             </>
                           ) : (
                             <>
-                              <option value="GENERAL">General</option>
+                              <option value="GENERAL">General (estudiantes · panel de asignaturas)</option>
                               <option value="GENERAL_ADMINISTRADOR">General administrador</option>
                               <option value="GENERAL_DOCENTE">General docente</option>
-                              <option value="MINIPROYECTO">Miniproyecto</option>
                             </>
                           )}
                         </select>

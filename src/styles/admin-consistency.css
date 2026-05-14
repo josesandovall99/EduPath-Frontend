@@ -3,13 +3,23 @@
    definidas en design-tokens.css. Ningún componente debe usar hex directos.   */
 @import './design-tokens.css';
 
+/* Degradado idéntico al de `.app-header` — una sola fuente para cabecera y banners de curso */
+:root {
+  --app-header-gradient: linear-gradient(135deg, #1a56db 0%, #1e429f 55%, #142d61 100%);
+  --app-header-accent: #1e429f;
+  --app-header-accent-soft: rgba(30, 66, 159, 0.14);
+  --app-header-navy-text: #142d61;
+  /* Barra horizontal: mismas paradas cromáticas que el header */
+  --app-header-progress-fill: linear-gradient(90deg, #1a56db 0%, #1e429f 55%, #142d61 100%);
+}
+
 .app-shell {
   min-height: 100vh;
   background: var(--color-surface-subtle);
 }
 
 .app-header {
-  background: linear-gradient(135deg, #1a56db 0%, #1e429f 55%, #142d61 100%);
+  background: var(--app-header-gradient);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 2px 12px rgba(14, 30, 70, 0.35);
 }
@@ -42,7 +52,7 @@
 .app-header .app-primary-btn,
 .app-header .app-btn-primary {
   background: #ffffff !important;
-  color: #1a56db !important;
+  color: var(--app-header-accent) !important;
   border: none !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 }

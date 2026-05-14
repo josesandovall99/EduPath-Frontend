@@ -1,15 +1,98 @@
-import { LogOut, Code, BookOpen, TrendingUp, User } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  LogOut,
+  Code,
+  BookOpen,
+  TrendingUp,
+  User,
+  Cpu,
+  Workflow,
+  GanttChart,
+  Database,
+  Network,
+  Calculator,
+  Shield,
+  Globe,
+  ClipboardList,
+} from 'lucide-react';
 import { ChatbotButton } from './ChatbotButton';
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../utils/constants';
 import { cachedFetch } from '../utils/fetchCache';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 
+/** Alineado con --primary en globals.css; barra e iconos sin verde u otros acentos. */
+const STUDENT_ACCENT = '#4A90E2';
+const STUDENT_ACCENT_SOFT = 'rgba(74, 144, 226, 0.14)';
+const STUDENT_PROGRESS_FILL = 'linear-gradient(90deg, #4A90E2 0%, #5B9FED 100%)';
+
+function stripAccents(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function resolveSubjectIcon(
+  nombre: string,
+  tipoPilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null
+): LucideIcon {
+  if (tipoPilar === 'PROGRAMACION') return Code;
+  if (tipoPilar === 'ANALISIS') return Workflow;
+  if (tipoPilar === 'ATC') return Cpu;
+
+  const n = stripAccents(nombre).toLowerCase();
+  const has = (...fragments: string[]) => fragments.some((f) => n.includes(f));
+
+  if (has('base de datos', 'basedatos', 'sql', 'mongodb', 'postgres')) return Database;
+  if (has('redes', 'tcp/ip', 'cisco', 'routing', 'protocolos de red')) return Network;
+  if (has('matematic', 'calculo', 'estadistic', 'probabilidad', 'algebra lineal')) return Calculator;
+  if (has('seguridad informatic', 'criptograf', 'ethical hacking', 'ciberseguridad')) return Shield;
+  if (
+    has(
+      'programacion',
+      'algoritm',
+      'codigo',
+      'computacion',
+      'python',
+      'java ',
+      'javascript',
+      'desarrollo de software',
+      'ingenieria de software',
+      'orientado a objetos'
+    )
+  )
+    return Code;
+  if (has('desarrollo web', 'html', 'css', 'frontend', 'backend web')) return Globe;
+  if (
+    has(
+      'analisis',
+      'sistema',
+      'requerimiento',
+      'modelado',
+      'uml',
+      'arquitectura de software',
+      'diseno de sistema'
+    )
+  )
+    return Workflow;
+  if (
+    has(
+      'gestion integral',
+      'alcance',
+      'tiempo y costo',
+      'proyectos informatic',
+      'proyecto informatic',
+      'direccion de proyecto',
+      'pmi'
+    )
+  )
+    return GanttChart;
+  if (has('prueba', 'evaluacion ', 'examen ')) return ClipboardList;
+
+  return BookOpen;
+}
+
 interface Subject {
   id: string;
   name: string;
-  icon: typeof Code;
-  color: string;
   progresion_secuencial?: boolean;
   tipoPilar?: 'PROGRAMACION' | 'ANALISIS' | 'ATC' | null;
 }
@@ -30,10 +113,8 @@ interface DashboardScreenProps {
   estudianteId?: number;
 }
 
-const colorPalette = ['#4A90E2', '#7ED6A7', '#F5A97F', '#FFB84D', '#A78BFA', '#EC4899'];
-
 export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudianteId }: DashboardScreenProps) {
-  const [subjects, setSubjects] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Mapa asignaturaId → datos reales del progreso del backend
@@ -88,14 +169,11 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
 
         // Solo asignaturas activas; el detalle de temas/progreso se carga después desde el backend
         const asignaturasFiltradas = asignaturas.filter((Asignatura: Asignatura) => Asignatura.estado !== false);
-        const transformedSubjects = asignaturasFiltradas.map((Asignatura: Asignatura, index: number) => ({
-
+        const transformedSubjects: Subject[] = asignaturasFiltradas.map((Asignatura: Asignatura) => ({
           id: Asignatura.id.toString(),
           name: Asignatura.nombre,
           progresion_secuencial: Boolean(Asignatura.progresion_secuencial),
           tipoPilar: Asignatura.tipo_pilar ?? null,
-          icon: Code,
-          color: colorPalette[index % colorPalette.length],
         }));
 
         setSubjects(transformedSubjects);
@@ -164,17 +242,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
       </header>
 
       <main className="app-main">
-        <section className="app-page-hero mb-8">
-          <div className="app-page-hero__content">
-            <div className="app-page-hero__copy">
-              <div className="app-page-hero__eyebrow">Panel académico</div>
-              <h2 className="app-page-hero__title">{userName || 'Estudiante'}</h2>
-              <p className="app-page-hero__description">Resumen de asignaturas académicas y avance registrado.</p>
-            </div>
-            <BookOpen className="app-page-hero__icon w-20 h-20" />
-          </div>
-        </section>
-
         <div className="app-section-head">
           <div>
             <h3 className="app-section-title">Asignaturas académicas</h3>
@@ -202,7 +269,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
             </div>
           ) : (
           subjects.map((subject) => {
-            const Icon = subject.icon;
+            const Icon = resolveSubjectIcon(subject.name, subject.tipoPilar);
             const asignaturaId = parseInt(subject.id);
             const data = progresosPorAsignatura.get(asignaturaId);
             const porcentaje = data?.porcentaje ?? 0;
@@ -218,9 +285,9 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
                 <div className="app-list-card__head">
                   <div
                     className="app-list-card__icon"
-                    style={{ backgroundColor: `${subject.color}15` }}
+                    style={{ backgroundColor: STUDENT_ACCENT_SOFT }}
                   >
-                    <Icon className="w-8 h-8" style={{ color: subject.color }} />
+                    <Icon className="w-8 h-8" style={{ color: STUDENT_ACCENT }} />
                   </div>
                   <div className="text-gray-400 group-hover:text-[#4A90E2] transition-colors">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -236,7 +303,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
                 <div>
                   <div className="flex items-center justify-between mb-2 app-list-card__meta">
                     <span>Progreso</span>
-                    <span className="text-sm" style={{ color: subject.color }}>
+                    <span className="text-sm" style={{ color: STUDENT_ACCENT }}>
                       {`${porcentaje}%`}
                     </span>
                   </div>
@@ -245,7 +312,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
                       className="app-progress-bar"
                       style={{
                         width: `${porcentaje}%`,
-                        backgroundColor: subject.color
+                        background: STUDENT_PROGRESS_FILL,
                       }}
                     ></div>
                   </div>

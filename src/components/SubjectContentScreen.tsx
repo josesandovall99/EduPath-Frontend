@@ -67,16 +67,7 @@ interface MiniproyectoApiItem {
   Actividad?: { id: number; titulo?: string; descripcion?: string; nivel_dificultad?: string };
 }
 
-// Colores por materia
-const subjectColors: Record<string, { primary: string; light: string; icon: any }> = {
-  'fundamentos': { primary: '#4A90E2', light: '#E3F2FD', icon: 'Code' },
-  'analisis': { primary: '#7ED6A7', light: '#E8F5E9', icon: 'Database' },
-  'alcance': { primary: '#F5A97F', light: '#FFF3E0', icon: 'BarChart3' }
-};
-
-const getSubjectColor = (subjectId: string) => {
-  return subjectColors[subjectId] || { primary: '#4A90E2', light: '#E3F2FD' };
-};
+/** Colores del banner y acentos: `var(--app-header-*)` en admin-consistency.css (misma pintura que `.app-header`). */
 
 const FALLBACK_CONTENT: Content[] = [
   { id: '1', title: 'Introducción al curso', type: 'video', duration: '15 min', status: 'completed' },
@@ -139,7 +130,17 @@ const getStatusBadge = (status: Content['status']) => {
     case 'completed':
       return <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs">Completado</span>;
     case 'in-progress':
-      return <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">En progreso</span>;
+      return (
+        <span
+          className="px-3 py-1 rounded-full text-xs font-medium"
+          style={{
+            backgroundColor: 'var(--app-header-accent-soft)',
+            color: 'var(--app-header-navy-text)',
+          }}
+        >
+          En progreso
+        </span>
+      );
     case 'not-started':
       return <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">No iniciado</span>;
   }
@@ -153,7 +154,6 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
   const [currentProgress, setCurrentProgress] = useState(0);
   const [miniproyectoNotice, setMiniproyectoNotice] = useState<string | null>(null);
   const noticeTimeoutRef = useRef<number | null>(null);
-  const colors = getSubjectColor(subject.id);
   const totalTemas = contentList.length;
 
   useEffect(() => {
@@ -405,9 +405,9 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         </button>
 
         {/* Subject Header Card */}
-        <div 
-          className="rounded-2xl p-8 mb-8 shadow-lg text-white"
-          style={{ background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primary}dd 100%)` }}
+        <div
+          className="rounded-2xl p-8 mb-8 shadow-lg text-white border border-white/10"
+          style={{ background: 'var(--app-header-gradient)' }}
         >
           <div className="flex items-center justify-between">
             <div className="flex-1">
@@ -423,14 +423,14 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         <div className="bg-white rounded-xl shadow-md p-6 mb-8">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[#3A4A5B]">Progreso</h3>
-            <span className="text-2xl" style={{ color: colors.primary }}>
+            <span className="text-2xl font-semibold" style={{ color: 'var(--app-header-accent)' }}>
               {`${currentProgress}%`}
             </span>
           </div>
           <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${currentProgress}%`, backgroundColor: colors.primary }}
+              style={{ width: `${currentProgress}%`, background: 'var(--app-header-progress-fill)' }}
             ></div>
           </div>
         </div>
@@ -507,16 +507,16 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
               >
                 <div className="flex items-center gap-4">
                   {/* Type Icon */}
-                  <div 
+                  <div
                     className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
-                    style={{ backgroundColor: `${colors.primary}15` }}
+                    style={{ backgroundColor: 'var(--app-header-accent-soft)' }}
                   >
                     {isLockedByProgress ? (
                       <Lock className="w-7 h-7 text-gray-400" />
                     ) : isApprovedMiniproyecto ? (
                       <CheckCircle2 className="w-7 h-7 text-green-500" />
                     ) : (
-                      <Icon className="w-7 h-7" style={{ color: colors.primary }} />
+                      <Icon className="w-7 h-7" style={{ color: 'var(--app-header-accent)' }} />
                     )}
                   </div>
 
@@ -526,7 +526,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                       <h4 className={`transition-colors ${
                         isLocked 
                           ? 'text-gray-400' 
-                          : 'text-[#3A4A5B] group-hover:text-[#4A90E2]'
+                          : 'text-[#3A4A5B] group-hover:[color:var(--app-header-accent)]'
                       }`}>
                         {content.title}
                       </h4>
@@ -534,7 +534,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                         <CheckCircle2 className="w-5 h-5 text-green-500" />
                       )}
                       {!content.completo && content.status === 'completed' && (
-                        <CheckCircle2 className="w-5 h-5 text-[#7ED6A7]" />
+                        <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: 'var(--app-header-accent)' }} />
                       )}
                     </div>
                     <div className="flex gap-4 text-sm text-gray-600">
@@ -557,7 +557,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
                   {/* Status Badge */}
                   <div className="flex items-center gap-3 flex-shrink-0">
                     {getStatusBadge(content.status)}
-                    <div className="text-gray-400 group-hover:text-[#4A90E2] transition-colors">
+                    <div className="text-gray-400 transition-colors group-hover:[color:var(--app-header-accent)]">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
