@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { CheckCircle2, TrendingUp } from 'lucide-react';
 import {
   CartesianGrid,
   ComposedChart,
@@ -76,6 +78,45 @@ function formatAxisMil(v: number) {
   if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
   return String(v);
 }
+
+/** Cuadro informativo: tono ámbar (decisión), verde (cierre), o azul tipo intro CPM. */
+function feedbackPanelStyle(step: number, needsDecision: boolean): { bg: string; bd: string; tx: string } {
+  if (needsDecision) return { bg: '#fffbeb', bd: '#fde68a', tx: '#92400e' };
+  if (step >= 6) return { bg: '#f0fdf4', bd: '#bbf7d0', tx: '#14532d' };
+  /** Misma familia visual que el recuadro introductorio del CPM (azul muy suave + borde claro). */
+  return { bg: '#f0f7ff', bd: '#d1e9ff', tx: '#1e3a8a' };
+}
+
+/** Markdown del texto del tutor: título en negrita + cuerpo (lista o párrafo como en CPMSimulationViewer). */
+function buildFeedbackMarkdown(step: number, feedbackLines: string[]): string {
+  const title = '**Simulación de la Curva S — Valor ganado (EVM)**';
+
+  if (step === 0 && feedbackLines.length <= 1) {
+    const main = feedbackLines[0] || '';
+    return `${title}\n\n${main}\n\nObserva la **tabla de valores** debajo y el **gráfico** a la derecha. Presiona **Siguiente mes** para avanzar.`;
+  }
+
+  const bullets = feedbackLines.map((line) => `- ${line}`).join('\n');
+  return `${title}\n\n${bullets}`;
+}
+
+const evmTutorMarkdownComponents: Partial<Components> = {
+  p: ({ children }) => (
+    <p className="mb-2.5 text-[13px] leading-relaxed last:mb-0 [&:has(>strong:only-child)]:mb-2 [&:has(>strong:only-child)]:text-[15px] [&:has(>strong:only-child)]:font-extrabold [&:has(>strong:only-child)]:leading-snug [&:has(>strong:only-child)]:text-inherit">
+      {children}
+    </p>
+  ),
+  ul: ({ children }) => (
+    <ul className="mb-0 mt-3 flex list-none flex-col gap-2.5 text-[13px] leading-relaxed">{children}</ul>
+  ),
+  ol: ({ children }) => <ol className="mb-0 mt-3 list-decimal space-y-2 pl-5 text-[13px] leading-relaxed">{children}</ol>,
+  li: ({ children }) => (
+    <li className="relative pl-[1.125rem] leading-relaxed before:absolute before:left-0 before:top-[0.58em] before:h-1 before:w-1 before:rounded-full before:bg-current before:opacity-50 [&_p]:mb-0 [&_p]:inline">
+      {children}
+    </li>
+  ),
+  strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+};
 
 function tutorFeedback(step: number, decision: Decision, cpi: number, spi: number): string[] {
   const lines: string[] = [];
@@ -184,6 +225,8 @@ export function EvmCurvaSContent({
 
   const feedbackLines = useMemo(() => tutorFeedback(step, decision, cpi, spi), [step, decision, cpi, spi]);
 
+  const feedbackMarkdown = useMemo(() => buildFeedbackMarkdown(step, feedbackLines), [step, feedbackLines]);
+
   const goNext = useCallback(() => {
     if (step >= 6) return;
     if (step === 3 && !decision) return;
@@ -207,83 +250,99 @@ export function EvmCurvaSContent({
   const needsDecision = step === 3 && !decision;
   const finished = step >= 6;
 
+  const panelStyle = useMemo(() => feedbackPanelStyle(step, needsDecision), [step, needsDecision]);
+
+  const restart = useCallback(() => {
+    setStep(0);
+    setDecision(null);
+  }, []);
+
   return (
-    <div className="mb-6 space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-md overflow-hidden">
-        <div className="border-b border-slate-100 bg-slate-50/90 px-6 py-4 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
-              style={{ background: `linear-gradient(135deg, ${accentColor}, #1e293b)` }}
-            >
+    <div className="mb-6">
+      <div
+        className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-[#f8fafc] font-sans shadow-[0_4px_24px_rgba(0,0,0,0.1)]"
+        style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
+      >
+        <header
+          className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-3.5 text-white"
+          style={{
+            background: `linear-gradient(135deg, ${accentColor}, #142d61)`,
+          }}
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 shadow-inner">
               <TrendingUp className="h-5 w-5" aria-hidden />
             </div>
             <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-[#3A4A5B] truncate">{title}</h2>
-              <p className="text-xs text-slate-500">Simulador evolutivo · Curva S y EVM (CACATUMBO)</p>
+              <p className="m-0 text-[11px] font-semibold uppercase tracking-wider text-white/70">Simulación interactiva</p>
+              <h2 className="m-0 truncate text-base font-extrabold">{title}</h2>
+              <p className="m-0 text-[11px] text-white/80">Curva S y EVM (CACATUMBO)</p>
             </div>
           </div>
-        </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <span className="rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold">{MONTH_LABELS[step]}</span>
+            <span className="rounded-full bg-white/12 px-2.5 py-1 text-[11px] text-white/85">
+              {step + 1} / {N + 1}
+            </span>
+          </div>
+        </header>
 
         {descripcionHtml ? (
           <div
-            className="px-6 py-4 border-b border-slate-100 html-content text-sm text-slate-700 max-h-48 overflow-y-auto"
+            className="html-content max-h-44 overflow-y-auto border-b border-slate-200 bg-white px-5 py-3 text-sm text-slate-700"
             dangerouslySetInnerHTML={{ __html: descripcionHtml }}
           />
         ) : null}
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 p-4 lg:p-6">
-          <div className="xl:col-span-4 space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Panel de control</h3>
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-100/80 text-left text-xs uppercase text-slate-600">
-                    <th className="px-3 py-2">Indicador</th>
-                    <th className="px-3 py-2 text-right">Valor (miles COP)</th>
-                  </tr>
-                </thead>
-                <tbody className="tabular-nums">
-                  <tr className="border-b border-slate-100">
-                    <td className="px-3 py-2 text-slate-600">PV · planificado</td>
-                    <td className="px-3 py-2 text-right font-medium text-slate-800">{curPv.toLocaleString('es-CO')}</td>
-                  </tr>
-                  <tr className="border-b border-slate-100">
-                    <td className="px-3 py-2 text-slate-600">AC · costo real</td>
-                    <td className="px-3 py-2 text-right font-medium text-red-700">{step > 0 ? curAc.toLocaleString('es-CO') : '—'}</td>
-                  </tr>
-                  <tr className="border-b border-slate-100">
-                    <td className="px-3 py-2 text-slate-600">EV · valor ganado</td>
-                    <td className="px-3 py-2 text-right font-medium text-amber-700">{step > 0 ? curEv.toLocaleString('es-CO') : '—'}</td>
-                  </tr>
-                  <tr className="border-b border-slate-100 bg-white">
-                    <td className="px-3 py-2 text-slate-600">CPI = EV/AC</td>
-                    <td className="px-3 py-2 text-right font-semibold text-slate-900">{step > 0 ? cpi.toFixed(3) : '—'}</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-2 text-slate-600">SPI = EV/PV</td>
-                    <td className="px-3 py-2 text-right font-semibold text-slate-900">{step > 0 ? spi.toFixed(3) : '—'}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="text-[11px] text-slate-500 leading-snug">
-              Eje del gráfico: tiempo (meses 0–6) vs valor acumulado. BAC referencia ≈ {BAC.toLocaleString('es-CO')} miles COP.
+        {/* Cuerpo: panel lateral fijo (~210px) + área principal, como CPMSimulationViewer */}
+        <div className="flex min-h-[280px] flex-1 overflow-hidden">
+          <aside className="w-[210px] shrink-0 overflow-y-auto border-r border-slate-200 bg-white px-3 py-3.5">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">Meses · simulación</p>
+            <table className="w-full border-collapse text-[12px]">
+              <thead>
+                <tr className="bg-[#1a56db]">
+                  <th className="px-2 py-1.5 text-left text-[11px] font-bold text-white">Mes</th>
+                  <th className="px-2 py-1.5 text-center text-[11px] font-bold text-white">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {MONTH_LABELS.map((m, i) => {
+                  const done = i < step;
+                  const cur = i === step;
+                  return (
+                    <tr
+                      key={m}
+                      className={`border-b border-slate-100 ${cur ? 'bg-amber-50' : done ? 'bg-slate-50/90' : 'bg-white'}`}
+                    >
+                      <td className={`px-2 py-1.5 font-bold ${cur ? 'text-amber-900' : 'text-slate-800'}`}>{m}</td>
+                      <td className="px-2 py-1.5 text-center">
+                        {done ? (
+                          <CheckCircle2 className="inline h-4 w-4 text-emerald-600" aria-label="Pasado" />
+                        ) : cur ? (
+                          <span className="text-[11px] font-semibold text-amber-700">► Ahora</span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="mt-3 text-[10px] leading-snug text-slate-500">
+              BAC referencia ≈{' '}
+              <span className="font-semibold text-slate-700">{BAC.toLocaleString('es-CO')}</span> miles COP.
             </p>
-          </div>
+          </aside>
 
-          <div className="xl:col-span-8 rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-3 sm:p-4 min-w-0">
-            <p className="mb-2 text-center text-[11px] font-medium text-slate-500">
+          <div className="min-w-0 flex-1 overflow-hidden bg-[#f1f5f9]">
+            <p className="px-3 pt-3 text-center text-[11px] font-medium text-slate-600">
               Curva acumulada (miles COP) · 0 = inicio del proyecto
             </p>
-            <div className="w-full mx-auto" style={{ height: CHART_H, minHeight: CHART_H }}>
+            <div className="w-full px-2 pb-3" style={{ height: CHART_H, minHeight: CHART_H }}>
               {chartMount ? (
                 <ResponsiveContainer width="100%" height={CHART_H}>
-                  <ComposedChart
-                    data={chartData}
-                    margin={{ top: 16, right: 16, left: 8, bottom: 16 }}
-                    syncId="evm-curva-s"
-                  >
+                  <ComposedChart data={chartData} margin={{ top: 16, right: 16, left: 8, bottom: 16 }} syncId="evm-curva-s">
                     <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" vertical={false} />
                     <XAxis
                       dataKey="mes"
@@ -307,11 +366,7 @@ export function EvmCurvaSContent({
                       labelFormatter={(l) => String(l)}
                       contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }}
                     />
-                    <Legend
-                      verticalAlign="top"
-                      height={32}
-                      wrapperStyle={{ fontSize: '12px', paddingBottom: 4 }}
-                    />
+                    <Legend verticalAlign="top" height={32} wrapperStyle={{ fontSize: '12px', paddingBottom: 4 }} />
                     {step >= 2 ? (
                       <ReferenceArea
                         x1="Mes 2"
@@ -358,10 +413,7 @@ export function EvmCurvaSContent({
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
-                <div
-                  className="flex h-full w-full items-center justify-center rounded-lg bg-slate-100/80 text-sm text-slate-500"
-                  style={{ height: CHART_H }}
-                >
+                <div className="flex h-full w-full items-center justify-center rounded-lg bg-slate-100/80 text-sm text-slate-500">
                   Cargando gráfico…
                 </div>
               )}
@@ -371,7 +423,7 @@ export function EvmCurvaSContent({
 
         {needsDecision ? (
           <div className="border-t border-amber-200 bg-amber-50/90 px-4 py-5 lg:px-8">
-            <p className="text-sm font-semibold text-amber-950 mb-3">Decisión en mes 3</p>
+            <p className="mb-3 text-sm font-semibold text-amber-950">Decisión en mes 3</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
@@ -379,7 +431,7 @@ export function EvmCurvaSContent({
                 className="rounded-xl border-2 border-emerald-600 bg-white p-4 text-left shadow-sm transition-all hover:bg-emerald-50/80 hover:shadow-md"
               >
                 <div className="text-sm font-bold text-emerald-900">Opción A — Inyectar recursos (crashing)</div>
-                <p className="mt-2 text-xs text-slate-700 leading-relaxed">
+                <p className="mt-2 text-xs leading-relaxed text-slate-700">
                   Refuerzo de equipo u horas: AC sube más en el mes 4, pero EV se recupera para acercarse a la meta al cierre.
                 </p>
               </button>
@@ -389,7 +441,7 @@ export function EvmCurvaSContent({
                 className="rounded-xl border-2 border-slate-400 bg-white p-4 text-left shadow-sm transition-all hover:bg-slate-50 hover:shadow-md"
               >
                 <div className="text-sm font-bold text-slate-900">Opción B — No hacer nada</div>
-                <p className="mt-2 text-xs text-slate-700 leading-relaxed">
+                <p className="mt-2 text-xs leading-relaxed text-slate-700">
                   Sin acción correctiva: el proyecto tiende a cerrar con sobrecosto y retraso frente al plan.
                 </p>
               </button>
@@ -397,54 +449,133 @@ export function EvmCurvaSContent({
           </div>
         ) : null}
 
-        <div className="border-t border-slate-200 bg-slate-50 px-4 py-4 lg:px-8 space-y-4">
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Feedback del tutor</h3>
-            <ul className="space-y-2 text-sm text-slate-800 leading-relaxed list-disc pl-5">
-              {feedbackLines.map((line, i) => (
-                <li key={i}>{line}</li>
-              ))}
-            </ul>
-          </div>
+        {/* Pie: mensaje tipo CPM + tabla dinámica + controles centrados */}
+        <div className="flex shrink-0 flex-col gap-2.5 border-t border-slate-200 bg-white px-4 py-3 lg:px-[18px]">
+          <div
+            className="rounded-xl border px-5 py-5 transition-colors"
+            style={{
+              background: panelStyle.bg,
+              borderColor: panelStyle.bd,
+              color: panelStyle.tx,
+              borderWidth: 1,
+              fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+              boxShadow: '0 1px 3px rgba(30, 58, 138, 0.06)',
+            }}
+          >
+            <div className="evm-tutor-markdown [&_a]:underline">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={evmTutorMarkdownComponents}>
+                {feedbackMarkdown}
+              </ReactMarkdown>
+            </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="mt-4 rounded-lg border border-slate-200/90 bg-white/[0.85] p-3 shadow-sm">
+              <p
+                className="mb-2.5 text-[10px] font-bold uppercase tracking-wide"
+                style={{ color: panelStyle.tx, opacity: 0.85 }}
+              >
+                Valores al cierre de {MONTH_LABELS[step]}
+              </p>
+              <table className="w-full border-collapse text-[12px]" style={{ border: '1px solid rgba(15, 23, 42, 0.14)' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(15, 23, 42, 0.07)' }}>
+                    <th
+                      className="px-2.5 py-2 text-left text-[11px] font-bold"
+                      style={{ borderBottom: '1px solid rgba(15,23,42,0.14)' }}
+                    >
+                      Indicador
+                    </th>
+                    <th
+                      className="px-2.5 py-2 text-right text-[11px] font-bold"
+                      style={{ borderBottom: '1px solid rgba(15,23,42,0.14)' }}
+                    >
+                      Valor
+                    </th>
+                  </tr>
+                </thead>
+              <tbody className="tabular-nums">
+                <tr style={{ borderBottom: '1px solid rgba(15,23,42,0.08)' }}>
+                  <td className="px-2.5 py-2 opacity-90">PV · planificado</td>
+                  <td className="px-2.5 py-2 text-right font-semibold">{curPv.toLocaleString('es-CO')} <span className="font-normal opacity-75">mil COP</span></td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid rgba(15,23,42,0.08)' }}>
+                  <td className="px-2.5 py-2 opacity-90">AC · costo real</td>
+                  <td className="px-2.5 py-2 text-right font-semibold text-red-700">{step > 0 ? `${curAc.toLocaleString('es-CO')} mil COP` : '—'}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid rgba(15,23,42,0.08)' }}>
+                  <td className="px-2.5 py-2 opacity-90">EV · valor ganado</td>
+                  <td className="px-2.5 py-2 text-right font-semibold text-amber-800">{step > 0 ? `${curEv.toLocaleString('es-CO')} mil COP` : '—'}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid rgba(15,23,42,0.08)' }}>
+                  <td className="px-2.5 py-2 opacity-90">CPI = EV ÷ AC</td>
+                  <td className="px-2.5 py-2 text-right font-bold">{step > 0 ? cpi.toFixed(3) : '—'}</td>
+                </tr>
+                <tr>
+                  <td className="px-2.5 py-2 opacity-90">SPI = EV ÷ PV</td>
+                  <td className="px-2.5 py-2 text-right font-bold">{step > 0 ? spi.toFixed(3) : '—'}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="mb-0 mt-2 text-[10px] text-slate-600">
+              PV, AC y EV en miles COP. CPI y SPI son índices adimensionales.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={restart}
+              title="Reiniciar simulación"
+              className="rounded-2xl border border-solid border-slate-200 bg-slate-100 px-4 py-2 text-[12px] font-semibold text-slate-600 transition-colors hover:bg-slate-200"
+            >
+              ↺ Reiniciar
+            </button>
             <button
               type="button"
               onClick={goPrev}
               disabled={step <= 0}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+              className={`rounded-2xl border px-4 py-2 text-[13px] font-bold transition-colors ${
+                step <= 0
+                  ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                  : 'border-[#bfd3f5] bg-[#dbeafe] text-[#1a56db]'
+              }`}
             >
-              <ChevronLeft className="h-4 w-4" />
-              Mes anterior
-            </button>
-            <div className="text-xs font-medium text-slate-500">
-              Mes actual en simulación: <span className="text-slate-900">{MONTH_LABELS[step]}</span>
-            </div>
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={step >= 6 || needsDecision}
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm disabled:opacity-40 disabled:pointer-events-none transition-opacity"
-              style={{ backgroundColor: accentColor }}
-            >
-              Siguiente mes
-              <ChevronRight className="h-4 w-4" />
+              ← Mes anterior
             </button>
           </div>
+          <p className="order-last mb-0 w-full min-w-0 shrink-0 basis-full text-center text-[11px] text-slate-600 sm:order-none sm:w-auto sm:basis-auto sm:flex-1 sm:px-2">
+            Mes en simulación:{' '}
+            <span className="font-semibold text-slate-900">{MONTH_LABELS[step]}</span>
+          </p>
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={step >= 6 || needsDecision}
+            className="rounded-2xl border-none px-5 py-2 text-[13px] font-bold text-white shadow-md transition-opacity disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+            style={
+              step >= 6 || needsDecision
+                ? {}
+                : { background: `linear-gradient(135deg, ${accentColor}, #142d61)`, boxShadow: '0 2px 8px rgba(26,86,219,0.35)' }
+            }
+          >
+            Siguiente mes →
+          </button>
+        </div>
 
-          {finished ? (
-            <div className="flex flex-wrap gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => onComplete?.()}
-                className="rounded-lg px-6 py-2.5 text-sm font-semibold text-white shadow-md"
-                style={{ backgroundColor: '#16a34a' }}
-              >
-                Marcar contenido como visto
-              </button>
-              <p className="text-xs text-slate-600 self-center">Has recorrido los 6 meses. Marca visto para registrar tu progreso.</p>
-            </div>
-          ) : null}
+        {finished ? (
+          <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => onComplete?.()}
+              className="rounded-2xl px-6 py-2.5 text-sm font-semibold text-white shadow-md"
+              style={{ backgroundColor: '#16a34a' }}
+            >
+              Marcar contenido como visto
+            </button>
+            <p className="self-center text-xs text-slate-600">Has recorrido los 6 meses. Marca visto para registrar tu progreso.</p>
+          </div>
+        ) : null}
         </div>
       </div>
     </div>

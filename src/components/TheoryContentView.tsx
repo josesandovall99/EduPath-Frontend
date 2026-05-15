@@ -263,11 +263,13 @@ interface ModuleItem {
   id: string;
   title: string;
   duration?: string;
-<<<<<<< Updated upstream
-  type: 'video' | 'document' | 'activity' | 'workshop' | 'simulacion_ruta_critica';
-=======
-  type: 'video' | 'document' | 'activity' | 'workshop' | 'evm_curva_s';
->>>>>>> Stashed changes
+  type:
+    | 'video'
+    | 'document'
+    | 'activity'
+    | 'workshop'
+    | 'simulacion_ruta_critica'
+    | 'evm_curva_s';
   completed?: boolean;
   visualizado?: boolean;
   descripcion?: string;
@@ -348,16 +350,14 @@ const mapTipoToType = (tipo: string): ModuleItem['type'] => {
     'documento': 'document',
     'document': 'document',
     'actividad': 'activity',
-<<<<<<< Updated upstream
     'activity': 'activity',
     'taller': 'workshop',
     'workshop': 'workshop',
     'explicacion': 'document',
     'simulacion_ruta_critica': 'simulacion_ruta_critica',
-=======
-    'taller': 'workshop',
     'simulador_curva_s': 'evm_curva_s',
->>>>>>> Stashed changes
+    'simulador-curva-s': 'evm_curva_s',
+    'simulador_evm_curva_s': 'evm_curva_s',
   };
   return tipoMap[tipo.toLowerCase()] || 'document';
 };
@@ -1655,7 +1655,6 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                     activity={{
                       id: ejercicioAsociado.id.toString(),
                       title: ejercicioAsociado.actividad?.titulo || 'Ejercicio',
-                      description: ejercicioAsociado.actividad?.descripcion
                     }}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}

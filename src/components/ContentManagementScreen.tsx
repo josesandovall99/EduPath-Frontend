@@ -31,7 +31,7 @@ interface ContentManagementScreenProps {
 interface ContentItem {
   id: string;
   title: string;
-  type: 'video' | 'document' | 'activity' | 'explicacion' | 'simulador_curva_s';
+  type: 'video' | 'document' | 'activity' | 'explicacion' | 'simulacion_ruta_critica' | 'simulador_curva_s';
   linkedTo: 'theme' | 'subtheme';
   linkedName: string;
   subject: string;
@@ -47,11 +47,7 @@ interface ContentItem {
 
 interface CreateContentFormData {
   titulo: string;
-<<<<<<< Updated upstream
-  tipo: 'video' | 'document' | 'activity' | 'explicacion' | 'simulacion_ruta_critica';
-=======
-  tipo: 'video' | 'document' | 'activity' | 'explicacion' | 'simulador_curva_s';
->>>>>>> Stashed changes
+  tipo: 'video' | 'document' | 'activity' | 'explicacion' | 'simulacion_ruta_critica' | 'simulador_curva_s';
   descripcion: string;
   url: string;
   tema_id: string;
@@ -103,6 +99,10 @@ const normalizeContentType = (value: unknown): ContentItem['type'] => {
 
   if (normalized === 'explicacion' || normalized === 'explicación') {
     return 'explicacion';
+  }
+
+  if (normalized === 'simulacion_ruta_critica') {
+    return 'simulacion_ruta_critica';
   }
 
   if (normalized === 'simulador_curva_s' || normalized === 'simulador-curva-s' || normalized === 'simulador_evm_curva_s') {
@@ -409,38 +409,21 @@ export function ContentManagementScreen({
       .replace(/\s+/g, ' ')
       .trim();
 
-<<<<<<< Updated upstream
     const isCPM = formData.tipo === 'simulacion_ruta_critica';
+    const isCurvaS = formData.tipo === 'simulador_curva_s';
 
-    // Detectar campos faltantes con mensajes específicos
     const missing: string[] = [];
-    if (!formData.titulo.trim())      missing.push('Título');
-    if (!isCPM && !formData.url.trim()) missing.push('URL');
+    if (!formData.titulo.trim()) missing.push('Título');
+    if (!selectedAsignaturaId) missing.push('Asignatura');
+    if (!formData.tema_id) missing.push('Tema');
+    if (!formData.subtema_id) missing.push('Subtema');
     if (isCPM && !formData.url.trim()) missing.push('Actividades CPM (define al menos una)');
-    if (!selectedAsignaturaId)         missing.push('Asignatura');
-    if (!formData.tema_id)             missing.push('Tema');
-    if (!formData.subtema_id)          missing.push('Subtema');
-    // Descripción: para CPM es opcional; para otros tipos es requerida
-    if (!isCPM && !descripcionPlano)   missing.push('Descripción');
+    if (!isCPM && !isCurvaS && !formData.url.trim()) missing.push('URL');
+    if (!isCPM && !descripcionPlano) missing.push('Descripción');
 
     if (missing.length > 0) {
       toast.error('Formulario incompleto', {
-        description: `Completa: ${missing.join(', ')}.`
-=======
-    const needsUrl = formData.tipo !== 'simulador_curva_s';
-    if (
-      !formData.titulo.trim() ||
-      (needsUrl && !formData.url.trim()) ||
-      !selectedAsignaturaId ||
-      !formData.tema_id ||
-      !formData.subtema_id ||
-      !descripcionPlano
-    ) {
-      toast.error('Formulario incompleto', {
-        description: needsUrl
-          ? 'Completa título, descripción, URL, asignatura, tema y subtema antes de guardar.'
-          : 'Completa título, descripción, asignatura, tema y subtema. La URL es opcional para el simulador.',
->>>>>>> Stashed changes
+        description: `Completa: ${missing.join(', ')}.`,
       });
       return;
     }
@@ -462,21 +445,16 @@ export function ContentManagementScreen({
         body: JSON.stringify({
           titulo: formData.titulo,
           tipo: formData.tipo,
-<<<<<<< Updated upstream
-          // Para CPM: si la descripción está vacía, usar el título como descripción
-          descripcion: descripcionHtml && descripcionHtml.replace(/<[^>]*>/g,'').trim()
-            ? descripcionHtml
-            : formData.tipo === 'simulacion_ruta_critica'
-              ? `Simulación de Ruta Crítica: ${formData.titulo}`
-              : descripcionHtml,
-          url: formData.url,
-=======
-          descripcion: descripcionHtml,
+          descripcion:
+            descripcionHtml && descripcionHtml.replace(/<[^>]*>/g, '').trim()
+              ? descripcionHtml
+              : formData.tipo === 'simulacion_ruta_critica'
+                ? `Simulación de Ruta Crítica: ${formData.titulo}`
+                : descripcionHtml,
           url:
             formData.tipo === 'simulador_curva_s'
               ? formData.url.trim() || 'https://edupath.app/contenido/simulador-curva-s-evm'
               : formData.url,
->>>>>>> Stashed changes
           tema_id: parseInt(formData.tema_id),
           subtema_id: parseInt(formData.subtema_id)
         })
@@ -700,9 +678,11 @@ export function ContentManagementScreen({
         ? 'Documento'
         : formData.tipo === 'activity'
           ? 'Actividad'
-          : formData.tipo === 'simulador_curva_s'
-            ? 'Simulador Curva S (EVM)'
-            : 'Explicación';
+          : formData.tipo === 'simulacion_ruta_critica'
+            ? 'Simulación Ruta Crítica (CPM)'
+            : formData.tipo === 'simulador_curva_s'
+              ? 'Simulador Curva S (EVM)'
+              : 'Explicación';
   const contentCompletion = [
     formData.titulo.trim(),
     formData.descripcion.replace(/<[^>]*>/g, '').trim(),
@@ -736,6 +716,7 @@ export function ContentManagementScreen({
       case 'document': return FileText;
       case 'activity': return Edit;
       case 'explicacion': return Edit;
+      case 'simulacion_ruta_critica': return ArrowRight;
       case 'simulador_curva_s': return TrendingUp;
       default: return FileText;
     }
@@ -747,6 +728,7 @@ export function ContentManagementScreen({
       case 'document': return '#7ED6A7';
       case 'activity': return '#F5A97F';
       case 'explicacion': return '#F5A97F';
+      case 'simulacion_ruta_critica': return '#1a56db';
       case 'simulador_curva_s': return '#ca8a04';
       default: return '#64748B';
     }
@@ -831,6 +813,7 @@ export function ContentManagementScreen({
               { key: 'video', label: 'Videos' },
               { key: 'document', label: 'Docs' },
               { key: 'explicacion', label: 'Explicación' },
+              { key: 'simulacion_ruta_critica', label: 'CPM' },
               { key: 'simulador_curva_s', label: 'Curva S EVM' },
             ].map(f => (
               <button key={f.key} type="button" onClick={() => setFilterType(f.key as any)}
@@ -941,9 +924,11 @@ export function ContentManagementScreen({
                             ? 'Documento'
                             : content.type === 'activity'
                               ? 'Actividad'
-                              : content.type === 'simulador_curva_s'
-                                ? 'Simulador Curva S (EVM)'
-                                : 'Explicación'}
+                              : content.type === 'simulacion_ruta_critica'
+                                ? 'Simulación Ruta Crítica (CPM)'
+                                : content.type === 'simulador_curva_s'
+                                  ? 'Simulador Curva S (EVM)'
+                                  : 'Explicación'}
                       </td>
                       <td style={{ color: contentIsActive ? '#1a56db' : '#b45309', fontSize: '13px', fontWeight: 500 }}>
                         {contentIsActive ? 'Activo' : 'Inhabilitado'}
@@ -991,7 +976,17 @@ export function ContentManagementScreen({
           style={{ background: 'rgba(10,20,50,0.45)', backdropFilter: 'blur(4px)' }}
           onClick={() => setShowCreateModal(false)}>
           <div className="rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-            style={{ width: formData.tipo === 'simulacion_ruta_critica' ? '1200px' : '680px', maxWidth: '96vw', maxHeight: '90vh', background: '#fff' }}
+            style={{
+              width:
+                formData.tipo === 'simulacion_ruta_critica'
+                  ? '1200px'
+                  : formData.tipo === 'simulador_curva_s'
+                    ? '920px'
+                    : '680px',
+              maxWidth: '96vw',
+              maxHeight: '90vh',
+              background: '#fff',
+            }}
             onClick={e => e.stopPropagation()}>
             {/* Cabecera azul */}
             <div style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
@@ -1050,24 +1045,17 @@ export function ContentManagementScreen({
                           <option value="video">Video</option>
                           <option value="document">Documento</option>
                           <option value="explicacion">Explicación</option>
-<<<<<<< Updated upstream
                           <option value="simulacion_ruta_critica">🎯 Simulación Ruta Crítica (CPM)</option>
-=======
                           <option value="simulador_curva_s">Simulador · Curva S (EVM)</option>
->>>>>>> Stashed changes
                         </select>
                       </div>
                     </div>
 
-<<<<<<< Updated upstream
-                    {/* Fila 2: URL (solo si NO es CPM) */}
                     {formData.tipo !== 'simulacion_ruta_critica' && (
-                      <div className="app-form-field mt-4">
-                        <label className="app-form-label">URL *</label>
-=======
-                      <div className="app-form-field">
-                        <label className="app-form-label">{formData.tipo === 'simulador_curva_s' ? 'URL (opcional)' : 'URL *'}</label>
->>>>>>> Stashed changes
+                      <div className={`app-form-field ${formData.tipo === 'simulador_curva_s' ? '' : 'mt-4'}`}>
+                        <label className="app-form-label">
+                          {formData.tipo === 'simulador_curva_s' ? 'URL (opcional)' : 'URL *'}
+                        </label>
                         <input
                           type="url"
                           name="url"
@@ -1098,7 +1086,9 @@ export function ContentManagementScreen({
                       <p className="app-form-section-description">
                         {formData.tipo === 'simulacion_ruta_critica'
                           ? 'Explica brevemente el contexto del proyecto o los objetivos de aprendizaje de esta simulación.'
-                          : 'Usa el editor enriquecido para explicar el enfoque del contenido, instrucciones de uso o contexto pedagógico.'}
+                          : formData.tipo === 'simulador_curva_s'
+                            ? 'Contextualiza la simulación de la Curva S y los indicadores EVM para el estudiante.'
+                            : 'Usa el editor enriquecido para explicar el enfoque del contenido, instrucciones de uso o contexto pedagógico.'}
                       </p>
                     </div>
                     <div className="app-form-field">

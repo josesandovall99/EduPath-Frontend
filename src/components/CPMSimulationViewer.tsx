@@ -3,7 +3,8 @@
  * Acepta cualquier tabla de actividades y genera la simulación paso a paso.
  */
 import { useState, useMemo } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 export interface CPMActivity {
@@ -382,6 +383,44 @@ const MSG_BG:Record<string,string>={default:'#eff6ff',success:'#f0fdf4',highligh
 const MSG_BD:Record<string,string>={default:'#bfd3f5',success:'#bbf7d0',highlight:'#fde68a',backward:'#e9d5ff',critical:'#fecaca'};
 const MSG_TX:Record<string,string>={default:'#1e3a5f',success:'#166534',highlight:'#92400e',backward:'#6b21a8',critical:'#991b1b'};
 
+const markdownComponents: Partial<Components> = {
+  table({ children }) {
+    return (
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontSize: 12,
+          margin: '10px 0',
+          border: '1px solid rgba(15,23,42,0.12)',
+        }}
+      >
+        {children}
+      </table>
+    );
+  },
+  th({ children }) {
+    return (
+      <th
+        style={{
+          textAlign: 'left',
+          padding: '8px 10px',
+          background: 'rgba(15,23,42,0.06)',
+          borderBottom: '1px solid rgba(15,23,42,0.12)',
+          fontWeight: 700,
+        }}
+      >
+        {children}
+      </th>
+    );
+  },
+  td({ children }) {
+    return (
+      <td style={{ padding: '8px 10px', borderBottom: '1px solid rgba(15,23,42,0.08)', verticalAlign: 'top' }}>{children}</td>
+    );
+  },
+};
+
 // ─── Main viewer ─────────────────────────────────────────────────────────────
 export function CPMSimulationViewer({ activities, title='Simulación Ruta Crítica', hideHeader }: Props) {
   const [step, setStep] = useState(0);
@@ -435,8 +474,8 @@ export function CPMSimulationViewer({ activities, title='Simulación Ruta Críti
         </div>
       )}
 
-      {/* Body */}
-      <div style={{display:'flex',flex:1,overflow:'hidden',minHeight:0}}>
+      {/* Body: mantiene alto mínimo para el diagrama aunque el pie crezca con el texto */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 260 }}>
 
         {/* Table panel */}
         <div style={{width:210,background:'#fff',borderRight:'1px solid #e2e8f0',padding:'14px 12px',overflowY:'auto',flexShrink:0}}>
@@ -521,19 +560,17 @@ export function CPMSimulationViewer({ activities, title='Simulación Ruta Críti
         </div>
       </div>
 
-      {/* Controls — altura fija para que los botones no se muevan */}
-      <div style={{background:'#fff',borderTop:'1px solid #e2e8f0',padding:'12px 18px',flexShrink:0,display:'flex',flexDirection:'column',gap:10,height:160}}>
-        {/* Mensaje con scroll interno si es muy largo */}
+      {/* Controles — altura según contenido del mensaje; sin scroll forzado en el recuadro */}
+      <div style={{background:'#fff',borderTop:'1px solid #e2e8f0',padding:'12px 18px',flexShrink:0,display:'flex',flexDirection:'column',gap:10}}>
         <div style={{
           background:MSG_BG[cur.msgType],border:`1.5px solid ${MSG_BD[cur.msgType]}`,
           borderRadius:12,padding:'10px 14px',color:MSG_TX[cur.msgType],fontSize:13,
           lineHeight:1.5,transition:'background 0.3s,border-color 0.3s',
-          flex:1,overflowY:'auto',minHeight:0,
+          maxWidth:'100%',
         }}>
-          <strong></strong>
-          <ReactMarkdown>{cur.message}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{cur.message}</ReactMarkdown>
         </div>
-        {/* Botones — siempre en la misma posición */}
+        {/* Botones — debajo del mensaje cuando el texto es alto */}
         <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0,flexWrap:'wrap'}}>
           {/* Reiniciar */}
           <button onClick={()=>setStep(0)} title="Reiniciar simulación"
