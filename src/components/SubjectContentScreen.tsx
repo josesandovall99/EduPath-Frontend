@@ -21,7 +21,7 @@ interface SubjectContentScreenProps {
 interface Content {
   id: string;
   title: string;
-  type: 'video' | 'document' | 'activity' | 'quiz' | 'uml' | 'workshop';
+  type: 'video' | 'document' | 'activity' | 'quiz' | 'uml' | 'workshop' | 'simulacion_ruta_critica';
   duration?: string;
   status: 'completed' | 'in-progress' | 'not-started';
   isMiniproyecto?: boolean;
@@ -80,11 +80,17 @@ const FALLBACK_CONTENT: Content[] = [
 const mapTipoToType = (tipo: string): Content['type'] => {
   const tipoMap: Record<string, Content['type']> = {
     'video': 'video',
+    'document': 'document',
     'documento': 'document',
     'actividad': 'activity',
+    'activity': 'activity',
     'cuestionario': 'quiz',
+    'quiz': 'quiz',
     'uml': 'uml',
-    'taller': 'workshop'
+    'taller': 'workshop',
+    'workshop': 'workshop',
+    'explicacion': 'document',
+    'simulacion_ruta_critica': 'simulacion_ruta_critica',
   };
   return tipoMap[tipo.toLowerCase()] || 'document';
 };
@@ -110,6 +116,8 @@ const getTypeIcon = (type: Content['type']) => {
     case 'quiz': return CheckCircle2;
     case 'uml': return Share2;
     case 'workshop': return Users;
+    case 'simulacion_ruta_critica': return Share2;
+    default: return FileText;
   }
 };
 
@@ -122,6 +130,8 @@ const getTypeLabel = (content: Content) => {
     case 'quiz': return 'Cuestionario';
     case 'uml': return 'Diagrama UML';
     case 'workshop': return 'Taller';
+    case 'simulacion_ruta_critica': return 'Simulación CPM';
+    default: return 'Contenido';
   }
 };
 

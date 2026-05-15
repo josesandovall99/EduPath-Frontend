@@ -35,6 +35,7 @@ import { MatchingExercise } from './MatchingExercise';
 import { PmSimulationExercise } from './PmSimulationExercise';
 import { API_BASE_URL } from '../utils/constants';
 import { cachedFetch } from '../utils/fetchCache';
+import { CPMSimulationViewer } from './CPMSimulationViewer';
 // Estilos para renderizado de HTML
 const htmlContentStyles = `
   .html-content p {
@@ -260,7 +261,7 @@ interface ModuleItem {
   id: string;
   title: string;
   duration?: string;
-  type: 'video' | 'document' | 'activity' | 'workshop';
+  type: 'video' | 'document' | 'activity' | 'workshop' | 'simulacion_ruta_critica';
   completed?: boolean;
   visualizado?: boolean;
   descripcion?: string;
@@ -339,8 +340,13 @@ const mapTipoToType = (tipo: string): ModuleItem['type'] => {
   const tipoMap: Record<string, ModuleItem['type']> = {
     'video': 'video',
     'documento': 'document',
+    'document': 'document',
     'actividad': 'activity',
-    'taller': 'workshop'
+    'activity': 'activity',
+    'taller': 'workshop',
+    'workshop': 'workshop',
+    'explicacion': 'document',
+    'simulacion_ruta_critica': 'simulacion_ruta_critica',
   };
   return tipoMap[tipo.toLowerCase()] || 'document';
 };
@@ -1686,8 +1692,35 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
             {/* Caso 2: Contenido (con o sin ejercicio) */}
             {selectedContentData && (
               <>
-                {/* Mostrar SIEMPRE el contenido primero */}
-                {selectedContentData.type === 'video' ? (
+                {/* ── Simulación Ruta Crítica ── */}
+                {selectedContentData.type === 'simulacion_ruta_critica' && (() => {
+                  try {
+                    const config = JSON.parse(selectedContentData.url || '{}');
+                    const acts = Array.isArray(config.activities) ? config.activities : [];
+                    return (
+                      <div className="mb-6">
+                        {/* Título y descripción arriba */}
+                        <h2 className="text-[#3A4A5B] mb-2 text-2xl font-semibold">{selectedContentData.title}</h2>
+                        {selectedContentData.descripcion && (
+                          <p className="text-gray-600 text-sm mb-4 leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: selectedContentData.descripcion }} />
+                        )}
+                        {acts.length === 0 ? (
+                          <div className="p-8 rounded-2xl bg-blue-50 text-center text-blue-700">
+                            Esta simulación no tiene actividades configuradas aún.
+                          </div>
+                        ) : (
+                          <div style={{ height: 650 }}>
+                            <CPMSimulationViewer activities={acts} title={selectedContentData.title} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  } catch { return null; }
+                })()}
+
+                {/* Mostrar video o documento — nunca para CPM (ya se renderizó arriba) */}
+                {selectedContentData.type !== 'simulacion_ruta_critica' && (selectedContentData.type === 'video' ? (
                   <div className="mb-6 -mx-2 sm:mx-0">
                     {selectedContentData.url ? (
                       <div className="w-full aspect-video min-h-[420px] lg:min-h-[560px] rounded-2xl overflow-hidden shadow-lg bg-gray-900">
@@ -1815,12 +1848,12 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                               );
                             })()}
                           </div>
-                          <p className="text-gray-600 text-xs mt-3 break-all">{selectedContentData.url}</p>
+                          {/* URL solo visible para tipos que la necesiten (no para documentos ni CPM) */}
                         </div>
                       )}
                     </div>
                   </div>
-                )}
+                ))}
 
               </>
             )}

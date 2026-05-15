@@ -5,6 +5,8 @@ const logoImage = new URL('../assets/image-removebg-preview (2).png', import.met
 import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 import { createQuillModules, loadQuill } from '../utils/quill';
+import { CPMSimulationCreator } from './CPMSimulationCreator';
+import type { CPMActivity } from './CPMSimulationViewer';
 
 interface ContentManagementScreenProps {
   onBack: () => void;
@@ -45,7 +47,7 @@ interface ContentItem {
 
 interface CreateContentFormData {
   titulo: string;
-  tipo: 'video' | 'document' | 'activity' | 'explicacion';
+  tipo: 'video' | 'document' | 'activity' | 'explicacion' | 'simulacion_ruta_critica';
   descripcion: string;
   url: string;
   tema_id: string;
@@ -399,9 +401,22 @@ export function ContentManagementScreen({
       .replace(/\s+/g, ' ')
       .trim();
 
-    if (!formData.titulo.trim() || !formData.url.trim() || !selectedAsignaturaId || !formData.tema_id || !formData.subtema_id || !descripcionPlano) {
+    const isCPM = formData.tipo === 'simulacion_ruta_critica';
+
+    // Detectar campos faltantes con mensajes específicos
+    const missing: string[] = [];
+    if (!formData.titulo.trim())      missing.push('Título');
+    if (!isCPM && !formData.url.trim()) missing.push('URL');
+    if (isCPM && !formData.url.trim()) missing.push('Actividades CPM (define al menos una)');
+    if (!selectedAsignaturaId)         missing.push('Asignatura');
+    if (!formData.tema_id)             missing.push('Tema');
+    if (!formData.subtema_id)          missing.push('Subtema');
+    // Descripción: para CPM es opcional; para otros tipos es requerida
+    if (!isCPM && !descripcionPlano)   missing.push('Descripción');
+
+    if (missing.length > 0) {
       toast.error('Formulario incompleto', {
-        description: 'Completa título, descripción, URL, asignatura, tema y subtema antes de guardar.'
+        description: `Completa: ${missing.join(', ')}.`
       });
       return;
     }
@@ -423,7 +438,12 @@ export function ContentManagementScreen({
         body: JSON.stringify({
           titulo: formData.titulo,
           tipo: formData.tipo,
-          descripcion: descripcionHtml,
+          // Para CPM: si la descripción está vacía, usar el título como descripción
+          descripcion: descripcionHtml && descripcionHtml.replace(/<[^>]*>/g,'').trim()
+            ? descripcionHtml
+            : formData.tipo === 'simulacion_ruta_critica'
+              ? `Simulación de Ruta Crítica: ${formData.titulo}`
+              : descripcionHtml,
           url: formData.url,
           tema_id: parseInt(formData.tema_id),
           subtema_id: parseInt(formData.subtema_id)
@@ -923,7 +943,7 @@ export function ContentManagementScreen({
           style={{ background: 'rgba(10,20,50,0.45)', backdropFilter: 'blur(4px)' }}
           onClick={() => setShowCreateModal(false)}>
           <div className="rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-            style={{ width: '680px', maxHeight: '90vh', background: '#fff' }}
+            style={{ width: formData.tipo === 'simulacion_ruta_critica' ? '1200px' : '680px', maxWidth: '96vw', maxHeight: '90vh', background: '#fff' }}
             onClick={e => e.stopPropagation()}>
             {/* Cabecera azul */}
             <div style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
@@ -955,8 +975,9 @@ export function ContentManagementScreen({
                       <p className="app-form-section-description">Define el nombre del recurso, su formato y la URL principal que utilizarán docentes o estudiantes.</p>
                     </div>
 
+                    {/* Fila 1: Título + Tipo (siempre en 2 columnas simétricas) */}
                     <div className="app-form-grid app-form-grid-2">
-                      <div className="app-form-field md:col-span-2">
+                      <div className="app-form-field">
                         <label className="app-form-label">Título *</label>
                         <input
                           type="text"
@@ -978,13 +999,17 @@ export function ContentManagementScreen({
                           className="app-form-select"
                           required
                         >
-                          <option value="video">Videos</option>
+                          <option value="video">Video</option>
                           <option value="document">Documento</option>
                           <option value="explicacion">Explicación</option>
+                          <option value="simulacion_ruta_critica">🎯 Simulación Ruta Crítica (CPM)</option>
                         </select>
                       </div>
+                    </div>
 
-                      <div className="app-form-field">
+                    {/* Fila 2: URL (solo si NO es CPM) */}
+                    {formData.tipo !== 'simulacion_ruta_critica' && (
+                      <div className="app-form-field mt-4">
                         <label className="app-form-label">URL *</label>
                         <input
                           type="url"
@@ -996,26 +1021,52 @@ export function ContentManagementScreen({
                           required
                         />
                       </div>
-                    </div>
+                    )}
+
                   </section>
 
+                  {/* Descripción ANTES del editor CPM */}
                   <section className="app-form-section">
                     <div className="mb-4 space-y-1.5">
                       <h4 className="app-form-section-title">Descripción del recurso</h4>
-                      <p className="app-form-section-description">Usa el editor enriquecido para explicar el enfoque del contenido, instrucciones de uso o contexto pedagógico.</p>
+                      <p className="app-form-section-description">
+                        {formData.tipo === 'simulacion_ruta_critica'
+                          ? 'Explica brevemente el contexto del proyecto o los objetivos de aprendizaje de esta simulación.'
+                          : 'Usa el editor enriquecido para explicar el enfoque del contenido, instrucciones de uso o contexto pedagógico.'}
+                      </p>
                     </div>
-
                     <div className="app-form-field">
                       <label className="app-form-label">Descripción *</label>
                       <div className="quill-editor-container app-rich-text-editor">
-                        <div
-                          ref={editorRef}
-                          className="w-full"
-                          data-placeholder="Ingrese la descripción del contenido"
-                        />
+                        <div ref={editorRef} className="w-full" data-placeholder="Ingrese la descripción del contenido" />
                       </div>
                     </div>
                   </section>
+
+                  {/* Editor CPM DESPUÉS de la descripción */}
+                  {formData.tipo === 'simulacion_ruta_critica' && (
+                    <section className="app-form-section">
+                      <div className="mb-4 space-y-1.5">
+                        <h4 className="app-form-section-title">Actividades del proyecto (CPM) *</h4>
+                        <p className="app-form-section-description">Define la tabla de actividades. Los cambios se guardan automáticamente.</p>
+                      </div>
+                      <div className="app-form-field">
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+                          {formData.url && (() => {
+                            try { const n=JSON.parse(formData.url).activities?.length; return <span style={{fontSize:12,color:'#16a34a',fontWeight:600}}>✅ {n} actividad(es) configuradas</span>; } catch { return null; }
+                          })()}
+                        </div>
+                        <div style={{ borderRadius: 12, border: '1.5px solid #bfd3f5' }}>
+                          <CPMSimulationCreator
+                            initialActivities={(() => { try { return JSON.parse(formData.url||'{}').activities as CPMActivity[]; } catch { return undefined; } })()}
+                            onChange={(acts: CPMActivity[]) => setFormData(prev => ({ ...prev, url: JSON.stringify({ activities: acts }) }))}
+                            onSave={(acts: CPMActivity[]) => setFormData(prev => ({ ...prev, url: JSON.stringify({ activities: acts }) }))}
+                            hideActions
+                          />
+                        </div>
+                      </div>
+                    </section>
+                  )}
 
                   <section className="app-form-section">
                     <div className="mb-4 space-y-1.5">

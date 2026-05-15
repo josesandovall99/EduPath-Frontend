@@ -90,7 +90,7 @@ interface Subject {
 interface Content {
   id: string;
   title: string;
-  type: 'video' | 'document' | 'activity' | 'quiz' | 'uml' | 'workshop';
+  type: 'video' | 'document' | 'activity' | 'quiz' | 'uml' | 'workshop' | 'simulacion_ruta_critica';
   duration?: string;
   status?: 'completed' | 'in-progress' | 'not-started';
   isMiniproyecto?: boolean;
