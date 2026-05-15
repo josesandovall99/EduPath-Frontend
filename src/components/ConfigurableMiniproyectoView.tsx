@@ -8,6 +8,7 @@ import { MultipleChoiceExercise } from './MultipleChoiceExercise';
 import { OrderingExercise } from './OrderingExercise';
 import { MatchingExercise } from './MatchingExercise';
 import { QuestionnaireExercise } from './QuestionnaireExercise';
+import { PmSimulationExercise } from './PmSimulationExercise';
 import { ConfigurableMiniproyectoPayload, EmbeddedExercise, parseConfigurableMiniproyecto } from './configurableEmbeddedExercises';
 
 interface ConfigurableMiniproyectoViewProps {
@@ -37,7 +38,7 @@ interface MiniproyectoResponse {
 
 interface LegacyExerciseResponse {
   id: number;
-  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar';
+  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar' | 'Simulación GP';
   configuracion?: EmbeddedExercise['configuracion'];
   actividad?: { titulo?: string; descripcion?: string };
 }
@@ -67,6 +68,21 @@ function hasDraftResponse(response: any, exercise?: EmbeddedExercise) {
   if (typeof response.respuesta?.opcion === 'string') return response.respuesta.opcion.trim().length > 0;
   if (Array.isArray(response.respuesta?.orden)) return response.respuesta.orden.length > 0;
   if (response.respuesta?.matches && typeof response.respuesta.matches === 'object') return Object.keys(response.respuesta.matches).length > 0;
+  if (response.respuesta?.placements && typeof response.respuesta.placements === 'object') {
+    return Object.keys(response.respuesta.placements).length > 0;
+  }
+  if (response.respuesta?.slotFill && typeof response.respuesta.slotFill === 'object') {
+    return Object.keys(response.respuesta.slotFill).length > 0;
+  }
+  if (response.respuesta?.parentById && typeof response.respuesta.parentById === 'object') {
+    return Object.keys(response.respuesta.parentById).length > 0;
+  }
+  if (response.respuesta?.pathChoice === 0 || response.respuesta?.pathChoice === 1) return true;
+  if (Array.isArray(response.respuesta?.criticalIds)) return response.respuesta.criticalIds.length > 0;
+  if (response.respuesta?.costos && typeof response.respuesta.costos === 'object') {
+    return Object.values(response.respuesta.costos).some((v) => Number(v) > 0);
+  }
+  if (response.respuesta?.cpi != null && String(response.respuesta.cpi).trim() !== '') return true;
   if (response.respuestas && typeof response.respuestas === 'object') {
     const preguntas = exercise?.configuracion?.preguntas;
     if (Array.isArray(preguntas) && preguntas.length > 0) {
@@ -95,6 +111,9 @@ function hasRenderableDescription(value?: string | null) {
 }
 
 function normalizeExerciseType(exercise: EmbeddedExercise | LegacyExerciseResponse) {
+  const raw =
+    typeof exercise.tipo_ejercicio === 'string' ? exercise.tipo_ejercicio : '';
+  if (raw.startsWith('pm_')) return 'Simulación GP';
   if (exercise.tipo_ejercicio !== 'Preguntas') return exercise.tipo_ejercicio;
   const configType = String(exercise.configuracion?.tipo || '').trim().toLowerCase();
   if (configType === 'opcion-unica') return 'Opción única';
@@ -272,7 +291,11 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
     const feedbackPath = `/miniproyectos/${content.id}/ejercicios/${selectedExercise.id}/retroalimentacion`;
     const approved = Boolean(correctMap[String(selectedExercise.id)]);
     const hasDraft = hasDraftResponse(exerciseResponses[String(selectedExercise.id)], selectedExercise);
-    const isLargeExercise = normalizedType === 'Compilador' || normalizedType === 'Diagramas UML' || normalizedType === 'Preguntas';
+    const isLargeExercise =
+      normalizedType === 'Compilador' ||
+      normalizedType === 'Diagramas UML' ||
+      normalizedType === 'Preguntas' ||
+      normalizedType === 'Simulación GP';
 
     let exerciseContent: React.ReactNode;
     if (normalizedType === 'Compilador') {
@@ -287,6 +310,24 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
       exerciseContent = <UMLDiagramView activity={{ id: String(selectedExercise.id), title: exerciseTitle }} onBack={() => undefined} configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} resolvePath={resolvePath} submitPath={submitPath} feedbackPath={feedbackPath} />;
     } else if (normalizedType === 'Preguntas') {
       exerciseContent = <QuestionnaireExercise activity={{ id: String(selectedExercise.id), title: exerciseTitle }} preguntas={Array.isArray(selectedExercise.configuracion?.preguntas) ? selectedExercise.configuracion?.preguntas : []} onBack={() => undefined} embedded configurableMode configurableResponse={exerciseResponses[String(selectedExercise.id)]} onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]} resolvePath={resolvePath} submitPath={submitPath} />;
+    } else if (normalizedType === 'Simulación GP') {
+      exerciseContent = (
+        <PmSimulationExercise
+          activity={{ id: String(selectedExercise.id), title: exerciseTitle }}
+          ejercicio={{
+            id: Number(selectedExercise.id),
+            configuracion: selectedExercise.configuracion,
+            actividad: { titulo: selectedExercise.titulo, descripcion: selectedExercise.descripcion },
+          }}
+          onBack={() => undefined}
+          embedded
+          configurableMode
+          configurableResponse={exerciseResponses[String(selectedExercise.id)]}
+          onConfigurableResponseChange={configurableResponseHandlers[String(selectedExercise.id)]}
+          resolvePath={resolvePath}
+          submitPath={submitPath}
+        />
+      );
     } else {
       exerciseContent = <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-sm text-amber-800">El tipo de ejercicio {normalizedType} todavía no está habilitado dentro del miniproyecto configurable.</div>;
     }

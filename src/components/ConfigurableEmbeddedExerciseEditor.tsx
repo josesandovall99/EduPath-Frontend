@@ -1,4 +1,10 @@
-import { ClipboardList, Code2, GitBranchPlus, Grip, ListChecks, Lock, MessagesSquare, Plus, Shapes, Trash2 } from 'lucide-react';
+import { ClipboardList, Code2, GitBranchPlus, Grip, LayoutGrid, ListChecks, Lock, MessagesSquare, Plus, Shapes, Trash2 } from 'lucide-react';
+import {
+  PM_EXERCISE_FORM_TYPES,
+  PM_EXERCISE_LABELS,
+  isPmExerciseFormType,
+  pmExerciseFormTypeFromVariante,
+} from '../utils/pmExerciseFormTypes';
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   ConfigurableExerciseType,
@@ -7,6 +13,7 @@ import {
   createEmptyEmbeddedExercise,
 } from './configurableEmbeddedExercises';
 import { JavaEditor } from './JavaEditor';
+import { SimulacionGpExerciseConfigPanel } from './SimulacionGpExerciseConfigPanel';
 import { CONSOLA_IO_SOURCE } from '../utils/consolaIOSource';
 
 interface ConfigurableEmbeddedExerciseEditorProps {
@@ -63,7 +70,20 @@ const GROUP_BADGE: Record<string, string> = {
   amber:  'bg-blue-50 text-blue-700 border-blue-200',
 };
 
-const EXERCISE_TYPES: ConfigurableExerciseType[] = ['Compilador', 'Diagramas UML', 'Preguntas', 'Opción única', 'Ordenar', 'Relacionar'];
+const EXERCISE_TYPES: ConfigurableExerciseType[] = [
+  'Compilador',
+  'Diagramas UML',
+  'Preguntas',
+  'Opción única',
+  'Ordenar',
+  'Relacionar',
+  ...PM_EXERCISE_FORM_TYPES,
+];
+
+const PM_TYPE_META: Record<string, { icon: typeof Code2; accent: string; soft: string; label: string }> = {
+  pm_mapa_poder: { icon: LayoutGrid, accent: 'text-indigo-700', soft: 'bg-indigo-50 border-indigo-200', label: 'Mapa poder / interés' },
+  pm_edt: { icon: LayoutGrid, accent: 'text-indigo-700', soft: 'bg-indigo-50 border-indigo-200', label: 'EDT / WBS' },
+};
 const ADDABLE_EXERCISE_TYPES: ConfigurableExerciseType[] = EXERCISE_TYPES.filter((type) => type !== 'Preguntas');
 
 const EXERCISE_TYPE_META: Record<ConfigurableExerciseType, { icon: typeof Code2; accent: string; soft: string; label: string }> = {
@@ -73,10 +93,21 @@ const EXERCISE_TYPE_META: Record<ConfigurableExerciseType, { icon: typeof Code2;
   'Opción única': { icon: ListChecks, accent: 'text-violet-700', soft: 'bg-violet-50 border-violet-200', label: 'Selección' },
   Ordenar: { icon: Grip, accent: 'text-cyan-700', soft: 'bg-cyan-50 border-cyan-200', label: 'Secuencia' },
   Relacionar: { icon: Shapes, accent: 'text-rose-700', soft: 'bg-rose-50 border-rose-200', label: 'Asociación' },
+  ...PM_TYPE_META,
 };
 
-function updateExerciseAt(exercises: EmbeddedExercise[], index: number, updater: (current: EmbeddedExercise) => EmbeddedExercise) {
-  return exercises.map((exercise, exerciseIndex) => exerciseIndex === index ? updater(exercise) : exercise);
+function formatExerciseTypeOptionLabel(type: ConfigurableExerciseType): string {
+  return (PM_EXERCISE_LABELS as Record<string, string>)[type] || type;
+}
+
+function updateExerciseAt(
+  exercises: EmbeddedExercise[],
+  index: number,
+  updater: (exercise: EmbeddedExercise) => EmbeddedExercise
+): EmbeddedExercise[] {
+  return exercises.map((exercise, exerciseIndex) =>
+    exerciseIndex === index ? updater(exercise) : exercise
+  );
 }
 
 function buildSingleChoiceExerciseUpdate(exercise: EmbeddedExercise, updates: Record<string, unknown>): Partial<EmbeddedExercise> {
@@ -222,7 +253,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                   <Plus className="h-3.5 w-3.5 text-slate-500" />
                 </span>
                 <span className="app-miniproyecto-builder-type-button__text">
-                  <span className="app-miniproyecto-builder-type-button__title">{type}</span>
+                  <span className="app-miniproyecto-builder-type-button__title">{formatExerciseTypeOptionLabel(type)}</span>
                   <span className="app-miniproyecto-builder-type-button__meta">{meta.label}</span>
                 </span>
               </span>
@@ -275,7 +306,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                   </span>
                 </div>
                 <div className="app-miniproyecto-flow-card__chips">
-                  <span className="app-miniproyecto-flow-card__chip">{exercise.tipo_ejercicio}</span>
+                  <span className="app-miniproyecto-flow-card__chip">{formatExerciseTypeOptionLabel(exercise.tipo_ejercicio)}</span>
                   <span className="app-miniproyecto-flow-card__chip app-miniproyecto-flow-card__chip--muted">{exercise.puntos} pts</span>
                 </div>
               </button>
@@ -329,7 +360,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                           <div className="min-w-0">
                             <div className="app-miniproyecto-visualizer__kicker">Ejercicio {index + 1}</div>
                             <h3 className="app-miniproyecto-visualizer__title">{exercise.titulo || `Ejercicio ${index + 1}`}</h3>
-                            <p className="app-miniproyecto-visualizer__subtitle">{exercise.tipo_ejercicio}</p>
+                            <p className="app-miniproyecto-visualizer__subtitle">{formatExerciseTypeOptionLabel(exercise.tipo_ejercicio)}</p>
                           </div>
                         </div>
 
@@ -359,7 +390,11 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                           </div>
                           {editingTypeExerciseId === exercise.id
                             ? <select value={exercise.tipo_ejercicio} onChange={e => handleChangeExerciseType(index, e.target.value as ConfigurableExerciseType)} className="app-form-select" style={{ fontSize: '13px' }}>
-                                {EXERCISE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                {EXERCISE_TYPES.map((t) => (
+                                  <option key={t} value={t}>
+                                    {formatExerciseTypeOptionLabel(t)}
+                                  </option>
+                                ))}
                               </select>
                             : <div className="app-form-input" style={{ fontSize: '13px', fontWeight: 600, color: '#1a56db', background: '#f0f5ff', display: 'flex', alignItems: 'center' }}>{exercise.tipo_ejercicio}</div>
                           }
@@ -741,6 +776,18 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                               </button>
                             </div>
                           </section>
+                        ) : null}
+
+                        {isPmExerciseFormType(exercise.tipo_ejercicio) ? (
+                          <SimulacionGpExerciseConfigPanel
+                            configuracion={exercise.configuracion}
+                            onConfigChange={(c) =>
+                              handleUpdateExercise(index, {
+                                configuracion: c,
+                                tipo_ejercicio: pmExerciseFormTypeFromVariante(String(c.variante)),
+                              })
+                            }
+                          />
                         ) : null}
 
                         {exercise.tipo_ejercicio === 'Diagramas UML' ? (

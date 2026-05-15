@@ -1,4 +1,21 @@
-export type ConfigurableExerciseType = 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar';
+import { pmDefaultConfig, pmDefaultSpecForVariante } from '../utils/pmSimulationSpecTemplates';
+import {
+  isPmExerciseFormType,
+  pmExerciseFormTypeFromVariante,
+  varianteFromPmExerciseFormType,
+  type PmExerciseFormType,
+} from '../utils/pmExerciseFormTypes';
+
+export type ConfigurableExerciseType =
+  | 'Compilador'
+  | 'Diagramas UML'
+  | 'Preguntas'
+  | 'Opción única'
+  | 'Ordenar'
+  | 'Relacionar'
+  | PmExerciseFormType;
+
+export { persistConfigurableExercisesForApi } from '../utils/pmExerciseFormTypes';
 
 export type MetodoDerivado = {
   nombre: string;
@@ -195,6 +212,20 @@ export function createEmptyEmbeddedExercise(type: ConfigurableExerciseType = 'Op
     };
   }
 
+  if (isPmExerciseFormType(type)) {
+    const variante = varianteFromPmExerciseFormType(type)!;
+    const cfg = pmDefaultConfig(variante);
+    return {
+      id: createExerciseId(),
+      titulo: `Simulación: ${variante.replace(/_/g, ' ')}`,
+      descripcion: '',
+      tipo_ejercicio: type,
+      puntos: 100,
+      resultado_ejercicio: 'Simulación completada correctamente',
+      configuracion: cfg,
+    };
+  }
+
   return {
     id: createExerciseId(),
     titulo: 'Opción única',
@@ -211,20 +242,43 @@ export function createEmptyEmbeddedExercise(type: ConfigurableExerciseType = 'Op
 }
 
 function normalizeEmbeddedExercise(rawExercise: any, index: number): EmbeddedExercise {
+  let tipoEj = rawExercise?.tipo_ejercicio;
+  const rawConfig = rawExercise?.configuracion || {};
+  const legacyPmForm = new Set(['pm_ruta_critica', 'pm_cotizador', 'pm_evm']);
+  if (legacyPmForm.has(String(tipoEj))) {
+    tipoEj = 'pm_mapa_poder';
+  }
+  if (tipoEj === 'Simulación GP') {
+    tipoEj = rawConfig?.variante
+      ? pmExerciseFormTypeFromVariante(String(rawConfig.variante))
+      : 'pm_mapa_poder';
+  }
+
+  const baseKnown = ['Compilador', 'Diagramas UML', 'Preguntas', 'Opción única', 'Ordenar', 'Relacionar'].includes(
+    String(tipoEj)
+  );
+  const isPm = isPmExerciseFormType(String(tipoEj));
   const fallback = createEmptyEmbeddedExercise(
-    ['Compilador', 'Diagramas UML', 'Preguntas', 'Opción única', 'Ordenar', 'Relacionar'].includes(rawExercise?.tipo_ejercicio)
-      ? rawExercise.tipo_ejercicio
-      : 'Opción única'
+    baseKnown || isPm ? (tipoEj as ConfigurableExerciseType) : 'Opción única'
   );
 
   const mergedConfig = {
     ...fallback.configuracion,
-    ...(rawExercise?.configuracion || {}),
+    ...rawConfig,
   };
+  if (String(mergedConfig.tipo) === 'simulacion-gp') {
+    const v = String(mergedConfig.variante || '');
+    if (v === 'ruta_critica' || v === 'cotizador' || v === 'evm') {
+      mergedConfig.variante = 'mapa_poder';
+      mergedConfig.spec = pmDefaultSpecForVariante('mapa_poder');
+    }
+  }
 
   const normalizedResult = rawExercise?.tipo_ejercicio === 'Opción única'
     ? (rawExercise?.resultado_ejercicio ?? mergedConfig.respuestaCorrecta ?? fallback.resultado_ejercicio)
     : (rawExercise?.resultado_ejercicio ?? fallback.resultado_ejercicio);
+
+  const tipoFinal = (baseKnown || isPm ? tipoEj : fallback.tipo_ejercicio) as ConfigurableExerciseType;
 
   return {
     ...fallback,
@@ -233,6 +287,7 @@ function normalizeEmbeddedExercise(rawExercise: any, index: number): EmbeddedExe
     titulo: typeof rawExercise?.titulo === 'string' && rawExercise.titulo.trim() ? rawExercise.titulo : `Ejercicio ${index + 1}`,
     descripcion: typeof rawExercise?.descripcion === 'string' ? rawExercise.descripcion : '',
     puntos: Number.isFinite(Number(rawExercise?.puntos)) ? Number(rawExercise.puntos) : fallback.puntos,
+    tipo_ejercicio: tipoFinal,
     configuracion: mergedConfig,
     codigoEstructura: rawExercise?.codigoEstructura ?? fallback.codigoEstructura,
     resultado_ejercicio: normalizedResult,

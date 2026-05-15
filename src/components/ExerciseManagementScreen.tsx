@@ -16,6 +16,20 @@ import { API_BASE_URL } from '../utils/constants';
 
 import { loadQuill, createQuillModules } from '../utils/quill';
 
+import { pmDefaultConfig } from '../utils/pmSimulationSpecTemplates';
+import {
+  isPmExerciseFormType,
+  varianteFromPmExerciseFormType,
+  pmExerciseFormTypeFromVariante,
+  PM_EXERCISE_FORM_TYPES,
+  PM_EXERCISE_LABELS,
+  PM_EXERCISE_DESCRIPTIONS,
+  labelForStoredExerciseTipo,
+  type PmExerciseFormType,
+} from '../utils/pmExerciseFormTypes';
+
+import { SimulacionGpExerciseConfigPanel } from './SimulacionGpExerciseConfigPanel';
+
 
 
 interface ExerciseManagementScreenProps {
@@ -69,7 +83,7 @@ interface EjercicioItem {
 
   codigoEstructura?: string;
 
-  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar';
+  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar' | PmExerciseFormType;
 
   configuracion?: any;
 
@@ -155,7 +169,7 @@ interface ExerciseFormData {
 
     codigoEstructura: string;
 
-    tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar';
+    tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar' | PmExerciseFormType;
 
     configuracion: any;
 
@@ -3254,6 +3268,26 @@ export function ExerciseManagementScreen({
 
       };
 
+    } else if (item.tipo_ejercicio === 'Simulación GP') {
+
+      const v = String(configuracion.variante || 'mapa_poder');
+
+      configuracion = {
+
+        ...pmDefaultConfig(v),
+
+        ...configuracion,
+
+        tipo: 'simulacion-gp',
+
+        variante: configuracion.variante || v,
+
+        spec: configuracion.spec || pmDefaultConfig(v).spec,
+
+      };
+
+      tipoReal = pmExerciseFormTypeFromVariante(v) as ExerciseFormData['ejercicio']['tipo_ejercicio'];
+
     }
 
 
@@ -3406,7 +3440,12 @@ export function ExerciseManagementScreen({
 
               ? 'Actividad para organizar elementos en el orden correcto.'
 
-              : 'Actividad para relacionar conceptos entre sí.';
+              : isPmExerciseFormType(formData.ejercicio.tipo_ejercicio)
+
+                ? (PM_EXERCISE_DESCRIPTIONS[formData.ejercicio.tipo_ejercicio] ||
+                    'Simulación interactiva de gestión de proyectos (PMI).')
+
+                : 'Actividad para relacionar conceptos entre sí.';
 
   const exerciseCompletion = [
 
@@ -3581,6 +3620,12 @@ export function ExerciseManagementScreen({
         } else if (value === 'Relacionar') {
 
           nuevaConfiguracion = { tipo: 'relacionar', enunciado: '', pares: [{ concepto: '', definicion: '' }] };
+
+        } else if (isPmExerciseFormType(String(value))) {
+
+          const variante = varianteFromPmExerciseFormType(String(value))!;
+
+          nuevaConfiguracion = pmDefaultConfig(variante);
 
         }
 
@@ -3760,6 +3805,18 @@ export function ExerciseManagementScreen({
 
       }
 
+    } else if (isPmExerciseFormType(formData.ejercicio.tipo_ejercicio)) {
+
+      const cfg = formData.ejercicio.configuracion;
+
+      if (!cfg || cfg.tipo !== 'simulacion-gp' || !cfg.variante || !cfg.spec || typeof cfg.spec !== 'object') {
+
+        toast.error('Simulación incompleta', { description: 'El spec JSON debe ser válido para este tipo de simulación.' });
+
+        return;
+
+      }
+
     }
 
 
@@ -3806,13 +3863,35 @@ export function ExerciseManagementScreen({
 
       }
 
+      if (isPmExerciseFormType(formData.ejercicio.tipo_ejercicio) && (!resultadoFinal || !String(resultadoFinal).trim())) {
+
+        resultadoFinal = 'Simulación gestión de proyectos aprobada';
+
+      }
+
 
 
       // Mapear tipo_ejercicio para el backend
 
-      // El backend acepta: "Compilador", "Diagramas UML", "Preguntas", "Opción única", "Ordenar", "Relacionar"
-
       let tipoEjercicioBackend = formData.ejercicio.tipo_ejercicio;
+
+      if (isPmExerciseFormType(tipoEjercicioBackend)) {
+
+        const variante = varianteFromPmExerciseFormType(tipoEjercicioBackend)!;
+
+        tipoEjercicioBackend = 'Simulación GP';
+
+        configuracionFinal = {
+
+          ...configuracionFinal,
+
+          tipo: 'simulacion-gp',
+
+          variante,
+
+        };
+
+      }
 
 
 
@@ -4155,7 +4234,7 @@ export function ExerciseManagementScreen({
                         {e.actividad?.titulo || `Ejercicio #${e.id}`}
                       </td>
                       <td style={{ color: '#4a6fa5', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                        {e.tipo_ejercicio || 'Compilador'}
+                        {labelForStoredExerciseTipo(e.tipo_ejercicio, e.configuracion)}
                       </td>
                       <td style={{ color: '#475569', fontSize: '13px' }}>
                         {e.contenido?.titulo || e.Contenido?.titulo || `Contenido ID ${e.contenido_id}`}
@@ -4239,7 +4318,11 @@ export function ExerciseManagementScreen({
 
                     <div className="app-modal-meta-label">Tipo actual</div>
 
-                    <div className="app-modal-meta-value">{formData.ejercicio.tipo_ejercicio}</div>
+                    <div className="app-modal-meta-value">
+                      {isPmExerciseFormType(formData.ejercicio.tipo_ejercicio)
+                        ? PM_EXERCISE_LABELS[formData.ejercicio.tipo_ejercicio]
+                        : formData.ejercicio.tipo_ejercicio}
+                    </div>
 
                   </div>
 
@@ -4474,6 +4557,12 @@ export function ExerciseManagementScreen({
                           <option value="Ordenar">Ordenar</option>
 
                           <option value="Relacionar">Relacionar</option>
+
+                          {PM_EXERCISE_FORM_TYPES.map((pm) => (
+                            <option key={pm} value={pm}>
+                              {PM_EXERCISE_LABELS[pm]}
+                            </option>
+                          ))}
 
                         </select>
 
@@ -4713,7 +4802,11 @@ export function ExerciseManagementScreen({
 
                           <div className="app-form-summary-label">Tipo</div>
 
-                          <div className="app-form-summary-value">{formData.ejercicio.tipo_ejercicio}</div>
+                          <div className="app-form-summary-value">
+                            {isPmExerciseFormType(formData.ejercicio.tipo_ejercicio)
+                              ? PM_EXERCISE_LABELS[formData.ejercicio.tipo_ejercicio]
+                              : formData.ejercicio.tipo_ejercicio}
+                          </div>
 
                           <div className="app-form-summary-help">{selectedTipoActividad?.nombre || 'Tipo de actividad pendiente'}</div>
 
@@ -4854,6 +4947,32 @@ export function ExerciseManagementScreen({
                     {formData.ejercicio.tipo_ejercicio === 'Relacionar' && (
 
                       <MatchingConfig formData={formData} setFormData={setFormData} />
+
+                    )}
+
+                    {isPmExerciseFormType(formData.ejercicio.tipo_ejercicio) && (
+
+                      <SimulacionGpExerciseConfigPanel
+
+                        configuracion={formData.ejercicio.configuracion}
+
+                        onConfigChange={(c) =>
+
+                          setFormData((prev) => ({
+
+                            ...prev,
+
+                            ejercicio: {
+                              ...prev.ejercicio,
+                              tipo_ejercicio: pmExerciseFormTypeFromVariante(String(c.variante)),
+                              configuracion: c,
+                            },
+
+                          }))
+
+                        }
+
+                      />
 
                     )}
 

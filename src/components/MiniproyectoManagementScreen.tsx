@@ -32,6 +32,8 @@ import {
 
   formatJavaLikeTemplate,
 
+  persistConfigurableExercisesForApi,
+
 } from './configurableEmbeddedExercises';
 
 
@@ -1750,7 +1752,7 @@ export function MiniproyectoManagementScreen({
 
           modo: 'ejercicios',
 
-          exercises: createForm.exercises,
+          exercises: persistConfigurableExercisesForApi(createForm.exercises),
 
           chatbot: {
 
@@ -1880,7 +1882,7 @@ export function MiniproyectoManagementScreen({
 
         modo: 'ejercicios',
 
-        exercises: selectedEmbeddedExercises,
+        exercises: persistConfigurableExercisesForApi(selectedEmbeddedExercises),
 
         chatbot: {
 

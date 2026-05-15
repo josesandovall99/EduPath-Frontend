@@ -32,6 +32,7 @@ import { QuizActivityView } from './QuizActivityView';
 import { MultipleChoiceExercise } from './MultipleChoiceExercise';
 import { OrderingExercise } from './OrderingExercise';
 import { MatchingExercise } from './MatchingExercise';
+import { PmSimulationExercise } from './PmSimulationExercise';
 import { API_BASE_URL } from '../utils/constants';
 import { cachedFetch } from '../utils/fetchCache';
 // Estilos para renderizado de HTML
@@ -285,7 +286,7 @@ interface Ejercicio {
   contenido_id: number;
   puntos: number;
   resultado_ejercicio: string;
-  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar';
+  tipo_ejercicio: 'Compilador' | 'Diagramas UML' | 'Preguntas' | 'Opción única' | 'Ordenar' | 'Relacionar' | 'Simulación GP';
   configuracion?: any;
   actividad?: {
     id: number;
@@ -1664,6 +1665,16 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                     activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
                     enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Relaciona conceptos con definiciones'}
                     pares={Array.isArray(ejercicioAsociado.configuracion?.pares) ? ejercicioAsociado.configuracion?.pares : undefined}
+                    onBack={onBack}
+                    onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
+                    embedded={true}
+                  />
+                )}
+
+                {ejercicioAsociado.tipo_ejercicio === 'Simulación GP' && (
+                  <PmSimulationExercise
+                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || 'Simulación' }}
+                    ejercicio={ejercicioAsociado}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
                     embedded={true}
