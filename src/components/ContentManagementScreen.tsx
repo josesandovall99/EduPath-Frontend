@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, ArrowRight, Plus, FileText, PlayCircle, Edit, Eye, EyeOff, Search, Loader } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, FileText, PlayCircle, Edit, Eye, EyeOff, Search, Loader, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { buildAuthHeaders } from '../utils/authHeaders';
@@ -31,7 +31,7 @@ interface ContentManagementScreenProps {
 interface ContentItem {
   id: string;
   title: string;
-  type: 'video' | 'document' | 'activity' | 'explicacion';
+  type: 'video' | 'document' | 'activity' | 'explicacion' | 'simulador_curva_s';
   linkedTo: 'theme' | 'subtheme';
   linkedName: string;
   subject: string;
@@ -47,7 +47,11 @@ interface ContentItem {
 
 interface CreateContentFormData {
   titulo: string;
+<<<<<<< Updated upstream
   tipo: 'video' | 'document' | 'activity' | 'explicacion' | 'simulacion_ruta_critica';
+=======
+  tipo: 'video' | 'document' | 'activity' | 'explicacion' | 'simulador_curva_s';
+>>>>>>> Stashed changes
   descripcion: string;
   url: string;
   tema_id: string;
@@ -99,6 +103,10 @@ const normalizeContentType = (value: unknown): ContentItem['type'] => {
 
   if (normalized === 'explicacion' || normalized === 'explicación') {
     return 'explicacion';
+  }
+
+  if (normalized === 'simulador_curva_s' || normalized === 'simulador-curva-s' || normalized === 'simulador_evm_curva_s') {
+    return 'simulador_curva_s';
   }
 
   return 'activity';
@@ -401,6 +409,7 @@ export function ContentManagementScreen({
       .replace(/\s+/g, ' ')
       .trim();
 
+<<<<<<< Updated upstream
     const isCPM = formData.tipo === 'simulacion_ruta_critica';
 
     // Detectar campos faltantes con mensajes específicos
@@ -417,6 +426,21 @@ export function ContentManagementScreen({
     if (missing.length > 0) {
       toast.error('Formulario incompleto', {
         description: `Completa: ${missing.join(', ')}.`
+=======
+    const needsUrl = formData.tipo !== 'simulador_curva_s';
+    if (
+      !formData.titulo.trim() ||
+      (needsUrl && !formData.url.trim()) ||
+      !selectedAsignaturaId ||
+      !formData.tema_id ||
+      !formData.subtema_id ||
+      !descripcionPlano
+    ) {
+      toast.error('Formulario incompleto', {
+        description: needsUrl
+          ? 'Completa título, descripción, URL, asignatura, tema y subtema antes de guardar.'
+          : 'Completa título, descripción, asignatura, tema y subtema. La URL es opcional para el simulador.',
+>>>>>>> Stashed changes
       });
       return;
     }
@@ -438,6 +462,7 @@ export function ContentManagementScreen({
         body: JSON.stringify({
           titulo: formData.titulo,
           tipo: formData.tipo,
+<<<<<<< Updated upstream
           // Para CPM: si la descripción está vacía, usar el título como descripción
           descripcion: descripcionHtml && descripcionHtml.replace(/<[^>]*>/g,'').trim()
             ? descripcionHtml
@@ -445,6 +470,13 @@ export function ContentManagementScreen({
               ? `Simulación de Ruta Crítica: ${formData.titulo}`
               : descripcionHtml,
           url: formData.url,
+=======
+          descripcion: descripcionHtml,
+          url:
+            formData.tipo === 'simulador_curva_s'
+              ? formData.url.trim() || 'https://edupath.app/contenido/simulador-curva-s-evm'
+              : formData.url,
+>>>>>>> Stashed changes
           tema_id: parseInt(formData.tema_id),
           subtema_id: parseInt(formData.subtema_id)
         })
@@ -661,15 +693,20 @@ export function ContentManagementScreen({
   const selectedAsignatura = asignaturas.find((Asignatura) => String(Asignatura.id) === selectedAsignaturaId);
   const selectedTema = temas.find((tema) => String(tema.id) === formData.tema_id);
   const selectedSubtema = subtemas.find((subtema) => String(subtema.id) === formData.subtema_id);
-  const contentTypeLabel = formData.tipo === 'video'
-    ? 'Video'
-    : formData.tipo === 'document'
-      ? 'Documento'
-      : 'Explicación';
+  const contentTypeLabel =
+    formData.tipo === 'video'
+      ? 'Video'
+      : formData.tipo === 'document'
+        ? 'Documento'
+        : formData.tipo === 'activity'
+          ? 'Actividad'
+          : formData.tipo === 'simulador_curva_s'
+            ? 'Simulador Curva S (EVM)'
+            : 'Explicación';
   const contentCompletion = [
     formData.titulo.trim(),
     formData.descripcion.replace(/<[^>]*>/g, '').trim(),
-    formData.url.trim(),
+    ...(formData.tipo === 'simulador_curva_s' ? [] : [formData.url.trim()]),
     selectedAsignaturaId,
     formData.tema_id,
     formData.subtema_id
@@ -699,6 +736,7 @@ export function ContentManagementScreen({
       case 'document': return FileText;
       case 'activity': return Edit;
       case 'explicacion': return Edit;
+      case 'simulador_curva_s': return TrendingUp;
       default: return FileText;
     }
   };
@@ -709,6 +747,7 @@ export function ContentManagementScreen({
       case 'document': return '#7ED6A7';
       case 'activity': return '#F5A97F';
       case 'explicacion': return '#F5A97F';
+      case 'simulador_curva_s': return '#ca8a04';
       default: return '#64748B';
     }
   };
@@ -792,6 +831,7 @@ export function ContentManagementScreen({
               { key: 'video', label: 'Videos' },
               { key: 'document', label: 'Docs' },
               { key: 'explicacion', label: 'Explicación' },
+              { key: 'simulador_curva_s', label: 'Curva S EVM' },
             ].map(f => (
               <button key={f.key} type="button" onClick={() => setFilterType(f.key as any)}
                 className="px-3 py-1 rounded-lg text-sm font-semibold transition-all"
@@ -895,7 +935,15 @@ export function ContentManagementScreen({
                         {content.title}
                       </td>
                       <td style={{ color: '#4a6fa5', fontSize: '13px' }}>
-                        {content.type === 'video' ? 'Video' : content.type === 'document' ? 'Documento' : content.type === 'activity' ? 'Actividad' : 'Explicación'}
+                        {content.type === 'video'
+                          ? 'Video'
+                          : content.type === 'document'
+                            ? 'Documento'
+                            : content.type === 'activity'
+                              ? 'Actividad'
+                              : content.type === 'simulador_curva_s'
+                                ? 'Simulador Curva S (EVM)'
+                                : 'Explicación'}
                       </td>
                       <td style={{ color: contentIsActive ? '#1a56db' : '#b45309', fontSize: '13px', fontWeight: 500 }}>
                         {contentIsActive ? 'Activo' : 'Inhabilitado'}
@@ -1002,24 +1050,42 @@ export function ContentManagementScreen({
                           <option value="video">Video</option>
                           <option value="document">Documento</option>
                           <option value="explicacion">Explicación</option>
+<<<<<<< Updated upstream
                           <option value="simulacion_ruta_critica">🎯 Simulación Ruta Crítica (CPM)</option>
+=======
+                          <option value="simulador_curva_s">Simulador · Curva S (EVM)</option>
+>>>>>>> Stashed changes
                         </select>
                       </div>
                     </div>
 
+<<<<<<< Updated upstream
                     {/* Fila 2: URL (solo si NO es CPM) */}
                     {formData.tipo !== 'simulacion_ruta_critica' && (
                       <div className="app-form-field mt-4">
                         <label className="app-form-label">URL *</label>
+=======
+                      <div className="app-form-field">
+                        <label className="app-form-label">{formData.tipo === 'simulador_curva_s' ? 'URL (opcional)' : 'URL *'}</label>
+>>>>>>> Stashed changes
                         <input
                           type="url"
                           name="url"
                           value={formData.url}
                           onChange={handleInputChange}
-                          placeholder="https://ejemplo.com/contenido"
+                          placeholder={
+                            formData.tipo === 'simulador_curva_s'
+                              ? 'Enlace opcional (p. ej. material complementario)'
+                              : 'https://ejemplo.com/contenido'
+                          }
                           className="app-form-input"
-                          required
+                          required={formData.tipo !== 'simulador_curva_s'}
                         />
+                        {formData.tipo === 'simulador_curva_s' ? (
+                          <p className="text-xs text-slate-500 mt-1">
+                            El simulador interactivo es el recurso principal. Si dejas la URL vacía, el sistema guardará un enlace interno de referencia.
+                          </p>
+                        ) : null}
                       </div>
                     )}
 

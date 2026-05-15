@@ -23,6 +23,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
@@ -33,6 +34,7 @@ import { MultipleChoiceExercise } from './MultipleChoiceExercise';
 import { OrderingExercise } from './OrderingExercise';
 import { MatchingExercise } from './MatchingExercise';
 import { PmSimulationExercise } from './PmSimulationExercise';
+import { EvmCurvaSContent } from './EvmCurvaSContent';
 import { API_BASE_URL } from '../utils/constants';
 import { cachedFetch } from '../utils/fetchCache';
 import { CPMSimulationViewer } from './CPMSimulationViewer';
@@ -261,7 +263,11 @@ interface ModuleItem {
   id: string;
   title: string;
   duration?: string;
+<<<<<<< Updated upstream
   type: 'video' | 'document' | 'activity' | 'workshop' | 'simulacion_ruta_critica';
+=======
+  type: 'video' | 'document' | 'activity' | 'workshop' | 'evm_curva_s';
+>>>>>>> Stashed changes
   completed?: boolean;
   visualizado?: boolean;
   descripcion?: string;
@@ -342,11 +348,16 @@ const mapTipoToType = (tipo: string): ModuleItem['type'] => {
     'documento': 'document',
     'document': 'document',
     'actividad': 'activity',
+<<<<<<< Updated upstream
     'activity': 'activity',
     'taller': 'workshop',
     'workshop': 'workshop',
     'explicacion': 'document',
     'simulacion_ruta_critica': 'simulacion_ruta_critica',
+=======
+    'taller': 'workshop',
+    'simulador_curva_s': 'evm_curva_s',
+>>>>>>> Stashed changes
   };
   return tipoMap[tipo.toLowerCase()] || 'document';
 };
@@ -1346,6 +1357,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   useEffect(() => {
     if (!selectedContentId || !estudianteId) return;
     if (selectedContentId.startsWith('ejercicio-')) return;
+    if (selectedContentData?.type === 'evm_curva_s') return;
 
     const srv = contenidosEstadoSrvRef.current.get(String(selectedContentId));
     if (srv?.completado === true || srv?.completo === true) return;
@@ -1357,13 +1369,15 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
     }, 2000);
 
     return () => window.clearTimeout(timer);
-  }, [selectedContentId, estudianteId]);
+  }, [selectedContentId, estudianteId, selectedContentData?.type]);
 
   const getItemIcon = (type: string) => {
     switch (type) {
       case 'video': return Play;
       case 'document': return FileText;
       case 'activity': return BookOpen;
+      case 'workshop': return BookOpen;
+      case 'evm_curva_s': return TrendingUp;
       default: return FileText;
     }
   };
@@ -1574,7 +1588,11 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                               <ItemIcon className="w-3 h-3" />
-                              <span>{item.type.charAt(0).toUpperCase() + item.type.slice(1)}</span>
+                              <span>
+                                {item.type === 'evm_curva_s'
+                                  ? 'Simulador · Curva S (EVM)'
+                                  : item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                              </span>
                             </div>
                           </div>
                         </button>
@@ -1774,6 +1792,33 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                       </div>
                     )}
                   </div>
+                ) : selectedContentData.type === 'evm_curva_s' ? (
+                  <EvmCurvaSContent
+                    title={selectedContentData.title}
+                    descripcionHtml={selectedContentData.descripcion}
+                    accentColor={subjectColor}
+                    onComplete={
+                      selectedContentId && estudianteId
+                        ? () => {
+                            void marcarContenidoVisualizado(selectedContentId);
+                            void obtenerProgresoAsignatura();
+                            setModules((prev) =>
+                              prev.map((m) => ({
+                                ...m,
+                                items: m.items.map((item) =>
+                                  item.id === selectedContentId ? { ...item, visualizado: true, completo: true } : item
+                                ),
+                                completo: esModuloCompletoPorItems(
+                                  m.items.map((item) =>
+                                    item.id === selectedContentId ? { ...item, visualizado: true, completo: true } : item
+                                  )
+                                ),
+                              }))
+                            );
+                          }
+                        : undefined
+                    }
+                  />
                 ) : (
                   <div className="mb-6">
                     <div className="rounded-2xl bg-white border border-gray-200 p-8 shadow-md">
