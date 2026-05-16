@@ -589,6 +589,41 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   const [failuresSortBy, setFailuresSortBy] = useState<'fallos' | 'intentos' | 'aciertos' | 'tasa'>('fallos');
 
   const [selectedActivity, setSelectedActivity] = useState<{ tipo: string; actividad_id: number; titulo: string } | null>(null);
+  const [activityPdfLoading, setActivityPdfLoading] = useState(false);
+
+  // ── Selección local de estudiante en tab Fallos ──────────────────────────
+  const [selectedFailuresStudent, setSelectedFailuresStudent] = useState<{ estudiante_id: number; nombre: string } | null>(null);
+  const [failuresStudentSearch, setFailuresStudentSearch] = useState('');
+  const [failuresStudentItems, setFailuresStudentItems] = useState<FailuresItem[]>([]);
+  const [failuresStudentLoading, setFailuresStudentLoading] = useState(false);
+  const [failuresActivitySearch, setFailuresActivitySearch] = useState('');
+
+  const downloadActivityDetailPdf = async (activity: { tipo: string; actividad_id: number; titulo: string }) => {
+    try {
+      setActivityPdfLoading(true);
+      const params = new URLSearchParams({
+        type: 'activity-detail',
+        actividad_id: String(activity.actividad_id),
+        tipo: activity.tipo,
+      });
+      if (failuresPeriodo !== 'all') params.append('periodo_academico', failuresPeriodo);
+      const response = await api.get(`/progresos/reporte-pdf?${params.toString()}`, {
+        ...(getDocenteRequestConfig() || {}),
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      setPdfPreviewUrl(url);
+    } catch (err) {
+      console.error('Error generando PDF de actividad:', err);
+      alert('No se pudo generar el PDF. Intenta nuevamente.');
+    } finally {
+      setActivityPdfLoading(false);
+    }
+  };
+
+  const [selectedFailuresAsignatura, setSelectedFailuresAsignatura] = useState<string>('all');
+  const [failuresTypeFilter, setFailuresTypeFilter] = useState<'all' | 'ejercicio' | 'miniproyecto'>('all');
 
   const [filters, setFilters] = useState<Filters>({
 
@@ -1456,15 +1491,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
         const params = new URLSearchParams();
 
-        if (appliedFilters.student !== 'all') {
-
-          params.append('estudiante_id', appliedFilters.student);
-
-        } else {
-
-          params.append('estudiante_id', 'all');
-
-        }
+        params.append('estudiante_id', 'all');
 
         if (failuresPeriodo !== 'all') {
 
@@ -1542,7 +1569,38 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     loadFailuresReport();
 
-  }, [activeTab, hasAppliedFilters, appliedFilters.student, failuresPeriodo, isDocenteMode, docenteId, docentePersonaId, docenteAsignaturaId]);
+  }, [activeTab, hasAppliedFilters, failuresPeriodo, isDocenteMode, docenteId, docentePersonaId, docenteAsignaturaId]);
+
+  // ── Fetch de actividades al seleccionar un estudiante en la tabla ─────────
+  useEffect(() => {
+    if (!selectedFailuresStudent) { setFailuresStudentItems([]); return; }
+    const fetchStudent = async () => {
+      setFailuresStudentLoading(true);
+      try {
+        const params = new URLSearchParams({ estudiante_id: String(selectedFailuresStudent.estudiante_id) });
+        if (failuresPeriodo !== 'all') params.append('periodo_academico', failuresPeriodo);
+        let rawData: any = null;
+        if (isDocenteMode) {
+          try {
+            const r = await api.get(`/docente/reportes/fallos?${params.toString()}`, getDocenteRequestConfig());
+            rawData = r.data;
+          } catch {
+            const r = await api.get(`/progresos/reporte-fallos?${params.toString()}`);
+            rawData = r.data;
+          }
+          // Asegurar que solo se muestren items de la asignatura del docente
+          const scoped = scopeFailuresDataByAsignatura(rawData || {}, effectiveAsignaturaId);
+          setFailuresStudentItems(scoped.items || []);
+        } else {
+          const r = await api.get(`/progresos/reporte-fallos?${params.toString()}`);
+          rawData = r.data;
+          setFailuresStudentItems(rawData?.items || []);
+        }
+      } catch { setFailuresStudentItems([]); }
+      finally { setFailuresStudentLoading(false); }
+    };
+    fetchStudent();
+  }, [selectedFailuresStudent, failuresPeriodo, isDocenteMode, effectiveAsignaturaId]);
 
 
 
@@ -1702,6 +1760,14 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   };
 
 
+
+  // Cerrar modal de actividad con tecla Escape
+  useEffect(() => {
+    if (!selectedActivity) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedActivity(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedActivity]);
 
   // Genera informe "Por asignatura" — mismo diseño que el informe por estudiante
   const printAsignaturaReport = () => {
@@ -2292,9 +2358,10 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
       const params = new URLSearchParams({ type });
 
       // En modo detalle de estudiante, usar el ID del estudiante actualmente visible
+      // (excluir failures — tiene su propia lógica de estudiante más abajo)
       const exportEstudianteId = type === 'student' && detailStudentId
         ? detailStudentId
-        : appliedFilters.student !== 'all' ? appliedFilters.student : null;
+        : (type !== 'failures' && appliedFilters.student !== 'all') ? appliedFilters.student : null;
 
       if (exportEstudianteId) {
         params.append('estudiante_id', exportEstudianteId);
@@ -2308,10 +2375,13 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         }
       }
 
-      if (type === 'failures' && appliedFilters.student !== 'all') {
-
-        params.append('estudiante_id', appliedFilters.student);
-
+      if (type === 'failures') {
+        if (selectedFailuresStudent) {
+          params.append('estudiante_id', String(selectedFailuresStudent.estudiante_id));
+        }
+        if (failuresPeriodo !== 'all') {
+          params.append('periodo_academico', failuresPeriodo);
+        }
       }
 
       // Filtros del tab "Por asignatura"
@@ -2899,7 +2969,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   const failuresItems = failuresData?.items || [];
 
-  const isAllStudentsFailuresView = appliedFilters.student === 'all';
+  const isAllStudentsFailuresView = selectedFailuresStudent === null;
 
 
 
@@ -2951,7 +3021,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       )
 
-    : failuresItems;
+    : failuresStudentItems;
 
 
 
@@ -3005,11 +3075,14 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
   const failuresStudentsSorted = [...failuresByStudent].sort((a, b) => b.fallos - a.fallos);
 
-  const failuresStudentsDisplay = appliedFilters.student === 'all'
+  const failuresStudentsFiltered = failuresStudentSearch.trim()
+    ? failuresStudentsSorted.filter(s =>
+        (s.nombre || '').toLowerCase().includes(failuresStudentSearch.trim().toLowerCase()) ||
+        (s.email || '').toLowerCase().includes(failuresStudentSearch.trim().toLowerCase())
+      )
+    : failuresStudentsSorted.slice(0, 20);
 
-    ? failuresStudentsSorted.slice(0, 20)
-
-    : failuresStudentsSorted;
+  const failuresStudentsDisplay = failuresStudentsFiltered;
 
   const docenteFailuresStudentChartData = failuresStudentsDisplay
 
@@ -3050,6 +3123,53 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
       intentos: item.intentos
 
     }));
+
+  // ── Datos filtrados por asignatura seleccionada (tab Fallos) ──────────────
+  const failuresAsignaturaButtons = [
+    { id: 'all', label: 'Todas' },
+    ...failuresByAsignatura.map(a => ({ id: String(a.asignatura_id ?? a.Asignatura_name ?? 'x'), label: a.Asignatura_name || 'Sin asignatura' }))
+  ];
+
+  const filteredFailuresTotals = selectedFailuresAsignatura === 'all'
+    ? failuresTotals
+    : (() => {
+        const found = failuresByAsignatura.find(a => String(a.asignatura_id ?? a.Asignatura_name ?? 'x') === selectedFailuresAsignatura);
+        return found ? { intentos: found.intentos, fallos: found.fallos, aciertos: found.aciertos } : { intentos: 0, fallos: 0, aciertos: 0 };
+      })();
+
+  const filteredFailuresRate = filteredFailuresTotals.intentos > 0
+    ? Math.round((filteredFailuresTotals.fallos / filteredFailuresTotals.intentos) * 100) : 0;
+
+  const filteredSuccessRate = filteredFailuresTotals.intentos > 0
+    ? Math.round((filteredFailuresTotals.aciertos / filteredFailuresTotals.intentos) * 100) : 0;
+
+  const filteredFailuresByType = selectedFailuresAsignatura === 'all'
+    ? failuresByType
+    : (() => {
+        const items = failuresItems.filter(i => String(i.asignatura_id ?? i.Asignatura_name ?? 'x') === selectedFailuresAsignatura);
+        return items.reduce((acc, i) => {
+          const t = i.tipo === 'ejercicio' ? 'ejercicios' : 'miniproyectos';
+          acc[t].intentos += i.intentos || 0;
+          acc[t].fallos += i.fallos || 0;
+          acc[t].aciertos += i.aciertos || 0;
+          return acc;
+        }, { ejercicios: { intentos: 0, fallos: 0, aciertos: 0 }, miniproyectos: { intentos: 0, fallos: 0, aciertos: 0 } });
+      })();
+
+  const filteredFailuresItems = failuresItemsDisplay
+    .filter(i => selectedFailuresAsignatura === 'all' || String(i.asignatura_id ?? i.Asignatura_name ?? 'x') === selectedFailuresAsignatura)
+    .filter(i => failuresTypeFilter === 'all' || i.tipo === failuresTypeFilter)
+    .filter(i => !failuresActivitySearch.trim() || (i.titulo || '').toLowerCase().includes(failuresActivitySearch.trim().toLowerCase()));
+
+  const filteredFailuresStudents = selectedFailuresAsignatura === 'all'
+    ? failuresStudentsDisplay
+    : failuresStudentsDisplay.filter(s => {
+        const studentItems = failuresItems.filter(i =>
+          String(i.asignatura_id ?? i.Asignatura_name ?? 'x') === selectedFailuresAsignatura &&
+          i.estudiante_id === s.estudiante_id
+        );
+        return studentItems.length > 0;
+      });
 
   const appliedFilterCount = Object.values(appliedFilters).filter((value) => value && value !== 'all').length + (appliedSearch ? 1 : 0);
 
@@ -3303,6 +3423,16 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             <div className="flex flex-wrap items-end gap-3 mb-4">
 
+              {activeTab === 'failures' ? (
+                <div style={{ flex: 1, minWidth: '160px', display: 'flex', alignItems: 'flex-end' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: '12px', padding: '8px 14px', height: '40px' }}>
+                    <User className="w-3.5 h-3.5 shrink-0" style={{ color: '#1a56db' }} />
+                    <span style={{ fontSize: '12px', color: '#1e3a5f', fontWeight: 500 }}>
+                      Haz clic en un estudiante de la tabla para ver sus actividades
+                    </span>
+                  </div>
+                </div>
+              ) : (
               <div style={{ flex: 1, minWidth: '160px' }}>
 
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#1e3a5f', display: 'block', marginBottom: '4px' }}>Código o nombre</label>
@@ -3313,6 +3443,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                     placeholder="Buscar estudiante..." className="flex-1 outline-none text-sm bg-transparent" style={{ color: '#1e3a5f' }} />
                 </div>
               </div>
+              )}
 
 
 
@@ -4601,6 +4732,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               <>
 
+                {/* ── 1. Métricas globales ── */}
                 <div className="app-metric-grid">
 
                   <div className="bg-white rounded-xl shadow-md p-6">
@@ -4707,9 +4839,133 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                 </div>
 
+                {/* ── 2. Filtro por asignatura ── */}
+                {!isDocenteMode && failuresAsignaturaButtons.length > 1 && (
+                  <div className="bg-white rounded-xl shadow-md px-5 py-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <BarChart3 className="w-4 h-4 text-[#1a56db]" />
+                      <span className="text-sm font-semibold text-[#3A4A5B]">Filtrar por asignatura</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {failuresAsignaturaButtons.map(btn => {
+                        const asigData = btn.id === 'all' ? null : failuresByAsignatura.find(a => String(a.asignatura_id ?? a.Asignatura_name ?? 'x') === btn.id);
+                        const btnFallos = asigData ? asigData.fallos : failuresTotals.fallos;
+                        return (
+                          <button
+                            key={btn.id}
+                            onClick={() => setSelectedFailuresAsignatura(btn.id)}
+                            style={{
+                              padding: '6px 16px',
+                              borderRadius: '999px',
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              border: selectedFailuresAsignatura === btn.id ? '2px solid #1a56db' : '1.5px solid #e5e7eb',
+                              background: selectedFailuresAsignatura === btn.id ? '#1a56db' : '#fff',
+                              color: selectedFailuresAsignatura === btn.id ? '#fff' : '#3A4A5B',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            {btn.label}
+                            {btn.id !== 'all' && (
+                              <span style={{
+                                background: selectedFailuresAsignatura === btn.id ? 'rgba(255,255,255,0.25)' : '#FEE2E2',
+                                color: selectedFailuresAsignatura === btn.id ? '#fff' : '#B91C1C',
+                                borderRadius: '999px',
+                                fontSize: '11px',
+                                padding: '1px 7px',
+                                fontWeight: 700,
+                              }}>
+                                {btnFallos} fallos
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
+                {/* ── 3. Gráficos (donut + barras horizontales por tipo) ── */}
+                <div className="grid grid-cols-2 gap-6">
 
-                <div className="grid grid-cols-3 gap-6">
+                  {/* Donut: Aciertos vs Fallos */}
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <h3 className="text-[#3A4A5B] mb-2 flex items-center gap-2 font-semibold">
+                      <BarChart3 className="w-5 h-5 text-[#B91C1C]" />
+                      Aciertos vs Fallos
+                      {selectedFailuresAsignatura !== 'all' && (
+                        <span className="ml-auto text-xs font-normal text-gray-400">
+                          {failuresAsignaturaButtons.find(b => b.id === selectedFailuresAsignatura)?.label}
+                        </span>
+                      )}
+                    </h3>
+                    <div className="relative">
+                      <ResponsiveContainer width="100%" height={240}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Aciertos', value: filteredFailuresTotals.aciertos },
+                              { name: 'Fallos', value: filteredFailuresTotals.fallos }
+                            ]}
+                            dataKey="value"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={65}
+                            outerRadius={100}
+                            paddingAngle={3}
+                          >
+                            <Cell fill="#7ED6A7" />
+                            <Cell fill="#DC2626" />
+                          </Pie>
+                          <Tooltip formatter={(v: number, name: string) => [v, name]} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      {/* Texto central del donut */}
+                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -62%)', textAlign: 'center', pointerEvents: 'none' }}>
+                        <div style={{ fontSize: '26px', fontWeight: 800, color: filteredSuccessRate >= 60 ? '#16a34a' : filteredSuccessRate >= 40 ? '#ea580c' : '#DC2626' }}>
+                          {filteredSuccessRate}%
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#6b7280' }}>acierto</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Barras horizontales: Ejercicios vs Miniproyectos */}
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <h3 className="text-[#3A4A5B] mb-4 flex items-center gap-2 font-semibold">
+                      <AlertTriangle className="w-5 h-5 text-[#DC2626]" />
+                      Comparativo por tipo
+                    </h3>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart
+                        data={[
+                          { tipo: 'Ejercicios', Intentos: filteredFailuresByType.ejercicios.intentos, Aciertos: filteredFailuresByType.ejercicios.aciertos, Fallos: filteredFailuresByType.ejercicios.fallos },
+                          { tipo: 'Miniproyectos', Intentos: filteredFailuresByType.miniproyectos.intentos, Aciertos: filteredFailuresByType.miniproyectos.aciertos, Fallos: filteredFailuresByType.miniproyectos.fallos },
+                        ]}
+                        layout="vertical"
+                        margin={{ top: 4, right: 24, left: 16, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis type="number" tick={{ fontSize: 12 }} />
+                        <YAxis dataKey="tipo" type="category" width={95} tick={{ fontSize: 13 }} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="Intentos" fill="#93C5FD" radius={[0, 6, 6, 0]} />
+                        <Bar dataKey="Aciertos" fill="#7ED6A7" radius={[0, 6, 6, 0]} />
+                        <Bar dataKey="Fallos" fill="#DC2626" radius={[0, 6, 6, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                </div>
+
+                {/* ── PLACEHOLDER para el bloque antiguo de gráficos (reemplazado) ── */}
+                <div className="grid grid-cols-3 gap-6" style={{ display: 'none' }}>
 
                   <div className="bg-white rounded-xl shadow-md p-6">
 
@@ -5065,195 +5321,304 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                 </div>
 
-
-
+                {/* ── 4. Tabla de estudiantes con buscador ── */}
                 <div className="app-table-card">
 
-                  <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Fallos por actividad</p>
-                      <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '2px' }}>Intentos, fallos y tasa de error acumulados.</p>
+                  <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                      <div>
+                        <h3 className="app-table-card__title">
+                          Estudiantes con más fallos
+                          {selectedFailuresAsignatura !== 'all' && (
+                            <span style={{ marginLeft: '8px', fontSize: '12px', fontWeight: 400, opacity: 0.8 }}>
+                              — {failuresAsignaturaButtons.find(b => b.id === selectedFailuresAsignatura)?.label}
+                            </span>
+                          )}
+                        </h3>
+                        <p className="app-table-card__description">
+                          {selectedFailuresStudent
+                            ? `Seleccionado: ${selectedFailuresStudent.nombre} · haz clic en otro para cambiar`
+                            : 'Top 20 · haz clic en un estudiante para ver sus actividades'}
+                        </p>
+                      </div>
+                      {/* Buscador inline */}
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <input
+                          type="text"
+                          placeholder="Buscar estudiante..."
+                          value={failuresStudentSearch}
+                          onChange={e => setFailuresStudentSearch(e.target.value)}
+                          style={{
+                            background: 'rgba(255,255,255,0.15)',
+                            border: '1px solid rgba(255,255,255,0.35)',
+                            borderRadius: '8px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            padding: '6px 28px 6px 10px',
+                            outline: 'none',
+                            width: '190px',
+                          }}
+                        />
+                        {failuresStudentSearch && (
+                          <button
+                            onClick={() => setFailuresStudentSearch('')}
+                            style={{ position: 'absolute', right: '7px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '13px', padding: 0, lineHeight: 1 }}
+                          >✕</button>
+                        )}
+                      </div>
                     </div>
+                  </div>
+
+                  <div style={{ maxHeight: '320px', overflowY: 'auto' }} className="overflow-x-auto">
+                    <table className="app-data-table text-[#111827]">
+                      <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
+                        <tr>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Intentos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aciertos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Fallos</th>
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm" style={{ minWidth: '140px' }}>Tasa de error</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredFailuresStudents.length === 0 && (
+                          <tr><td className="px-4 py-3 text-sm text-gray-500" colSpan={5}>Sin datos</td></tr>
+                        )}
+                        {filteredFailuresStudents.map((student) => {
+                          const tasa = student.intentos > 0 ? Math.round((student.fallos / student.intentos) * 100) : 0;
+                          const tasaColor = tasa >= 50 ? '#DC2626' : tasa >= 25 ? '#F97316' : '#16a34a';
+                          const isSelectedSt = selectedFailuresStudent?.estudiante_id === student.estudiante_id;
+                          return (
+                            <tr
+                              key={student.estudiante_id}
+                              onClick={() => {
+                                if (isSelectedSt) {
+                                  setSelectedFailuresStudent(null);
+                                  setFailuresStudentItems([]);
+                                  setSelectedActivity(null);
+                                } else {
+                                  setSelectedFailuresStudent({ estudiante_id: student.estudiante_id, nombre: student.nombre || `Estudiante ${student.estudiante_id}` });
+                                  setSelectedActivity(null);
+                                }
+                              }}
+                              style={{ cursor: 'pointer', background: isSelectedSt ? '#EFF6FF' : undefined }}
+                              className={`transition-colors ${isSelectedSt ? 'ring-1 ring-blue-300' : 'hover:bg-gray-50'}`}
+                            >
+                              <td className="px-4 py-3 text-[#3A4A5B] text-sm">
+                                <div className="flex items-center gap-2">
+                                  <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: isSelectedSt ? 'linear-gradient(135deg,#1a56db,#3b82f6)' : 'linear-gradient(135deg,#4A90E2,#7ED6A7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                                    {(student.nombre || 'E').split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()}
+                                  </div>
+                                  <span style={{ fontWeight: isSelectedSt ? 700 : 400, color: isSelectedSt ? '#1a56db' : undefined }}>{student.nombre || `Estudiante ${student.estudiante_id}`}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-gray-600 text-sm">{student.intentos}</td>
+                              <td className="px-4 py-3 text-gray-600 text-sm">{student.aciertos}</td>
+                              <td className="px-4 py-3 text-sm font-semibold" style={{ color: student.fallos > 0 ? '#DC2626' : '#6b7280' }}>{student.fallos}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <div style={{ width: '70px', height: '7px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden', flexShrink: 0 }}>
+                                    <div style={{ width: `${Math.min(tasa, 100)}%`, height: '100%', background: tasaColor, borderRadius: '999px' }} />
+                                  </div>
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: tasaColor }}>{tasa}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                </div>
+
+                {/* ── 5. Tabla de actividades con altura fija + tasa de error ── */}
+                <div className="app-table-card">
+
+                  <div style={{ background: '#1a56db', padding: '12px 18px', borderRadius: '0.875rem 0.875rem 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+
+                    {/* Título + pills de tipo + buscador en la misma fila */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', flex: 1 }}>
+                      <div style={{ flexShrink: 0 }}>
+                        <p style={{ color: '#fff', fontWeight: 700, fontSize: '15px', margin: 0 }}>
+                          Detalle de fallos por actividad
+                          {selectedFailuresAsignatura !== 'all' && (
+                            <span style={{ marginLeft: '8px', fontSize: '12px', fontWeight: 400, opacity: 0.8 }}>
+                              — {failuresAsignaturaButtons.find(b => b.id === selectedFailuresAsignatura)?.label}
+                            </span>
+                          )}
+                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px', flexWrap: 'wrap' }}>
+                          {selectedFailuresStudent ? (
+                            <>
+                              {failuresStudentLoading ? (
+                                <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '11px' }}>Cargando actividades...</span>
+                              ) : (
+                                <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '11px' }}>{filteredFailuresItems.length} actividad(es)</span>
+                              )}
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)',
+                                borderRadius: '999px', padding: '2px 8px 2px 10px', fontSize: '11px', fontWeight: 600, color: '#fff',
+                              }}>
+                                {selectedFailuresStudent.nombre}
+                                <button
+                                  onClick={() => { setSelectedFailuresStudent(null); setFailuresStudentItems([]); setSelectedActivity(null); }}
+                                  style={{ background: 'rgba(255,255,255,0.25)', border: 'none', borderRadius: '50%', width: '14px', height: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: '#fff', fontSize: '10px', fontWeight: 700, lineHeight: 1 }}
+                                  title="Volver a vista general"
+                                >✕</button>
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '11px' }}>
+                              {filteredFailuresItems.length} actividad(es) · haz clic en un estudiante para ver sus actividades
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Pills Todos / Ejercicios / Miniproyectos */}
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {([
+                          { key: 'all', label: 'Todos' },
+                          { key: 'ejercicio', label: 'Ejercicios' },
+                          { key: 'miniproyecto', label: 'Miniproyectos' },
+                        ] as const).map(opt => (
+                          <button
+                            key={opt.key}
+                            onClick={() => setFailuresTypeFilter(opt.key)}
+                            style={{
+                              padding: '4px 12px',
+                              borderRadius: '999px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              border: failuresTypeFilter === opt.key ? '1.5px solid #fff' : '1.5px solid rgba(255,255,255,0.35)',
+                              background: failuresTypeFilter === opt.key ? '#fff' : 'transparent',
+                              color: failuresTypeFilter === opt.key ? '#1a56db' : 'rgba(255,255,255,0.85)',
+                            }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Buscador de actividad */}
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <input
+                          type="text"
+                          placeholder="Buscar actividad..."
+                          value={failuresActivitySearch}
+                          onChange={e => setFailuresActivitySearch(e.target.value)}
+                          style={{
+                            background: 'rgba(255,255,255,0.15)',
+                            border: '1px solid rgba(255,255,255,0.35)',
+                            borderRadius: '8px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            padding: '6px 28px 6px 10px',
+                            outline: 'none',
+                            width: '170px',
+                          }}
+                        />
+                        {failuresActivitySearch && (
+                          <button
+                            onClick={() => setFailuresActivitySearch('')}
+                            style={{ position: 'absolute', right: '7px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '13px', padding: 0, lineHeight: 1 }}
+                          >✕</button>
+                        )}
+                      </div>
+                    </div>
+
                     <button onClick={() => downloadPdf('failures')}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
                       <Download className="w-3.5 h-3.5" />
                       Exportar PDF
                     </button>
                   </div>
 
-                  <div className="app-table-card__body overflow-x-auto">
-
+                  <div style={{ maxHeight: '380px', overflowY: 'auto' }} className="overflow-x-auto">
                     <table className="app-data-table text-[#111827]">
-
-                      <thead>
-
+                      <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
                         <tr>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Asignatura</th>
-
+                          {failuresTypeFilter === 'all' && <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Tipo</th>}
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Actividad</th>
+                          {!isDocenteMode && <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Asignatura</th>}
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Intentos</th>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aciertos</th>
-
                           <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Fallos</th>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Ejercicios</th>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Miniproyectos</th>
-
+                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm" style={{ minWidth: '160px' }}>Tasa de error</th>
                         </tr>
-
                       </thead>
-
                       <tbody>
-
-                        {failuresByAsignatura.length === 0 && (
-
+                        {filteredFailuresItems.length === 0 && (
                           <tr>
-
-                            <td className="px-4 py-3 text-sm text-gray-500" colSpan={6}>Sin datos</td>
-
-                          </tr>
-
-                        )}
-
-                        {failuresByAsignatura.map((Asignatura) => (
-
-                          <tr key={`${Asignatura.asignatura_id ?? 'sin-Asignatura'}`} className="hover:bg-gray-50 transition-colors">
-
-                            <td className="px-4 py-3 text-[#3A4A5B] text-sm">
-
-                              <div className="flex items-center gap-2">
-
-                                <span>{Asignatura.Asignatura_name || 'Sin Asignatura'}</span>
-
-                                {Number(Asignatura.intentos || 0) === 0 && (
-
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">
-
-                                    Sin intentos de estudiantes
-
-                                  </span>
-
-                                )}
-
-                              </div>
-
+                            <td className="px-4 py-3 text-sm text-gray-500" colSpan={failuresTypeFilter === 'all' ? (isDocenteMode ? 5 : 6) : (isDocenteMode ? 4 : 5)}>
+                              {failuresStudentLoading ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1a56db' }}>
+                                  <svg className="animate-spin" style={{ width: '15px', height: '15px', flexShrink: 0 }} viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="#BFDBFE" strokeWidth="3"/>
+                                    <path d="M12 2a10 10 0 0 1 10 10" stroke="#1a56db" strokeWidth="3" strokeLinecap="round"/>
+                                  </svg>
+                                  Cargando actividades...
+                                </div>
+                              ) : 'Sin datos'}
                             </td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{Asignatura.intentos}</td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{Asignatura.aciertos}</td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{Asignatura.fallos}</td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{Asignatura.ejercicios}</td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{Asignatura.miniproyectos}</td>
-
                           </tr>
-
-                        ))}
-
-                      </tbody>
-
-                    </table>
-
-                  </div>
-
-                </div>
-
-
-
-                {isAllStudentsFailuresView && (
-
-                <div className="app-table-card">
-
-                  <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0' }}>
-
-                    <div>
-
-                    <h3 className="app-table-card__title">Fallos por estudiante</h3>
-
-                    <p className="app-table-card__description">Top 20 estudiantes con mas fallos</p>
-
-                    </div>
-
-                  </div>
-
-                  <div className="app-table-card__body overflow-x-auto">
-
-                    <table className="app-data-table text-[#111827]">
-
-                      <thead>
-
-                        <tr>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Correo</th>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Intentos</th>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aciertos</th>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Fallos</th>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Ejercicios</th>
-
-                          <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Miniproyectos</th>
-
-                        </tr>
-
-                      </thead>
-
-                      <tbody>
-
-                        {failuresStudentsDisplay.length === 0 && (
-
-                          <tr>
-
-                            <td className="px-4 py-3 text-sm text-gray-500" colSpan={7}>Sin datos</td>
-
-                          </tr>
-
                         )}
-
-                        {failuresStudentsDisplay.map((student) => (
-
-                          <tr key={student.estudiante_id} className="hover:bg-gray-50 transition-colors">
-
-                            <td className="px-4 py-3 text-[#3A4A5B] text-sm">{student.nombre || `Estudiante ${student.estudiante_id}`}</td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{student.email || '-'}</td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{student.intentos}</td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{student.aciertos}</td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{student.fallos}</td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{student.ejercicios}</td>
-
-                            <td className="px-4 py-3 text-gray-600 text-sm">{student.miniproyectos}</td>
-
-                          </tr>
-
-                        ))}
-
+                        {filteredFailuresItems.map((item, idx) => {
+                          const tasa = item.intentos > 0 ? Math.round((item.fallos / item.intentos) * 100) : 0;
+                          const tasaColor = tasa >= 50 ? '#DC2626' : tasa >= 25 ? '#F97316' : '#16a34a';
+                          const isSelected = isAllStudentsFailuresView && selectedActivity?.tipo === item.tipo && selectedActivity?.actividad_id === item.actividad_id;
+                          return (
+                            <tr
+                              key={`${item.tipo}-${item.actividad_id}-${idx}`}
+                              className={`transition-colors ${isAllStudentsFailuresView ? 'cursor-pointer' : ''} ${isSelected ? 'bg-red-50' : 'hover:bg-gray-50'}`}
+                              onClick={() => {
+                                if (!isAllStudentsFailuresView) return;
+                                setSelectedActivity(isSelected ? null : { tipo: item.tipo, actividad_id: item.actividad_id, titulo: item.titulo });
+                              }}
+                            >
+                              {failuresTypeFilter === 'all' && (
+                                <td className="px-4 py-3 text-sm">
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', padding: '2px 8px',
+                                    borderRadius: '999px', fontSize: '11px', fontWeight: 600,
+                                    background: item.tipo === 'ejercicio' ? '#DBEAFE' : '#FEF3C7',
+                                    color: item.tipo === 'ejercicio' ? '#1D4ED8' : '#92400E',
+                                  }}>
+                                    {item.tipo}
+                                  </span>
+                                </td>
+                              )}
+                              <td className="px-4 py-3 text-gray-700 text-sm">
+                                <div className="flex items-center gap-2">
+                                  {item.titulo}
+                                  {isSelected && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">Seleccionada</span>}
+                                </div>
+                              </td>
+                              {!isDocenteMode && <td className="px-4 py-3 text-gray-500 text-sm">{item.Asignatura_name || '—'}</td>}
+                              <td className="px-4 py-3 text-gray-600 text-sm">{item.intentos}</td>
+                              <td className="px-4 py-3 text-sm font-semibold" style={{ color: item.fallos > 0 ? '#DC2626' : '#6b7280' }}>{item.fallos}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <div style={{ width: '80px', height: '7px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden', flexShrink: 0 }}>
+                                    <div style={{ width: `${Math.min(tasa, 100)}%`, height: '100%', background: tasaColor, borderRadius: '999px', transition: 'width 0.3s' }} />
+                                  </div>
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: tasaColor }}>{tasa}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
-
                     </table>
-
                   </div>
 
                 </div>
 
-                )}
-
-
-
-                <div className="app-table-card">
+                {/* Bloque antiguo eliminado — reemplazado por la tabla con tasa de error arriba */}
+                {false && <div className="app-table-card">
 
                   <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0' }}>
 
@@ -5415,145 +5780,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                   </div>
 
-                </div>
+                </div>}
 
-
-
-                {isAllStudentsFailuresView && selectedActivity && (() => {
-
-                  const studentMap = new Map(failuresByStudent.map(s => [String(s.estudiante_id), s]));
-
-                  const activityStudents = failuresItems
-
-                    .filter(i => i.tipo === selectedActivity.tipo && i.actividad_id === selectedActivity.actividad_id)
-
-                    .sort((a, b) => b.fallos - a.fallos);
-
-                  return (
-
-                    <div className="app-table-card border-2 border-red-200">
-
-                      <div style={{ background: '#1a56db', padding: '14px 18px', borderRadius: '0.875rem 0.875rem 0 0' }}>
-
-                        <div>
-
-                          <h3 className="app-table-card__title">Estudiantes en: {selectedActivity.titulo}</h3>
-
-                          <p className="app-table-card__description">{activityStudents.length} estudiante(s) con intentos registrados</p>
-
-                        </div>
-
-                        <button
-
-                          className="app-btn app-btn-secondary app-btn-sm"
-
-                          onClick={() => setSelectedActivity(null)}
-
-                        >
-
-                          <X className="w-4 h-4" />
-
-                        </button>
-
-                      </div>
-
-                      <div className="app-table-card__body overflow-x-auto">
-
-                        <table className="app-data-table text-[#111827]">
-
-                          <thead>
-
-                            <tr>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Estudiante</th>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Correo</th>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Intentos</th>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aciertos</th>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Fallos</th>
-
-                              <th className="px-4 py-3 text-left text-[#3A4A5B] text-sm">Aprobado</th>
-
-                            </tr>
-
-                          </thead>
-
-                          <tbody>
-
-                            {activityStudents.length === 0 && (
-
-                              <tr>
-
-                                <td className="px-4 py-3 text-sm text-gray-500" colSpan={6}>Sin datos</td>
-
-                              </tr>
-
-                            )}
-
-                            {activityStudents.map((item) => {
-
-                              const meta = studentMap.get(String(item.estudiante_id));
-
-                              return (
-
-                                <tr key={item.estudiante_id} className="hover:bg-gray-50 transition-colors">
-
-                                  <td className="px-4 py-3 text-[#3A4A5B] text-sm">{meta?.nombre || `Estudiante ${item.estudiante_id}`}</td>
-
-                                  <td className="px-4 py-3 text-gray-600 text-sm">{meta?.email || '-'}</td>
-
-                                  <td className="px-4 py-3 text-gray-600 text-sm">{item.intentos}</td>
-
-                                  <td className="px-4 py-3 text-gray-600 text-sm">{item.aciertos}</td>
-
-                                  <td className="px-4 py-3 text-gray-600 text-sm">{item.fallos}</td>
-
-                                  <td className="px-4 py-3">
-
-                                    {item.aprobado ? (
-
-                                      <span className="inline-flex items-center gap-1 text-[#7ED6A7] text-sm">
-
-                                        <CheckCircle2 className="w-4 h-4" />
-
-                                        Sí
-
-                                      </span>
-
-                                    ) : (
-
-                                      <span className="inline-flex items-center gap-1 text-[#F97316] text-sm">
-
-                                        <XCircle className="w-4 h-4" />
-
-                                        No
-
-                                      </span>
-
-                                    )}
-
-                                  </td>
-
-                                </tr>
-
-                              );
-
-                            })}
-
-                          </tbody>
-
-                        </table>
-
-                      </div>
-
-                    </div>
-
-                  );
-
-                })()}
+                {/* Modal de detalle renderizado a nivel raíz — ver más abajo */}
 
               </>
 
@@ -5763,6 +5992,228 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
         )}
 
       </main>
+
+      {/* ══════════════════════════════════════════════════════════════
+          Modal — Estudiantes que intentaron la actividad seleccionada
+          Se renderiza fuera del flujo de tabs para flotar sobre todo.
+      ══════════════════════════════════════════════════════════════ */}
+      {isAllStudentsFailuresView && selectedActivity && (() => {
+        const studentMap = new Map(failuresByStudent.map(s => [String(s.estudiante_id), s]));
+        const activityStudents = failuresItems
+          .filter(i => i.tipo === selectedActivity.tipo && i.actividad_id === selectedActivity.actividad_id)
+          .sort((a, b) => b.fallos - a.fallos);
+
+        return (
+          /* Overlay oscuro */
+          <div
+            onClick={() => setSelectedActivity(null)}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(15, 23, 42, 0.55)',
+              backdropFilter: 'blur(2px)',
+              zIndex: 9999,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '24px',
+              animation: 'fadeIn 0.15s ease',
+            }}
+          >
+            {/* Contenedor del modal — detener propagación para no cerrar al clicar dentro */}
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: '#fff',
+                borderRadius: '16px',
+                boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+                width: '100%',
+                maxWidth: '680px',
+                maxHeight: '85vh',
+                display: 'flex',
+                flexDirection: 'column',
+                animation: 'slideUp 0.18s ease',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Header del modal */}
+              <div style={{
+                background: 'linear-gradient(135deg, #1a56db, #2563eb)',
+                padding: '18px 22px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: '12px',
+                flexShrink: 0,
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{
+                      background: selectedActivity.tipo === 'ejercicio' ? 'rgba(219,234,254,0.3)' : 'rgba(254,243,199,0.3)',
+                      color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.3)',
+                      borderRadius: '999px', fontSize: '11px', fontWeight: 600, padding: '2px 10px',
+                    }}>
+                      {selectedActivity.tipo}
+                    </span>
+                  </div>
+                  <h2 style={{ color: '#fff', fontWeight: 700, fontSize: '16px', margin: 0, lineHeight: 1.3 }}>
+                    {selectedActivity.titulo}
+                  </h2>
+                  <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '12px', marginTop: '4px' }}>
+                    {activityStudents.length} estudiante{activityStudents.length !== 1 ? 's' : ''} con intentos registrados
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  {/* Botón exportar PDF de la actividad */}
+                  <button
+                    onClick={() => downloadActivityDetailPdf(selectedActivity)}
+                    disabled={activityPdfLoading}
+                    style={{
+                      background: 'rgba(255,255,255,0.15)',
+                      border: '1px solid rgba(255,255,255,0.3)',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      height: '32px',
+                      padding: '0 12px',
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      cursor: activityPdfLoading ? 'wait' : 'pointer',
+                      fontSize: '12px', fontWeight: 600,
+                      transition: 'background 0.15s',
+                      opacity: activityPdfLoading ? 0.7 : 1,
+                    }}
+                    title="Exportar PDF de esta actividad"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {activityPdfLoading ? 'Generando...' : 'PDF'}
+                  </button>
+                  {/* Botón cerrar */}
+                  <button
+                    onClick={() => setSelectedActivity(null)}
+                    style={{
+                      background: 'rgba(255,255,255,0.15)',
+                      border: '1px solid rgba(255,255,255,0.3)',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      width: '32px', height: '32px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', flexShrink: 0,
+                      transition: 'background 0.15s',
+                    }}
+                    title="Cerrar (Esc)"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Cuerpo scrolleable solo vertical */}
+              <div style={{ overflowY: 'auto', overflowX: 'hidden', flexGrow: 1 }}>
+                {activityStudents.length === 0 ? (
+                  <div style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                    No hay estudiantes con intentos registrados en esta actividad.
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', tableLayout: 'fixed' }}>
+                    <colgroup>
+                      <col style={{ width: '38%' }} />
+                      <col style={{ width: '11%' }} />
+                      <col style={{ width: '11%' }} />
+                      <col style={{ width: '11%' }} />
+                      <col style={{ width: '29%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: '11px' }}>Estudiante</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: '11px' }}>Intentos</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: '11px' }}>Aciertos</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: '11px' }}>Fallos</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: '11px' }}>Tasa de error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activityStudents.map((item, idx) => {
+                        const meta = studentMap.get(String(item.estudiante_id));
+                        const nombre = meta?.nombre || `Estudiante ${item.estudiante_id}`;
+                        const tasa = item.intentos > 0 ? Math.round((item.fallos / item.intentos) * 100) : 0;
+                        const tasaColor = tasa >= 50 ? '#DC2626' : tasa >= 25 ? '#F97316' : '#16a34a';
+                        const initials = nombre.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+                        return (
+                          <tr
+                            key={item.estudiante_id}
+                            style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#fff' : '#fafbfc', transition: 'background 0.1s' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = '#f0f7ff')}
+                            onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafbfc')}
+                          >
+                            {/* Columna estudiante: avatar + nombre + email truncado */}
+                            <td style={{ padding: '10px 14px', overflow: 'hidden' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                <div style={{
+                                  width: '30px', height: '30px', borderRadius: '50%', flexShrink: 0,
+                                  background: 'linear-gradient(135deg,#4A90E2,#7ED6A7)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  color: '#fff', fontSize: '11px', fontWeight: 700,
+                                }}>
+                                  {initials}
+                                </div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</div>
+                                  {meta?.email && (
+                                    <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {meta.email}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', color: '#475569' }}>{item.intentos}</td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', color: '#16a34a', fontWeight: 600 }}>{item.aciertos}</td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', color: item.fallos > 0 ? '#DC2626' : '#94a3b8', fontWeight: 600 }}>{item.fallos}</td>
+                            {/* Tasa + estado en la misma celda */}
+                            <td style={{ padding: '10px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ flex: 1, height: '6px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden', minWidth: 0 }}>
+                                  <div style={{ width: `${Math.min(tasa, 100)}%`, height: '100%', background: tasaColor, borderRadius: '999px' }} />
+                                </div>
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: tasaColor, flexShrink: 0 }}>{tasa}%</span>
+                                {item.aprobado
+                                  ? <CheckCircle2 style={{ width: '13px', height: '13px', color: '#16a34a', flexShrink: 0 }} />
+                                  : <XCircle style={{ width: '13px', height: '13px', color: '#F97316', flexShrink: 0 }} />}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Footer con resumen */}
+              <div style={{
+                padding: '12px 22px',
+                borderTop: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                display: 'flex',
+                gap: '24px',
+                flexShrink: 0,
+              }}>
+                {[
+                  { label: 'Total intentos', value: activityStudents.reduce((s, i) => s + (i.intentos || 0), 0), color: '#475569' },
+                  { label: 'Total aciertos', value: activityStudents.reduce((s, i) => s + (i.aciertos || 0), 0), color: '#16a34a' },
+                  { label: 'Total fallos', value: activityStudents.reduce((s, i) => s + (i.fallos || 0), 0), color: '#DC2626' },
+                ].map(m => (
+                  <div key={m.label} style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <span style={{ fontSize: '18px', fontWeight: 800, color: m.color }}>{m.value}</span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>{m.label}</span>
+                  </div>
+                ))}
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>Presiona <kbd style={{ background: '#e2e8f0', borderRadius: '4px', padding: '1px 6px', fontSize: '11px', fontWeight: 600 }}>Esc</kbd> para cerrar</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
 

@@ -3070,6 +3070,7 @@
 .app-table-card__title {
   font-size: 1.02rem;
   font-weight: 700;
+  color: #ffffff;
 }
 
 .app-table-card__description {
@@ -3077,6 +3078,7 @@
   font-size: 0.86rem;
   line-height: 1.55;
   opacity: 0.92;
+  color: #ffffff;
 }
 
 .app-table-card__body {
