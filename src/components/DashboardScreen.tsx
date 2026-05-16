@@ -128,30 +128,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
   const [progresosPorAsignatura, setProgresosPorAsignatura] = useState<Map<number, AsignaturaProgress>>(new Map());
 
 
-  // Obtener progreso real de un asignatura (porcentaje + info de temas)
-  const obtenerProgresoAsignatura = async (asignaturaId: number): Promise<AsignaturaProgress> => {
-    const empty: AsignaturaProgress = {
-      porcentaje: 0, temasTotal: 0, temasCompletados: 0, temasPendientes: 0,
-      siguienteTema: 'Sin temas registrados'
-    };
-    if (!estudianteId) return empty;
-    try {
-      const url = `${API_BASE_URL}/progresos/por-asignatura?asignatura_id=${asignaturaId}&estudiante_id=${estudianteId}`;
-      // Caché de 30s — el progreso no cambia durante la navegación normal
-      const data = await cachedFetch(url, {}, 30_000) as any;
-      return {
-        porcentaje: Math.round(data.resumen?.porcentajeTotalAsignatura || 0),
-        temasTotal: Number(data.temas?.total ?? 0),
-        temasCompletados: Number(data.temas?.completados ?? 0),
-        temasPendientes: Number(data.temas?.pendientes ?? 0),
-        siguienteTema: data.temas?.siguiente || 'Sin temas registrados',
-      };
-    } catch (err) {
-      console.error(`Error al obtener progreso del asignatura ${asignaturaId}:`, err);
-      return empty;
-    }
-  };
-
   useEffect(() => {
     const fetchasignaturas = async () => {
       try {
@@ -192,21 +168,42 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
     fetchasignaturas();
   }, []);
 
-  // Carga el progreso de cada asignatura en background — las tarjetas ya son visibles
+  // Carga el progreso de todas las asignaturas en una sola petición bulk
   useEffect(() => {
     if (subjects.length === 0 || !estudianteId) return;
     let cancelled = false;
 
-    // Lanza todas las peticiones en paralelo sin bloquear el render
-    subjects.forEach(async (s) => {
-      const asignaturaId = parseInt(s.id);
-      const progreso = await obtenerProgresoAsignatura(asignaturaId);
-      if (!cancelled) {
-        // Actualiza solo la tarjeta que acaba de responder — no espera a las demás
-        setProgresosPorAsignatura(prev => new Map(prev).set(asignaturaId, progreso));
+    const fetchBulkProgreso = async () => {
+      const asignaturaIds = subjects.map(s => s.id).join(',');
+      const url = `${API_BASE_URL}/progresos/bulk-por-asignatura?asignatura_ids=${asignaturaIds}&estudiante_id=${estudianteId}`;
+      try {
+        // Caché de 30s — el progreso no cambia durante la navegación normal
+        const data = await cachedFetch(url, {}, 30_000) as Record<string, any>;
+        if (cancelled) return;
+        const newMap = new Map<number, AsignaturaProgress>();
+        const empty: AsignaturaProgress = { porcentaje: 0, temasTotal: 0, temasCompletados: 0, temasPendientes: 0, siguienteTema: 'Sin temas registrados' };
+        for (const subject of subjects) {
+          const aId = parseInt(subject.id);
+          const entry = data[aId];
+          if (!entry || entry.error) {
+            newMap.set(aId, empty);
+          } else {
+            newMap.set(aId, {
+              porcentaje: Math.round(entry.resumen?.porcentajeTotalAsignatura || 0),
+              temasTotal: Number(entry.temas?.total ?? 0),
+              temasCompletados: Number(entry.temas?.completados ?? 0),
+              temasPendientes: Number(entry.temas?.pendientes ?? 0),
+              siguienteTema: entry.temas?.siguiente || 'Sin temas registrados',
+            });
+          }
+        }
+        setProgresosPorAsignatura(newMap);
+      } catch (err) {
+        console.error('Error al obtener progreso bulk de asignaturas:', err);
       }
-    });
+    };
 
+    fetchBulkProgreso();
     return () => { cancelled = true; };
   }, [subjects, estudianteId]);
 

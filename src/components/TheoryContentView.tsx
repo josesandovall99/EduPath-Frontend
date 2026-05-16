@@ -962,30 +962,55 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
     }
   };
 
-  // Calcular progreso de cada subtema
+  // Replica el algoritmo de ordenamiento topológico del backend (getContenidosOrdenadosPorSecuencia)
+  const ordenarContenidosPorSecuencia = (contenidos: any[], secuencias: any[]): any[] => {
+    if (contenidos.length === 0) return [];
+    const contenidoIds = new Set(contenidos.map((c: any) => Number(c.id)));
+    const secuenciaMap = new Map<number, number[]>();
+    const destinosSet = new Set<number>();
+    secuencias.forEach((sc: any) => {
+      const origen = Number(sc.contenido_origen_id);
+      const destino = Number(sc.contenido_destino_id);
+      if (!contenidoIds.has(origen)) return;
+      if (!secuenciaMap.has(origen)) secuenciaMap.set(origen, []);
+      secuenciaMap.get(origen)!.push(destino);
+      destinosSet.add(destino);
+    });
+    const iniciales = contenidos.filter((c: any) => !destinosSet.has(Number(c.id)));
+    const ordenado: any[] = [];
+    const visitados = new Set<number>();
+    const agregar = (id: number) => {
+      if (visitados.has(id)) return;
+      const c = contenidos.find((c: any) => Number(c.id) === id);
+      if (c) { ordenado.push(c); visitados.add(id); const ds = secuenciaMap.get(id); if (ds?.length) agregar(ds[0]); }
+    };
+    iniciales.forEach((c: any) => agregar(Number(c.id)));
+    const ids = new Set(ordenado.map((c: any) => Number(c.id)));
+    contenidos.forEach((c: any) => { if (!ids.has(Number(c.id))) ordenado.push(c); });
+    return ordenado;
+  };
+
+  // Calcular progreso de todos los subtemas en 1 sola petición bulk
   const calcularProgresoSubtemas = async (subtemas: any[]) => {
-    if (!estudianteId || !temaId) return new Map<string, { porcentaje: number }>();
-    
+    if (!estudianteId || !temaId || subtemas.length === 0) return new Map<string, { porcentaje: number }>();
     const progresoMap = new Map<string, { porcentaje: number }>();
-    
-    for (const subtema of subtemas) {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/progresos/por-subtema?subtema_id=${subtema.id}&estudiante_id=${estudianteId}`
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          const porcentaje = data.resumen?.porcentajeTotalSubtema || 0;
-          progresoMap.set(String(subtema.id), { porcentaje });
-        } else {
-          progresoMap.set(String(subtema.id), { porcentaje: 0 });
-        }
-      } catch (err) {
-        progresoMap.set(String(subtema.id), { porcentaje: 0 });
+    try {
+      const ids = subtemas.map((s: any) => s.id).join(',');
+      const response = await fetch(
+        `${API_BASE_URL}/progresos/bulk-por-subtema?subtema_ids=${ids}&estudiante_id=${estudianteId}`
+      );
+      if (response.ok) {
+        const data = await response.json() as Record<string, any>;
+        subtemas.forEach((s: any) => {
+          const porcentaje = data[String(s.id)]?.resumen?.porcentajeTotalSubtema ?? 0;
+          progresoMap.set(String(s.id), { porcentaje });
+        });
+      } else {
+        subtemas.forEach((s: any) => progresoMap.set(String(s.id), { porcentaje: 0 }));
       }
+    } catch {
+      subtemas.forEach((s: any) => progresoMap.set(String(s.id), { porcentaje: 0 }));
     }
-    
     return progresoMap;
   };
 
@@ -1066,6 +1091,14 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
           /* mantener modo del prop */
         }
         secuencialRef.current = modoSecuencial;
+
+        // Pre-calentar caché en paralelo con Phase 1 — cuando loadContenidosForSubtema los necesite, ya estarán listos
+        if (temaId) {
+          cachedFetch(`${API_BASE_URL}/secuencias-contenido/tema/${temaId}/contenidos-bulk`, { headers });
+        }
+        if (asignaturaId != null && estudianteId) {
+          cachedFetch(`${API_BASE_URL}/ejercicios/con-completado?asignatura_id=${asignaturaId}&estudiante_id=${estudianteId}`, { headers }, 30_000);
+        }
 
         // Datos estructurales con caché (60s TTL) — segunda visita es instantánea
         // Datos de progreso sin caché — siempre frescos
@@ -1175,15 +1208,21 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       const token = localStorage.getItem('authToken');
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Contenidos y ejercicios con caché — en paralelo y rápidos en revisitas
-      const [contenidosData, ejerciciosData] = await Promise.all([
-        cachedFetch(`${API_BASE_URL}/secuencias-contenido/subtema/${subtemaId}/ordenados`, { headers }) as Promise<Contenido[]>,
-        asignaturaId
-          ? cachedFetch(`${API_BASE_URL}/ejercicios?asignatura_id=${asignaturaId}`, { headers }) as Promise<any[]>
-          : Promise.resolve(null),
+      // Usa los endpoints bulk pre-calentados al montar — en caché son instantáneos (<1ms)
+      const [bulkData, ejerciciosConEstado] = await Promise.all([
+        temaId
+          ? cachedFetch(`${API_BASE_URL}/secuencias-contenido/tema/${temaId}/contenidos-bulk`, { headers }) as Promise<{ contenidos: any[], secuencias: any[] }>
+          : Promise.resolve({ contenidos: [], secuencias: [] }),
+        asignaturaId != null && estudianteId
+          ? cachedFetch(`${API_BASE_URL}/ejercicios/con-completado?asignatura_id=${asignaturaId}&estudiante_id=${estudianteId}`, { headers }, 30_000) as Promise<any[]>
+          : Promise.resolve([]),
       ]);
 
-      const contenidos: Contenido[] = Array.isArray(contenidosData) ? contenidosData : [];
+      // Filtrar y ordenar contenidos del subtema actual usando datos del bulk
+      const allContenidos: any[] = Array.isArray(bulkData?.contenidos) ? bulkData.contenidos : [];
+      const allSecuencias: any[] = Array.isArray(bulkData?.secuencias) ? bulkData.secuencias : [];
+      const contenidosDelSubtema = allContenidos.filter((c: any) => String(c.subtema_id) === String(subtemaId));
+      const contenidos: Contenido[] = ordenarContenidosPorSecuencia(contenidosDelSubtema, allSecuencias) as Contenido[];
 
       // El endpoint /ordenados ya devuelve solo los contenidos en secuencia — no hace falta
       // cargar todas las secuencias globales para filtrar
@@ -1212,9 +1251,9 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
 
       // Cargar ejercicios asociados y agregarlos como ítems separados
       try {
-        // Usa ejerciciosData ya cargado en el Promise.all superior
-        if (ejerciciosData && Array.isArray(ejerciciosData)) {
-          const todosEjercicios: Ejercicio[] = ejerciciosData;
+        // Usa ejerciciosConEstado (pre-cargado al montar, incluye completado sin fetch extra)
+        if (ejerciciosConEstado && Array.isArray(ejerciciosConEstado)) {
+          const todosEjercicios: Ejercicio[] = ejerciciosConEstado;
           
           // IDs de contenidos de este subtema
           const contenidoIdsDeEsteSubtema = contenidosSecuenciados.map(c => String(c.id));
@@ -1230,24 +1269,11 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
           });
           
           
-          // Cargar estado de aprobación real de cada ejercicio en paralelo
+          // completado ya viene incluido en ejerciciosConEstado — sin round trip extra
           const aprobadosMap = new Map<number, boolean>();
-          if (estudianteId) {
-            await Promise.all(
-              ejerciciosDeEsteSubtema.map(async (ej) => {
-                try {
-                  const r = await fetch(
-                    `${API_BASE_URL}/respuestasEstudianteEjercicio/verificar-completado?ejercicio_id=${ej.id}&estudiante_id=${estudianteId}`
-                  );
-                  if (!r.ok) { aprobadosMap.set(ej.id, false); return; }
-                  const data = await r.json();
-                  aprobadosMap.set(ej.id, Boolean(data?.completado));
-                } catch {
-                  aprobadosMap.set(ej.id, false);
-                }
-              })
-            );
-          }
+          ejerciciosDeEsteSubtema.forEach((ej: any) => {
+            aprobadosMap.set(ej.id, Boolean(ej.completado));
+          });
 
           // Mezclar contenidos + ejercicios en orden (ejercicios DESPUÉS de su contenido)
           const itemsConEjercicios: ModuleItem[] = [];
@@ -1383,7 +1409,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] flex flex-col">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
       {/* Barra superior: mismo estilo que el header global; ocupa todo el ancho */}
       <header className="app-header shrink-0">
         <div className="px-8 py-4">
@@ -1447,176 +1473,169 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
         </div>
       </header>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-      {/* Left Sidebar - Course Modules */}
-      <div className="w-80 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto shadow-sm min-h-0">
-        {/* Modules List */}
-        <div className="p-3">
-          {modules.map((module, idx) => {
-            const isModuleLocked = module.desbloqueado === false;
-            
-            return (
-            <div key={module.id} className="mb-3">
-              {/* Module Header */}
-              <button
-                onClick={() => {
-                  if (isModuleLocked) {
-                    alert('Este subtema está bloqueado. Complete el subtema anterior para desbloquearlo.');
-                    return;
-                  }
-                  toggleModule(module.id);
-                }}
-                className={`w-full text-left p-3 bg-white border border-gray-200 rounded-xl flex items-center justify-between transition-all shadow-sm ${
-                  isModuleLocked 
-                    ? 'opacity-60 cursor-not-allowed' 
-                    : 'hover:bg-gray-50 hover:shadow-md'
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs shadow-sm flex-shrink-0"
-                    style={{ backgroundColor: isModuleLocked ? '#9CA3AF' : subjectColor }}
-                  >
-                    {isModuleLocked ? <Lock className="w-4 h-4" /> : (idx + 1)}
-                  </div>
-                  <span className={`text-sm leading-snug break-words min-w-0 ${isModuleLocked ? 'text-gray-400' : 'text-[#3A4A5B]'}`}>
-                    {module.title}
-                  </span>
-                  {module.completo && (
-                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  )}
-                </div>
-                {!isModuleLocked && (module.expanded ? (
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
-                ))}
-              </button>
-
-              {/* Module Items */}
-              {module.expanded && (
-                <div className="mt-2 ml-4 space-y-1">
-                  {module.loadingItems ? (
-                    <div className="flex items-center justify-center p-3 text-gray-500">
-                      <Loader className="w-4 h-4 animate-spin mr-2" />
-                      <span className="text-xs">Cargando contenidos...</span>
-                    </div>
-                  ) : module.items.length === 0 ? (
-                    <div className="p-3 text-center text-gray-500 text-xs">
-                      No hay contenidos disponibles
-                    </div>
-                  ) : (
-                    module.items.map((item) => {
-                      const ItemIcon = getItemIcon(item.type);
-                      const isSelected = selectedContentId === item.id;
-                      const isItemLocked = item.desbloqueado === false;
-                      
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => {
-                            if (isItemLocked) {
-                              alert('Este contenido está bloqueado. Complete el contenido anterior para desbloquearlo.');
-                              return;
-                            }
-                            
-                            // Si es un ejercicio, manejarlo de forma especial
-                            if (item.ejercicioData) {
-                              setSelectedContentId(item.id);
-                              setSelectedContentData(null); // No hay contenido asociado
-                              
-                              // Detectar el subtipo real desde la configuración para ejercicios de tipo "Preguntas"
-                              let ejercicioConTipoReal = { ...item.ejercicioData };
-                              if (item.ejercicioData.tipo_ejercicio === 'Preguntas' && item.ejercicioData.configuracion?.tipo) {
-                                if (item.ejercicioData.configuracion.tipo === 'opcion-unica') {
-                                  ejercicioConTipoReal.tipo_ejercicio = 'Opción única';
-                                } else if (item.ejercicioData.configuracion.tipo === 'ordenar') {
-                                  ejercicioConTipoReal.tipo_ejercicio = 'Ordenar';
-                                } else if (item.ejercicioData.configuracion.tipo === 'relacionar') {
-                                  ejercicioConTipoReal.tipo_ejercicio = 'Relacionar';
-                                }
-                              }
-                              
-                              setEjercicioAsociado(ejercicioConTipoReal); // Cargar el ejercicio directamente
-                              setLoadingEjercicio(false);
-                            } else {
-                              // Es un contenido normal
-                              setSelectedContentId(item.id);
-                              setSelectedContentData(item);
-                              setEjercicioAsociado(null); // Limpiar ejercicio asociado
-                              onContentChange?.(item.id);
-                            }
-                          }}
-                          className={`w-full text-left p-3 border rounded-lg flex items-center gap-3 text-base transition-all group ${
-                            isItemLocked
-                              ? 'opacity-60 cursor-not-allowed border-gray-200 bg-white'
-                              : isSelected
-                                ? 'border-blue-400 bg-blue-50'
-                                : item.ejercicioData
-                                  ? 'border-gray-200 bg-white hover:bg-gray-50'         // ejercicio → blanco
-                                  : 'border-blue-100 bg-blue-50/50 hover:bg-blue-50'   // contenido → azul muy tenue
-                          }`}
-                        >
-                          {isItemLocked ? (
-                            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                              <Lock className="w-4 h-4 text-gray-400" />
-                            </div>
-                          ) : (() => {
-                            // Distinción clara: ejercicio = COMPLETADO (aprobado) | contenido = VISTO (visualizado)
-                            const isDone = item.ejercicioData
-                              ? Boolean(item.completo)        // ejercicio: aprobado
-                              : Boolean(item.visualizado);    // contenido: visualizado
-                            return (
-                              <div
-                                className="w-5 h-5 border-2 rounded flex items-center justify-center flex-shrink-0"
-                                style={{ borderColor: isDone ? subjectColor : isSelected ? subjectColor : '#E5E7EB' }}
-                              >
-                                {isDone && <CheckCircle2 className="w-4 h-4" style={{ color: subjectColor }} />}
-                              </div>
-                            );
-                          })()}
-                          <div className="flex-1 min-w-0">
-                            <div className={`transition-colors break-words leading-snug ${
-                              isItemLocked
-                                ? 'text-gray-400'
-                                : isSelected
-                                  ? 'text-blue-600 font-semibold'
-                                  : 'text-[#3A4A5B] group-hover:text-[#4A90E2]'
-                            }`}>
-                              {item.title}
-                              {item.completo && <CheckCircle2 className="w-4 h-4 ml-2 inline text-green-500" />}
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                              <ItemIcon className="w-3 h-3" />
-                              <span>
-                                {item.type === 'evm_curva_s'
-                                  ? 'Simulador · Curva S (EVM)'
-                                  : item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </div>
-            );
-          })}
-        </div>
+      {/* ── Franja "Volver" compartida — ambas columnas arrancan aquí ── */}
+      <div className="shrink-0 flex items-center px-8 py-4 bg-white border-b border-gray-100">
+        <button onClick={onBack} className="app-back-button">
+          <ArrowLeft className="w-4 h-4" />
+          <span>Volver</span>
+        </button>
       </div>
 
-      {/* Right Content Asignatura */}
-      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
-        {/* Main Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#F2F2F2] p-8">
-          <div className="mx-auto w-full max-w-[1500px]">
-            <button onClick={onBack} className="app-back-button mb-6">
-              <ArrowLeft className="w-4 h-4" />
-              <span>Volver</span>
-            </button>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
 
+        {/* ── Sidebar ── */}
+        <div className="w-48 flex-shrink-0 bg-white overflow-y-auto min-h-0">
+          <div className="px-3 pt-4 pb-6 space-y-2">
+            {modules.map((module, idx) => {
+              const isModuleLocked = module.desbloqueado === false;
+              return (
+                <div key={module.id}>
+
+                  {/* ── Tarjeta de subtema ── */}
+                  <button
+                    onClick={() => {
+                      if (isModuleLocked) { alert('Este subtema está bloqueado. Complete el subtema anterior para desbloquearlo.'); return; }
+                      toggleModule(module.id);
+                    }}
+                    className={`w-full flex items-center gap-3 pl-4 pr-3 py-3 rounded-xl text-left transition-all min-w-0 ${
+                      isModuleLocked
+                        ? 'opacity-50 cursor-not-allowed bg-white border border-gray-200'
+                        : module.expanded
+                          ? 'bg-[#EFF6FF] border border-blue-200 shadow-sm'
+                          : 'bg-white border border-gray-200 hover:border-blue-200 hover:bg-[#EFF6FF] shadow-sm hover:shadow'
+                    }`}
+                  >
+                    {/* Número en cuadro redondeado */}
+                    <span
+                      className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-white text-[9px] font-bold shadow-sm"
+                      style={{
+                        background: isModuleLocked
+                          ? '#9CA3AF'
+                          : 'linear-gradient(135deg,#3B82F6 0%,#1D4ED8 100%)',
+                      }}
+                    >
+                      {isModuleLocked ? <Lock className="w-2 h-2" /> : idx + 1}
+                    </span>
+                    <span className={`flex-1 min-w-0 text-[11px] font-semibold leading-snug break-words ${isModuleLocked ? 'text-gray-400' : 'text-[#1E3A8A]'}`}>
+                      {module.title}
+                    </span>
+                    <div className="flex items-center gap-1 flex-shrink-0 pr-2.5">
+                      {module.completo && <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />}
+                      {!isModuleLocked && (module.expanded
+                        ? <ChevronDown className="w-3.5 h-3.5 text-blue-400" />
+                        : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />)}
+                    </div>
+                  </button>
+
+                  {/* Línea sutil entre la tarjeta del subtema y sus ítems */}
+                  {module.expanded && (
+                    <div className="mx-2 mt-1 mb-0.5 border-t border-gray-100" />
+                  )}
+
+                  {/* ── Items ── */}
+                  {module.expanded && (
+                    <div className="ml-5 mr-1 space-y-0.5 mb-3">
+                      {module.loadingItems ? (
+                        <div className="flex items-center gap-1.5 px-2 py-2 text-gray-400">
+                          <Loader className="w-3 h-3 animate-spin" />
+                          <span className="text-[10px]">Cargando...</span>
+                        </div>
+                      ) : module.items.length === 0 ? (
+                        <p className="px-2 py-1.5 text-[10px] text-gray-400">Sin contenidos</p>
+                      ) : (
+                        module.items.map((item) => {
+                          const isSelected   = selectedContentId === item.id;
+                          const isItemLocked = item.desbloqueado === false;
+                          const isEjercicio  = Boolean(item.ejercicioData);
+                          const isDone = isEjercicio ? Boolean(item.completo) : Boolean(item.visualizado);
+                          // Azul para contenido, ámbar para ejercicio
+                          const typeColor = isEjercicio ? '#D97706' : '#2563EB';
+
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                if (isItemLocked) { alert('Este contenido está bloqueado. Complete el contenido anterior para desbloquearlo.'); return; }
+                                if (item.ejercicioData) {
+                                  setSelectedContentId(item.id);
+                                  setSelectedContentData(null);
+                                  let ej = { ...item.ejercicioData };
+                                  if (ej.tipo_ejercicio === 'Preguntas' && ej.configuracion?.tipo) {
+                                    if (ej.configuracion.tipo === 'opcion-unica') ej.tipo_ejercicio = 'Opción única';
+                                    else if (ej.configuracion.tipo === 'ordenar') ej.tipo_ejercicio = 'Ordenar';
+                                    else if (ej.configuracion.tipo === 'relacionar') ej.tipo_ejercicio = 'Relacionar';
+                                  }
+                                  setEjercicioAsociado(ej);
+                                  setLoadingEjercicio(false);
+                                } else {
+                                  setSelectedContentId(item.id);
+                                  setSelectedContentData(item);
+                                  setEjercicioAsociado(null);
+                                  onContentChange?.(item.id);
+                                }
+                              }}
+                              className={`w-full flex items-center gap-2 pr-2 py-2 rounded-md text-left transition-colors overflow-hidden ${
+                                isItemLocked
+                                  ? 'opacity-40 cursor-not-allowed'
+                                  : isSelected
+                                    ? 'bg-blue-50'
+                                    : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              {/* Borde izquierdo — identifica tipo */}
+                              <div
+                                className="self-stretch w-[3px] flex-shrink-0 rounded-full"
+                                style={{ backgroundColor: isItemLocked ? '#E5E7EB' : typeColor }}
+                              />
+
+                              {/* Estado */}
+                              <div className="flex-shrink-0">
+                                {isItemLocked ? (
+                                  <Lock className="w-3 h-3 text-gray-300" />
+                                ) : isDone ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5" style={{ color: typeColor }} />
+                                ) : (
+                                  <div className="w-3.5 h-3.5 rounded-full border-2"
+                                    style={{ borderColor: isSelected ? typeColor : '#CBD5E1' }} />
+                                )}
+                              </div>
+
+                              {/* Título — color del tipo cuando pendiente */}
+                              <span className={`flex-1 text-[11px] leading-snug ${
+                                isItemLocked ? 'text-gray-400'
+                                  : isSelected ? 'font-semibold'
+                                  : isDone ? 'text-gray-400 line-through'
+                                  : ''
+                              }`}
+                                style={
+                                  isItemLocked || isDone ? undefined
+                                    : isSelected ? { color: typeColor }
+                                    : { color: isEjercicio ? '#92400E' : '#1E40AF' }
+                                }
+                              >
+                                {item.title}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Línea divisora estática — siempre llega al fondo ── */}
+        <div className="w-px flex-shrink-0 bg-gray-200" />
+
+        {/* ── Área de contenido derecha ── */}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+        {/* Main Content */}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-white pt-4 px-8 pb-8">
+          <div className="mx-auto w-full max-w-[1500px]">
             {/* Content Display */}
             {/* Caso 1: Solo ejercicio (sin contenido) */}
             {!selectedContentData && ejercicioAsociado && (
@@ -1821,11 +1840,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                 ) : (
                   <div className="mb-6">
                     <div className="rounded-2xl bg-white border border-gray-200 p-8 shadow-md">
-                      <h2 className="text-[#3A4A5B] mb-4 text-2xl font-semibold">{selectedContentData.title}</h2>
-                      <div className="flex items-center gap-2 mb-6 text-sm text-gray-600">
-                        <FileText className="w-4 h-4" style={{ color: subjectColor }} />
-                        <span>{selectedContentData.type.charAt(0).toUpperCase() + selectedContentData.type.slice(1)}</span>
-                      </div>
+                      <h2 className="text-[#3A4A5B] mb-6 text-2xl font-semibold">{selectedContentData.title}</h2>
 
                       {/* Mostrar imagen si la URL es una imagen */}
                       {selectedContentData.url && (selectedContentData.url.includes('jpg') || selectedContentData.url.includes('jpeg') || selectedContentData.url.includes('png') || selectedContentData.url.includes('gif') || selectedContentData.url.includes('webp')) && (

@@ -190,6 +190,17 @@
 
 html {
   font-size: var(--font-size);
+  height: 100%;
+}
+
+body {
+  height: 100%;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ─── Renderizado de HTML generado por Quill (vista estudiante) ─────────────

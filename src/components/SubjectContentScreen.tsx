@@ -301,27 +301,19 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
             let aprobadosMap = new Map<number, boolean>();
 
             if (estudianteId && visibles.length > 0) {
-              const aprobados = await Promise.all(
-                visibles.map(async (mini) => {
-                  try {
-                    const cfg = parseConfigurableMiniproyecto(mini.respuesta_miniproyecto);
-                    if (cfg && cfg.exercises.length > 0) {
-                      const r = await fetch(`${API_BASE_URL}/miniproyectos/${mini.id}/configurable-progress`, { headers });
-                      if (!r.ok) return [mini.id, false] as const;
-                      const d = await r.json();
-                      return [mini.id, Boolean(d?.completado)] as const;
-                    }
-                    const r = await fetch(`${API_BASE_URL}/evaluaciones/by?miniproyecto_id=${mini.id}`, { headers });
-                    if (!r.ok) return [mini.id, false] as const;
-                    const d = await r.json();
-                    const aprobado = (Array.isArray(d) ? d : []).some((e) => String(e?.estado || '').toUpperCase() === 'APROBADO');
-                    return [mini.id, aprobado] as const;
-                  } catch {
-                    return [mini.id, false] as const;
-                  }
-                })
-              );
-              aprobadosMap = new Map(aprobados);
+              try {
+                const miniIds = visibles.map((m) => m.id).join(',');
+                const r = await fetch(
+                  `${API_BASE_URL}/miniproyectos/aprobacion-bulk?ids=${miniIds}&estudiante_id=${estudianteId}`,
+                  { headers }
+                );
+                if (r.ok) {
+                  const data = await r.json() as Record<number, { completado: boolean }>;
+                  visibles.forEach((m) => aprobadosMap.set(m.id, Boolean(data[m.id]?.completado)));
+                }
+              } catch {
+                // deja aprobadosMap vacío — las tarjetas se muestran sin estado de aprobación
+              }
             }
 
             miniproyectosContent = visibles.map((mini) => {
