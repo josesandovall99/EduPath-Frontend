@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './constants';
+﻿import { API_BASE_URL } from './constants';
 
 export interface SubmitResult<T = any> {
   status: number;
@@ -45,7 +45,7 @@ export async function submitExercise(
     try {
       data = await res.json();
     } catch {
-      // Non-JSON or empty body
+      // Cuerpo no-JSON o vacío
     }
 
     return { status: res.status, data, message: (data && (data.message || data.error)) };
@@ -82,7 +82,7 @@ export async function executeExercise(
     try {
       data = await res.json();
     } catch {
-      // Non-JSON or empty body
+      // Cuerpo no-JSON o vacío
     }
 
     return { status: res.status, data, message: (data && (data.message || data.error)) };

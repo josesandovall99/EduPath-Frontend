@@ -46,7 +46,7 @@ function computeCPM(acts: CPMActivity[]) {
     ...acts,
     { id:'__end',   duration:0, predecessors:[] },
   ];
-  // Connect roots to __start, sinks to __end
+  // Conectar raíces a __start y hojas a __end
   const ids = acts.map(a=>a.id);
   const referenced = new Set(acts.flatMap(a=>a.predecessors));
   all.forEach(a=>{
@@ -210,7 +210,7 @@ function buildSteps(acts: CPMActivity[], cpm: ReturnType<typeof computeCPM>): St
   // Phase 1: build network
   push(1,{visN:['__start'],msg:`**Nodo de Inicio** — Duración: 0 días\n\nEn el PMBOK, el diagrama de red siempre empieza con un nodo ficticio de inicio.\n- No representa trabajo real\n- Conecta a todas las actividades sin predecesoras\n- Es el punto de referencia para calcular los tiempos tempranos`,mt:'default'});
 
-  // Group by layer for nicer messages
+  // Agrupar por capa para los mensajes del paso a paso
   const layerOf: Record<string,number>={};
   const computeLayers=()=>{
     layerOf['__start']=0;
@@ -259,7 +259,7 @@ function buildSteps(acts: CPMActivity[], cpm: ReturnType<typeof computeCPM>): St
   push(2,{rev:{'__start':{ES:0,EF:0}},fo:{id:'__start',text:'0 + 0 = 0'},act:'__start',
     msg:`**Nodo Inicio**\n\n- **ES = 0** → el proyecto empieza en el día 0\n- **EF = ES + 0 = 0** → no consume tiempo\n- Este valor (0) se "hereda" hacia todas las actividades sin predecesoras`,mt:'default'});
 
-  // Each node in topo order
+  // Cada nodo en orden topológico
   const topoActIds=cpm.order.filter(id=>id!=='__start'&&id!=='__end');
   topoActIds.forEach(id=>{
     const a=acts.find(x=>x.id===id)!;

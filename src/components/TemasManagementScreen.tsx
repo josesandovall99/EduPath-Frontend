@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { ArrowLeft, Edit2, EyeOff, Eye, Loader, Plus, Search, X } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
@@ -78,7 +79,6 @@ export function TemasManagementScreen({ asignaturaId, asignaturaName, onBack, on
       const updated = await res.json();
       setTemas(prev => prev.map(t => t.id === tema.id ? { ...t, estado: updated.estado ?? !isActive } : t));
     } catch (err) {
-      console.error('Error toggling tema:', err);
     }
   };
 
@@ -149,7 +149,7 @@ export function TemasManagementScreen({ asignaturaId, asignaturaName, onBack, on
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
@@ -188,7 +188,7 @@ export function TemasManagementScreen({ asignaturaId, asignaturaName, onBack, on
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
           {/* Filtros */}
-          <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: '40px' }}>
+          <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto" style={{ background: '#e8eef8', height: '40px' }}>
             {[
               { key: 'all',      label: `Todos (${temas.length})` },
               { key: 'active',   label: `Activos (${activeTemas})` },
@@ -243,8 +243,7 @@ export function TemasManagementScreen({ asignaturaId, asignaturaName, onBack, on
             <p style={{ color: '#4a6fa5' }}>Sin resultados para la búsqueda.</p>
           </div>
         ) : (
-          /* Grid 5 columnas */
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
             {filteredTemas.map(tema => {
               const isActive = tema.estado !== false;
               return (
@@ -306,7 +305,7 @@ export function TemasManagementScreen({ asignaturaId, asignaturaName, onBack, on
         <div className="fixed inset-0 z-[100] flex items-center justify-center"
           style={{ background: 'rgba(10,20,50,0.45)', backdropFilter: 'blur(4px)' }}
           onClick={() => setShowModal(false)}>
-          <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ width: '440px', background: '#fff' }}
+          <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ width: '100%', maxWidth: '440px', background: '#fff' }}
             onClick={e => e.stopPropagation()}>
             {/* Cabecera azul */}
             <div style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

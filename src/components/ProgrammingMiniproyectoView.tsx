@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { ArrowLeft, Loader2, Trash2, Lock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { submitMiniproyecto } from '../utils/submitMiniproyecto';
@@ -7,192 +7,6 @@ import { CONSOLA_IO_SOURCE } from '../utils/consolaIOSource';
 import { mergeMvcFiles } from '../utils/mergeMvcFiles';
 import { JavaEditor } from './JavaEditor';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- legacy placeholder
-const _REMOVED_CONSOLA_IO = `import java.util.Scanner;
-import java.util.InputMismatchException;
-
-public class ConsolaIO {
-
-    private Scanner sc;
-
-    public ConsolaIO() {
-        sc = new Scanner(System.in);
-    }
-
-    public String leerCadena() {
-        String s = sc.nextLine();
-        if (s.isEmpty() && sc.hasNextLine()) {
-            s = sc.nextLine();
-        }
-        return s;
-    }
-
-    public String leerCadena(String aviso) {
-        imprimir(aviso);
-        return leerCadena();
-    }
-
-    public String leerToken() {
-        return sc.next();
-    }
-
-    public String leerToken(String aviso) {
-        imprimir(aviso);
-        return leerToken();
-    }
-
-    public short leerShort() {
-        while (true) {
-            try {
-                short v = sc.nextShort();
-                sc.nextLine();
-                return v;
-            } catch (InputMismatchException e) {
-                System.out.println("Error: Ingrese un número short válido");
-                sc.nextLine();
-            }
-        }
-    }
-
-    public short leerShort(String aviso) {
-        imprimir(aviso);
-        return leerShort();
-    }
-
-    public byte leerByte() {
-        while (true) {
-            try {
-                byte v = sc.nextByte();
-                sc.nextLine();
-                return v;
-            } catch (InputMismatchException e) {
-                System.out.println("Error: Ingrese un número byte válido");
-                sc.nextLine();
-            }
-        }
-    }
-
-    public byte leerByte(String aviso) {
-        imprimir(aviso);
-        return leerByte();
-    }
-
-    public int leerEntero() {
-        while (true) {
-            try {
-                int v = sc.nextInt();
-                sc.nextLine();
-                return v;
-            } catch (InputMismatchException e) {
-                System.out.println("Error: Ingrese un entero válido");
-                sc.nextLine();
-            }
-        }
-    }
-
-    public int leerEntero(String aviso) {
-        imprimir(aviso);
-        return leerEntero();
-    }
-
-    public float leerFloat() {
-        while (true) {
-            try {
-                float v = sc.nextFloat();
-                sc.nextLine();
-                return v;
-            } catch (InputMismatchException e) {
-                System.out.println("Error: Ingrese un número float válido");
-                sc.nextLine();
-            }
-        }
-    }
-
-    public float leerFloat(String aviso) {
-        imprimir(aviso);
-        return leerFloat();
-    }
-
-    public double leerDouble() {
-        while (true) {
-            try {
-                double v = sc.nextDouble();
-                sc.nextLine();
-                return v;
-            } catch (InputMismatchException e) {
-                System.out.println("Error: Ingrese un número double válido");
-                sc.nextLine();
-            }
-        }
-    }
-
-    public double leerDouble(String aviso) {
-        imprimir(aviso);
-        return leerDouble();
-    }
-
-    public boolean leerBoolean() {
-        while (true) {
-            try {
-                boolean v = sc.nextBoolean();
-                sc.nextLine();
-                return v;
-            } catch (InputMismatchException e) {
-                System.out.println("Error: Ingrese true o false");
-                sc.nextLine();
-            }
-        }
-    }
-
-    public boolean leerBoolean(String aviso) {
-        imprimir(aviso);
-        return leerBoolean();
-    }
-
-    public char leerCaracter() {
-        String s = leerCadena();
-        return (s == null || s.isEmpty()) ? '\\0' : s.charAt(0);
-    }
-
-    public char leerCaracter(String aviso) {
-        imprimir(aviso);
-        return leerCaracter();
-    }
-
-    public int leerEnteroEnRango(int min, int max) {
-        int num;
-        do {
-            num = leerEntero();
-            if (num < min || num > max) {
-                System.out.println("Error: Valor fuera de rango [" + min + ", " + max + "]");
-            }
-        } while (num < min || num > max);
-        return num;
-    }
-
-    public int leerEnteroEnRango(String aviso, int min, int max) {
-        imprimir(aviso);
-        return leerEnteroEnRango(min, max);
-    }
-
-    public void imprimir(String aviso) {
-        System.out.println(aviso);
-    }
-
-    public void imprimir(int num) {
-        System.out.println(num);
-    }
-
-    public void imprimir(float num) {
-        System.out.println(num);
-    }
-
-    public void imprimir(double num) {
-        System.out.println(num);
-    }
-}`;
-
-// (end of unused placeholder — actual source is CONSOLA_IO_SOURCE from consolaIOSource.ts)
 
 function buildDefaultModelo(nombreModelo: string) {
   return `public class ${nombreModelo} {
@@ -281,7 +95,7 @@ interface MiniproyectoConfig {
   nombreModelo?: string;
   templateMain?: string;
   templateModelo?: string;
-  // Legacy fields — exercises created before MVC became the standard
+  // Campos legacy — ejercicios creados antes de que MVC fuera el estándar
   metodo?: unknown;
   casos_prueba?: CasoPrueba[];
 }
@@ -306,7 +120,7 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
 
   const nombreModelo = config?.nombreModelo || 'SeguridadBancaria';
   // MVC is the standard for all programming miniproyectos.
-  // Only fall back to legacy single-file mode when the exercise explicitly has a
+  // Usar modo legacy de archivo único solo cuando el ejercicio lo indique explícitamente
   // `metodo` field (exercises created before MVC became the standard).
   const isMvc = !config?.metodo;
 
@@ -372,7 +186,6 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
           }
         }
       } catch (error) {
-        console.error('Error al cargar miniproyecto:', error);
       } finally {
         setIsLoadingInfo(false);
       }
@@ -381,7 +194,7 @@ export function ProgrammingMiniproyectoView({ content, onBack }: ProgrammingMini
     cargarMiniproyecto();
   }, [content.id, API_BASE_URL]);
 
-  // Initialize MVC tab content once we know the model name and teacher templates
+  // Inicializar contenido de las pestañas MVC al conocer el nombre del modelo y plantillas
   useEffect(() => {
     if (isMvc) {
       setMainCode(config?.templateMain || buildDefaultMain(nombreModelo));

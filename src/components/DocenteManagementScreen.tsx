@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Building2, Eye, EyeOff, GraduationCap, Mail, Pencil, Plus, Search, Users, X } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
@@ -101,7 +102,6 @@ export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScr
       const data = await response.json();
       setAsignaturas(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Error loading asignaturas:', err);
       setAsignaturas([]);
     }
   };
@@ -120,7 +120,6 @@ export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScr
       const data = await response.json();
       setDocentes(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Error loading docentes:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar docentes');
     } finally {
       setLoading(false);
@@ -350,7 +349,6 @@ export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScr
       }
       handleCloseModal();
     } catch (err) {
-      console.error('Error saving docente:', err);
       const message = err instanceof Error ? err.message : 'Error al guardar docente';
       setError(message);
       if (!editingDocente) {
@@ -374,7 +372,7 @@ export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScr
             <div className="app-brand-block">
               <button type="button" onClick={onHome} title="Ir al panel principal">
                 <div className="app-brand-icon">
-                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                  <AppLogo size={48} />
                 </div>
               </button>
               <div>
@@ -396,7 +394,7 @@ export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScr
 
         {/* ── Toolbar: Estado + Búsqueda + Acción ── */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
-          <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: 40 }}>
+          <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto" style={{ background: '#e8eef8', height: 40 }}>
             {([
               { key: 'all',      label: `Todos (${stats.total})` },
               { key: 'active',   label: `Activos (${stats.activos})` },
@@ -433,7 +431,7 @@ export function DocenteManagementScreen({ onBack, onHome }: DocenteManagementScr
         </div>
 
         {/* ── 4 tarjetas de asignatura ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(asignaturas.length + 1, 5)}, 1fr)`, gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
           {/* Tarjeta "Todas" */}
           {(() => {
             const active = selectedAsignaturaFilter === 'all';

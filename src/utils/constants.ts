@@ -11,7 +11,7 @@ const stripTrailingSlash = (url: string) => url.trim().replace(/\/$/, '');
  * habla directamente al backend y CORS no aplica.
  */
 export const API_BASE_URL = import.meta.env.PROD
-  ? stripTrailingSlash(import.meta.env.VITE_API_BASE_URL?.trim() || 'http://localhost:4000')
+  ? stripTrailingSlash(import.meta.env.VITE_API_BASE_URL?.trim() || '/api')
   : '/api';
 
 export const API_PROXY_TARGET = import.meta.env.VITE_API_BASE_URL?.trim() ||

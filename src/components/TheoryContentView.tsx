@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import { AppLogo } from './AppLogo';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
@@ -331,7 +332,7 @@ const subjectColors: Record<string, string> = {
   'Fundamentos de Programación': '#4A90E2'
 };
 
-// Fallback data for subtemas
+// Datos de respaldo para subtemas
 const FALLBACK_MODULES: Module[] = [
   {
     id: 'fallback-1',
@@ -368,7 +369,7 @@ const getYouTubeEmbedUrl = (rawUrl?: string): string | null => {
   try {
     let candidate = rawUrl.trim();
 
-    // Legacy records may store full iframe HTML; extract src value if present.
+    // Registros legacy pueden tener HTML de iframe; extraer el valor src si existe.
     const iframeSrcMatch = candidate.match(/src=["']([^"']+)["']/i);
     if (iframeSrcMatch?.[1]) {
       candidate = iframeSrcMatch[1];
@@ -744,14 +745,12 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       );
       
       if (!response.ok) {
-        console.warn('No se pudo obtener estado de visualización');
         return false;
       }
       
       const data = await response.json();
       return data.visualizado || false;
     } catch (err) {
-      console.error('Error al obtener estado de visualización:', err);
       return false;
     }
   };
@@ -759,7 +758,6 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   // Obtener el mismo progreso de asignatura que se muestra en la pantalla anterior.
   const obtenerProgresoAsignatura = async () => {
     if (!estudianteId || (!asignaturaId && !temaId)) {
-      console.warn('No hay estudiante_id, asignaturaId o temaId disponibles');
       return;
     }
 
@@ -772,7 +770,6 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Error ${response.status}:`, errorText);
         setCurrentProgress(0);
         return;
       }
@@ -783,7 +780,6 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
         : data.resumen?.porcentajeTotalTema || 0;
       setCurrentProgress(Math.round(porcentaje));
     } catch (err) {
-      console.error('Error al obtener progreso:', err);
       setCurrentProgress(0);
     }
   };
@@ -830,7 +826,6 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
   // Marcar contenido como visualizado cuando se selecciona
   const marcarContenidoVisualizado = async (contenidoId: string) => {
     if (!estudianteId) {
-      console.warn('No hay estudiante_id disponible');
       return;
     }
 
@@ -887,7 +882,6 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       });
 
     } catch (err) {
-      console.error('Error al marcar contenido como visualizado:', err);
     }
   };
 
@@ -1054,14 +1048,13 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
         setEjercicioAsociado(null);
       }
     } catch (err) {
-      console.error('Error al cargar ejercicio asociado:', err);
       setEjercicioAsociado(null);
     } finally {
       setLoadingEjercicio(false);
     }
   };
 
-  // Fetch subtemas when temaId changes
+  // Cargar subtemas al cambiar temaId
   useEffect(() => {
     if (!temaId) {
       setModules(FALLBACK_MODULES);
@@ -1183,7 +1176,6 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
         }
 
       } catch (err) {
-        console.error('Error fetching subtemas:', err);
         setError(`Error loading subtemas: ${err instanceof Error ? err.message : 'Unknown error'}`);
         setModules(FALLBACK_MODULES);
         setLoading(false);
@@ -1193,10 +1185,10 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
     fetchSubtemas();
   }, [temaId, estudianteId, progresionSecuencial]);
 
-  // Fetch contenidos for a specific subtema
+  // Cargar contenidos de un subtema específico
   // ...existing code...
 
-  // Fetch contenidos for a specific subtema
+  // Cargar contenidos de un subtema específico
   const loadContenidosForSubtema = async (
     subtemaId: string,
     modulosActuales?: Module[],
@@ -1312,13 +1304,12 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
           );
         }
       } catch (err) {
-        console.error('Error al cargar ejercicios para el menú:', err);
         // No es crítico, continuar sin ejercicios
       }
 
       const gatedItems = aplicarServidorDesbloqueoContenidos(recalcularGatingItems(items), mapSrvContenidos);
 
-      // Update the module with the loaded items
+      // Actualizar el módulo con los contenidos cargados
       setModules(prevModules => {
         const updatedModules = prevModules.map(m =>
           m.id === subtemaId
@@ -1348,7 +1339,6 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
         setSelectedContentData(null);
       }
     } catch (err) {
-      console.error('Error fetching contenidos:', err);
       setModules(prevModules => 
         prevModules.map(m => 
           m.id === subtemaId 
@@ -1412,11 +1402,11 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
     <div className="h-screen bg-white flex flex-col overflow-hidden">
       {/* Barra superior: mismo estilo que el header global; ocupa todo el ancho */}
       <header className="app-header shrink-0">
-        <div className="px-8 py-4">
+        <div style={{ paddingInline: 'clamp(0.75rem, 3vw, 2rem)', paddingBlock: '1rem' }}>
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onHome} title="Ir al panel principal" className="app-brand-icon">
-                <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <h1>{subjectName}</h1>
@@ -1474,17 +1464,17 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
       </header>
 
       {/* ── Franja "Volver" compartida — ambas columnas arrancan aquí ── */}
-      <div className="shrink-0 flex items-center px-8 py-4 bg-white border-b border-gray-100">
+      <div className="shrink-0 flex items-center py-3 bg-white border-b border-gray-100" style={{ paddingInline: 'clamp(0.75rem, 3vw, 2rem)' }}>
         <button onClick={onBack} className="app-back-button">
           <ArrowLeft className="w-4 h-4" />
           <span>Volver</span>
         </button>
       </div>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="theory-layout flex flex-1 min-h-0 overflow-hidden">
 
         {/* ── Sidebar ── */}
-        <div className="w-48 flex-shrink-0 bg-white overflow-y-auto min-h-0">
+        <div className="theory-sidebar w-48 flex-shrink-0 bg-white overflow-y-auto min-h-0">
           <div className="px-3 pt-4 pb-6 space-y-2">
             {modules.map((module, idx) => {
               const isModuleLocked = module.desbloqueado === false;
@@ -1632,9 +1622,9 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
         <div className="w-px flex-shrink-0 bg-gray-200" />
 
         {/* ── Área de contenido derecha ── */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+        <div className="theory-content flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         {/* Main Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-white pt-4 px-8 pb-8">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-white pt-4 pb-8" style={{ paddingInline: 'clamp(0.75rem, 3vw, 2rem)' }}>
           <div className="mx-auto w-full max-w-[1500px]">
             {/* Content Display */}
             {/* Caso 1: Solo ejercicio (sin contenido) */}
@@ -1839,8 +1829,8 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                   />
                 ) : (
                   <div className="mb-6">
-                    <div className="rounded-2xl bg-white border border-gray-200 p-8 shadow-md">
-                      <h2 className="text-[#3A4A5B] mb-6 text-2xl font-semibold">{selectedContentData.title}</h2>
+                    <div className="rounded-2xl bg-white border border-gray-200 shadow-md" style={{ padding: 'clamp(1rem, 3vw, 2rem)' }}>
+                      <h2 className="text-[#3A4A5B] mb-4 font-semibold" style={{ fontSize: 'clamp(1.1rem, 3vw, 1.5rem)' }}>{selectedContentData.title}</h2>
 
                       {/* Mostrar imagen si la URL es una imagen */}
                       {selectedContentData.url && (selectedContentData.url.includes('jpg') || selectedContentData.url.includes('jpeg') || selectedContentData.url.includes('png') || selectedContentData.url.includes('gif') || selectedContentData.url.includes('webp')) && (

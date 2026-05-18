@@ -1,4 +1,5 @@
-import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Edit, Share2, Users, Lock, User } from 'lucide-react';
+﻿import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Edit, Share2, Users, Lock, User } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 import { useState, useEffect, useRef } from 'react';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { API_BASE_URL } from '../utils/constants';
@@ -337,7 +338,6 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
             });
           }
         } catch (minisError) {
-          console.warn('Error al cargar miniproyectos:', minisError);
         }
 
         const newTemasMap = new Map<string, string>();
@@ -371,11 +371,11 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
     <div className="min-h-screen bg-[#F2F2F2]">
       {/* Header */}
       <header className="app-header">
-        <div className="max-w-7xl mx-auto px-8 py-4">
+        <div className="max-w-7xl mx-auto py-4" style={{ paddingInline: 'clamp(1rem, 4vw, 2rem)' }}>
           <div className="app-page-header">
             <div className="app-brand-block">
               <div className="app-brand-icon">
-                <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </div>
               <div>
                 <h1>EduPath</h1>
@@ -396,7 +396,7 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="max-w-7xl mx-auto py-6" style={{ paddingInline: 'clamp(1rem, 4vw, 2rem)' }}>
         {/* Back Button */}
         <button
           onClick={onBack}
@@ -408,13 +408,15 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
 
         {/* Subject Header Card */}
         <div
-          className="rounded-2xl p-8 mb-8 shadow-lg text-white border border-white/10"
-          style={{ background: 'var(--app-header-gradient)' }}
+          className="subject-header-card rounded-2xl mb-6 shadow-lg text-white border border-white/10"
+          style={{ background: 'var(--app-header-gradient)', padding: 'clamp(1.25rem, 4vw, 2rem)' }}
         >
           <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h2 className="text-3xl mb-3">{subject.name}</h2>
-              <p className="text-white/90 text-lg">
+            <div className="flex-1 min-w-0">
+              <h2 className="subject-title mb-2" style={{ fontSize: 'clamp(1.1rem, 4vw, 1.875rem)', lineHeight: 1.25, fontWeight: 700 }}>
+                {subject.name}
+              </h2>
+              <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: 'clamp(0.8rem, 2.5vw, 1rem)' }}>
                 Aprende los fundamentos y conceptos esenciales a través de videos, documentos y ejercicios prácticos.
               </p>
             </div>
@@ -422,10 +424,10 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
         </div>
 
         {/* Progress Bar */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[#3A4A5B]">Progreso</h3>
-            <span className="text-2xl font-semibold" style={{ color: 'var(--app-header-accent)' }}>
+        <div className="bg-white rounded-xl shadow-md mb-6" style={{ padding: 'clamp(1rem, 3vw, 1.5rem)' }}>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[#3A4A5B]" style={{ fontSize: 'clamp(0.9rem, 2.5vw, 1rem)' }}>Progreso</h3>
+            <span className="font-semibold" style={{ fontSize: 'clamp(1.1rem, 4vw, 1.5rem)', color: 'var(--app-header-accent)' }}>
               {`${currentProgress}%`}
             </span>
           </div>
@@ -479,9 +481,9 @@ export function SubjectContentScreen({ subject, onBack, onContentSelect, estudia
             return (
               <button
                 key={`${content.id}-${content.isMiniproyecto ? 'miniproyecto' : 'tema'}`}
-                className={`w-full bg-white rounded-xl shadow-md transition-all duration-300 p-5 text-left group ${
-                  isLocked 
-                    ? 'opacity-60 cursor-not-allowed' 
+                className={`subject-content-card w-full bg-white rounded-xl shadow-md transition-all duration-300 p-5 text-left group ${
+                  isLocked
+                    ? 'opacity-60 cursor-not-allowed'
                     : 'hover:shadow-lg'
                 }`}
                 onClick={() => {

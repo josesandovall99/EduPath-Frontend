@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -58,17 +58,17 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center"
-      style={{ background: 'radial-gradient(ellipse at center, #1e3a5f 0%, #16294a 50%, #0d1e36 100%)' }}
+      style={{ background: 'radial-gradient(ellipse at center, #1e3a5f 0%, #16294a 50%, #0d1e36 100%)', padding: '1rem' }}
     >
-      {/* Card dos mitades — igual al login */}
+      {/* Card dos mitades */}
       <div
-        className="flex rounded-2xl overflow-hidden shadow-2xl"
-        style={{ width: '780px', maxWidth: '95vw', minHeight: '480px' }}
+        className="auth-card"
+        style={{ maxWidth: '780px', minHeight: '480px' }}
       >
         {/* ── Panel izquierdo: marca ── */}
         <div
-          className="relative flex flex-col items-center justify-center gap-5"
-          style={{ width: '50%', background: 'linear-gradient(160deg, #1a56db 0%, #1e429f 40%, #1a3a7c 70%, #142d61 100%)' }}
+          className="auth-card__brand relative flex flex-col items-center justify-center gap-5"
+          style={{ background: 'linear-gradient(160deg, #1a56db 0%, #1e429f 40%, #1a3a7c 70%, #142d61 100%)' }}
         >
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div style={{ position: 'absolute', width: '260px', height: '260px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.08)', top: '-60px', left: '-60px' }} />
@@ -97,8 +97,8 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
 
         {/* ── Panel derecho: formulario ── */}
         <div
-          className="flex flex-col justify-between"
-          style={{ width: '50%', background: '#f0f5ff', padding: '36px 32px 24px' }}
+          className="auth-card__form flex flex-col justify-between"
+          style={{ background: '#f0f5ff', padding: '36px 32px 24px' }}
         >
           <div>
             <h2 className="font-bold mb-5" style={{ fontSize: '22px', color: '#1e3a5f' }}>
@@ -148,7 +148,7 @@ export function ChangePasswordScreen({ onComplete, isFirstLogin = false, persona
                 {true && (
                   <div style={{ marginTop: 10, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
                     <p style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Requisitos</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
                       {passwordRequirements.map((req, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {req.met

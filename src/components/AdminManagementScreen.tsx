@@ -1,5 +1,6 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { ArrowLeft, Plus, X } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { API_BASE_URL } from '../utils/constants';
 
@@ -103,7 +104,7 @@ export function AdminManagementScreen({ onBack, onHome }: AdminManagementScreenP
             <div className="app-brand-block">
               <button type="button" onClick={onHome} title="Ir al panel principal">
                 <div className="app-brand-icon">
-                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                  <AppLogo size={48} />
                 </div>
               </button>
               <div>

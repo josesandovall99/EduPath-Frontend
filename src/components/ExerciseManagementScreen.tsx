@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { ArrowLeft, Plus, Edit, Eye, EyeOff, Search, Loader, Trash2, AlertCircle, Lock } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 
 import { JavaEditor } from './JavaEditor';
 
@@ -1009,7 +1010,7 @@ function CompiladorConfig({ formData, setFormData }: { formData: ExerciseFormDat
 
                 style={{
 
-                  gridTemplateColumns: '140px 1fr',
+                  gridTemplateColumns: 'minmax(100px, 140px) 1fr',
 
                   padding: '14px 18px',
 
@@ -2711,7 +2712,6 @@ export function ExerciseManagementScreen({
 
     } catch (err) {
 
-      console.error(err);
 
       toast.error('Error', { description: 'No se pudieron cargar los ejercicios' });
 
@@ -2901,7 +2901,6 @@ export function ExerciseManagementScreen({
 
     } catch (err) {
 
-      console.error(err);
 
       toast.error('Error', { description: 'No se pudieron cargar los contenidos para el selector' });
 
@@ -2937,7 +2936,6 @@ export function ExerciseManagementScreen({
 
     } catch (err) {
 
-      console.error(err);
 
       toast.error('Error', { description: 'No se pudieron cargar los tipos de actividad' });
 
@@ -3038,7 +3036,6 @@ export function ExerciseManagementScreen({
 
 
     } catch (err) {
-      console.error('Error al cambiar estado:', err);
 
     }
 
@@ -3943,7 +3940,6 @@ export function ExerciseManagementScreen({
 
       if (!res.ok) {
 
-        // Try to extract detailed error info
 
         let serverMessage = '';
 
@@ -4043,7 +4039,7 @@ export function ExerciseManagementScreen({
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
@@ -4081,9 +4077,9 @@ export function ExerciseManagementScreen({
         </nav>
 
         {/* Toolbar principal */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="app-filter-bar mb-4">
           {/* Pills estado */}
-          <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: '40px' }}>
+          <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto" style={{ background: '#e8eef8', height: '40px' }}>
             {[
               { key: 'all',      label: `Todos (${jerarchicallyVisible.length})` },
               { key: 'active',   label: `Activos (${activeExercisesCount})` },

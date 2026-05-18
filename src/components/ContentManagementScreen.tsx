@@ -1,5 +1,7 @@
+﻿import 'quill/dist/quill.snow.css';
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, ArrowRight, Plus, FileText, PlayCircle, Edit, Eye, EyeOff, Search, Loader, TrendingUp } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 import { toast } from 'sonner';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { buildAuthHeaders } from '../utils/authHeaders';
@@ -204,7 +206,6 @@ export function ContentManagementScreen({
         setAsignaturas(data);
       }
     } catch (err) {
-      console.error('Error cargando asignaturas:', err);
     }
   };
 
@@ -219,7 +220,6 @@ export function ContentManagementScreen({
         setTemas(data);
       }
     } catch (err) {
-      console.error('Error cargando temas:', err);
       setTemas([]);
     }
   };
@@ -235,7 +235,6 @@ export function ContentManagementScreen({
         setSubtemas(data);
       }
     } catch (err) {
-      console.error('Error cargando subtemas:', err);
       setSubtemas([]);
     }
   };
@@ -389,7 +388,6 @@ export function ContentManagementScreen({
 
       setContents(contenidosMapeados);
     } catch (err) {
-      console.error('Error cargando contenidos:', err);
       toast.error('Error', {
         description: 'No se pudieron cargar los contenidos'
       });
@@ -541,7 +539,6 @@ export function ContentManagementScreen({
           setSelectedasignaturaId(tema.asignatura_id.toString());
         }
       } catch (err) {
-        console.error('Error cargando tema:', err);
       }
     }
 
@@ -566,7 +563,6 @@ export function ContentManagementScreen({
         item.id === content.id ? { ...item, estado: updatedEstado, status: updatedEstado ? 'published' : 'draft' } : item
       ));
     } catch (err) {
-      console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -580,11 +576,11 @@ export function ContentManagementScreen({
     }));
   };
 
-  // Rich text editor ref and helpers
+  // Ref y helpers del editor de texto enriquecido
   const editorRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
 
-  // Initialize Quill when modal opens and sync content.
+  // Inicializar Quill al abrir el modal y sincronizar contenido.
   useEffect(() => {
     let cancelled = false;
 
@@ -742,7 +738,7 @@ export function ContentManagementScreen({
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
@@ -796,7 +792,7 @@ export function ContentManagementScreen({
         )}
 
         {/* Toolbar compacta */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="app-filter-bar mb-4">
           {/* Búsqueda */}
           <div className="flex items-center gap-2 flex-1 min-w-[200px] rounded-xl px-3"
             style={{ background: '#fff', border: '1.5px solid #bfd3f5', height: '40px' }}>
@@ -807,11 +803,9 @@ export function ContentManagementScreen({
               className="flex-1 outline-none text-sm bg-transparent" style={{ color: '#1e3a5f' }} />
           </div>
           {/* Filtros de tipo */}
-          <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: '40px' }}>
+          <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto" style={{ background: '#e8eef8', height: '40px' }}>
             {[
               { key: 'all', label: 'Todos' },
-              { key: 'video', label: 'Videos' },
-              { key: 'document', label: 'Docs' },
               { key: 'explicacion', label: 'Explicación' },
               { key: 'simulacion_ruta_critica', label: 'CPM' },
               { key: 'simulador_curva_s', label: 'Curva S EVM' },
@@ -824,7 +818,7 @@ export function ContentManagementScreen({
             ))}
           </div>
           {/* Estado */}
-          <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: '40px' }}>
+          <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto" style={{ background: '#e8eef8', height: '40px' }}>
             {[
               { key: 'all', label: 'Todos' },
               { key: 'active', label: `Activos (${activeContentsCount})` },

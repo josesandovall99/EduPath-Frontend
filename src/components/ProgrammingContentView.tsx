@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 
 import { AlertCircle, ArrowLeft, CheckCircle2, Lightbulb, Loader2, Lock, Trash2, XCircle } from 'lucide-react';
 
@@ -404,7 +404,7 @@ function TerminalOutput({ output }: { output: string }) {
 
         {output.split('\n').map((line, i) => {
 
-          // Highlight input values (appended after prompts ending in ':')
+          // Resaltar valores de entrada (después de prompts que terminan en ':')
 
           const promptMatch = line.match(/^(.*:\s*)(.+)$/);
 
@@ -1432,7 +1432,6 @@ export function ProgrammingContentView({ content, onBack, onComplete, embedded =
 
       } catch (error) {
 
-        console.error('Error al cargar ejercicio:', error);
 
       } finally {
 

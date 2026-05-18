@@ -1,4 +1,4 @@
-import { ClipboardList, Code2, GitBranchPlus, Grip, LayoutGrid, ListChecks, Lock, MessagesSquare, Plus, Shapes, Trash2 } from 'lucide-react';
+﻿import { ClipboardList, Code2, GitBranchPlus, Grip, LayoutGrid, ListChecks, Lock, MessagesSquare, Plus, Shapes, Trash2 } from 'lucide-react';
 import {
   PM_EXERCISE_FORM_TYPES,
   PM_EXERCISE_LABELS,
@@ -375,7 +375,7 @@ export function ConfigurableEmbeddedExerciseEditor({ exercises, onChange, suppor
                       </section>
 
                       {/* Título / Tipo / Puntos en 3 columnas */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '12px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '11px', fontWeight: 700, color: '#1a56db', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Título</label>
                           <input value={exercise.titulo} onChange={e => handleUpdateExercise(index, { titulo: e.target.value })} className="app-form-input" style={{ fontSize: '13px' }} />

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 
 import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight, ArrowDownUp } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 
@@ -183,7 +184,7 @@ export function SubtemaSequenceManagementScreen({
 
 
 
-  // Drag and drop
+  // Arrastrar y soltar
 
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
 
@@ -229,7 +230,7 @@ export function SubtemaSequenceManagementScreen({
 
 
 
-  // Set Asignatura when asignaturaId is provided
+  // Asignar asignatura cuando se provee asignaturaId
 
   useEffect(() => {
 
@@ -243,7 +244,7 @@ export function SubtemaSequenceManagementScreen({
 
 
 
-  // Set tema when temaId is provided
+  // Asignar tema cuando se provee temaId
 
   useEffect(() => {
 
@@ -343,7 +344,6 @@ export function SubtemaSequenceManagementScreen({
 
     } catch (err) {
 
-      console.error('Error en loadData:', err);
 
       setError(err instanceof Error ? err.message : 'Error al cargar datos');
 
@@ -377,7 +377,7 @@ export function SubtemaSequenceManagementScreen({
 
     
 
-    // Filter by Asignatura if asignaturaId is provided
+    // Filtrar por asignatura si se provee asignaturaId
 
     if (effectiveSelectedAsignatura) {
 
@@ -393,7 +393,7 @@ export function SubtemaSequenceManagementScreen({
 
     
 
-    // Filter by tema if selected
+    // Filtrar por tema si está seleccionado
 
     if (effectiveSelectedTema) {
 
@@ -833,7 +833,6 @@ export function SubtemaSequenceManagementScreen({
 
         } catch (err) {
 
-          console.error('Error cargando temas para modal:', err);
 
           setModalTemas([]);
 
@@ -961,7 +960,6 @@ export function SubtemaSequenceManagementScreen({
 
         } catch (err) {
 
-          console.error('Error cargando temas:', err);
 
           setTemas([]);
 
@@ -1790,7 +1788,7 @@ export function SubtemaSequenceManagementScreen({
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
@@ -2240,7 +2238,7 @@ export function SubtemaSequenceManagementScreen({
           style={{ background: 'rgba(10,20,50,0.45)', backdropFilter: 'blur(4px)' }}
           onClick={() => { setShowCreateModal(false); resetForm(); }}>
           <div className="rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-            style={{ width: '460px', maxHeight: '90vh', background: '#fff' }}
+            style={{ width: '100%', maxWidth: '460px', maxHeight: '90vh', background: '#fff' }}
             onClick={e => e.stopPropagation()}>
 
             {/* Cabecera azul */}

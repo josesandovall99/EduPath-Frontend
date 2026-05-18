@@ -1,14 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { Bot, Send } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 import { buildAuthHeaders } from '../utils/authHeaders';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { preprocessForMarkdown } from '../utils/markdown';
+import { getChatbotResolveKey, getCachedChatbot, setCachedChatbot } from '../utils/chatbotResolveCache';
 
 const CHATBOT_TIMEOUT_MS = 120000;
 
 type ChatbotType = 'GENERAL' | 'MINIPROYECTO';
+
+interface ResolvedChatbot {
+  id: number;
+  nombre: string;
+  tipo: ChatbotType;
+  fallback?: boolean;
+}
+
 
 interface MiniproyectoChatbotPanelProps {
   chatbotType?: ChatbotType;
@@ -17,13 +26,6 @@ interface MiniproyectoChatbotPanelProps {
   title?: string;
   subtitle?: string;
   contextLabel?: string;
-}
-
-interface ResolvedChatbot {
-  id: number;
-  nombre: string;
-  tipo: ChatbotType;
-  fallback?: boolean;
 }
 
 function toOptionalPositiveId(value: unknown): number | undefined {
@@ -96,44 +98,47 @@ export function MiniproyectoChatbotPanel({
     let cancelled = false;
 
     const resolveChatbot = async () => {
+      if (!localStorage.getItem('authToken')) { setIsResolving(false); return; }
+
+      const parsedAsignaturaId = toOptionalPositiveId(asignaturaId);
+      const parsedMiniproyectoId = toOptionalPositiveId(miniproyectoId);
+      const cacheKey = getChatbotResolveKey(chatbotType, parsedAsignaturaId, parsedMiniproyectoId);
+
+      const cached = getCachedChatbot(cacheKey);
+      if (cached.found) {
+        setResolvedChatbot(cached.value);
+        setMessages([{ text: buildWelcomeMessage(chatbotType, cached.value?.nombre, contextLabel, !cached.value), isBot: true }]);
+        setIsResolving(false);
+        return;
+      }
+
       setIsResolving(true);
       try {
         const searchParams = new URLSearchParams();
         searchParams.set('tipo', chatbotType);
         searchParams.set('allow_fallback', 'false');
-
-        const parsedasignaturaId = toOptionalPositiveId(asignaturaId);
-        const shouldSendasignaturaId = chatbotType === 'GENERAL' || chatbotType === 'MINIPROYECTO';
-        if (shouldSendasignaturaId && parsedasignaturaId !== undefined) {
-          searchParams.set('asignatura_id', String(parsedasignaturaId));
-        }
-
-        const parsedMiniproyectoId = toOptionalPositiveId(miniproyectoId);
-        if (chatbotType === 'MINIPROYECTO' && parsedMiniproyectoId !== undefined) {
+        if (parsedAsignaturaId !== undefined)
+          searchParams.set('asignatura_id', String(parsedAsignaturaId));
+        if (chatbotType === 'MINIPROYECTO' && parsedMiniproyectoId !== undefined)
           searchParams.set('miniproyecto_id', String(parsedMiniproyectoId));
-        }
 
         const response = await fetch(`${API_BASE_URL}/chatbots/resolve?${searchParams.toString()}`, {
           headers: buildAuthHeaders(),
         });
-        if (!response.ok) {
-          throw new Error(response.status === 404 ? 'not_found' : 'resolve_failed');
-        }
+        if (!response.ok) throw new Error(response.status === 404 ? 'not_found' : 'resolve_failed');
 
-        const data = await response.json();
+        const data: ResolvedChatbot = await response.json();
+        setCachedChatbot(cacheKey, data);
         if (cancelled) return;
-
         setResolvedChatbot(data);
         setMessages([{ text: buildWelcomeMessage(chatbotType, data?.nombre, contextLabel), isBot: true }]);
-      } catch (error) {
+      } catch {
+        setCachedChatbot(cacheKey, null);
         if (cancelled) return;
-        console.error('Error resolving managed chatbot panel:', error);
         setResolvedChatbot(null);
         setMessages([{ text: buildWelcomeMessage(chatbotType, null, contextLabel, true), isBot: true }]);
       } finally {
-        if (!cancelled) {
-          setIsResolving(false);
-        }
+        if (!cancelled) setIsResolving(false);
       }
     };
 
@@ -210,7 +215,6 @@ export function MiniproyectoChatbotPanel({
         setMessages((prev) => replaceLastBotMessage(prev, 'Respuesta no disponible.'));
       }
     } catch (error) {
-      console.error('Error in managed chatbot panel:', error);
       setMessages((prev) => replaceLastBotMessage(
         prev,
         error instanceof Error && (error.name === 'AbortError' || error.message === 'timeout')

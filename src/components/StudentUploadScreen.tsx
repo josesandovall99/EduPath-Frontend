@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, X, ArrowLeft, Users, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { API_BASE_URL } from '../utils/constants';
@@ -72,7 +72,6 @@ export function StudentUploadScreen({ onBack }: StudentUploadScreenProps) {
       });
 
     } catch (err: any) {
-      console.error(err);
       // Si falla, mostramos el error general
       setServerError(err.message);
       setResult({

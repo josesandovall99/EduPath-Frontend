@@ -1,4 +1,4 @@
-let quillPromise: Promise<any> | null = null;
+﻿let quillPromise: Promise<any> | null = null;
 let quillConfigured = false;
 
 export const sharedQuillToolbar = [
@@ -62,7 +62,6 @@ export const loadQuill = async () => {
       FontStyle.whitelist = ['Algerian', 'Roboto', 'Monospace'];
       Quill.register(FontStyle, true);
     } catch (err) {
-      console.warn('Quill format registration failed', err);
     }
 
     quillConfigured = true;

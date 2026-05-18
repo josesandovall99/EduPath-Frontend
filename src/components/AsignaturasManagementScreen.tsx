@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { ArrowLeft, Eye, EyeOff, Pencil, Plus, Search, X } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { AdminFlowGuide } from './ui/AdminFlowGuide';
 import { buildAuthHeaders } from '../utils/authHeaders';
@@ -70,6 +71,7 @@ export function AsignaturasManagementScreen({ onBack, onHome, onSelectAsignatura
   }, []);
 
   const loadAsignaturas = async () => {
+    if (!localStorage.getItem('authToken')) { setIsLoading(false); return; }
     setIsLoading(true);
     setError(null);
     try {
@@ -83,7 +85,6 @@ export function AsignaturasManagementScreen({ onBack, onHome, onSelectAsignatura
       const data = await response.json();
       setAsignaturas(data);
     } catch (err) {
-      console.error('Error en loadAsignaturas:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar asignaturas');
     } finally {
       setIsLoading(false);
@@ -284,7 +285,7 @@ export function AsignaturasManagementScreen({ onBack, onHome, onSelectAsignatura
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onHome} className="app-brand-icon" title="Ir al panel principal">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <h1>{isDocenteMode ? 'Mis asignaturas' : 'Gestión de asignaturas'}</h1>

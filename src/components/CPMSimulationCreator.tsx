@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CPMSimulationCreator — Editor de tabla CPM para la profesora
  * Diseño idéntico a la tabla de referencia: Actividad | Predecesores inmediatos | Tiempo (días)
  */
@@ -160,7 +160,7 @@ export function CPMSimulationCreator({ initialActivities = DEFAULT_ROWS, onSave,
   const updateId = (i: number, val: string) => {
     const newId = val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
     const oldId = rows[i].id;
-    // Update predecessors references in other rows
+    // Actualizar referencias a predecesoras en otras filas
     setRows(prev => prev.map((r, idx) =>
       idx === i
         ? { ...r, id: newId }
@@ -237,10 +237,10 @@ export function CPMSimulationCreator({ initialActivities = DEFAULT_ROWS, onSave,
       )}
 
       {/* Tabla — idéntica al diseño de referencia */}
-      <div style={{ borderRadius: 12, overflow: 'visible', boxShadow: '0 2px 12px rgba(26,86,219,0.10)', marginBottom: 16 }}>
+      <div style={{ borderRadius: 12, overflowX: 'auto', boxShadow: '0 2px 12px rgba(26,86,219,0.10)', marginBottom: 16 }}>
 
         {/* Header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr 44px', background: '#1a56db' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr 44px', background: '#1a56db', minWidth: '400px' }}>
           {['Actividad', 'Predecesores inmediatos', 'Tiempo (días)', ''].map(h => (
             <div key={h} style={{ padding: '12px 16px', color: '#fff', fontWeight: 700, fontSize: 13, textAlign: 'center' }}>{h}</div>
           ))}

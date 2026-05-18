@@ -313,3 +313,150 @@ body {
   color: #06c;
   text-decoration: underline;
 }
+
+/* ─── RESPONSIVE GLOBAL ─────────────────────────────────────────────────────
+   Solo reglas seguras que NO sobreescriben el sistema de diseño existente.
+   admin-consistency.css ya maneja max-width 767px y 1023px.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Tablas: el body hace scroll horizontal sin romper dropdowns */
+.app-table-card {
+  min-width: 0;  /* permite que el flex item se comprima */
+}
+
+.app-table-card__body {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Pantalla de autenticación: card responsivo en mobile */
+.auth-card {
+  display: flex;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4);
+  width: 100%;
+}
+
+.auth-card__brand {
+  width: 50%;
+  flex-shrink: 0;
+}
+
+.auth-card__form {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .auth-card {
+    flex-direction: column;
+  }
+
+  /* En mobile: franja compacta horizontal en lugar de panel vertical */
+  .auth-card__brand {
+    width: 100% !important;
+    flex-direction: row !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 16px 20px !important;
+    min-height: 0 !important;
+  }
+
+  /* Ocultar círculos decorativos en mobile */
+  .auth-card__brand > .absolute {
+    display: none !important;
+  }
+
+  /* Logo más pequeño en mobile */
+  .auth-card__brand .auth-logo-circle {
+    width: 52px !important;
+    height: 52px !important;
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.25) !important;
+  }
+
+  .auth-card__brand .auth-logo-circle img {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  /* Texto más compacto */
+  .auth-card__brand h1 {
+    font-size: 20px !important;
+    letter-spacing: 0 !important;
+    margin: 0 !important;
+  }
+
+  .auth-card__brand p {
+    font-size: 11px !important;
+    margin-top: 1px !important;
+  }
+
+  .auth-card__brand .text-center {
+    text-align: left !important;
+  }
+
+  .auth-card__form {
+    width: 100%;
+  }
+}
+
+/* ── TheoryContentView: layout de dos columnas responsivo ────────────── */
+@media (max-width: 640px) {
+  /* En mobile: sidebar ocupa ancho completo, contenido debajo */
+  .theory-layout {
+    flex-direction: column !important;
+  }
+
+  /* Sidebar: ancho completo, altura auto (no ocupa toda la pantalla) */
+  .theory-sidebar {
+    width: 100% !important;
+    max-height: 45vh;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  /* Área de contenido: toma el espacio restante */
+  .theory-content {
+    min-height: 0;
+  }
+}
+
+/* ── SubjectContentScreen: card de contenidos más compacto en mobile ─── */
+@media (max-width: 600px) {
+  /* Reducir padding lateral del header y main */
+  .max-w-7xl.mx-auto {
+    padding-inline: clamp(0.75rem, 3vw, 1rem);
+  }
+
+  /* Icono de tipo de contenido más pequeño */
+  .subject-content-card .w-14 {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+  }
+
+  /* Ocultar badge de estado en mobile para ganar espacio */
+  .subject-content-card .flex.items-center.gap-3.flex-shrink-0 > :first-child {
+    display: none;
+  }
+}
+
+/* Barra de filtros: scroll horizontal en mobile pequeño */
+.app-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .app-filter-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .app-filter-bar > * {
+    flex-shrink: 0;
+  }
+}

@@ -78,7 +78,51 @@ export default defineConfig(({ mode }) => {
       sourcemap: false,
       reportCompressedSize: false,
       assetsInlineLimit: 4096,
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 1500,
+      // Minificación JS con esbuild + CSS con lightningcss
+      minify: 'esbuild',
+      cssMinify: true,
+      rollupOptions: {
+        output: {
+          // Code splitting manual: separa librerías pesadas en chunks cacheables
+          manualChunks(id) {
+            // React core — carga siempre, debe estar en chunk propio para cache
+            if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+              return 'vendor-react';
+            }
+            // Radix UI — muchos componentes, chunk independiente
+            if (id.includes('node_modules/@radix-ui/')) {
+              return 'vendor-radix';
+            }
+            // Recharts + d3 — solo se usa en Reports/Dashboard, chunk separado
+            if (id.includes('node_modules/recharts') || id.includes('node_modules/d3') || id.includes('node_modules/victory')) {
+              return 'vendor-charts';
+            }
+            // Librerías pesadas de edición: cargan solo en pantallas específicas
+            if (id.includes('node_modules/quill') || id.includes('node_modules/react-quill')) {
+              return 'vendor-quill';
+            }
+            if (id.includes('node_modules/@monaco-editor') || id.includes('node_modules/monaco-editor')) {
+              return 'vendor-monaco';
+            }
+            if (id.includes('node_modules/jointjs') || id.includes('node_modules/@joint')) {
+              return 'vendor-joint';
+            }
+            // Markdown y resaltado de código
+            if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark') || id.includes('node_modules/rehype')) {
+              return 'vendor-markdown';
+            }
+            // Resto de node_modules como vendor general
+            if (id.includes('node_modules/')) {
+              return 'vendor-misc';
+            }
+          },
+        },
+        treeshake: {
+          moduleSideEffects: false,
+          propertyReadSideEffects: false,
+        },
+      },
     },
     server: {
       port: 3000,
@@ -94,8 +138,6 @@ export default defineConfig(({ mode }) => {
     },
     preview: {
       port: 4173,
-      // Mismo proxy que dev: el browser habla con Vite (mismo origen),
-      // Vite reenvía al backend. CORS no aplica nunca.
       proxy: {
         '/api': {
           target: devProxyTarget,
@@ -108,6 +150,8 @@ export default defineConfig(({ mode }) => {
         'X-Frame-Options': 'DENY',
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
+        // Permite bfcache (back/forward cache) sin guardar en disco
+        'Cache-Control': 'public, max-age=0, must-revalidate',
       },
     },
   };

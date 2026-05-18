@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './constants';
+﻿import { API_BASE_URL } from './constants';
 
 export interface MvcArchivos {
   main: string;
@@ -55,7 +55,7 @@ export async function submitMiniproyecto(
     try {
       data = await res.json();
     } catch {
-      // Non-JSON or empty body
+      // Cuerpo no-JSON o vacío
     }
 
     return { status: res.status, data, message: data && (data.message || data.error) };

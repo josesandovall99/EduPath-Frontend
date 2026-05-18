@@ -1,5 +1,7 @@
+﻿import 'quill/dist/quill.snow.css';
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Code, Database, BarChart3, Eye, EyeOff, ChevronUp, ChevronDown, ToggleLeft, ToggleRight, Plus, Edit2, Search, X } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 import axios from 'axios';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { AdminFlowGuide } from './ui/AdminFlowGuide';
@@ -97,7 +99,7 @@ export function SubThemeManagementScreen({
   const editorRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
 
-  // Initialize Quill when modal opens
+  // Inicializar Quill al abrir el modal
   useEffect(() => {
     let cancelled = false;
 
@@ -181,7 +183,6 @@ export function SubThemeManagementScreen({
         }
         
         setError(errorMessage);
-        console.error('Error fetching asignaturas:', err);
       } finally {
         setLoading(false);
       }
@@ -242,7 +243,6 @@ export function SubThemeManagementScreen({
         
         setTemasError(errorMessage);
         setTemas([]);
-        console.error('Error fetching temas:', err);
       } finally {
         setTemasLoading(false);
       }
@@ -289,7 +289,6 @@ export function SubThemeManagementScreen({
         
         setSubtemasError(errorMessage);
         setSubtemas([]);
-        console.error('Error fetching subtemas:', err);
       } finally {
         setSubtemasLoading(false);
       }
@@ -332,7 +331,6 @@ export function SubThemeManagementScreen({
           setSubtemas(subtemasResponse.data.filter((subtema) => subtema.tema_id === temaObjetivo));
         }
       } catch (refreshError) {
-        console.warn('Auto-actualización de subtemas omitida temporalmente:', refreshError);
       }
     }, 120000); // 2 minutos
 
@@ -411,7 +409,6 @@ export function SubThemeManagementScreen({
       }
       handleCloseModal();
     } catch (err) {
-      console.error('Error saving subtema:', err);
       setError(err instanceof Error ? err.message : 'No se pudo guardar el subtema.');
     } finally {
       setSubmitting(false);
@@ -444,7 +441,6 @@ export function SubThemeManagementScreen({
         s.id === subtema.id ? { ...s, estado: updatedEstado } : s
       ));
     } catch (err) {
-      console.error('Error toggling subtema:', err);
       window.alert(`No se pudo cambiar el estado: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     }
   };
@@ -522,7 +518,7 @@ export function SubThemeManagementScreen({
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
@@ -569,7 +565,7 @@ export function SubThemeManagementScreen({
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
               {/* Filtros */}
-              <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: '40px' }}>
+              <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto" style={{ background: '#e8eef8', height: '40px' }}>
                 {[
                   { key: 'all',      label: `Todos (${subtemas.length})` },
                   { key: 'active',   label: `Activos (${activeSubtemas})` },
@@ -697,7 +693,7 @@ export function SubThemeManagementScreen({
         <div className="fixed inset-0 z-[100] flex items-center justify-center"
           style={{ background: 'rgba(10,20,50,0.45)', backdropFilter: 'blur(4px)' }}
           onClick={handleCloseModal}>
-          <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ width: '620px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: '#fff' }}
+          <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ width: '100%', maxWidth: '620px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: '#fff' }}
             onClick={e => e.stopPropagation()}>
             {/* Cabecera azul */}
             <div style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>

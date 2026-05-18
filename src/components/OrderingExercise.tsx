@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { resolveExercise } from '../utils/resolveExercise';
 import { submitExercise } from '../utils/submitExercise';
@@ -55,7 +55,7 @@ export function OrderingExercise({ activity, enunciado = 'Ordena los elementos c
     setList(arr);
   };
 
-  // Simple HTML5 drag & drop for better UX
+
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const onDragStart = (idx: number) => setDragIndex(idx);
   const onDragOver = (e: React.DragEvent<HTMLDivElement>) => e.preventDefault();

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { ArrowLeft, ClipboardList, Eye, EyeOff, Plus, RefreshCw, Save, Search } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 
 import { JavaEditor } from './JavaEditor';
 
@@ -692,7 +693,6 @@ export function MiniproyectoManagementScreen({
 
     } catch (err) {
 
-      console.error('Error cargando datos auxiliares de miniproyectos:', err);
 
       setError((previousError) => previousError || (err instanceof Error ? err.message : 'Error al cargar asignaturas y chatbots'));
 
@@ -720,7 +720,6 @@ export function MiniproyectoManagementScreen({
 
     } catch (err) {
 
-      console.error('Error cargando chatbots:', err);
 
     }
 
@@ -764,7 +763,6 @@ export function MiniproyectoManagementScreen({
 
     } catch (err) {
 
-      console.error('Error en loadMiniproyectos:', err);
 
       setError(err instanceof Error ? err.message : 'Error al cargar miniproyectos');
 
@@ -1550,7 +1548,6 @@ export function MiniproyectoManagementScreen({
 
     } catch (err) {
 
-      console.error('Error actualizando publicación del miniproyecto:', err);
 
       setError(err instanceof Error ? err.message : 'Error al actualizar la asignación del miniproyecto del asignatura');
 
@@ -1798,7 +1795,6 @@ export function MiniproyectoManagementScreen({
 
     } catch (err) {
 
-      console.error('Error creando miniproyecto configurable:', err);
 
       setCreateError(err instanceof Error ? err.message : 'Error al crear el miniproyecto configurable');
 
@@ -2074,7 +2070,6 @@ export function MiniproyectoManagementScreen({
 
     } catch (err) {
 
-      console.error('Error actualizando miniproyecto:', err);
 
       setError(err instanceof Error ? err.message : 'Error al actualizar el miniproyecto');
 
@@ -2138,7 +2133,7 @@ export function MiniproyectoManagementScreen({
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
@@ -2170,7 +2165,7 @@ export function MiniproyectoManagementScreen({
         </nav>
 
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="app-filter-bar mb-6">
           {/* Asignatura — solo en modo global */}
           {!docenteAsignaturaId && !isDocenteMode && (
             <select value={selectedAsignaturaFilterId} onChange={e => setSelectedAsignaturaFilterId(e.target.value)}
@@ -2814,7 +2809,7 @@ export function MiniproyectoManagementScreen({
 
                         </p>
 
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
                           {mvcCasosPrueba.map((caso, idx) => (
 
@@ -3005,13 +3000,13 @@ export function MiniproyectoManagementScreen({
 
                           <label className="text-sm text-gray-600">Hitos del proyecto</label>
 
-                          <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
+                          <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 overflow-x-auto">
 
                             <div
 
                               className="bg-gray-50 text-[11px] text-gray-500"
 
-                              style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr auto' }}
+                              style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr auto', minWidth: '400px' }}
 
                             >
 
@@ -3169,7 +3164,7 @@ export function MiniproyectoManagementScreen({
 
                               className="bg-gray-50 text-[11px] text-gray-500"
 
-                              style={{ display: 'grid', gridTemplateColumns: '2.5fr 0.9fr 1.2fr 1fr' }}
+                              style={{ display: 'grid', gridTemplateColumns: '2.5fr 0.9fr 1.2fr 1fr', minWidth: '440px' }}
 
                             >
 

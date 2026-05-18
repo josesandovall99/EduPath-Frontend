@@ -57,8 +57,11 @@ export function StudentTrackingScreen({ onBack }: StudentTrackingScreenProps) {
       setError(null);
       try {
         const token = localStorage.getItem('authToken');
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
+        if (!token) { setLoading(false); return; }
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        };
 
         const res = await fetch(`${API_BASE_URL}/progresos/resumen-general`, { headers });
         if (!res.ok) throw new Error(`Error ${res.status}`);

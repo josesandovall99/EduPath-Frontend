@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Circle, ClipboardList, Settings, XCircle, Trophy, AlertTriangle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 import { MiniproyectoChatbotPanel } from './MiniproyectoChatbotPanel';
@@ -515,7 +515,7 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
             {/* ── Stats cards ── */}
-            <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+            <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px' }}>
               <article style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderRadius: '16px', borderLeft: '5px solid #2563EB', padding: '24px 28px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
                 <div>
                   <p style={{ fontSize: '13px', fontWeight: 500, color: '#94a3b8', marginBottom: '8px' }}>Total ejercicios</p>
@@ -586,7 +586,7 @@ export function ConfigurableMiniproyectoView({ content, onBack }: ConfigurableMi
             {/* ── Ejercicios ── */}
             <section>
               <p style={{ fontSize: '16px', fontWeight: 600, color: '#1e293b', marginBottom: '16px' }}>Ejercicios</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '24px' }}>
                 {exercises.map((exercise, index) => renderExerciseCard(exercise, index))}
               </div>
             </section>

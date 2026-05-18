@@ -1,4 +1,4 @@
-
+﻿
   <!DOCTYPE html>
   <html lang="es">
     <head>
@@ -8,6 +8,22 @@
       <meta name="theme-color" content="#4A90E2" />
       <meta name="robots" content="index,follow" />
       <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+      <!--
+        Fuente Roboto: carga asíncrona (media="print" trick) para NO bloquear el FCP.
+        El navegador descarga la hoja de estilos como recurso de baja prioridad
+        y al terminar la convierte a "all" (aplica en pantalla).
+        Fallback: <noscript> asegura que usuarios sin JS también la obtengan.
+      -->
+      <link rel="preload" as="style"
+            href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" />
+      <link rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
+            media="print" onload="this.media='all'" />
+      <noscript>
+        <link rel="stylesheet"
+              href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" />
+      </noscript>
+
       <title>EduPath — Plataforma educativa</title>
       <style>
         /* Quill editor professional styling */

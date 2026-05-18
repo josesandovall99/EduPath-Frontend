@@ -1,3 +1,4 @@
+﻿import { AppLogo } from './AppLogo';
 /**
  * AsignaturaDashboardScreen
  *
@@ -146,7 +147,7 @@ export function AsignaturaDashboardScreen({
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>Asignatura</p>
@@ -189,7 +190,7 @@ export function AsignaturaDashboardScreen({
               <p className="app-section-description">Selecciona un módulo para gestionarlo.</p>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', gridAutoRows: '1fr' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', gridAutoRows: '1fr' }}>
             {accesos.map((a) => {
               const Icon = a.icon;
               return (

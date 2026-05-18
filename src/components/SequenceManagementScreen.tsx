@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 
 import { ArrowLeft, Plus, Trash2, Edit, Eye, EyeOff, Search, Loader, ArrowRight, ChevronUp, ChevronDown, ArrowDownUp } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 
@@ -500,7 +501,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
     loadCreationContext(subtemaScope, formData.contenido_origen_id).catch((err) => {
 
-      console.error('Error cargando contexto de secuencia:', err);
 
       setSequenceCreationContext(null);
 
@@ -572,7 +572,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
     } catch (err) {
 
-      console.error('Error en loadData:', err);
 
       setError(err instanceof Error ? err.message : 'Error al cargar datos');
 
@@ -1081,7 +1080,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
         } catch (err) {
 
-          console.error('Error cargando temas para modal:', err);
 
           setModalTemas([]);
 
@@ -1144,7 +1142,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
         } catch (err) {
 
-          console.error('Error cargando subtemas para modal:', err);
 
           setModalSubtemas([]);
 
@@ -1199,7 +1196,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
             const errorData = await res.text();
 
-            console.error('Error response (modal contenidos by subtema):', errorData);
 
             throw new Error(`Error ${res.status}: ${res.statusText}`);
 
@@ -1214,7 +1210,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
         } catch (err) {
 
-          console.error('Error cargando contenidos por subtema (modal):', err);
 
           setModalContents([]);
 
@@ -1364,7 +1359,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
             const errorData = await res.text();
 
-            console.error('Error response:', errorData);
 
             throw new Error(`Error ${res.status}: ${res.statusText}`);
 
@@ -1377,7 +1371,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
         } catch (err) {
 
-          console.error('Error cargando temas:', err);
 
           setTemas([]);
 
@@ -1413,7 +1406,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
             const errorData = await res.text();
 
-            console.error('Error response:', errorData);
 
             throw new Error(`Error ${res.status}: ${res.statusText}`);
 
@@ -1426,7 +1418,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
         } catch (err) {
 
-          console.error('Error cargando subtemas:', err);
 
           setSubtemas([]);
 
@@ -2598,7 +2589,6 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
 
       loadCreationContext(subtemaId.toString()).catch((err) => {
 
-        console.error('Error cargando contexto inicial de secuencia:', err);
 
       });
 
@@ -2636,7 +2626,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onHome} className="app-brand-icon" title="Panel principal">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
@@ -3117,7 +3107,7 @@ export function SequenceManagementScreen({ onBack, onHome, onGoToContentManageme
           style={{ background: 'rgba(10,20,50,0.45)', backdropFilter: 'blur(4px)' }}
           onClick={() => { setShowCreateModal(false); resetForm(); setInsertAfterSequenceId(null); setModalSelectedAsignatura(''); setModalSelectedTema(''); setModalSelectedSubtema(''); setModalTemas([]); setModalSubtemas([]); setModalContents([]); setSequenceCreationContext(null); }}>
           <div className="rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-            style={{ width: '560px', maxHeight: '90vh', background: '#fff' }}
+            style={{ width: '100%', maxWidth: '560px', maxHeight: '90vh', background: '#fff' }}
             onClick={e => e.stopPropagation()}>
 
             {/* Cabecera azul */}

@@ -1,3 +1,4 @@
+﻿import { AppLogo } from './AppLogo';
 /**
  * Pantalla raíz del rol Administrador.
  *
@@ -15,6 +16,7 @@
  *  • Mostrar el flujo guiado (`AdminFlowGuide`) y las tarjetas de acción
  *    agrupadas por categoría (`workflow` / `support`).
  */
+import '../styles/admin-consistency.css';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useArea } from '../context/AreaContext';
 import {
@@ -248,19 +250,18 @@ export function AdminDashboard({ onLogout, onNavigate, adminName }: AdminDashboa
     let isCancelled = false;
 
     const loadDashboardStats = async () => {
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken) {
+        setIsLoadingStats(false);
+        return;
+      }
       setIsLoadingStats(true);
       try {
-        const authToken = localStorage.getItem('authToken');
         const headers = {
           'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          Authorization: `Bearer ${authToken}`,
         };
 
-        /**
-         * Intenta resolver el primer endpoint disponible de la lista. Sirve
-         * para tolerar diferencias de naming entre versiones del backend
-         * (`/estudiante` vs `/estudiantes`, por ejemplo).
-         */
         const fetchJsonWithFallback = async (paths: string[]) => {
           let lastError: unknown = null;
           for (const path of paths) {
@@ -288,7 +289,7 @@ export function AdminDashboard({ onLogout, onNavigate, adminName }: AdminDashboa
           // Fallback: si el endpoint nuevo aún no está disponible, usa los existentes
           const [asignaturas, estudiantes] = await Promise.all([
             fetchJsonWithFallback(['/asignaturas']),
-            fetchJsonWithFallback(['/estudiante', '/estudiantes']),
+            fetchJsonWithFallback(['/estudiante']),
           ]);
           data = {
             asignaturas: { activas: Array.isArray(asignaturas) ? asignaturas.filter((a: any) => isActiveFlag(a?.estado)).length : 0 },
@@ -318,10 +319,11 @@ export function AdminDashboard({ onLogout, onNavigate, adminName }: AdminDashboa
   // Cargar asignaturas al montar el dashboard
   useEffect(() => {
     if (currentScreen !== 'dashboard') return;
+    const token = localStorage.getItem('authToken');
+    if (!token) { setLoadingAsignaturas(false); return; }
     let cancelled = false;
     setLoadingAsignaturas(true);
-    const token = localStorage.getItem('authToken');
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers = { Authorization: `Bearer ${token}` };
     (cachedFetch(`${API_BASE_URL}/asignaturas`, { headers }) as Promise<any[]>)
       .then((data) => { if (!cancelled) setAsignaturasList(Array.isArray(data) ? data : []); })
       .catch(() => { if (!cancelled) setAsignaturasList([]); })
@@ -897,7 +899,7 @@ export function AdminDashboard({ onLogout, onNavigate, adminName }: AdminDashboa
               <div className="app-brand-icon">
                 <img
                   src={logoImage}
-                  alt="EduPath"
+                  alt="EduPath" width={48} height={48} fetchpriority="high" decoding="sync"
                   className="w-full h-full object-contain"
                   width={48}
                   height={48}
@@ -1001,7 +1003,7 @@ export function AdminDashboard({ onLogout, onNavigate, adminName }: AdminDashboa
               <p className="app-section-description">Usuarios, informes, carga masiva y servicios del sistema.</p>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.875rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.875rem' }}>
             {supportActions.map(renderActionCard)}
           </div>
         </section>

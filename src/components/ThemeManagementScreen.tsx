@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { ArrowLeft, Code, Database, BarChart3, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Plus, Edit2, ChevronUp, X, Search } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 import axios from 'axios';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;
 import { API_BASE_URL } from '../utils/constants';
@@ -171,7 +172,6 @@ export function ThemeManagementScreen({ onBack, initialAsignaturaId, initialEdit
         }
         
         setError(errorMessage);
-        console.error('Error fetching asignaturas:', err);
       } finally {
         setLoading(false);
       }
@@ -244,7 +244,6 @@ export function ThemeManagementScreen({ onBack, initialAsignaturaId, initialEdit
         
         setTemasError(errorMessage);
         setTemas([]);
-        console.error('Error fetching temas:', err);
       } finally {
         setTemasLoading(false);
       }
@@ -278,7 +277,6 @@ export function ThemeManagementScreen({ onBack, initialAsignaturaId, initialEdit
       
       setSubtemas(prev => ({ ...prev, [temaId]: data }));
     } catch (err) {
-      console.error('Error fetching subtemas:', err);
       setSubtemas(prev => ({ ...prev, [temaId]: [] }));
     } finally {
       setSubtemasLoading(prev => ({ ...prev, [temaId]: false }));
@@ -374,7 +372,6 @@ export function ThemeManagementScreen({ onBack, initialAsignaturaId, initialEdit
       // Limpiar mensaje después de 3 segundos
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      console.error('Error saving tema:', err);
       if (axios.isAxiosError(err) && err.response) {
         alert(`Error: ${err.response.data.message || err.response.data.detail || 'No se pudo guardar el tema'}`);
       } else {
@@ -403,7 +400,6 @@ export function ThemeManagementScreen({ onBack, initialAsignaturaId, initialEdit
       // Limpiar mensaje después de 3 segundos
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      console.error('Error deleting tema:', err);
       if (axios.isAxiosError(err) && err.response) {
         alert(`Error: ${err.response.data.message || 'No se pudo eliminar el tema'}`);
       } else {
@@ -429,7 +425,6 @@ export function ThemeManagementScreen({ onBack, initialAsignaturaId, initialEdit
         setTemas(temasOrdenados);
       }
     } catch (err) {
-      console.error('Error toggling tema:', err);
       alert('Error al cambiar el estado del tema');
     }
   };
@@ -470,7 +465,6 @@ export function ThemeManagementScreen({ onBack, initialAsignaturaId, initialEdit
       const orden = newTemas.map(tema => tema.id);
       await api.put('/temas/reordenar', { orden });
     } catch (err) {
-      console.error('Error saving orden:', err);
       alert('Error al guardar el orden de los temas');
     }
   };
@@ -550,7 +544,7 @@ export function ThemeManagementScreen({ onBack, initialAsignaturaId, initialEdit
                   className="app-brand-icon"
                   title="Volver"
                 >
-                  <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                  <AppLogo size={48} />
                 </button>
                 <div>
                   <h1 className="text-[#3A4A5B]">Gestión de temas</h1>

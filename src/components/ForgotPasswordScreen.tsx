@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+﻿import { useState, type FormEvent } from 'react';
 import { Mail, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -44,18 +44,18 @@ export function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenProps) {
       className="min-h-screen flex flex-col items-center justify-center"
       style={{
         background: 'radial-gradient(ellipse at center, #1e3a5f 0%, #16294a 50%, #0d1e36 100%)',
+        padding: '1rem',
       }}
     >
       {/* Card principal */}
       <div
-        className="flex rounded-2xl overflow-hidden shadow-2xl"
-        style={{ width: '780px', maxWidth: '95vw', minHeight: '400px' }}
+        className="auth-card"
+        style={{ maxWidth: '780px', minHeight: '400px' }}
       >
-        {/* ── Panel izquierdo: marca EduPath ── */}
+        {/* ── Panel izquierdo: marca ── */}
         <div
-          className="relative flex flex-col items-center justify-center gap-5"
+          className="auth-card__brand relative flex flex-col items-center justify-center gap-5"
           style={{
-            width: '50%',
             background: 'linear-gradient(160deg, #1a56db 0%, #1e429f 40%, #1a3a7c 70%, #142d61 100%)',
           }}
         >
@@ -66,14 +66,13 @@ export function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenProps) {
 
           {/* Logo UDES */}
           <div
-            className="flex items-center justify-center rounded-full"
+            className="auth-logo-circle flex items-center justify-center rounded-full"
             style={{
               width: '130px', height: '130px',
               background: '#ffffff',
               borderRadius: '50%',
               boxShadow: '0 0 0 8px rgba(255,255,255,0.25), 0 4px 20px rgba(0,0,0,0.3)',
-              padding: '8px',
-            }}
+              padding: '8px', flexShrink: 0, }}
           >
             <img
               src={logoUdes}
@@ -90,8 +89,8 @@ export function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenProps) {
 
         {/* ── Panel derecho: formulario ── */}
         <div
-          className="flex flex-col justify-between"
-          style={{ width: '50%', background: '#f0f5ff', padding: '40px 36px 28px' }}
+          className="auth-card__form flex flex-col justify-between"
+          style={{ background: '#f0f5ff', padding: '40px 36px 28px' }}
         >
           <div>
             <h2 className="font-bold mb-1" style={{ fontSize: '24px', color: '#1e3a5f' }}>

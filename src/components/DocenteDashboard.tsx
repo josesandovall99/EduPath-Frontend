@@ -1,5 +1,7 @@
+﻿import '../styles/admin-consistency.css';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { BarChart3, BookOpen, ChevronRight, ClipboardList, Loader2, LogOut, Search } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 import { buildAuthHeaders } from '../utils/authHeaders';
 import { API_BASE_URL } from '../utils/constants';
 import { ChatbotButton } from './ChatbotButton';
@@ -64,6 +66,7 @@ export function DocenteDashboard({ onLogout, docente }: DocenteDashboardProps) {
   // Cargar asignaturas del docente
   useEffect(() => {
     if (currentScreen !== 'dashboard') return;
+    if (!localStorage.getItem('authToken')) { setLoadingAsignaturas(false); return; }
     setLoadingAsignaturas(true);
     fetch(`${API_BASE_URL}/asignaturas/mis-asignaturas`, {
       headers: buildAuthHeaders({ Accept: 'application/json' }), credentials: 'include'
@@ -306,7 +309,7 @@ export function DocenteDashboard({ onLogout, docente }: DocenteDashboardProps) {
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={goHome} className="app-brand-icon" title="Panel docente">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <img src={logoImage} alt="EduPath" width={48} height={48} fetchpriority="high" decoding="sync" className="w-full h-full object-contain" />
               </button>
               <div>
                 <h1 className="text-white">Panel docente</h1>
@@ -390,7 +393,7 @@ export function DocenteDashboard({ onLogout, docente }: DocenteDashboardProps) {
               <p className="app-section-description">Herramientas de seguimiento e informes académicos.</p>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.875rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.875rem' }}>
             {[
               { label: 'Generación de Informes', desc: 'Consulta y exportación de informes de progreso.', icon: BarChart3, action: () => navigateTo('reports') },
               { label: 'Miniproyectos', desc: 'Gestión de miniproyectos y actividades prácticas.', icon: ClipboardList, action: () => navigateTo('miniproyectos') },

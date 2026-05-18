@@ -5,10 +5,18 @@ import { buildAuthHeaders } from '../utils/authHeaders';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { preprocessForMarkdown } from '../utils/markdown';
+import { getChatbotResolveKey, getCachedChatbot, setCachedChatbot } from '../utils/chatbotResolveCache';
 
 const CHATBOT_TIMEOUT_MS = 120000;
 
 type ChatbotType = 'GENERAL' | 'GENERAL_ADMINISTRADOR' | 'GENERAL_DOCENTE' | 'MINIPROYECTO';
+
+interface ResolvedChatbot {
+  id: number;
+  nombre: string;
+  tipo: ChatbotType;
+  fallback?: boolean;
+}
 
 interface ChatbotButtonProps {
   chatbotType?: ChatbotType;
@@ -17,12 +25,6 @@ interface ChatbotButtonProps {
   contextLabel?: string;
 }
 
-interface ResolvedChatbot {
-  id: number;
-  nombre: string;
-  tipo: ChatbotType;
-  fallback?: boolean;
-}
 
 function toOptionalPositiveId(value: unknown): number | undefined {
   if (value === null || value === undefined || value === '') return undefined;
@@ -81,25 +83,40 @@ export function ChatbotButton({ chatbotType = 'GENERAL', asignaturaId = null, mi
   useEffect(() => {
     let cancelled = false;
     const resolveChatbot = async () => {
+      if (!localStorage.getItem('authToken')) { setIsResolving(false); return; }
+
+      const parsedAsignaturaId = toOptionalPositiveId(asignaturaId);
+      const parsedMiniproyectoId = toOptionalPositiveId(miniproyectoId);
+      const cacheKey = getChatbotResolveKey(chatbotType, parsedAsignaturaId, parsedMiniproyectoId);
+
+      // Si ya tenemos el resultado en caché (incluyendo los 404), lo usamos directamente.
+      const cached = getCachedChatbot(cacheKey);
+      if (cached.found) {
+        setResolvedChatbot(cached.value);
+        setMessages([{ text: buildWelcomeMessage(chatbotType, cached.value?.nombre, contextLabel, !cached.value), isBot: true }]);
+        setIsResolving(false);
+        return;
+      }
+
       setIsResolving(true);
       setResolvedChatbot(null);
       try {
         const searchParams = new URLSearchParams();
         searchParams.set('tipo', chatbotType);
         searchParams.set('allow_fallback', 'false');
-        const parsedasignaturaId = toOptionalPositiveId(asignaturaId);
-        if ((chatbotType === 'GENERAL' || chatbotType === 'MINIPROYECTO') && parsedasignaturaId !== undefined)
-          searchParams.set('asignatura_id', String(parsedasignaturaId));
-        const parsedMiniproyectoId = toOptionalPositiveId(miniproyectoId);
+        if ((chatbotType === 'GENERAL' || chatbotType === 'MINIPROYECTO') && parsedAsignaturaId !== undefined)
+          searchParams.set('asignatura_id', String(parsedAsignaturaId));
         if (chatbotType === 'MINIPROYECTO' && parsedMiniproyectoId !== undefined)
           searchParams.set('miniproyecto_id', String(parsedMiniproyectoId));
         const response = await fetch(`${API_BASE_URL}/chatbots/resolve?${searchParams.toString()}`, { headers: buildAuthHeaders() });
         if (!response.ok) throw new Error(response.status === 404 ? 'not_found' : 'resolve_failed');
-        const data = await response.json();
+        const data: ResolvedChatbot = await response.json();
+        setCachedChatbot(cacheKey, data);
         if (cancelled) return;
         setResolvedChatbot(data);
         setMessages([{ text: buildWelcomeMessage(chatbotType, data?.nombre, contextLabel), isBot: true }]);
       } catch {
+        setCachedChatbot(cacheKey, null); // cachea el 404 para no repetir
         if (cancelled) return;
         setResolvedChatbot(null);
         setMessages([{ text: buildWelcomeMessage(chatbotType, null, contextLabel, true), isBot: true }]);

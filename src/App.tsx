@@ -1,8 +1,9 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+﻿import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Toaster } from './components/ui/sonner';
 import { ChatbotButton } from './components/ChatbotButton';
 import { applyAuthHeaders, setupAuthFetch } from './utils/authHeaders';
 import { clearAllCache } from './utils/fetchCache';
+import { clearChatbotResolveCache } from './utils/chatbotResolveCache';
 
 // Carga diferida — el bundle inicial solo incluye LoginScreen
 const LoginScreen = lazy(() => import('./components/LoginScreen').then(m => ({ default: m.LoginScreen })));
@@ -101,6 +102,9 @@ interface Content {
   miniproyectoMode?: 'legacy' | 'configurable';
 }
 
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 min sin actividad → cierre automático
+const SESSION_ACTIVE_KEY = 'edupathSessionActive'; // sessionStorage: se borra al cerrar el navegador
+
 export default function App() {
   const APP_NAV_STATE_KEY = 'appNavigationState';
   const APP_ROLE_KEY = 'appActiveRole';
@@ -119,6 +123,18 @@ export default function App() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [isHydratingState, setIsHydratingState] = useState(true);
+
+  // Sesión por inactividad
+  const [showInactivityModal, setShowInactivityModal] = useState(false);
+  const lastActivityRef = useRef(Date.now());
+  const inactivityTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Retomar sesión previa (cuando el usuario cerró el navegador sin hacer logout)
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [pendingResume, setPendingResume] = useState<{
+    nombre: string;
+    restoreSession: () => void;
+  } | null>(null);
 
   const changePasswordPersonaId = userSession?.personaId ?? docenteSession?.personaId ?? adminSession?.personaId ?? null;
   const changePasswordNextScreen: Screen = userSession ? 'dashboard' : adminSession ? 'admin-dashboard' : 'docente-dashboard';
@@ -162,6 +178,7 @@ export default function App() {
     localStorage.removeItem('docenteAsignaturaFlowState');
     localStorage.removeItem('docenteDashboardScreen');
     clearAllCache();
+    clearChatbotResolveCache();
   };
 
   // Limpia sesión y vuelve al login — usado por logout y "volver al login"
@@ -182,6 +199,7 @@ export default function App() {
     localStorage.removeItem(DOCENTE_SESSION_KEY);
     localStorage.removeItem(ADMIN_SESSION_KEY);
     clearPersistedNavigation();
+    sessionStorage.removeItem(SESSION_ACTIVE_KEY);
     applyAuthHeaders();
   };
 
@@ -189,6 +207,27 @@ export default function App() {
     setupAuthFetch();
     applyAuthHeaders();
   }, []);
+
+  // Timer de inactividad: cierra la sesión tras 30 min sin interacción.
+  const resetActivity = useCallback(() => { lastActivityRef.current = Date.now(); }, []);
+
+  useEffect(() => {
+    const events = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'] as const;
+    events.forEach(e => window.addEventListener(e, resetActivity, { passive: true }));
+
+    inactivityTimerRef.current = setInterval(() => {
+      const inactive = Date.now() - lastActivityRef.current >= INACTIVITY_TIMEOUT_MS;
+      const hasSession = !!(userSession || adminSession || docenteSession);
+      if (inactive && hasSession && !isPublicScreen(currentScreen) && !showInactivityModal) {
+        setShowInactivityModal(true);
+      }
+    }, 60_000);
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetActivity));
+      if (inactivityTimerRef.current) clearInterval(inactivityTimerRef.current);
+    };
+  }, [currentScreen, userSession, adminSession, docenteSession, showInactivityModal, resetActivity]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -200,7 +239,6 @@ export default function App() {
         const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.hash || ''}`;
         window.history.replaceState({}, document.title, cleanUrl);
       } catch (error) {
-        console.warn('No se pudo limpiar el token de la URL:', error);
       }
       setIsHydratingState(false);
       return;
@@ -283,24 +321,54 @@ export default function App() {
           return false;
         };
 
+        // Determinar la pantalla a restaurar
+        let screenToRestore: Screen | null = null;
         if (nav.currentScreen && canRestoreScreen(nav.currentScreen)) {
-          setCurrentScreen(nav.currentScreen);
+          screenToRestore = nav.currentScreen;
         } else if (role === 'estudiante' && estudianteIdRaw) {
-          setCurrentScreen('dashboard');
+          screenToRestore = 'dashboard';
         } else if (role === 'docente' && storedDocenteSession) {
-          setCurrentScreen('docente-dashboard');
+          screenToRestore = 'docente-dashboard';
         } else if (role === 'admin' && adminIdRaw && personaIdRaw) {
-          setCurrentScreen('admin-dashboard');
+          screenToRestore = 'admin-dashboard';
+        }
+
+        if (screenToRestore) {
+          const sessionWasActive = Boolean(sessionStorage.getItem(SESSION_ACTIVE_KEY));
+          const hasToken = Boolean(localStorage.getItem('authToken'));
+
+          if (!sessionWasActive && hasToken) {
+            // El usuario cerró el navegador sin hacer logout → preguntar
+            const nombre = nombreEstudiante
+              || (storedDocenteSession ? (JSON.parse(storedDocenteSession) as DocenteSession).nombre : null)
+              || (storedAdminSession ? (JSON.parse(storedAdminSession) as AdminSession).nombre : null)
+              || 'usuario';
+            const screenCapture = screenToRestore;
+            setPendingResume({
+              nombre,
+              restoreSession: () => {
+                sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
+                setCurrentScreen(screenCapture);
+              },
+            });
+            setShowResumeModal(true);
+            // La pantalla queda en 'login' hasta que el usuario confirme
+          } else {
+            sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
+            setCurrentScreen(screenToRestore);
+          }
         }
       } else if (role === 'estudiante' && estudianteIdRaw) {
+        sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
         setCurrentScreen('dashboard');
       } else if (role === 'docente' && storedDocenteSession) {
+        sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
         setCurrentScreen('docente-dashboard');
       } else if (role === 'admin' && adminIdRaw && personaIdRaw) {
+        sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
         setCurrentScreen('admin-dashboard');
       }
     } catch (restoreError) {
-      console.error('No se pudo restaurar el estado de navegación:', restoreError);
     } finally {
       setIsHydratingState(false);
     }
@@ -342,6 +410,7 @@ export default function App() {
     }
     persistAuthToken(apiResponse);
     applyAuthHeaders();
+    sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
     setCurrentScreen(apiResponse.primerIngreso ? 'change-password' : 'dashboard');
   };
 
@@ -371,6 +440,7 @@ export default function App() {
     localStorage.setItem(APP_ROLE_KEY, 'docente');
     persistAuthToken(apiResponse);
     applyAuthHeaders();
+    sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
     setDocenteSession(session);
     localStorage.setItem(DOCENTE_SESSION_KEY, JSON.stringify(session));
     setCurrentScreen(apiResponse.primerIngreso ? 'change-password' : 'docente-dashboard');
@@ -401,6 +471,7 @@ export default function App() {
     localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
     persistAuthToken(apiResponse);
     applyAuthHeaders();
+    sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
     setCurrentScreen(apiResponse.primerIngreso ? 'change-password' : 'admin-dashboard');
   };
 
@@ -711,6 +782,89 @@ export default function App() {
         )}
       </Suspense>
 
+      {/* Modal: sesión cerrada por inactividad */}
+      {showInactivityModal && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center"
+          style={{ background: 'rgba(10,20,50,0.55)', backdropFilter: 'blur(4px)' }}
+        >
+          <div
+            className="rounded-2xl shadow-2xl w-full mx-4"
+            style={{ maxWidth: '400px', background: '#fff', padding: '32px 28px 24px' }}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <span style={{ fontSize: '1.8rem' }}>⏱️</span>
+              <h3 className="font-bold text-lg" style={{ color: '#1e3a5f' }}>
+                Sesión cerrada por inactividad
+              </h3>
+            </div>
+            <p className="text-sm leading-relaxed mb-6" style={{ color: '#4a6fa5' }}>
+              Tu sesión se cerró automáticamente tras 30 minutos sin actividad. Por favor, inicia sesión nuevamente.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setShowInactivityModal(false);
+                clearSession();
+              }}
+              className="w-full px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)' }}
+            >
+              Ir al inicio de sesión
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: retomar sesión previa (browser cerrado sin logout) */}
+      {showResumeModal && pendingResume && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center"
+          style={{ background: 'rgba(10,20,50,0.55)', backdropFilter: 'blur(4px)' }}
+        >
+          <div
+            className="rounded-2xl shadow-2xl w-full mx-4"
+            style={{ maxWidth: '400px', background: '#fff', padding: '32px 28px 24px' }}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <span style={{ fontSize: '1.8rem' }}>👋</span>
+              <h3 className="font-bold text-lg" style={{ color: '#1e3a5f' }}>
+                Tienes una sesión activa
+              </h3>
+            </div>
+            <p className="text-sm leading-relaxed mb-2" style={{ color: '#4a6fa5' }}>
+              Dejaste una sesión abierta como <strong>{pendingResume.nombre}</strong>. ¿Deseas continuar donde lo dejaste?
+            </p>
+            <div className="flex items-center justify-center gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowResumeModal(false);
+                  clearSession();
+                  setPendingResume(null);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80"
+                style={{ background: '#fff', color: '#1e3a5f', border: '1.5px solid #bfd3f5' }}
+              >
+                Cerrar sesión
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  pendingResume.restoreSession();
+                  setShowResumeModal(false);
+                  setPendingResume(null);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #1a56db 0%, #142d61 100%)' }}
+              >
+                Continuar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showLogoutConfirm && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center"
@@ -718,8 +872,8 @@ export default function App() {
           onClick={() => setShowLogoutConfirm(false)}
         >
           <div
-            className="rounded-2xl shadow-2xl"
-            style={{ width: '380px', background: '#fff', padding: '32px 28px 24px' }}
+            className="rounded-2xl shadow-2xl w-full mx-4"
+            style={{ maxWidth: '380px', background: '#fff', padding: '32px 28px 24px' }}
             onClick={e => e.stopPropagation()}
           >
             <h3 className="font-bold text-lg mb-2" style={{ color: '#1e3a5f' }}>

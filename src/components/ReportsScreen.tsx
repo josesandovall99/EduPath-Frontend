@@ -615,7 +615,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
       const url = window.URL.createObjectURL(blob);
       setPdfPreviewUrl(url);
     } catch (err) {
-      console.error('Error generando PDF de actividad:', err);
       alert('No se pudo generar el PDF. Intenta nuevamente.');
     } finally {
       setActivityPdfLoading(false);
@@ -869,6 +868,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
   useEffect(() => {
 
     const loadStudentsAndProgress = async () => {
+      if (!localStorage.getItem('authToken')) { setLoadingStudents(false); return; }
 
       try {
 
@@ -1146,32 +1146,13 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
 
-        // 2) obtener estudiantes — probar primero el endpoint singular '/estudiante' (el backend usa ese nombre)
-
         let students: any[] = [];
 
         try {
-
           const studentsRes = await api.get('/estudiante');
-
           students = Array.isArray(studentsRes.data) ? studentsRes.data : (studentsRes.data ? [studentsRes.data] : []);
-
-        } catch (err) {
-
-          // Si falla, intentar el plural '/estudiantes' como alternativa
-
-          try {
-
-            const studentsRes2 = await api.get('/estudiantes');
-
-            students = Array.isArray(studentsRes2.data) ? studentsRes2.data : [];
-
-          } catch (e) {
-
-            students = [];
-
-          }
-
+        } catch {
+          students = [];
         }
 
 
@@ -1218,7 +1199,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
               AsignaturaResumen = null;
 
-              console.warn('[Reports] sin progreso por asignatura', { estudianteId: st.id, asignaturaId: Asignatura.id, error: e });
 
             }
 
@@ -1256,7 +1236,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                   temaProgress = 0;
 
-                  console.warn('[Reports] sin progreso por tema', { estudianteId: st.id, temaId: tema.id, error: e });
 
                 }
 
@@ -1288,7 +1267,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                       subProgress = 0;
 
-                      console.warn('[Reports] sin progreso por subtema', { estudianteId: st.id, subtemaId: sub.id, error: e });
 
                     }
 
@@ -1300,7 +1278,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
                   subtopics = [];
 
-                  console.warn('[Reports] sin subtemas por tema', { temaId: tema.id, error: e });
 
                 }
 
@@ -1435,7 +1412,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       } catch (error) {
 
-        console.error('Error cargando estudiantes o asignaturas:', error);
 
         setStudentsData(fallbackMockStudents);
 
@@ -1553,7 +1529,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       } catch (error) {
 
-        console.error('Error cargando reporte de fallos:', error);
 
         setFailuresData(null);
 
@@ -1631,7 +1606,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
       } catch (error) {
 
-        console.error('Error cargando ranking de visualizaciones:', error);
 
         setRankingData(null);
 
@@ -2450,7 +2424,6 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
     } catch (error) {
 
-      console.error('Error descargando PDF:', error);
 
       alert('No se pudo generar el PDF. Intenta nuevamente.');
 
@@ -3369,7 +3342,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             </div>
 
-            <div className="mt-6 grid grid-cols-3 gap-4">
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
 
               <div className="h-20 bg-gray-100 rounded-lg animate-pulse" />
 
@@ -3385,8 +3358,9 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
 
-        {/* Tabs — ancho completo simétrico */}
-        <div className="mb-6" style={{ display: 'grid', gridTemplateColumns: `repeat(${isDocenteMode ? 3 : 5}, 1fr)`, gap: '8px' }}>
+        {/* Tabs — responsivo en móvil */}
+        <div className="mb-6 overflow-x-auto pb-1">
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isDocenteMode ? 3 : 5}, minmax(120px, 1fr))`, gap: '8px', minWidth: isDocenteMode ? '360px' : '600px' }}>
           {[
             { key: 'student', label: 'Por estudiante', icon: User },
             ...(!isDocenteMode ? [
@@ -3411,6 +3385,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
               </button>
             );
           })}
+        </div>
         </div>
 
 
@@ -3807,7 +3782,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                     </div>
 
                     {/* Estadísticas por materia */}
-                    <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+                    <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
 
                       {student.subjects.map((subject) => {
 
@@ -3874,7 +3849,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
 
 
-                            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-gray-100">
 
                               <div className="text-center">
 
@@ -4448,8 +4423,8 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
                   )}
                 </div>
 
-                {/* ── Grid de tarjetas — 4 columnas, clicables ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+                {/* ── Grid de tarjetas — responsivo ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 28 }}>
                   {subjectProgressData.map((subject) => {
                     const subjectName = subject.name;
                     const color = subject.color;
@@ -5832,7 +5807,7 @@ export function ReportsScreen({ onBack, mode = 'admin', docenteId, docentePerson
 
             {/* ── Tarjetas de asignatura — filtro visual ── */}
             {!isDocenteMode && (
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(asignaturasCatalog.length + 1, 5)}, 1fr)`, gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
                 {/* Tarjeta "Todas" */}
                 {(() => {
                   const active = rankingAsignaturaFilter === 'all';

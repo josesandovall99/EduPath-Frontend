@@ -1,3 +1,5 @@
+﻿import '../styles/admin-consistency.css';
+import { AppLogo } from './AppLogo';
 import type { LucideIcon } from 'lucide-react';
 import {
   LogOut,
@@ -16,6 +18,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { ChatbotButton } from './ChatbotButton';
+import '../styles/admin-consistency.css';
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../utils/constants';
 import { cachedFetch } from '../utils/fetchCache';
@@ -130,10 +133,10 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
 
   useEffect(() => {
     const fetchasignaturas = async () => {
+      if (!localStorage.getItem('authToken')) { setLoading(false); return; }
       try {
         setLoading(true);
         setError(null);
-
 
         // cachedFetch devuelve JSON directo — en revisitas es instantáneo (<1ms)
         const asignaturas = await cachedFetch(`${API_BASE_URL}/asignaturas`) as any[];
@@ -155,7 +158,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         setSubjects(transformedSubjects);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-        console.error('Error fetching asignaturas:', errorMessage);
         setError(`No se pudieron cargar las asignaturas: ${errorMessage}`);
         
         // No se inventan datos: lista vacía + alerta para que el estudiante sepa que algo falló
@@ -199,7 +201,6 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
         }
         setProgresosPorAsignatura(newMap);
       } catch (err) {
-        console.error('Error al obtener progreso bulk de asignaturas:', err);
       }
     };
 
@@ -214,7 +215,7 @@ export function DashboardScreen({ userName, onSubjectSelect, onLogout, estudiant
           <div className="app-page-header">
             <div className="app-brand-block">
               <div className="app-brand-icon">
-                <img src={logoImage} alt="Logo UDES" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </div>
               <div>
                 <h1>EduPath</h1>

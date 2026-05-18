@@ -912,7 +912,6 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     } catch (error) {
 
-      console.error('Error completo:', error);
 
       alert('Error al validar. Backend no disponible en este momento.');
 
@@ -1100,7 +1099,6 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     } catch (error) {
 
-      console.error('Error completo:', error);
 
       alert('Error al enviar el diagrama. Backend no disponible.');
 
@@ -1173,7 +1171,6 @@ export function UMLDiagramView({ activity, onBack, onComplete, configurableMode 
 
     } catch (error) {
 
-      console.error('Error al obtener retroalimentación:', error);
 
       alert('Error al obtener la retroalimentación.');
 

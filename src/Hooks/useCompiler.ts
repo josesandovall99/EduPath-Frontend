@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../utils/constants';
 
@@ -18,12 +18,10 @@ export function useCompiler() {
       codigo: code,
     };
     
-    console.log('Enviando al backend:', payload);
     
     try {
       const response = await axios.post(`${API_BASE_URL}/evaluaciones/compilador`, payload);
 
-      console.log('Respuesta del backend:', response.data);
       const resultado = response.data;
       
       let finalOutput = '';
@@ -38,8 +36,6 @@ export function useCompiler() {
       setIsLoading(false);
 
     } catch (error: any) {
-      console.error("Error completo:", error);
-      console.error("Respuesta del servidor:", error.response?.data);
       
       // Si el backend responde con 400 y tiene información del ejercicio
       if (error.response?.status === 400 && error.response?.data) {

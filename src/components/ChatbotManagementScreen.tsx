@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { AppLogo } from './AppLogo';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Bot,
@@ -154,7 +155,6 @@ function getMiniproyectoLabel(item: MiniproyectoItem) {
   return `Miniproyecto ${item.id}`;
 }
 
-const TEMPERATURE_OPTIONS = ['0.1', '0.4', '0.7', '1.0'];
 const TOPK_OPTIONS = ['3', '5', '10'];
 const MAX_TOKENS_OPTIONS = ['256', '512', '1024', '2048'];
 const MAX_CONTEXT_CHARS_OPTIONS = ['1000', '4000', '8000'];
@@ -678,7 +678,6 @@ export function ChatbotManagementScreen({
         );
       }
     } catch (error) {
-      console.error('Error loading chatbot admin data:', error);
       setStatusMessage(error instanceof Error ? error.message : 'Error al cargar la gestión de chatbots.');
     } finally {
       setIsLoading(false);
@@ -718,7 +717,6 @@ export function ChatbotManagementScreen({
         setChatbots((prev) => prev.map((c) => (c.id === chatbot.id ? { ...c, documentos: arr } : c)));
       }
     } catch (error) {
-      console.error('Error selecting chatbot:', error);
     }
   }
 
@@ -874,7 +872,6 @@ export function ChatbotManagementScreen({
         }, 150);
       }
     } catch (error) {
-      console.error('Error saving chatbot:', error);
       setStatusMessage(error instanceof Error ? error.message : 'Error al guardar el chatbot.');
     } finally {
       setIsSaving(false);
@@ -910,7 +907,6 @@ export function ChatbotManagementScreen({
       setIsFormVisible(false);
       setStatusMessage('Chatbot eliminado correctamente.');
     } catch (error) {
-      console.error('Error deleting chatbot:', error);
       setStatusMessage(error instanceof Error ? error.message : 'Error al eliminar el chatbot.');
     } finally {
       setIsDeleting(false);
@@ -942,7 +938,6 @@ export function ChatbotManagementScreen({
       }
       setStatusMessage(newEstado ? 'Chatbot habilitado correctamente.' : 'Chatbot deshabilitado correctamente.');
     } catch (error) {
-      console.error('Error toggling chatbot estado:', error);
       setStatusMessage(error instanceof Error ? error.message : 'Error al actualizar el estado del chatbot.');
     }
   }
@@ -996,7 +991,6 @@ export function ChatbotManagementScreen({
       setPdfSizeError('');
       setStatusMessage('Documento subido y procesado correctamente.');
     } catch (error) {
-      console.error('Error uploading document:', error);
       setStatusMessage(error instanceof Error ? error.message : 'Error al subir el documento.');
     } finally {
       setIsUploading(false);
@@ -1022,7 +1016,6 @@ export function ChatbotManagementScreen({
       }
       setStatusMessage('Documento eliminado correctamente.');
     } catch (error) {
-      console.error('Error deleting document:', error);
       setStatusMessage(error instanceof Error ? error.message : 'Error al eliminar el documento.');
     }
   }
@@ -1045,7 +1038,6 @@ export function ChatbotManagementScreen({
       }
       setStatusMessage('Documentos recargados correctamente.');
     } catch (error) {
-      console.error('Error reloading chatbot:', error);
       setStatusMessage(error instanceof Error ? error.message : 'Error al recargar el chatbot.');
     } finally {
       setIsReloading(false);
@@ -1114,7 +1106,6 @@ export function ChatbotManagementScreen({
         setMessages((prev) => replaceLastBotMessage(prev, 'No pude obtener respuesta.'));
       }
     } catch (error) {
-      console.error('Error testing chatbot:', error);
       setMessages((prev) => replaceLastBotMessage(
         prev,
         error instanceof Error && error.name === 'AbortError'
@@ -1136,7 +1127,7 @@ export function ChatbotManagementScreen({
           <div className="app-page-header">
             <div className="app-brand-block">
               <button type="button" onClick={onBack} className="app-brand-icon" title="Volver">
-                <img src={logoImage} alt="EduPath" className="w-full h-full object-contain" />
+                <AppLogo size={48} />
               </button>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '0.15em' }}>
@@ -1163,7 +1154,7 @@ export function ChatbotManagementScreen({
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
               {/* Filtro tipo */}
-              <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: 40 }}>
+              <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto" style={{ background: '#e8eef8', height: 40 }}>
                 {([
                   { key: 'all', label: 'Todos' },
                   { key: 'GENERAL', label: isDocenteMode ? 'Asignatura' : 'General' },
@@ -1183,7 +1174,7 @@ export function ChatbotManagementScreen({
               </div>
 
               {/* Filtro estado */}
-              <div className="flex items-center gap-1 p-1 rounded-xl shrink-0" style={{ background: '#e8eef8', height: 40 }}>
+              <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto" style={{ background: '#e8eef8', height: 40 }}>
                 {([
                   { key: 'all',      label: `Todos (${totalChatbots})` },
                   { key: 'active',   label: `Activos (${activeChatbots})` },
@@ -1229,7 +1220,7 @@ export function ChatbotManagementScreen({
               </div>
             ) : (
               /* Grid de tarjetas */
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: 16 }}>
                 {visibleChatbots.map(chatbot => {
                   const isActive = chatbot.estado !== false;
                   const tipoColors: Record<string, string> = { GENERAL: '#059669', GENERAL_ADMINISTRADOR: '#1a56db', GENERAL_DOCENTE: '#7c3aed', MINIPROYECTO: '#d97706' };
@@ -1347,7 +1338,7 @@ export function ChatbotManagementScreen({
               {/* ── Tab: Configuración ── */}
               {detailTab === 'config' && selectedChatbot && (
                 <div className="app-table-card" style={{ padding: '24px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
                     {[
                       { label: 'Tipo', value: getChatbotTypeLabel(selectedChatbot.tipo, isDocenteMode ? 'docente' : 'admin') },
                       { label: 'Modelo', value: selectedChatbot.model_name || 'Modelo por defecto' },
