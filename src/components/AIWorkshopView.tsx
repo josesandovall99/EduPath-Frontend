@@ -39,7 +39,7 @@ const workshopConfigs = {
   analysis: {
     description: (
       <>
-        Taller con cliente simulado por IA para análisis completo de requisitos 
+        Taller con cliente simulado por IA para análisis completo de requisitos
         del sistema.
       </>
     ),
@@ -52,7 +52,7 @@ const workshopConfigs = {
   management: {
     description: (
       <>
-        Taller con cliente simulado por IA para definición de alcance, 
+        Taller con cliente simulado por IA para definición de alcance,
         cronograma y costos del proyecto propuesto.
       </>
     ),
@@ -64,13 +64,14 @@ const workshopConfigs = {
   }
 };
 
+const ANALYSIS_TASK_KEYS = ['stakeholders', 'requisitosFuncionales', 'requisitosNoFuncionales'] as const;
+const MANAGEMENT_TASK_KEYS = ['alcance', 'cronograma', 'costos'] as const;
+
 const taskColors = ['#4A90E2', '#7ED6A7', '#F5A97F', '#A78BFA', '#FBBF24', '#60A5FA'];
 
 export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: AIWorkshopViewProps) {
-  const [currentTask, setCurrentTask] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [studentResponse, setStudentResponse] = useState('');
   const [stakeholdersList, setStakeholdersList] = useState<string[]>([]);
   const [functionalList, setFunctionalList] = useState<string[]>([]);
   const [nonFunctionalList, setNonFunctionalList] = useState<string[]>([]);
@@ -97,11 +98,46 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingEstado, setPendingEstado] = useState<'ENVIADO' | 'COMPLETADO' | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
-  const totalTasks = 5;
   const subjectColor = subjectColors[subjectName] || '#4A90E2';
   const normalizedAsignaturaName = normalizeasignaturaName(workshop.asignaturaNombre || subjectName);
   const isManagementWorkshop = workshop.tipoPilar === 'ATC' || normalizedAsignaturaName.includes('alcance') || normalizedAsignaturaName.includes('gestion');
   const workshopConfig = isManagementWorkshop ? workshopConfigs.management : workshopConfigs.analysis;
+
+  const sectionFilledCount = isManagementWorkshop
+    ? {
+        alcance: scopeList.length,
+        cronograma: scheduleRows.filter((r) => r.activity.trim()).length,
+        costos: costRows.filter((r) => r.concept.trim()).length,
+      }
+    : {
+        stakeholders: stakeholdersList.length,
+        requisitosFuncionales: functionalList.length,
+        requisitosNoFuncionales: nonFunctionalList.length,
+      };
+
+  const sectionExpectedCount = isManagementWorkshop
+    ? {
+        alcance: expectedManagementCounts?.scope ?? 3,
+        cronograma: expectedManagementCounts?.schedule ?? 3,
+        costos: expectedManagementCounts?.costs ?? 3,
+      }
+    : {
+        stakeholders: expectedCounts?.stakeholders ?? 4,
+        requisitosFuncionales: expectedCounts?.functional ?? 6,
+        requisitosNoFuncionales: expectedCounts?.nonFunctional ?? 5,
+      };
+
+  const isSectionComplete = (key: string) => {
+    const filled = (sectionFilledCount as Record<string, number>)[key] ?? 0;
+    const expected = (sectionExpectedCount as Record<string, number>)[key] ?? 1;
+    return filled >= expected;
+  };
+
+  const taskKeys = isManagementWorkshop
+    ? (MANAGEMENT_TASK_KEYS as unknown as string[])
+    : (ANALYSIS_TASK_KEYS as unknown as string[]);
+
+  const completedTasksCount = taskKeys.filter((key) => isSectionComplete(key)).length;
 
   const buildScheduleList = (rows: Array<{ activity: string; start: string; end: string }>) =>
     rows
@@ -294,8 +330,8 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
     const respuesta = JSON.stringify({
       mensajes: [],
-      tAsignaturaActual: currentTask,
-      totalTasignaturas: totalTasks,
+      tareaActual: completedTasksCount,
+      totalTareas: workshopConfig.tasks.length,
       respuestaEstudiante
     });
 
@@ -362,19 +398,33 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
         {/* Tasks Checklist */}
         <div className="p-6">
-          <h3 className="text-[#3A4A5B] mb-4">Tasignaturas a Completar</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[#3A4A5B]">Tareas a Completar</h3>
+            <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ backgroundColor: `${subjectColor}20`, color: subjectColor }}>
+              {completedTasksCount}/{workshopConfig.tasks.length}
+            </span>
+          </div>
           <div className="space-y-3">
-            {workshopConfig.tasks.map((task, index) => (
-              <TaskItem
-                key={task}
-                number={index + 1}
-                text={task}
-                completed={index === 0}
-                active={index === 1}
-                subjectColor={subjectColor}
-                taskColor={taskColors[index % taskColors.length]}
-              />
-            ))}
+            {workshopConfig.tasks.map((task, index) => {
+              const key = taskKeys[index];
+              const filled = (sectionFilledCount as Record<string, number>)[key] ?? 0;
+              const expected = (sectionExpectedCount as Record<string, number>)[key] ?? 1;
+              const completed = filled >= expected;
+              const active = !completed && index === taskKeys.findIndex((k) => !(isSectionComplete(k)));
+              return (
+                <TaskItem
+                  key={task}
+                  number={index + 1}
+                  text={task}
+                  completed={completed}
+                  active={active}
+                  subjectColor={subjectColor}
+                  taskColor={taskColors[index % taskColors.length]}
+                  filled={filled}
+                  expected={expected}
+                />
+              );
+            })}
           </div>
 
           {/* Help Section */}
@@ -530,7 +580,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                 <div>
                   <label className="text-sm text-gray-700 font-semibold">Respuesta del estudiante</label>
                   <p className="text-xs text-gray-500 mt-1">
-                    A partir del chat con la IA, responde las tasignaturas solicitadas.
+                    A partir del chat con la IA, responde las tareas solicitadas.
                   </p>
                 </div>
                 <span
@@ -990,10 +1040,10 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
         <div className="bg-white border-t border-gray-200 p-4">
           <div className="flex items-center justify-between px-4">
             <div className="text-gray-600 text-sm">
-              TAsignatura actual: <span style={{ color: subjectColor }}>{currentTask} de {totalTasks}</span>
+              Progreso: <span style={{ color: subjectColor }} className="font-semibold">{completedTasksCount} de {workshopConfig.tasks.length} tareas completadas</span>
             </div>
             <div className="flex items-center gap-3">
-<button 
+              <button
                 onClick={() => {
                   setPendingEstado('COMPLETADO');
                   setShowConfirmModal(true);
@@ -1003,7 +1053,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                 style={{ backgroundColor: subjectColor }}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                Completar tAsignatura
+                Completar tarea
               </button>
             </div>
           </div>
@@ -1119,33 +1169,46 @@ interface TaskItemProps {
   active?: boolean;
   subjectColor: string;
   taskColor: string;
+  filled?: number;
+  expected?: number;
 }
 
-function TaskItem({ number, text, completed, active, subjectColor, taskColor }: TaskItemProps) {
+function TaskItem({ number, text, completed, active, subjectColor, taskColor, filled = 0, expected = 1 }: TaskItemProps) {
+  const progressPct = expected > 0 ? Math.min(100, Math.round((filled / expected) * 100)) : 0;
   return (
-    <div 
-      className="flex items-start gap-3 p-3 border-2 rounded-xl transition-all"
+    <div
+      className="flex flex-col gap-1.5 p-3 border-2 rounded-xl transition-all"
       style={{
-        borderColor: taskColor,
-        backgroundColor: `${taskColor}10`
+        borderColor: completed ? '#16a34a' : taskColor,
+        backgroundColor: completed ? '#f0fdf4' : `${taskColor}10`
       }}
     >
-      <div 
-        className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 text-xs shadow-sm"
-        style={{ 
-          borderColor: taskColor,
-          backgroundColor: taskColor,
-          color: 'white'
-        }}
-      >
-        {number}
+      <div className="flex items-center gap-3">
+        <div
+          className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 text-xs shadow-sm"
+          style={{
+            borderColor: completed ? '#16a34a' : taskColor,
+            backgroundColor: completed ? '#16a34a' : taskColor,
+            color: 'white'
+          }}
+        >
+          {completed ? '✓' : number}
+        </div>
+        <span className={`text-sm flex-1 ${completed ? 'text-green-700 font-medium' : active ? 'text-[#3A4A5B]' : 'text-gray-600'}`}>
+          {text}
+        </span>
+        <span className="text-[11px] font-semibold shrink-0" style={{ color: completed ? '#16a34a' : taskColor }}>
+          {filled}/{expected}
+        </span>
       </div>
-      <span className={`text-sm ${
-        active ? 'text-[#3A4A5B]' :
-        'text-gray-600'
-      }`}>
-        {text}
-      </span>
+      {!completed && (
+        <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden ml-9">
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{ width: `${progressPct}%`, backgroundColor: taskColor }}
+          />
+        </div>
+      )}
     </div>
   );
 }
