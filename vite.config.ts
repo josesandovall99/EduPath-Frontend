@@ -118,10 +118,8 @@ export default defineConfig(({ mode }) => {
             }
           },
         },
-        treeshake: {
-          moduleSideEffects: false,
-          propertyReadSideEffects: false,
-        },
+        // Sin override de treeshake: `moduleSideEffects: false` global rompe
+        // muchas libs (React/Radix) y en build puede causar `.createContext` sobre undefined.
       },
     },
     server: {

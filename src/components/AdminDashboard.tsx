@@ -899,11 +899,12 @@ export function AdminDashboard({ onLogout, onNavigate, adminName }: AdminDashboa
               <div className="app-brand-icon">
                 <img
                   src={logoImage}
-                  alt="EduPath" width={48} height={48} fetchpriority="high" decoding="sync"
-                  className="w-full h-full object-contain"
+                  alt="EduPath"
                   width={48}
                   height={48}
-                  decoding="async"
+                  fetchPriority="high"
+                  decoding="sync"
+                  className="w-full h-full object-contain"
                 />
               </div>
               <div>
