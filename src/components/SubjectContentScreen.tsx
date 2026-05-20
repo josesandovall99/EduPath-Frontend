@@ -1,4 +1,5 @@
-﻿import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Edit, Share2, Users, Lock, User } from 'lucide-react';
+﻿import '../styles/admin-consistency.css';
+import { ArrowLeft, CheckCircle2, FileText, PlayCircle, Edit, Share2, Users, Lock, User } from 'lucide-react';
 import { AppLogo } from './AppLogo';
 import { useState, useEffect, useRef } from 'react';
 const logoImage = new URL('../assets/image-removebg-preview (2).png', import.meta.url).href;

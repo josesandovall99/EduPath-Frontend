@@ -1,8 +1,9 @@
 ﻿import { useEffect, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Lightbulb, FileText, Check, Save } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Save } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
 import { buildAuthHeaders } from '../utils/authHeaders';
 import { MiniproyectoChatbotPanel } from './MiniproyectoChatbotPanel';
+import 'quill/dist/quill.snow.css';
 
 
 interface AIWorkshopViewProps {
@@ -26,6 +27,7 @@ const normalizeasignaturaName = (value?: string | null) =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase();
+
 
 
 // Colores por materia
@@ -57,7 +59,7 @@ const workshopConfigs = {
       </>
     ),
     tasks: [
-      'Definir alcance del proyecto',
+      'Definir entregables del proyecto',
       'Crear cronograma del proyecto',
       'Estimar costos y recursos'
     ]
@@ -78,19 +80,26 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
   const [stakeholderInput, setStakeholderInput] = useState('');
   const [functionalInput, setFunctionalInput] = useState('');
   const [nonFunctionalInput, setNonFunctionalInput] = useState('');
+  const [projectObjective, setProjectObjective] = useState('');
+  const [specificObjectivesList, setSpecificObjectivesList] = useState<string[]>([]);
+  const [specificObjectiveInput, setSpecificObjectiveInput] = useState('');
   const [scopeList, setScopeList] = useState<string[]>([]);
   const [scopeInput, setScopeInput] = useState('');
   const [scheduleRows, setScheduleRows] = useState<Array<{ activity: string; start: string; end: string }>>([
     { activity: '', start: '', end: '' }
   ]);
   const [costRows, setCostRows] = useState<
-    Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }>
+    Array<{ concept: string; quantity: string; unitCost: string }>
   >([
-    { concept: '', type: 'Humano', quantity: '', unitCost: '' }
+    { concept: '', quantity: '', unitCost: '' }
   ]);
-  const [managementJustification, setManagementJustification] = useState('');
+  const [imprevistos, setImprevistos] = useState('5');
+  const [utilidad, setUtilidad] = useState('10');
+  const [supuestosList, setSupuestosList] = useState<string[]>([]);
+  const [supuestosInput, setSupuestosInput] = useState('');
   const [expectedCounts, setExpectedCounts] = useState<{ stakeholders: number; functional: number; nonFunctional: number } | null>(null);
   const [expectedManagementCounts, setExpectedManagementCounts] = useState<{ scope: number; schedule: number; costs: number; supuestos: number } | null>(null);
+  const [miniproyectoDescripcion, setMiniproyectoDescripcion] = useState<string | null>(null);
   const [evaluation, setEvaluation] = useState<{
     puntaje: number;
     criterios?: Array<{ criterio: string; cumplido: boolean; puntaje?: number; peso?: number; detalle?: string }>;
@@ -143,7 +152,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
     rows
       .filter((row) => row.activity || row.start || row.end)
       .map((row, index) =>
-        `Actividad ${index + 1}: ${row.activity || '-'} | Inicio: ${row.start || '-'} | Fin: ${row.end || '-'}`
+        `Hito ${index + 1}: ${row.activity || '-'} | Inicio: ${row.start || '-'} | Fin: ${row.end || '-'}`
       );
 
   const parseNumber = (value: string) => {
@@ -159,87 +168,24 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
     parseNumber(row.quantity) * parseNumber(row.unitCost);
 
   const totalCost = costRows.reduce((sum, row) => sum + calculateRowTotal(row), 0);
-
-  const normalizeDate = (value?: string) => {
-    if (!value) return '';
-    if (/\d{4}-\d{2}-\d{2}/.test(value)) return value;
-    if (/\d{2}\/\d{2}\/\d{4}/.test(value)) {
-      const [day, month, year] = value.split('/');
-      return `${year}-${month}-${day}`;
-    }
-    return value;
-  };
-
-  const parseExpectedScheduleRows = (value: unknown) => {
-    const scheduleItems = Array.isArray(value) ? value : [];
-    const parsedRows = scheduleItems.map((entry) => {
-      if (entry && typeof entry === 'object') {
-        const objectEntry = entry as { activity?: string; actividad?: string; tAsignatura?: string; start?: string; inicio?: string; end?: string; fin?: string };
-        return {
-          activity: (objectEntry.activity ?? objectEntry.actividad ?? objectEntry.tAsignatura ?? '').toString(),
-          start: normalizeDate((objectEntry.start ?? objectEntry.inicio ?? '').toString()),
-          end: normalizeDate((objectEntry.end ?? objectEntry.fin ?? '').toString())
-        };
-      }
-
-      const text = entry?.toString?.() ?? '';
-      const activityMatch = text.match(/Actividad\s*\d*:?\s*([^|]+)\|/i);
-      const startMatch = text.match(/Inicio\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/\d{2}\/\d{4})/i);
-      const endMatch = text.match(/Fin\s*:?\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/\d{2}\/\d{4})/i);
-
-      return {
-        activity: activityMatch ? activityMatch[1].trim() : text,
-        start: normalizeDate(startMatch?.[1]),
-        end: normalizeDate(endMatch?.[1])
-      };
-    }).filter((row) => row.activity || row.start || row.end);
-
-    return parsedRows.length > 0 ? parsedRows : [{ activity: '', start: '', end: '' }];
-  };
-
-  const parseExpectedCostRows = (value: unknown) => {
-    const costItems = Array.isArray(value) ? value : [];
-    const parsedRows = costItems.map((entry) => {
-      if (entry && typeof entry === 'object') {
-        const objectEntry = entry as { concept?: string; concepto?: string; type?: string; quantity?: string | number; cantidad?: string | number; unitCost?: string | number; costoUnitario?: string | number };
-        return {
-          concept: (objectEntry.concept ?? objectEntry.concepto ?? '').toString(),
-          type: objectEntry.type === 'Material' ? 'Material' as const : 'Humano' as const,
-          quantity: (objectEntry.quantity ?? objectEntry.cantidad ?? '').toString(),
-          unitCost: (objectEntry.unitCost ?? objectEntry.costoUnitario ?? '').toString()
-        };
-      }
-
-      const text = entry?.toString?.() ?? '';
-      if (/total\s+general/i.test(text)) return null;
-
-      const conceptMatch = text.match(/Costo\s*\d*:?\s*([^|]+)\|/i);
-      const typeMatch = text.match(/Tipo\s*:?\s*(Humano|Material)/i);
-      const quantityMatch = text.match(/Cantidad\s*:?\s*([0-9.,]+)/i);
-      const unitCostMatch = text.match(/Costo\s*unitario\s*:?\s*([0-9.,]+)/i);
-
-      return {
-        concept: conceptMatch ? conceptMatch[1].trim() : text,
-        type: typeMatch?.[1] === 'Material' ? 'Material' as const : 'Humano' as const,
-        quantity: quantityMatch?.[1] ?? '',
-        unitCost: unitCostMatch?.[1] ?? ''
-      };
-    }).filter((row): row is { concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string } => Boolean(row && (row.concept || row.quantity || row.unitCost)));
-
-    return parsedRows.length > 0
-      ? parsedRows
-      : [{ concept: '', type: 'Humano' as const, quantity: '', unitCost: '' }];
-  };
+  const contingencyValue = totalCost * (parseNumber(imprevistos) / 100);
+  const utilityValue = totalCost * (parseNumber(utilidad) / 100);
+  const projectTotal = totalCost + contingencyValue + utilityValue;
 
   const buildCostList = (
-    rows: Array<{ concept: string; type: 'Humano' | 'Material'; quantity: string; unitCost: string }>
+    rows: Array<{ concept: string; quantity: string; unitCost: string }>
   ) =>
     rows
       .filter((row) => row.concept || row.quantity || row.unitCost)
       .map((row, index) =>
-        `Costo ${index + 1}: ${row.concept || '-'} | Tipo: ${row.type} | Cantidad: ${row.quantity || '-'} | Costo unitario: ${row.unitCost || '-'} | Subtotal: ${formatCurrency(calculateRowTotal(row))}`
+        `Entregable ${index + 1}: ${row.concept || '-'} | Cantidad: ${row.quantity || '-'} | Precio unitario: ${row.unitCost || '-'} | Subtotal: ${formatCurrency(calculateRowTotal(row))}`
       )
-      .concat([`Total general: ${formatCurrency(totalCost)}`]);
+      .concat([
+        `Total: ${formatCurrency(totalCost)}`,
+        `Imprevistos: ${imprevistos}% | Valor: ${formatCurrency(contingencyValue)}`,
+        `Utilidad: ${utilidad}% | Valor: ${formatCurrency(utilityValue)}`,
+        `Total proyecto: ${formatCurrency(projectTotal)}`,
+      ]);
 
   useEffect(() => {
     const fetchExpectedCounts = async () => {
@@ -251,12 +197,14 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
         const response = await fetch(`${API_BASE_URL}/miniproyectos/${miniId}`);
         if (!response.ok) return;
         const data = await response.json();
+        const descripcionProfe = data?.Actividad?.descripcion || data?.actividad?.descripcion || null;
+        if (descripcionProfe) setMiniproyectoDescripcion(descripcionProfe);
         const expectedRaw = data?.respuesta_miniproyecto || data?.respuestaMiniproyecto || data?.Miniproyecto?.respuesta_miniproyecto;
         if (!expectedRaw) return;
 
         const parsed = typeof expectedRaw === 'string' ? JSON.parse(expectedRaw) : expectedRaw;
         if (isManagementWorkshop) {
-          const scope = Array.isArray(parsed?.alcance) ? parsed.alcance.length : 0;
+          const scope = Array.isArray(parsed?.entregables) ? parsed.entregables.length : Array.isArray(parsed?.alcance) ? parsed.alcance.length : 0;
           const schedule = Array.isArray(parsed?.cronograma) ? parsed.cronograma.length : 0;
           const costs = Array.isArray(parsed?.costos) ? parsed.costos.length : 0;
           const supuestos = Array.isArray(parsed?.supuestos) ? parsed.supuestos.length : 0;
@@ -264,27 +212,6 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
             setExpectedManagementCounts({ scope, schedule, costs, supuestos });
           }
 
-          const defaultScope = Array.isArray(parsed?.alcance)
-            ? parsed.alcance.map((item: unknown) => item?.toString?.().trim?.() ?? '').filter(Boolean)
-            : [];
-          const defaultSchedule = parseExpectedScheduleRows(parsed?.cronograma);
-          const defaultCosts = parseExpectedCostRows(parsed?.costos);
-
-          if (defaultScope.length > 0) {
-            setScopeList((prev) => (prev.length > 0 ? prev : defaultScope));
-          }
-
-          setScheduleRows((prev) => (
-            prev.some((row) => row.activity || row.start || row.end)
-              ? prev
-              : defaultSchedule
-          ));
-
-          setCostRows((prev) => (
-            prev.some((row) => row.concept || row.quantity || row.unitCost)
-              ? prev
-              : defaultCosts
-          ));
         } else {
           const stakeholders = Array.isArray(parsed?.stakeholders) ? parsed.stakeholders.length : 0;
           const functional = Array.isArray(parsed?.requisitosFuncionales) ? parsed.requisitosFuncionales.length : 0;
@@ -317,10 +244,12 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
     const respuestaEstudiante = isManagementWorkshop
       ? {
+          objetivoPrincipal: projectObjective.trim() ? [projectObjective.trim()] : [],
+          objetivosEspecificos: specificObjectivesList,
           alcance: scopeList,
           cronograma: buildScheduleList(scheduleRows),
           costos: buildCostList(costRows),
-          justificacionGestion: managementJustification.trim()
+          supuestos: supuestosList
         }
       : {
           stakeholders: stakeholdersList,
@@ -384,25 +313,30 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
           className="text-white p-4 border-b border-gray-200"
           style={{ background: `linear-gradient(135deg, ${subjectColor} 0%, ${subjectColor}dd 100%)` }}
         >
-          <h2 className="text-sm">Taller Evaluativo</h2>
+          <h2 className="text-sm">Miniproyecto</h2>
           <p className="text-xs text-white/80 mt-1">{workshop.title}</p>
         </div>
 
         {/* Workshop Info */}
         <div className="p-6 border-b border-gray-200">
-          <h3 className="text-[#3A4A5B] mb-3">Descripción del Taller</h3>
-          <p className="text-gray-700 text-sm mb-4">
-            {workshopConfig.description}
-          </p>
+          <h3 className="text-[#3A4A5B] mb-3">Descripción del Miniproyecto</h3>
+          {miniproyectoDescripcion ? (
+            <div
+              className="ql-editor mb-4"
+              style={{ padding: 0, height: 'auto', overflow: 'visible', fontSize: '0.875rem', color: '#374151' }}
+              dangerouslySetInnerHTML={{ __html: miniproyectoDescripcion }}
+            />
+          ) : (
+            <p className="text-gray-700 text-sm mb-4">
+              {workshopConfig.description}
+            </p>
+          )}
         </div>
 
         {/* Tasks Checklist */}
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-[#3A4A5B]">Tareas a Completar</h3>
-            <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ backgroundColor: `${subjectColor}20`, color: subjectColor }}>
-              {completedTasksCount}/{workshopConfig.tasks.length}
-            </span>
           </div>
           <div className="space-y-3">
             {workshopConfig.tasks.map((task, index) => {
@@ -427,39 +361,6 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
             })}
           </div>
 
-          {/* Help Section */}
-          <div className="mt-6 border-t border-gray-200 pt-6">
-            <h4 className="text-[#3A4A5B] mb-3 text-sm">Consejos</h4>
-            <div className="space-y-3 text-xs text-gray-700">
-              <div className="flex gap-3 items-start">
-                <div 
-                  className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${subjectColor}20` }}
-                >
-                  <Lightbulb className="w-3 h-3" style={{ color: subjectColor }} />
-                </div>
-                <span>Consulta específica al cliente para obtención de información clara</span>
-              </div>
-              <div className="flex gap-3 items-start">
-                <div 
-                  className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${subjectColor}20` }}
-                >
-                  <FileText className="w-3 h-3" style={{ color: subjectColor }} />
-                </div>
-                <span>Registro de respuestas relevantes del caso</span>
-              </div>
-              <div className="flex gap-3 items-start">
-                <div 
-                  className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${subjectColor}20` }}
-                >
-                  <Check className="w-3 h-3" style={{ color: subjectColor }} />
-                </div>
-                <span>Validación de comprensión mediante síntesis de la información</span>
-              </div>
-            </div>
-          </div>
 
           <div className="mt-6 border-t border-gray-200 pt-6">
             <div className="flex items-center justify-between mb-3">
@@ -472,46 +373,30 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
               </span>
             </div>
             {isManagementWorkshop ? (
-              <div className="space-y-3 text-xs text-gray-700">
-                <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-                  Evaluación basada en rúbrica ponderada por secciones. Cada sección se considera cumplida desde 70%.
+              <div className="grid gap-2 mt-2">
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-gray-700">
+                  <strong>Entregables:</strong> productos o módulos del proyecto.
                 </div>
-                <div className="grid gap-2">
-                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
-                    <strong>Alcance:</strong> funcionalidades clave y términos concretos del cliente.
-                  </div>
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
-                    <strong>Cronograma:</strong> actividades relevantes, orden lógico entre fases y fechas coherentes con la duración propuesta.
-                  </div>
-                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
-                    <strong>Costos:</strong> se revisan rubros, consistencia entre cantidad, costo unitario, subtotales y total general.
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                    <strong>Supuestos:</strong> si indicas de dónde salen fechas, tarifas o recursos, la evaluación valora ese razonamiento.
-                  </div>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-gray-700">
+                  <strong>Cronograma:</strong> fases con fechas coherentes.
                 </div>
-                <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-[11px] text-gray-600">
-                  No se exige coincidencia exacta con una única respuesta; se valora una propuesta coherente y justificada.
+                <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-gray-700">
+                  <strong>Costos:</strong> recursos humanos y materiales.
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-gray-700">
+                  <strong>Supuestos:</strong> justificación de estimaciones.
                 </div>
               </div>
             ) : (
-              <div className="space-y-3 text-xs text-gray-700">
-                <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-                  Evaluación basada en rúbrica ponderada por secciones. Cada sección se considera cumplida desde 70%.
+              <div className="grid gap-2 mt-2">
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-gray-700">
+                  <strong>Stakeholders:</strong> roles involucrados en el sistema.
                 </div>
-                <div className="grid gap-2">
-                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
-                    <strong>Stakeholders:</strong> roles reales del proyecto (usuario final, admin, cliente).
-                  </div>
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
-                    <strong>Requisitos funcionales:</strong> acciones o funcionalidades concretas.
-                  </div>
-                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
-                    <strong>Requisitos no funcionales:</strong> rendimiento, seguridad, disponibilidad, etc.
-                  </div>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-gray-700">
+                  <strong>Req. funcionales:</strong> acciones que debe realizar el sistema.
                 </div>
-                <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-[11px] text-gray-600">
-                  Se valoran términos específicos y respuestas no genéricas.
+                <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-gray-700">
+                  <strong>Req. no funcionales:</strong> rendimiento, seguridad, usabilidad.
                 </div>
               </div>
             )}
@@ -571,7 +456,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
               asignaturaId={workshop.asignaturaId}
               miniproyectoId={workshop.isMiniproyecto ? workshop.id : null}
               title="Cliente del Proyecto"
-              subtitle="Este chatbot reemplaza la integración anterior de TextCortex"
+              subtitle="Cliente simulado del proyecto"
               contextLabel={workshop.title}
             />
 
@@ -610,16 +495,52 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
               </div>
               {isManagementWorkshop ? (
                 <div className="space-y-4">
+                  {/* Objetivo principal */}
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                    <label className="text-xs text-gray-500">Alcance del proyecto</label>
+                    <label className="text-xs text-gray-500">Objetivo principal</label>
+                    <textarea
+                      value={projectObjective}
+                      onChange={(event) => setProjectObjective(event.target.value)}
+                      rows={3}
+                      placeholder="Resume el propósito central del proyecto..."
+                      className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                    />
+                  </div>
+                  {/* Objetivos específicos */}
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <label className="text-xs text-gray-500">Objetivos específicos</label>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={specificObjectiveInput}
+                        onChange={(event) => setSpecificObjectiveInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') { event.preventDefault(); const t = specificObjectiveInput.trim(); if (!t) return; setSpecificObjectivesList((p) => [...p, t]); setSpecificObjectiveInput(''); }
+                        }}
+                        placeholder="Agregar objetivo específico"
+                        className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                      />
+                      <button type="button" onClick={() => { const t = specificObjectiveInput.trim(); if (!t) return; setSpecificObjectivesList((p) => [...p, t]); setSpecificObjectiveInput(''); }} className="px-4 py-2 rounded-xl bg-[#4A90E2] text-white text-xs">Agregar</button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {specificObjectivesList.map((item, index) => (
+                        <span key={`${item}-${index}`} className="inline-flex items-center gap-2 bg-cyan-50 text-cyan-700 px-3 py-1 rounded-full text-xs">
+                          {item}
+                          <button type="button" onClick={() => setSpecificObjectivesList((p) => p.filter((_, i) => i !== index))} className="text-cyan-600">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Entregables */}
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                    <label className="text-xs text-gray-500">Entregables clave</label>
                     <p className="text-[11px] text-gray-400 mt-1">
-                      Pista: se esperan {expectedManagementCounts?.scope ?? 3} ítems de alcance.
+                      Pista: se esperan {expectedManagementCounts?.scope ?? 3} entregables.
                     </p>
                     <div className="mt-2 flex gap-2">
                       <input
                         value={scopeInput}
                         onChange={(event) => setScopeInput(event.target.value)}
-                        placeholder="Agregar alcance"
+                        placeholder="Agregar entregable"
                         className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
                       />
                       <button
@@ -637,212 +558,104 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {scopeList.map((item, index) => (
-                        <span
-                          key={`${item}-${index}`}
-                          className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs"
-                        >
+                        <span key={`${item}-${index}`} className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs">
                           {item}
-                          <button
-                            type="button"
-                            onClick={() => setScopeList((prev) => prev.filter((_, i) => i !== index))}
-                            className="text-blue-600"
-                          >
-                            ×
-                          </button>
+                          <button type="button" onClick={() => setScopeList((prev) => prev.filter((_, i) => i !== index))} className="text-blue-600">×</button>
                         </span>
                       ))}
                     </div>
                   </div>
+                  {/* Cronograma / Hitos */}
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                    <label className="text-xs text-gray-500">Cronograma del proyecto</label>
+                    <label className="text-xs text-gray-500">Hitos del proyecto</label>
                     <p className="text-[11px] text-gray-400 mt-1">
-                      Pista: se esperan {expectedManagementCounts?.schedule ?? 3} actividades en el cronograma.
+                      Pista: se esperan {expectedManagementCounts?.schedule ?? 3} hitos en el cronograma.
                     </p>
                     <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 overflow-x-auto">
-                      <div
-                        className="bg-gray-50 text-[11px] text-gray-500"
-                        style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr 80px', minWidth: '400px' }}
-                      >
-                        <div className="px-3 py-2">Actividad</div>
+                      <div className="bg-gray-50 text-[11px] text-gray-500" style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr 80px', minWidth: '400px' }}>
+                        <div className="px-3 py-2">Hito</div>
                         <div className="px-3 py-2">Inicio</div>
                         <div className="px-3 py-2">Fin</div>
                         <div className="px-3 py-2 text-right">Acción</div>
                       </div>
                       <div className="divide-y divide-gray-100">
                         {scheduleRows.map((row, index) => (
-                          <div
-                            key={index}
-                            className="px-3 py-2"
-                            style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr 80px', gap: '8px', alignItems: 'center' }}
-                          >
-                            <input
-                              value={row.activity}
-                              onChange={(event) => {
-                                const updated = [...scheduleRows];
-                                updated[index] = { ...updated[index], activity: event.target.value };
-                                setScheduleRows(updated);
-                              }}
-                              placeholder="Actividad"
-                              className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                            />
-                            <input
-                              type="date"
-                              value={row.start}
-                              onChange={(event) => {
-                                const updated = [...scheduleRows];
-                                updated[index] = { ...updated[index], start: event.target.value };
-                                setScheduleRows(updated);
-                              }}
-                              placeholder="Inicio"
-                              className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                            />
-                            <input
-                              type="date"
-                              value={row.end}
-                              onChange={(event) => {
-                                const updated = [...scheduleRows];
-                                updated[index] = { ...updated[index], end: event.target.value };
-                                setScheduleRows(updated);
-                              }}
-                              placeholder="Fin"
-                              className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (scheduleRows.length === 1) {
-                                  setScheduleRows([{ activity: '', start: '', end: '' }]);
-                                  return;
-                                }
-                                setScheduleRows(scheduleRows.filter((_, rowIndex) => rowIndex !== index));
-                              }}
-                              className="text-xs text-red-500 hover:text-red-600 justify-self-end"
-                            >
-                              Quitar
-                            </button>
+                          <div key={index} className="px-3 py-2" style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1fr 80px', gap: '8px', alignItems: 'center' }}>
+                            <input value={row.activity} onChange={(event) => { const u = [...scheduleRows]; u[index] = { ...u[index], activity: event.target.value }; setScheduleRows(u); }} placeholder="Hito" className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30" />
+                            <input type="date" value={row.start} onChange={(event) => { const u = [...scheduleRows]; u[index] = { ...u[index], start: event.target.value }; setScheduleRows(u); }} className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30" />
+                            <input type="date" value={row.end} onChange={(event) => { const u = [...scheduleRows]; u[index] = { ...u[index], end: event.target.value }; setScheduleRows(u); }} className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30" />
+                            <button type="button" onClick={() => { if (scheduleRows.length === 1) { setScheduleRows([{ activity: '', start: '', end: '' }]); return; } setScheduleRows(scheduleRows.filter((_, i) => i !== index)); }} className="text-xs text-red-500 hover:text-red-600 justify-self-end">Quitar</button>
                           </div>
                         ))}
                       </div>
                     </div>
                     <div className="mt-3 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setScheduleRows([...scheduleRows, { activity: '', start: '', end: '' }])}
-                        className="text-xs text-blue-600 hover:text-blue-700"
-                      >
-                        + Agregar fila
-                      </button>
+                      <button type="button" onClick={() => setScheduleRows([...scheduleRows, { activity: '', start: '', end: '' }])} className="text-xs text-blue-600 hover:text-blue-700">+ Agregar fila</button>
                     </div>
                   </div>
+                  {/* Costos por entregable */}
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                    <label className="text-xs text-gray-500">Estimación de costos y recursos</label>
+                    <label className="text-xs text-gray-500">Costos por entregable</label>
                     <p className="text-[11px] text-gray-400 mt-1">
                       Pista: se esperan {expectedManagementCounts?.costs ?? 3} ítems de costos.
                     </p>
                     <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 overflow-x-auto">
-                      <div
-                        className="bg-gray-50 text-[11px] text-gray-500"
-                        style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr 1.2fr 80px', minWidth: '480px' }}
-                      >
-                        <div className="px-3 py-2">Concepto</div>
-                        <div className="px-3 py-2">Tipo</div>
+                      <div className="bg-gray-50 text-[11px] text-gray-500" style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1.4fr 80px', minWidth: '440px' }}>
+                        <div className="px-3 py-2">Entregable</div>
                         <div className="px-3 py-2">Cantidad</div>
-                        <div className="px-3 py-2">Costo unitario</div>
+                        <div className="px-3 py-2">Precio unitario</div>
                         <div className="px-3 py-2 text-right">Acción</div>
                       </div>
                       <div className="divide-y divide-gray-100">
                         {costRows.map((row, index) => (
-                          <div
-                            key={index}
-                            className="px-3 py-2"
-                            style={{ display: 'grid', gridTemplateColumns: '2.4fr 1fr 1fr 1.2fr 80px', gap: '8px', alignItems: 'center' }}
-                          >
-                            <input
-                              value={row.concept}
-                              onChange={(event) => {
-                                const updated = [...costRows];
-                                updated[index] = { ...updated[index], concept: event.target.value };
-                                setCostRows(updated);
-                              }}
-                              placeholder="Concepto"
-                              className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                            />
-                            <select
-                              value={row.type}
-                              onChange={(event) => {
-                                const updated = [...costRows];
-                                updated[index] = { ...updated[index], type: event.target.value as 'Humano' | 'Material' };
-                                setCostRows(updated);
-                              }}
-                              className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                            >
-                              <option value="Humano">Humano</option>
-                              <option value="Material">Material</option>
-                            </select>
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              min={0}
-                              step="1"
-                              value={row.quantity}
-                              onChange={(event) => {
-                                const updated = [...costRows];
-                                updated[index] = { ...updated[index], quantity: event.target.value };
-                                setCostRows(updated);
-                              }}
-                              placeholder="Cantidad"
-                              className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                            />
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              min={0}
-                              step="0.01"
-                              value={row.unitCost}
-                              onChange={(event) => {
-                                const updated = [...costRows];
-                                updated[index] = { ...updated[index], unitCost: event.target.value };
-                                setCostRows(updated);
-                              }}
-                              placeholder="Costo unitario"
-                              className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (costRows.length === 1) {
-                                  setCostRows([
-                                    { concept: '', type: 'Humano', quantity: '', unitCost: '' }
-                                  ]);
-                                  return;
-                                }
-                                setCostRows(costRows.filter((_, rowIndex) => rowIndex !== index));
-                              }}
-                              className="text-xs text-red-500 hover:text-red-600 justify-self-end"
-                            >
-                              Quitar
-                            </button>
+                          <div key={index} className="px-3 py-2" style={{ display: 'grid', gridTemplateColumns: '2.6fr 1fr 1.4fr 80px', gap: '8px', alignItems: 'center' }}>
+                            <input value={row.concept} onChange={(event) => { const u = [...costRows]; u[index] = { ...u[index], concept: event.target.value }; setCostRows(u); }} placeholder="Entregable" className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30" />
+                            <input type="number" inputMode="numeric" min={0} step="1" value={row.quantity} onChange={(event) => { const u = [...costRows]; u[index] = { ...u[index], quantity: event.target.value }; setCostRows(u); }} placeholder="Cantidad" className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30" />
+                            <input type="number" inputMode="decimal" min={0} step="0.01" value={row.unitCost} onChange={(event) => { const u = [...costRows]; u[index] = { ...u[index], unitCost: event.target.value }; setCostRows(u); }} placeholder="Precio unitario" className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30" />
+                            <button type="button" onClick={() => { if (costRows.length === 1) { setCostRows([{ concept: '', quantity: '', unitCost: '' }]); return; } setCostRows(costRows.filter((_, i) => i !== index)); }} className="text-xs text-red-500 hover:text-red-600 justify-self-end">Quitar</button>
                           </div>
                         ))}
                       </div>
-                      <div className="flex items-center justify-between px-3 py-2 text-xs text-gray-600">
-                        <span>Subtotal fila calculado automáticamente</span>
-                        <span className="font-semibold">Total: {formatCurrency(totalCost)}</span>
-                      </div>
+                      <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100">Subtotal fila calculado automáticamente</div>
                     </div>
                     <div className="mt-3 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCostRows([
-                            ...costRows,
-                            { concept: '', type: 'Humano', quantity: '', unitCost: '' }
-                          ])
-                        }
-                        className="text-xs text-blue-600 hover:text-blue-700"
-                      >
+                      <button type="button" onClick={() => setCostRows([...costRows, { concept: '', quantity: '', unitCost: '' }])} className="text-xs text-blue-600 hover:text-blue-700">
                         + Agregar fila
                       </button>
+                    </div>
+                    {/* Imprevistos y Utilidad */}
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-gray-500">Imprevistos (%)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.1"
+                          value={imprevistos}
+                          onChange={(event) => setImprevistos(event.target.value)}
+                          className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-gray-500">Utilidad (%)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.1"
+                          value={utilidad}
+                          onChange={(event) => setUtilidad(event.target.value)}
+                          className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                        />
+                      </div>
+                    </div>
+                    {/* Resumen de costos */}
+                    <div className="mt-4 rounded-xl bg-gray-50 border border-gray-200 p-3 text-xs text-gray-700 space-y-1">
+                      <div className="flex justify-between"><span>Subtotal entregables</span><span className="font-mono">{formatCurrency(totalCost)}</span></div>
+                      <div className="flex justify-between text-gray-500"><span>Imprevistos ({imprevistos}%)</span><span className="font-mono">{formatCurrency(contingencyValue)}</span></div>
+                      <div className="flex justify-between text-gray-500"><span>Utilidad ({utilidad}%)</span><span className="font-mono">{formatCurrency(utilityValue)}</span></div>
+                      <div className="flex justify-between border-t border-gray-200 pt-1 font-semibold text-[#3A4A5B]"><span>Total proyecto</span><span className="font-mono">{formatCurrency(projectTotal)}</span></div>
                     </div>
                   </div>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
@@ -852,13 +665,52 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
                         Pista: se esperan {expectedManagementCounts.supuestos} supuestos.
                       </p>
                     ) : null}
-                    <textarea
-                      value={managementJustification}
-                      onChange={(event) => setManagementJustification(event.target.value)}
-                      placeholder="Ejemplo: asumí 1 analista y 2 desarrolladores durante 4 semanas; usé una licencia mensual de mensajería y dejé una fase corta de pruebas al final."
-                      rows={4}
-                      className="mt-3 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-                    />
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={supuestosInput}
+                        onChange={(event) => setSupuestosInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            const trimmed = supuestosInput.trim();
+                            if (!trimmed) return;
+                            setSupuestosList((prev) => [...prev, trimmed]);
+                            setSupuestosInput('');
+                          }
+                        }}
+                        placeholder="Agregar supuesto"
+                        className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const trimmed = supuestosInput.trim();
+                          if (!trimmed) return;
+                          setSupuestosList((prev) => [...prev, trimmed]);
+                          setSupuestosInput('');
+                        }}
+                        className="px-4 py-2 rounded-xl bg-[#4A90E2] text-white text-xs"
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {supuestosList.map((item, index) => (
+                        <span
+                          key={`${item}-${index}`}
+                          className="inline-flex items-center gap-2 bg-slate-50 text-slate-700 px-3 py-1 rounded-full text-xs border border-slate-200"
+                        >
+                          {item}
+                          <button
+                            type="button"
+                            onClick={() => setSupuestosList((prev) => prev.filter((_, i) => i !== index))}
+                            className="text-slate-500"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1038,10 +890,7 @@ export function AIWorkshopView({ subjectName, workshop, onBack, estudianteId }: 
 
         {/* Bottom Action Bar */}
         <div className="bg-white border-t border-gray-200 p-4">
-          <div className="flex items-center justify-between px-4">
-            <div className="text-gray-600 text-sm">
-              Progreso: <span style={{ color: subjectColor }} className="font-semibold">{completedTasksCount} de {workshopConfig.tasks.length} tareas completadas</span>
-            </div>
+          <div className="flex items-center justify-end px-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => {
@@ -1179,36 +1028,25 @@ function TaskItem({ number, text, completed, active, subjectColor, taskColor, fi
     <div
       className="flex flex-col gap-1.5 p-3 border-2 rounded-xl transition-all"
       style={{
-        borderColor: completed ? '#16a34a' : taskColor,
-        backgroundColor: completed ? '#f0fdf4' : `${taskColor}10`
+        borderColor: taskColor,
+        backgroundColor: `${taskColor}10`
       }}
     >
       <div className="flex items-center gap-3">
         <div
           className="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 text-xs shadow-sm"
           style={{
-            borderColor: completed ? '#16a34a' : taskColor,
-            backgroundColor: completed ? '#16a34a' : taskColor,
+            borderColor: taskColor,
+            backgroundColor: taskColor,
             color: 'white'
           }}
         >
-          {completed ? '✓' : number}
+          {number}
         </div>
-        <span className={`text-sm flex-1 ${completed ? 'text-green-700 font-medium' : active ? 'text-[#3A4A5B]' : 'text-gray-600'}`}>
+        <span className={`text-sm flex-1 ${active ? 'text-[#3A4A5B]' : 'text-gray-600'}`}>
           {text}
         </span>
-        <span className="text-[11px] font-semibold shrink-0" style={{ color: completed ? '#16a34a' : taskColor }}>
-          {filled}/{expected}
-        </span>
       </div>
-      {!completed && (
-        <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden ml-9">
-          <div
-            className="h-full rounded-full transition-all duration-300"
-            style={{ width: `${progressPct}%`, backgroundColor: taskColor }}
-          />
-        </div>
-      )}
     </div>
   );
 }

@@ -1635,7 +1635,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                   <ProgrammingContentView
                     content={{
                       id: ejercicioAsociado.contenido_id?.toString() || '0',
-                      title: ejercicioAsociado.actividad?.titulo || 'Ejercicio',
+                      title: ejercicioAsociado.titulo || ejercicioAsociado.actividad?.titulo || 'Ejercicio',
                       type: 'activity'
                     }}
                     onBack={onBack}
@@ -1650,8 +1650,8 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                   <UMLDiagramView
                     activity={{
                       id: ejercicioAsociado.id.toString(),
-                      title: ejercicioAsociado.actividad?.titulo || 'Ejercicio',
-                      description: ejercicioAsociado.actividad?.descripcion
+                      title: ejercicioAsociado.titulo || ejercicioAsociado.actividad?.titulo || 'Ejercicio',
+                      description: ejercicioAsociado.descripcion || ejercicioAsociado.actividad?.descripcion
                     }}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
@@ -1663,7 +1663,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
                     subjectName={subjectName}
                     activity={{
                       id: ejercicioAsociado.id.toString(),
-                      title: ejercicioAsociado.actividad?.titulo || 'Ejercicio',
+                      title: ejercicioAsociado.titulo || ejercicioAsociado.actividad?.titulo || 'Ejercicio',
                     }}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
@@ -1672,8 +1672,8 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
 
                 {ejercicioAsociado.tipo_ejercicio === 'Opción única' && (
                   <MultipleChoiceExercise
-                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
-                    enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Selecciona la opción correcta'}
+                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.titulo || ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
+                    enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.descripcion || ejercicioAsociado.actividad?.descripcion || 'Selecciona la opción correcta'}
                     opciones={Array.isArray(ejercicioAsociado.configuracion?.opciones) ? ejercicioAsociado.configuracion?.opciones : undefined}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
@@ -1683,8 +1683,8 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
 
                 {ejercicioAsociado.tipo_ejercicio === 'Ordenar' && (
                   <OrderingExercise
-                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
-                    enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Ordena los elementos correctamente'}
+                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.titulo || ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
+                    enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.descripcion || ejercicioAsociado.actividad?.descripcion || 'Ordena los elementos correctamente'}
                     items={Array.isArray(ejercicioAsociado.configuracion?.items) ? ejercicioAsociado.configuracion?.items : undefined}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
@@ -1694,8 +1694,8 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
 
                 {ejercicioAsociado.tipo_ejercicio === 'Relacionar' && (
                   <MatchingExercise
-                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
-                    enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.actividad?.descripcion || 'Relaciona conceptos con definiciones'}
+                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.titulo || ejercicioAsociado.actividad?.titulo || 'Ejercicio' }}
+                    enunciado={(ejercicioAsociado.configuracion?.enunciado) || ejercicioAsociado.descripcion || ejercicioAsociado.actividad?.descripcion || 'Relaciona conceptos con definiciones'}
                     pares={Array.isArray(ejercicioAsociado.configuracion?.pares) ? ejercicioAsociado.configuracion?.pares : undefined}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}
@@ -1705,7 +1705,7 @@ export function TheoryContentView({ subjectName, asignaturaId, progresionSecuenc
 
                 {ejercicioAsociado.tipo_ejercicio === 'Simulación GP' && (
                   <PmSimulationExercise
-                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.actividad?.titulo || 'Simulación' }}
+                    activity={{ id: ejercicioAsociado.id.toString(), title: ejercicioAsociado.titulo || ejercicioAsociado.actividad?.titulo || 'Simulación' }}
                     ejercicio={ejercicioAsociado}
                     onBack={onBack}
                     onComplete={selectedContentId ? () => handleExerciseComplete(selectedContentId) : undefined}

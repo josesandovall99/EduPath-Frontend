@@ -1936,6 +1936,26 @@ export function MiniproyectoManagementScreen({
 
 
 
+    if (!isConfigurableMiniproyecto && !isProgrammingMiniproyecto && !isManagementMiniproyecto) {
+      const descTexto = (formData.descripcion || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+      if (!descTexto) {
+        setError('La descripción del miniproyecto no puede estar vacía.');
+        return;
+      }
+      if (stakeholdersList.length === 0) {
+        setError('Debes agregar al menos un stakeholder.');
+        return;
+      }
+      if (functionalList.length === 0) {
+        setError('Debes agregar al menos un requisito funcional.');
+        return;
+      }
+      if (nonFunctionalList.length === 0) {
+        setError('Debes agregar al menos un requisito no funcional.');
+        return;
+      }
+    }
+
     setIsSaving(true);
 
     setError(null);

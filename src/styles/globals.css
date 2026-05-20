@@ -233,6 +233,14 @@ body {
   padding: 0;
 }
 
+/* Separación entre párrafos para conservar el formato del editor */
+.quill-render p {
+  margin-bottom: 0.5em !important;
+}
+.quill-render p:last-child {
+  margin-bottom: 0 !important;
+}
+
 /* Headings: Tailwind Preflight los resetea a font-size:inherit.
    Restauramos los tamaños que el navegador aplica normalmente en el editor
    (y que Quill no sobreescribe porque carga fuera de Preflight). */
